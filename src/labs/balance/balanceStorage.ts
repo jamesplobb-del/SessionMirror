@@ -1,4 +1,5 @@
 import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
+import { resolveBalanceInstrumentId } from './balanceInstruments'
 import { isBalanceCharacterId } from './balanceCharacters'
 import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
 import { balanceStarsForRun, getBalanceLevel } from './balanceLevels'
@@ -113,8 +114,12 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
   const defaults = createDefaultBalanceSettings(instrumentId)
   if (!value || typeof value !== 'object') return defaults
   const source = value as Partial<BalanceSettings>
+  // Instrument ids moved to Staff Jumper's spelling; a stored 'bb-trumpet'
+  // must still land on the trumpet rather than silently on Concert Pitch.
   const instrument = getBalanceInstrument(
-    typeof source.instrumentId === 'string' ? source.instrumentId : defaults.instrumentId,
+    resolveBalanceInstrumentId(
+      typeof source.instrumentId === 'string' ? source.instrumentId : defaults.instrumentId,
+    ),
   )
   const single = source.single ?? defaults.single
   const scale = source.scale ?? defaults.scale

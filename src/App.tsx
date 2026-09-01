@@ -3657,6 +3657,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useAppShellPolicies({
     keepAwake: isRecording || isReviewOpen || takePlaybackActive,
     hudSurface: hudModalState,
+    lightStatusBarSurface: recordingMode === 'audio' && !settings.darkMode,
   })
 
   useEffect(() => {
@@ -5462,7 +5463,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onNavigate={handleLabsNavigate}
                     onRequestMicStream={handleRequestLabsMicStream}
                     onReleaseMicStream={releaseLiveStream}
-                    onTunerSettingsChange={(next) => updateSettings(next)}
                   />
 
                   <MultitrackOverlay

@@ -238,6 +238,17 @@ const SIGNATURE_POSITIONS: Record<
     /** B E A D G C F */
     flats: [['B', 2], ['E', 3], ['A', 2], ['D', 3], ['G', 2], ['C', 3], ['F', 2]],
   },
+  /*
+   * Alto reads C4 on the middle line, so the signature sits a step lower on
+   * the staff than treble: F♯ on the top space rather than the top line, B♭ on
+   * the second space rather than the middle line.
+   */
+  alto: {
+    /** F C G D A E B */
+    sharps: [['F', 4], ['C', 4], ['G', 4], ['D', 4], ['A', 3], ['E', 4], ['B', 3]],
+    /** B E A D G C F */
+    flats: [['B', 3], ['E', 4], ['A', 3], ['D', 4], ['G', 3], ['C', 4], ['F', 3]],
+  },
 }
 
 const MAJOR_SHARP_COUNT: Partial<Record<StaffJumperMajorKey, number>> = {

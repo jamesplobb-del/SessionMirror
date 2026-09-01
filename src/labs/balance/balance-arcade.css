@@ -42,6 +42,17 @@
   --locked-edge: #93a4b4;
 
   --card: #ffffff;
+  /*
+   * A slab skin only reads as one material if every object is cut from it at
+   * the same thickness. These three depths and three radii replaced nine and
+   * ten hand-written values — differences of under a pixel that nobody chose.
+   */
+  --edge-1: 0.16rem;  /* chips, pills, small controls */
+  --edge-2: 0.24rem;  /* cards, tiles, nodes */
+  --edge-3: 0.34rem;  /* the primary CTA */
+  --r-sm: 0.9rem;
+  --r-md: 1.25rem;
+  --r-lg: 1.6rem;
   --card-edge: #d3e3ef;
   --card-lift: 0 0.75rem 1.6rem rgba(30, 84, 138, 0.14);
 
@@ -122,7 +133,10 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 2.9rem minmax(0, 1fr) auto;
+  /* Both rails fixed. With an `auto` right column the title's optical centre
+     moved ~43px between a screen with a stat pill and one without, which on a
+     screen showing one centred word is the most obvious thing on it. */
+  grid-template-columns: 2.9rem minmax(0, 1fr) 2.9rem;
   align-items: center;
   gap: 0.6rem;
   padding:
@@ -164,6 +178,9 @@
 .balance-round-button:active { transform: translateY(0.15rem); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 0.07rem 0 rgba(154,187,210,0.55); }
 
 .balance-arcade__bar-stat {
+  position: absolute;
+  top: max(0.7rem, env(safe-area-inset-top, 0px));
+  right: max(1rem, env(safe-area-inset-right, 0px));
   display: grid;
   min-width: 3.4rem;
   justify-items: end;
@@ -173,7 +190,7 @@
   box-shadow: 0 0.22rem 0 rgba(154, 187, 210, 0.5);
 }
 
-.balance-arcade__bar-stat small { color: var(--ink-faint); font-size: 0.56rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
+.balance-arcade__bar-stat small { color: var(--ink-faint); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .balance-arcade__bar-stat strong { font-family: var(--display-font); font-size: 0.86rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------- display type ---- */
@@ -182,8 +199,10 @@
   margin: 0;
   font-family: var(--display-font);
   font-weight: 900;
-  line-height: 0.94;
-  letter-spacing: -0.022em;
+  line-height: 0.98;
+  /* Uppercase needs the letters pushed apart, not pulled together: at Black
+     weight the pairs in "TODAY'S CHALLENGE" collided. */
+  letter-spacing: 0.012em;
   text-align: center;
   text-transform: uppercase;
   color: var(--ink);
@@ -251,9 +270,22 @@
     0 0.2rem 0.4rem rgba(150, 82, 12, 0.26);
 }
 
+/*
+ * A designed stone state, not a filter. `grayscale()` desaturated the hard
+ * edge along with the face and produced a muddy tan — and this is the state a
+ * new player sees most, on the trail's locked button.
+ */
 .balance-cta:disabled {
-  filter: grayscale(0.55);
-  opacity: 0.62;
+  --edge: var(--locked-edge);
+  filter: none;
+  opacity: 1;
+  color: #7c8b99;
+  background: linear-gradient(180deg, #e6edf3 0%, var(--locked-mid) 100%);
+  text-shadow: none;
+  box-shadow:
+    inset 0 0.13rem 0 rgba(255, 255, 255, 0.75),
+    0 var(--edge-height) 0 var(--locked-edge),
+    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(90, 116, 138, 0.22);
 }
 
 .balance-cta--small { min-height: 2.9rem; padding: 0.6rem 1.1rem; font-size: 0.98rem; --edge-height: 0.28rem; }
@@ -371,9 +403,9 @@
 
 .balance-chip small {
   color: var(--ink-faint);
-  font-size: 0.56rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.11em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -863,7 +895,7 @@
   background: #f2f7fb;
 }
 
-.balance-award__stats dt { color: var(--ink-faint); font-size: 0.58rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.balance-award__stats dt { color: var(--ink-faint); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .balance-award__stats dd { margin: 0; font-family: var(--display-font); font-size: 1.02rem; font-weight: 900; font-variant-numeric: tabular-nums; }
 
 .balance-award__actions { display: grid; width: 100%; gap: 0.5rem; }
@@ -921,6 +953,12 @@
 }
 
 .balance-screen--arcade .balance-head > div p { color: #4a7099; font-weight: 600; }
+
+/* The arcade's round button is wider than the column the old header sized for,
+   so the title started under it. */
+.balance-screen--arcade .balance-head {
+  grid-template-columns: 2.9rem minmax(0, 1fr) auto;
+}
 
 .balance-screen--arcade .balance-head > button {
   width: 2.9rem;
@@ -1021,3 +1059,99 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* ------------------------------------------------------- staff note ---- */
+
+/*
+ * The target on a staff, under its name. The world inside is Staff Jumper's
+ * own coordinate space, scaled down to card size, so the note lands on the
+ * line Staff Jumper would put it on.
+ */
+.balance-staff-note {
+  position: relative;
+  overflow: visible;
+  margin: 0 auto;
+  color: #1c1917;
+}
+
+.balance-staff-note__world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* The play screen's target card: name, then the staff beneath it. */
+.balance-target-card__staff {
+  margin-top: 0.35rem;
+}
+
+/* ------------------------------------------------ instrument picker ---- */
+
+.balance-instrument-pill {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem 0.65rem;
+  border-radius: 1.15rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 var(--edge-1) 0 var(--card-edge),
+    0 0.4rem 0.8rem rgba(30, 84, 138, 0.1);
+}
+
+.balance-instrument-pill > span { display: grid; min-width: 0; }
+.balance-instrument-pill small { color: var(--ink-faint); font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.balance-instrument-pill strong { overflow: hidden; font-family: var(--display-font); font-size: 1rem; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
+.balance-instrument-pill b { color: var(--ink-soft); font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.balance-instrument-pill svg { width: 1.1rem; height: 1.1rem; color: var(--ink-faint); stroke-width: 2.6; }
+
+.balance-picker__group { display: grid; gap: 0.4rem; }
+
+.balance-picker__family {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-family: var(--display-font);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.balance-picker__list { display: grid; gap: 0.45rem; }
+
+.balance-picker__row {
+  display: grid;
+  overflow: hidden;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--r-md);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 var(--edge-1) 0 var(--card-edge);
+}
+
+.balance-picker__row.is-selected {
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 0.14rem var(--blue-mid),
+    0 var(--edge-1) 0 var(--blue-edge);
+}
+
+.balance-picker__text { display: grid; min-width: 0; gap: 0.08rem; }
+.balance-picker__text strong { overflow: hidden; font-size: 0.92rem; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.balance-picker__text small { color: var(--ink-faint); font-size: 0.72rem; font-weight: 600; }
+
+/* The staff preview is decoration on a row; never let it squeeze the name. */
+.balance-picker__staff { flex: 0 0 auto; overflow: visible; opacity: 0.85; }
+
+.balance-picker__check { width: 1.2rem; height: 1.2rem; color: var(--blue-mid); stroke-width: 3; }

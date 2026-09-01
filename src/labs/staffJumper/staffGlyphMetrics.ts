@@ -8,7 +8,13 @@
  * tall with its bowl on the note" and have it come out right everywhere.
  */
 
-export type MusicGlyphName = 'sharp' | 'flat' | 'natural' | 'trebleClef' | 'bassClef'
+export type MusicGlyphName =
+  | 'sharp'
+  | 'flat'
+  | 'natural'
+  | 'trebleClef'
+  | 'bassClef'
+  | 'altoClef'
 
 export const MUSIC_GLYPH_FONT_FAMILY =
   "'Bravura', 'Apple Symbols', 'Noto Music', 'Noto Sans Symbols 2', 'Segoe UI Symbol', serif"
@@ -19,6 +25,7 @@ export const MUSIC_GLYPH_CHARS: Record<MusicGlyphName, string> = {
   natural: '♮',
   trebleClef: '\u{1D11E}',
   bassClef: '\u{1D122}',
+  altoClef: '\u{1D121}',
 }
 
 /**
@@ -37,6 +44,10 @@ export const GLYPH_HEIGHT_IN_SPACES: Record<MusicGlyphName, number> = {
   // than the clef does.
   trebleClef: 5.9,
   bassClef: 3.1,
+  // A C clef spans the full four spaces between the outer lines, and its waist
+  // must land exactly on the line it names — so unlike the G clef there is no
+  // room to shrink it for a phone without it ceasing to point at anything.
+  altoClef: 4.0,
 }
 
 export const GLYPH_WIDTH_IN_SPACES: Record<MusicGlyphName, number> = {
@@ -45,6 +56,7 @@ export const GLYPH_WIDTH_IN_SPACES: Record<MusicGlyphName, number> = {
   natural: 0.66,
   trebleClef: 2.26,
   bassClef: 2.36,
+  altoClef: 2.1,
 }
 
 /**
@@ -61,6 +73,9 @@ export const GLYPH_STAFF_ANCHOR: Record<MusicGlyphName, number> = {
   flat: 0.736,
   trebleClef: 0.625,
   bassClef: 0.27,
+  // The C clef is symmetric about the line it names, so its anchor is its
+  // middle.
+  altoClef: 0.5,
 }
 
 /** Ink box measured per 1px of font size. */
@@ -83,6 +98,9 @@ const FALLBACK_METRICS: Record<MusicGlyphName, GlyphInkMetrics> = {
   natural: { ascent: 0.62, descent: 0.1, height: 0.72, left: -0.1, right: 0.28, width: 0.38 },
   trebleClef: { ascent: 0.66, descent: 0.08, height: 0.73, left: -0.03, right: 0.31, width: 0.34 },
   bassClef: { ascent: 0.66, descent: 0, height: 0.65, left: -0.03, right: 0.56, width: 0.59 },
+  // The C clef is close to symmetric about its own centre, so ascent and
+  // descent are near equal — unlike the G and F clefs, which hang and sit.
+  altoClef: { ascent: 0.36, descent: 0.34, height: 0.7, left: -0.03, right: 0.5, width: 0.53 },
 }
 
 const REFERENCE_FONT_SIZE = 200

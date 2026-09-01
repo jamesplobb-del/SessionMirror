@@ -36,6 +36,16 @@ function smallestNoteUnitsPerPulse(meter: MetronomeMeter, pulseCount: number): n
   return smallestNoteUnitsPerBar(meter) / pulseCount
 }
 
+/**
+ * Length of one conducting pulse in sixteenth-note units — 4 for a quarter, 6
+ * for a dotted quarter, 12 for a dotted half. This is what makes a pulse
+ * compound: a length divisible by 3 is a dotted note and divides into 3.
+ */
+export function pulseNoteUnits(meter: MetronomeMeter, pulseCount?: number): number {
+  const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
+  return smallestNoteUnitsPerPulse(meter, count)
+}
+
 function smallestNoteUnitsPerPulseResolved(resolved: ResolvedPulseTiming): number {
   return smallestNoteUnitsPerBarFromResolved(resolved) / resolved.pulseCount
 }
@@ -65,12 +75,23 @@ function ticksPerPulseInner(
     }
   }
 
+  // A pulse whose length divides by 3 is a dotted (compound) beat, so its
+  // natural division is 3 rather than 2 — whatever note value that works out
+  // to. Reading that off the unit count keeps the dotted quarter of 6/8 and
+  // the dotted half of 6/4-in-2 on one rule: `naturalUnits / 2` happened to
+  // give the correct 3 for the dotted quarter and a wrong 6 for the dotted
+  // half, which made 6/4-in-2 the only compound mode that skipped its own
+  // beat division.
+  const compoundPulse = naturalUnits % 3 === 0
+
   if (subdivision === '8ths') {
+    if (compoundPulse) return 3
     if (naturalUnits <= 2) return 2
     return naturalUnits / 2
   }
 
   if (subdivision === '16ths') {
+    if (compoundPulse) return 6
     if (naturalUnits <= 2) return 4
     return naturalUnits
   }
@@ -270,6 +291,27 @@ export function getPulseLabel(meter: MetronomeMeter): string {
   return getTimeSignatureDefinition(meter).pulseName
 }
 
+/**
+ * Note value of one conducting pulse, keyed by its length in sixteenth-note
+ * units. Derived from the pulse rather than read off the meter's default mode,
+ * so 6/8 switched to its simple-eighth pulse reports "Eighth" instead of the
+ * compound mode's "Dotted Quarter".
+ */
+const PULSE_NOTE_NAMES: Record<string, string> = {
+  '16': 'Whole',
+  '12': 'Dotted Half',
+  '8': 'Half',
+  '6': 'Dotted Quarter',
+  '4': 'Quarter',
+  '3': 'Dotted Eighth',
+  '2': 'Eighth',
+  '1': 'Sixteenth',
+}
+
+function pulseNoteName(units: number): string {
+  return PULSE_NOTE_NAMES[String(Number(units.toFixed(4)))] ?? 'Pulse'
+}
+
 /** Note value of one tick, keyed by its length in sixteenth-note units. */
 const TICK_NOTE_NAMES: Record<string, string> = {
   '16': 'Whole notes',
@@ -302,7 +344,7 @@ export function getSubdivisionLabel(
 ): string {
   const count = pulseCount ?? getTimeSignatureDefinition(meter).pulseCount
   if (subdivision === 'off') {
-    return getTimeSignatureDefinition(meter).pulseName
+    return pulseNoteName(smallestNoteUnitsPerPulse(meter, count))
   }
 
   const ticks = ticksPerPulse(meter, subdivision, count)

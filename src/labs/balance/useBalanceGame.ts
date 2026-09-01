@@ -118,7 +118,6 @@ function createRoutineResult(
 interface UseBalanceGameOptions {
   initialInstrumentId: string
   hapticFeedback: boolean
-  onInstrumentChange: (settings: Pick<BalanceSettings, 'instrumentId'>) => void
 }
 
 export interface UseBalanceGameResult {
@@ -153,7 +152,6 @@ export interface UseBalanceGameResult {
 export function useBalanceGame({
   initialInstrumentId,
   hapticFeedback,
-  onInstrumentChange,
 }: UseBalanceGameOptions): UseBalanceGameResult {
   const [data, setData] = useState<BalanceStoredDataV3>(() => {
     const stored = loadBalanceData(initialInstrumentId)
@@ -452,9 +450,16 @@ export function useBalanceGame({
       setData(next)
       saveBalanceData(next)
       dispatch({ type: 'UPDATE_SETTINGS', settings, bestBalancedMs: getBalanceBestMs(next) })
-      if (patch.instrumentId) onInstrumentChange({ instrumentId: patch.instrumentId })
+      /*
+       * Deliberately does NOT write the instrument back to the app-wide tuner.
+       * The pitch tracker is already handed this instrument's own profile for
+       * the run, so nothing here needs the global setting — and pushing it out
+       * meant a trumpet player who tried Tuba once came back to find the Tuner
+       * tab on concert pitch. Balance reads the tuner for a sensible first
+       * guess and owns its choice from then on.
+       */
     },
-    [onInstrumentChange],
+    [],
   )
 
   /**

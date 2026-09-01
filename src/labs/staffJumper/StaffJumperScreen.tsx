@@ -56,7 +56,7 @@ import {
 } from '../practiceGameCharacters'
 import {
   CLEF_LABELS,
-  STAFF_JUMPER_CLEFS,
+  STAFF_JUMPER_READING_CLEFS,
   type StaffJumperClef,
 } from './staffNotationMap'
 import { useStaffJumperGame } from './useStaffJumperGame'
@@ -732,7 +732,7 @@ export default function StaffJumperScreen({
               label="Clef"
               value={draftClef}
               onChange={chooseClef}
-              options={STAFF_JUMPER_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
+              options={STAFF_JUMPER_READING_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
               hapticFeedback={hapticFeedback}
             />
           </div>

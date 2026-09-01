@@ -87,6 +87,10 @@ export function getWrittenRange(
   tunerInstrument: TunerInstrument,
 ): WrittenRange {
   if (clef === 'bass') return BASS_RANGE_BY_INSTRUMENT[tunerInstrument]
+  // Viola territory. Not reachable from Staff Jumper's own setup, but returning
+  // a treble range here would have been silently wrong for any caller that does
+  // pass alto.
+  if (clef === 'alto') return { minMidi: N.C3, maxMidi: N.E6, label: 'C3–E6' }
   if (transposition === 'concert') return CONCERT_TREBLE_BY_INSTRUMENT[tunerInstrument]
   return TREBLE_RANGES[transposition]
 }
@@ -97,4 +101,6 @@ export const STAFF_CENTER_MIDI: Record<StaffJumperClef, number> = {
   treble: 71,
   /** D3, the middle line of the bass staff. */
   bass: 50,
+  /** C4 — middle C is the middle line of the alto staff, which is the point of it. */
+  alto: 60,
 }

@@ -11,7 +11,6 @@ import {
   frequencyToPitchReadout,
   getIntonationColor,
   getTraceColor,
-  getTraceZone,
   glowColorForCents,
   isSilenceFloorSample,
   isFrequencyInInstrumentRange,
@@ -787,49 +786,19 @@ function drawColoredTraceSegments(
   ctx.lineJoin = 'round'
   ctx.globalAlpha = alpha
 
-  let runStart = 0
-  const strokeRun = (start: number, end: number) => {
-    ctx.beginPath()
-    ctx.moveTo(points[start].x, points[start].y)
-    if (end === start) return
-    if (end === start + 1) {
-      ctx.lineTo(points[end].x, points[end].y)
-      return
-    }
-    for (let step = start + 1; step < end; step += 1) {
-      const midpointX = (points[step].x + points[step + 1].x) * 0.5
-      const midpointY = (points[step].y + points[step + 1].y) * 0.5
-      ctx.quadraticCurveTo(points[step].x, points[step].y, midpointX, midpointY)
-    }
-    ctx.quadraticCurveTo(
-      points[end - 1].x,
-      points[end - 1].y,
-      points[end].x,
-      points[end].y,
-    )
-  }
-
   for (let index = 1; index < points.length; index += 1) {
-    const zoneChanged =
-      getTraceZone(points[index].cents) !== getTraceZone(points[index - 1].cents)
-    const isLast = index === points.length - 1
-
-    if (!zoneChanged && !isLast) continue
-
-    const runEnd = isLast && !zoneChanged ? index : index - 1
-    const strokeColor = getTraceColor(points[runEnd].cents)
-
-    if (glow && !isSilenceFloorSample(points[runEnd].cents)) {
-      ctx.strokeStyle = glowColorForCents(points[runEnd].cents)
-      strokeRun(runStart, runEnd)
-      ctx.stroke()
+    const from = points[index - 1]
+    const to = points[index]
+    const cents = to.cents
+    if (glow && !isSilenceFloorSample(cents)) {
+      ctx.strokeStyle = glowColorForCents(cents)
+    } else {
+      ctx.strokeStyle = getTraceColor(cents)
     }
-
-    ctx.strokeStyle = strokeColor
-    strokeRun(runStart, runEnd)
+    ctx.beginPath()
+    ctx.moveTo(from.x, from.y)
+    ctx.lineTo(to.x, to.y)
     ctx.stroke()
-
-    runStart = zoneChanged ? index - 1 : index
   }
 
   ctx.globalAlpha = 1
@@ -1031,7 +1000,6 @@ function drawTraceEndpointDot(
   if (isSilenceFloorSample(point.cents)) return
 
   const dotColor = getIntonationColor(point.cents)
-  const dotGlow = glowColorForCents(point.cents)
   const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
   const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
   const isWidgetGlass = theme === 'glass-widget'
@@ -1061,7 +1029,7 @@ function drawTraceEndpointDot(
 
   ctx.beginPath()
   ctx.arc(point.x, point.y, glowRadius, 0, Math.PI * 2)
-  ctx.fillStyle = dotGlow.replace('0.55', String(0.28 + Math.min(1, glowBoost) * 0.25))
+  ctx.fillStyle = glowColorForCents(point.cents, 0.28 + Math.min(1, glowBoost) * 0.25)
   ctx.fill()
   ctx.beginPath()
   ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
@@ -1075,6 +1043,33 @@ function drawTraceEndpointDot(
   ctx.lineWidth = 1.75
   ctx.stroke()
   ctx.shadowBlur = 0
+}
+
+function drawHorizonCaret(
+  ctx: CanvasRenderingContext2D,
+  point: TraceDisplayPoint,
+  inTuneGlow: number,
+): void {
+  if (isSilenceFloorSample(point.cents)) return
+
+  const abs = Math.abs(point.cents)
+  const pull = Math.max(0, Math.min(1, (abs - TUNING_GREEN_CENTS) / 10))
+  const alpha = pull * (1 - Math.max(0, Math.min(1, inTuneGlow)))
+  if (alpha < 0.05) return
+
+  const towardHorizon = point.cents > 0 ? 1 : -1
+  const reach = 11 + pull * 6
+
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.fillStyle = getIntonationColor(point.cents)
+  ctx.beginPath()
+  ctx.moveTo(point.x, point.y + towardHorizon * reach)
+  ctx.lineTo(point.x - 6.5, point.y + towardHorizon * 5)
+  ctx.lineTo(point.x + 6.5, point.y + towardHorizon * 5)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
 }
 
 function getGlassLayoutMetrics(
@@ -1432,12 +1427,11 @@ function drawPitchCanvas(
     const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
     centsToY = metrics.centsToY
   } else if (isLivingAudio) {
-    // Keep the high-refresh pitch trace clear of the tuner tool row. The row
-    // remains inside the canvas surface, but now occupies reserved space below
-    // the graph instead of covering the flat end of the pitch scale.
+    // Compact tools chip (~48px + 10px inset) sits on the canvas; keep the
+    // high-refresh pitch trace clear of those three icon buttons.
     const toolRowInset = canvas.classList.contains('pitch-spectrogram--tool-free')
       ? 0
-      : Math.min(64, height * 0.22)
+      : Math.min(56, height * 0.18)
     const metrics = getGlassLayoutMetrics(height, true, toolRowInset)
     centsToY = metrics.centsToY
     drawLivingPitchSurface(ctx, width, centsToY, inTuneHighlight)
@@ -1524,7 +1518,9 @@ function drawPitchCanvas(
   }
 
   if (active && tracePoints.length > 0) {
-    drawTraceEndpointDot(ctx, tracePoints[tracePoints.length - 1], theme, inTuneHighlight)
+    const livePoint = tracePoints[tracePoints.length - 1]
+    drawTraceEndpointDot(ctx, livePoint, theme, inTuneHighlight)
+    if (isLivingAudio) drawHorizonCaret(ctx, livePoint, inTuneHighlight)
   }
 
   if (isGlass) return

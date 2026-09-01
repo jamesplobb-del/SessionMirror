@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CircleCheck, Flame, Map, Play, Trophy } from 'lucide-react'
+import { ChevronRight, CircleCheck, Flame, Map, Play, Trophy } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import { getBalanceCharacter, type BalanceCharacterId } from './balanceCharacters'
@@ -14,6 +14,8 @@ import {
   balanceTotalStars,
   BALANCE_MAX_STARS,
 } from './balanceLevels'
+import { getBalanceInstrument } from './balanceInstruments'
+import { midiToBalanceNoteName } from './balanceMusic'
 import { formatBalanceDuration } from './balanceStorage'
 import type { BalanceDailyProgress, BalanceLevelProgress } from './balanceTypes'
 import { BALANCE_TROPHIES } from './balanceTrophies'
@@ -31,6 +33,7 @@ interface BalanceHomeProps {
   onQuickPlay: () => void
   onTrail: () => void
   onTrophies: () => void
+  onInstrument: () => void
 }
 
 /**
@@ -51,6 +54,7 @@ export default function BalanceHome({
   onQuickPlay,
   onTrail,
   onTrophies,
+  onInstrument,
 }: BalanceHomeProps) {
   const dayKey = balanceDayKey()
   const challenge = useMemo(
@@ -62,6 +66,7 @@ export default function BalanceHome({
   const nextLevel = balanceNextLevel(levels)
   const totalStars = balanceTotalStars(levels)
   const character = getBalanceCharacter(characterId)
+  const instrument = getBalanceInstrument(instrumentId)
 
   // Three flames, filled up to the streak — a full row reads as "on a roll"
   // without having to print a number the player has to parse.
@@ -77,6 +82,28 @@ export default function BalanceHome({
       className="balance-arcade--home"
     >
       <h1 className="balance-display balance-display--page">Today&apos;s Challenge</h1>
+
+      {/*
+        * The instrument sits above everything, because it decides every note
+        * the game will ask for. Buried in Quick Play's options it was a
+        * setting; here it reads as the first thing you tell the game.
+        */}
+      <Pressable
+        intensity="soft"
+        hapticFeedback={hapticFeedback}
+        className="balance-instrument-pill"
+        onClick={onInstrument}
+      >
+        <span>
+          <small>Instrument</small>
+          <strong>{instrument.name}</strong>
+        </span>
+        <b>
+          {midiToBalanceNoteName(instrument.minWrittenMidi)}–
+          {midiToBalanceNoteName(instrument.maxWrittenMidi)}
+        </b>
+        <ChevronRight aria-hidden />
+      </Pressable>
 
       <div className="balance-home__portrait">
         {character.asset ? (

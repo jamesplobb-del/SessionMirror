@@ -205,6 +205,53 @@ export function movingAverage(values: number[], radius: number): number[] {
   })
 }
 
+type Rgb = { r: number; g: number; b: number }
+
+const LINE_GREEN: Rgb = { r: 34, g: 197, b: 94 }
+const LINE_AMBER: Rgb = { r: 245, g: 158, b: 11 }
+const LINE_RED: Rgb = { r: 239, g: 68, b: 68 }
+
+const WASH_GREEN: Rgb = { r: 0, g: 184, b: 92 }
+const WASH_AMBER: Rgb = { r: 240, g: 160, b: 0 }
+const WASH_RED: Rgb = { r: 240, g: 51, b: 72 }
+
+function mixRgb(from: Rgb, to: Rgb, amount: number): Rgb {
+  const t = Math.max(0, Math.min(1, amount))
+  return {
+    r: from.r + (to.r - from.r) * t,
+    g: from.g + (to.g - from.g) * t,
+    b: from.b + (to.b - from.b) * t,
+  }
+}
+
+function rgbToHex(color: Rgb): string {
+  const channel = (value: number) => Math.round(value).toString(16).padStart(2, '0')
+  return `#${channel(color.r)}${channel(color.g)}${channel(color.b)}`
+}
+
+function rgbToRgba(color: Rgb, alpha: number): string {
+  return `rgba(${Math.round(color.r)}, ${Math.round(color.g)}, ${Math.round(color.b)}, ${alpha})`
+}
+
+/**
+ * Continuous intonation mix: green in the pocket, orange-yellow when close,
+ * then redder the farther sharp or flat you travel.
+ */
+function intonationRgb(absCents: number, green: Rgb, amber: Rgb, red: Rgb): Rgb {
+  const abs = Math.max(0, Math.min(50, absCents))
+  if (abs <= TUNING_GREEN_CENTS) {
+    return mixRgb(green, amber, (abs / TUNING_GREEN_CENTS) * 0.06)
+  }
+  if (abs <= TUNING_YELLOW_CENTS) {
+    const t = (abs - TUNING_GREEN_CENTS) / (TUNING_YELLOW_CENTS - TUNING_GREEN_CENTS)
+    const eased = 1 - (1 - t) * (1 - t)
+    return mixRgb(green, amber, 0.06 + eased * 0.94)
+  }
+  const t = Math.min(1, (abs - TUNING_YELLOW_CENTS) / 28)
+  const eased = t ** 1.35
+  return mixRgb(amber, red, eased)
+}
+
 export function getIntonationZone(cents: number): IntonationZone {
   const abs = Math.abs(cents)
   if (abs <= TUNING_GREEN_CENTS) return 'green'
@@ -213,10 +260,84 @@ export function getIntonationZone(cents: number): IntonationZone {
 }
 
 export function getIntonationColor(cents: number): string {
-  const zone = getIntonationZone(cents)
-  if (zone === 'green') return '#22c55e'
-  if (zone === 'yellow') return '#f59e0b'
-  return '#ef4444'
+  return rgbToHex(intonationRgb(Math.abs(cents), LINE_GREEN, LINE_AMBER, LINE_RED))
+}
+
+export function getIntonationWashHue(cents: number): string {
+  return rgbToHex(intonationRgb(Math.abs(cents), WASH_GREEN, WASH_AMBER, WASH_RED))
+}
+
+export interface TunerWashTarget {
+  hue: string
+  strength: number
+  feather: number
+  darkStrength: number
+  center: number
+  rim: number
+  rimGlow: number
+  rimSpread: number
+}
+
+export const IDLE_TUNER_WASH: TunerWashTarget = {
+  hue: '#1598ff',
+  strength: 0,
+  feather: 0,
+  darkStrength: 22,
+  center: 0,
+  rim: 28,
+  rimGlow: 18,
+  rimSpread: 34,
+}
+
+/** Whole-screen wash that tracks the live line color, blooming on a held in-tune. */
+export function getTunerWashTarget(
+  cents: number | null,
+  inTuneGlow = 0,
+): TunerWashTarget {
+  if (cents === null) return IDLE_TUNER_WASH
+
+  const abs = Math.abs(cents)
+  const hue = getIntonationWashHue(cents)
+  const glow = Math.max(0, Math.min(1, inTuneGlow))
+
+  if (abs <= TUNING_GREEN_CENTS) {
+    return {
+      hue,
+      strength: 18 + glow * 14,
+      feather: 8 + glow * 3,
+      darkStrength: 36 + glow * 16,
+      center: 22 + glow * 44,
+      rim: 32 + glow * 20,
+      rimGlow: 18 + glow * 16,
+      rimSpread: 42 + glow * 40,
+    }
+  }
+
+  if (abs <= TUNING_YELLOW_CENTS) {
+    const close = (abs - TUNING_GREEN_CENTS) / (TUNING_YELLOW_CENTS - TUNING_GREEN_CENTS)
+    return {
+      hue,
+      strength: 22 + close * 2,
+      feather: 10,
+      darkStrength: 42 + close * 2,
+      center: 48 + close * 4,
+      rim: 34 + close * 2,
+      rimGlow: 21 + close * 2,
+      rimSpread: 46 + close * 2,
+    }
+  }
+
+  const far = Math.min(1, (abs - TUNING_YELLOW_CENTS) / 28)
+  return {
+    hue,
+    strength: 26 + far * 6,
+    feather: 10,
+    darkStrength: 46 + far * 4,
+    center: 54 + far * 4,
+    rim: 38 + far * 6,
+    rimGlow: 25 + far * 4,
+    rimSpread: 54 + far * 10,
+  }
 }
 
 export function isSilenceFloorSample(cents: number): boolean {
@@ -239,19 +360,18 @@ export function createPitchVerticalGradient(
   centsToY: (cents: number) => number,
 ): CanvasGradient {
   const gradient = ctx.createLinearGradient(0, centsToY(50), 0, centsToY(-50))
-  gradient.addColorStop(0, '#ef4444')
-  gradient.addColorStop(0.32, '#f59e0b')
-  gradient.addColorStop(0.5, '#22c55e')
-  gradient.addColorStop(0.68, '#f59e0b')
-  gradient.addColorStop(1, '#ef4444')
+  gradient.addColorStop(0, getIntonationColor(50))
+  gradient.addColorStop(0.28, getIntonationColor(22))
+  gradient.addColorStop(0.42, getIntonationColor(TUNING_YELLOW_CENTS))
+  gradient.addColorStop(0.5, getIntonationColor(0))
+  gradient.addColorStop(0.58, getIntonationColor(-TUNING_YELLOW_CENTS))
+  gradient.addColorStop(0.72, getIntonationColor(-22))
+  gradient.addColorStop(1, getIntonationColor(-50))
   return gradient
 }
 
-export function glowColorForCents(cents: number): string {
-  const zone = getIntonationZone(cents)
-  if (zone === 'green') return 'rgba(34, 197, 94, 0.55)'
-  if (zone === 'yellow') return 'rgba(245, 158, 11, 0.55)'
-  return 'rgba(239, 68, 68, 0.55)'
+export function glowColorForCents(cents: number, alpha = 0.55): string {
+  return rgbToRgba(intonationRgb(Math.abs(cents), LINE_GREEN, LINE_AMBER, LINE_RED), alpha)
 }
 
 export function formatFrequencyHz(frequencyHz: number): string {

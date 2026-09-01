@@ -34,6 +34,8 @@ export interface BalanceInstrument {
   transposition: TunerTranspositionId
   tunerInstrument: TunerInstrument
   clef: 'treble' | 'alto' | 'bass'
+  /** Grouping for the instrument picker. */
+  family: string
   minWrittenMidi: number
   maxWrittenMidi: number
   /**

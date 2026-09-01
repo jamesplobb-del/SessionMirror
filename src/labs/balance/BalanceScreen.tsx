@@ -16,15 +16,19 @@ import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTe
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceHome from './BalanceHome'
+import BalanceInstrumentPicker from './BalanceInstrumentPicker'
 import BalanceLevelResults from './BalanceLevelResults'
 import BalanceQuickPlay from './BalanceQuickPlay'
 import BalanceResults from './BalanceResults'
 import BalanceScene from './BalanceScene'
+import BalanceStaffNote from './BalanceStaffNote'
 import BalanceSetup from './BalanceSetup'
 import BalanceTrail from './BalanceTrail'
 import BalanceTrophyCase from './BalanceTrophyCase'
 import {
   buildBalanceTargets,
+  clampWrittenMidi,
+  getBalanceInstrument,
   inferBalanceInstrument,
 } from './balanceMusic'
 import {
@@ -45,7 +49,7 @@ import './balance.css'
 import './balance-arcade.css'
 
 /** Where the player is when no run is in progress. */
-type BalanceRoute = 'home' | 'trail' | 'quick' | 'options' | 'trophies'
+type BalanceRoute = 'home' | 'trail' | 'quick' | 'options' | 'trophies' | 'instrument'
 
 interface BalanceScreenProps {
   streamRef: RefObject<MediaStream | null>
@@ -56,10 +60,6 @@ interface BalanceScreenProps {
   micPermissionBlocked: boolean
   micPermissionPending: boolean
   onRequestMicStream: GameMicRequest
-  onTunerSettingsChange: (settings: {
-    tunerInstrument: TunerInstrument
-    tunerTransposition: TunerTranspositionId
-  }) => void
   onBack: () => void
 }
 
@@ -72,7 +72,6 @@ export default function BalanceScreen({
   micPermissionBlocked,
   micPermissionPending,
   onRequestMicStream,
-  onTunerSettingsChange,
   onBack,
 }: BalanceScreenProps) {
   const initialInstrument = useMemo(
@@ -86,8 +85,6 @@ export default function BalanceScreen({
   const game = useBalanceGame({
     initialInstrumentId: initialInstrument.id,
     hapticFeedback,
-    onInstrumentChange: ({ instrumentId }) =>
-      onTunerSettingsChange(balanceInstrumentSettings(instrumentId)),
   })
   const selectedInstrument = balanceInstrumentSettings(game.state.settings.instrumentId)
   /*
@@ -233,6 +230,7 @@ export default function BalanceScreen({
           onQuickPlay={() => setRoute('quick')}
           onTrail={() => setRoute('trail')}
           onTrophies={() => setRoute('trophies')}
+          onInstrument={() => setRoute('instrument')}
         />
       )
     }
@@ -245,6 +243,36 @@ export default function BalanceScreen({
           hapticFeedback={hapticFeedback}
           onBack={() => setRoute('home')}
           onPlayLevel={startLevel}
+        />
+      )
+    }
+
+    if (route === 'instrument') {
+      return (
+        <BalanceInstrumentPicker
+          instrumentId={game.state.settings.instrumentId}
+          hapticFeedback={hapticFeedback}
+          onBack={() => setRoute('home')}
+          onSelect={(instrumentId) => {
+            // Changing horn moves every note, so the quick-play target has to
+            // be pulled back into the new range or it would sit outside it.
+            const next = getBalanceInstrument(instrumentId)
+            game.updateSettings({
+              instrumentId: next.id,
+              single: {
+                ...game.state.settings.single,
+                writtenMidi: clampWrittenMidi(game.state.settings.single.writtenMidi, next),
+              },
+              scale: {
+                ...game.state.settings.scale,
+                rootWrittenMidi: Math.min(
+                  clampWrittenMidi(game.state.settings.scale.rootWrittenMidi, next),
+                  next.maxWrittenMidi - game.state.settings.scale.octaveRange * 12,
+                ),
+              },
+            })
+            setRoute('home')
+          }}
         />
       )
     }
@@ -339,6 +367,8 @@ export default function BalanceScreen({
       />
     )
   }
+
+  const staffClef = getBalanceInstrument(game.state.settings.instrumentId).clef
 
   /** What the run is, for the bars and cards shown while it is in progress. */
   const runTitle =
@@ -475,12 +505,17 @@ export default function BalanceScreen({
         : sourceHealth === 'stalled'
           ? 'Microphone unavailable'
           : !pitchIsVisible
-            ? 'Find the note'
-            : `${cents >= 0 ? '+' : ''}${cents}¢ · ${Math.abs(cents) <= game.toleranceCents ? 'In tune' : cents < 0 ? 'Flat' : 'Sharp'}`
+            ? `Play ${target?.writtenLabel ?? 'the note'} and hold it`
+            : Math.abs(cents) >= 50
+              // Beyond a semitone the cents number is useless and actively
+              // misleading — a trumpeter set to concert pitch was being told to
+              // lip down 200¢. Name what was actually heard instead.
+              ? `Heard ${readout.noteName} — play ${target?.writtenLabel ?? 'the target'}`
+              : `${cents >= 0 ? '+' : ''}${cents}¢ · ${Math.abs(cents) <= game.toleranceCents ? 'In tune' : cents < 0 ? 'Flat' : 'Sharp'}`
   const pitchFeedbackTone =
     sourceHealth === 'stalled'
       ? 'error'
-      : !pitchIsVisible
+      : !pitchIsVisible || Math.abs(cents) >= 50
         ? 'idle'
         : Math.abs(cents) <= game.toleranceCents
           ? 'centered'
@@ -507,6 +542,15 @@ export default function BalanceScreen({
         <div className="balance-target-card">
           <small>{game.launch.kind === 'quick' ? 'Target' : runTitle}</small>
           <strong>{target?.writtenLabel ?? '—'}</strong>
+          {/* The note as it is printed, under the name it is called. */}
+          {target ? (
+            <BalanceStaffNote
+              writtenMidi={target.writtenMidi}
+              clef={staffClef}
+              height={62}
+              className="balance-target-card__staff"
+            />
+          ) : null}
           <span>
             {game.state.targets.length > 1
               ? `Note ${game.state.targetIndex + 1} of ${game.state.targets.length}`

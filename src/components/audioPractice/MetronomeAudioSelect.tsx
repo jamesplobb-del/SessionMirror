@@ -1,12 +1,22 @@
 import { Check, ChevronDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
 
 export interface MetronomeAudioSelectOption<T extends string> {
   value: T
   label: string
+  /** Compact value used only in the closed field; menus keep the full label. */
+  shortLabel?: string
+  /**
+   * Drawn stand-in for the value — shown instead of the text in the closed
+   * field, and beside the label in the menu. The label still carries the
+   * accessible name, so a glyph never has to be readable to be usable.
+   */
+  glyph?: ReactNode
+  /** Secondary line in the menu, e.g. what a rhythm does to the beat. */
+  hint?: string
   /** Non-selectable section header or divider row */
   disabled?: boolean
 }
@@ -58,7 +68,7 @@ export default function MetronomeAudioSelect<T extends string>({
         <button
           type="button"
           className="metronome-audio-select__control interactive-native"
-          aria-label={ariaLabel}
+          aria-label={selectedOption ? `${ariaLabel}: ${selectedOption.label}` : ariaLabel}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={listboxId}
@@ -68,7 +78,15 @@ export default function MetronomeAudioSelect<T extends string>({
           }}
         >
           <span className="metronome-audio-select__selection">
-            <span className="metronome-audio-select__value">{selectedOption?.label ?? value}</span>
+            {selectedOption?.glyph ? (
+              <span className="metronome-audio-select__glyph" aria-hidden>
+                {selectedOption.glyph}
+              </span>
+            ) : (
+              <span className="metronome-audio-select__value">
+                {selectedOption?.shortLabel ?? selectedOption?.label ?? value}
+              </span>
+            )}
             <ChevronDown
               className="metronome-audio-select__chevron"
               strokeWidth={2.2}
@@ -126,7 +144,19 @@ export default function MetronomeAudioSelect<T extends string>({
                         setOpen(false)
                       }}
                     >
-                      <span>{option.label}</span>
+                      <span className="metronome-audio-select__option-body">
+                        {option.glyph ? (
+                          <span className="metronome-audio-select__option-glyph" aria-hidden>
+                            {option.glyph}
+                          </span>
+                        ) : null}
+                        <span className="metronome-audio-select__option-text">
+                          <span>{option.label}</span>
+                          {option.hint ? (
+                            <span className="metronome-audio-select__option-hint">{option.hint}</span>
+                          ) : null}
+                        </span>
+                      </span>
                       {selected && <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />}
                     </button>
                   )

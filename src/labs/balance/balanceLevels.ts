@@ -188,18 +188,45 @@ export function balanceLevelsForWorld(id: BalanceWorldId): BalanceLevel[] {
 /**
  * Written pitches for one level on one instrument.
  *
- * Offsets are measured from home and then clamped, which keeps every note
- * playable. Clamping can collapse two notes onto the same pitch at the very
- * edge of a range — that is the right failure: an unreachable note would end
- * the run, a repeated one merely makes the level easier.
+ * Offsets are measured from the note this instrument's method book starts on,
+ * then the *whole shape* is moved to fit the horn rather than each note being
+ * clamped individually. That distinction matters: a recorder cannot play a
+ * seventh below its bottom C, and clamping each note would have turned "hold
+ * C, E, G" into "hold C, C, C" — an exercise about intervals collapsed into
+ * one note repeated. Shifting the set keeps the interval that was being
+ * taught and simply plays it in a register the instrument owns.
+ *
+ * Only when the level's own span is wider than the instrument's entire range
+ * does anything get clamped, because then no transposition can save it.
  */
 export function balanceLevelWrittenMidi(
   level: BalanceLevel,
   instrument: BalanceInstrument,
 ): number[] {
-  return level.offsets.map((offset) =>
-    clampWrittenMidi(instrument.homeWrittenMidi + offset, instrument),
-  )
+  const raw = level.offsets.map((offset) => instrument.homeWrittenMidi + offset)
+  const low = Math.min(...raw)
+  const high = Math.max(...raw)
+
+  let shift = 0
+  if (low < instrument.minWrittenMidi) shift = instrument.minWrittenMidi - low
+  else if (high > instrument.maxWrittenMidi) shift = instrument.maxWrittenMidi - high
+
+  // Move by whole octaves where that is enough, so the exercise keeps the key
+  // it was written in; fall back to a plain semitone shift only when an octave
+  // would overshoot the other end of a narrow horn.
+  if (shift !== 0) {
+    const octaves = Math.sign(shift) * Math.ceil(Math.abs(shift) / 12) * 12
+    const shiftedLow = low + octaves
+    const shiftedHigh = high + octaves
+    if (
+      shiftedLow >= instrument.minWrittenMidi &&
+      shiftedHigh <= instrument.maxWrittenMidi
+    ) {
+      shift = octaves
+    }
+  }
+
+  return raw.map((midi) => clampWrittenMidi(midi + shift, instrument))
 }
 
 export function balanceLevelNoteLabels(level: BalanceLevel, instrumentId: string): string[] {

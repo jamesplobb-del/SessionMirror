@@ -2,7 +2,6 @@ import {
   getAvailableSubdivisions,
   getSubdivisionLabel,
   hasFeelOptions,
-  subdivisionsPerBeat,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../../utils/metronomeConfig'
@@ -61,38 +60,39 @@ export const PRACTICE_ALL_METERS: MetronomeMeter[] = [
 export interface PracticeRhythmOption {
   id: string
   value: MetronomeSubdivision
-  label: string
+  /** Note value this rhythm actually plays under the CURRENT pulse. */
   name: string
-  ticksPerBeat: number
 }
 
-const RHYTHM_LABELS: Record<MetronomeSubdivision, { id: string; label: string }> = {
-  off: { id: 'pulse', label: '♩' },
-  '8ths': { id: 'eighth', label: '♪' },
-  triplets: { id: 'triplet', label: '♪3' },
-  '16ths': { id: 'sixteenth', label: '♬' },
-  dotted: { id: 'dotted', label: '♩·' },
-  quints: { id: 'quintuplet', label: '5' },
-  septuplets: { id: 'septuplet', label: '7' },
+/**
+ * Stable ids per subdivision.
+ *
+ * There is deliberately no fixed glyph or tick count here: both depend on the
+ * pulse, not on the subdivision id. Under an eighth pulse '8ths' plays
+ * sixteenths and under a dotted quarter it plays the three natural eighths, so
+ * a per-id '♪' and a per-id 2 are wrong in every meter but a simple one. The
+ * drawn cell and `name` are both derived from the active pulse instead.
+ */
+const RHYTHM_IDS: Record<MetronomeSubdivision, string> = {
+  off: 'pulse',
+  '8ths': 'eighth',
+  triplets: 'triplet',
+  '16ths': 'sixteenth',
+  dotted: 'dotted',
+  quints: 'quintuplet',
+  septuplets: 'septuplet',
 }
 
 export function getPracticeRhythmOptions(
   meter: MetronomeMeter,
   pulseModeId?: string,
 ): PracticeRhythmOption[] {
-  return getAvailableSubdivisions(meter, pulseModeId).map((value) => {
-    const mode = getPulseModeById(meter, pulseModeId)
-    const meta = RHYTHM_LABELS[value]
-    const name =
-      value === 'off' ? mode.pulseName : getSubdivisionLabel(meter, value, mode.pulseCount)
-    return {
-      id: meta.id,
-      value,
-      label: meta.label,
-      name,
-      ticksPerBeat: subdivisionsPerBeat(value),
-    }
-  })
+  const mode = getPulseModeById(meter, pulseModeId)
+  return getAvailableSubdivisions(meter, pulseModeId).map((value) => ({
+    id: RHYTHM_IDS[value],
+    value,
+    name: getSubdivisionLabel(meter, value, mode.pulseCount),
+  }))
 }
 
 export function getPracticeFeelOptions(

@@ -1,7 +1,5 @@
-import {
-  writtenMidiToConcertMidi,
-  type TunerTranspositionId,
-} from '../../utils/tunerTransposition'
+import { writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
+import { getBalanceInstrument } from './balanceInstruments'
 import type {
   BalanceCustomRoutine,
   BalanceInstrument,
@@ -15,28 +13,13 @@ import type {
 const FLAT_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'] as const
 const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'] as const
 
-const N = (pitchClass: number, octave: number) => (octave + 1) * 12 + pitchClass
-
-export const BALANCE_INSTRUMENTS: readonly BalanceInstrument[] = [
-  { id: 'concert', name: 'Concert Pitch', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
-  { id: 'bb-trumpet', name: 'B♭ Trumpet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(6, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(2, 6) },
-  { id: 'bb-clarinet', name: 'B♭ Clarinet', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(4, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(7, 6) },
-  { id: 'soprano-sax', name: 'Soprano Saxophone', transposition: 'bb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
-  { id: 'tenor-sax', name: 'Tenor Saxophone', transposition: 'bb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
-  { id: 'alto-sax', name: 'E♭ Alto Saxophone', transposition: 'eb', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
-  { id: 'baritone-sax', name: 'E♭ Baritone Saxophone', transposition: 'eb_octave', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(7, 4), maxWrittenMidi: N(6, 6) },
-  { id: 'f-horn', name: 'F Horn', transposition: 'f', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(5, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
-  { id: 'flute', name: 'Flute', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(0, 4), homeWrittenMidi: N(11, 4), maxWrittenMidi: N(3, 7) },
-  { id: 'oboe', name: 'Oboe', transposition: 'concert', tunerInstrument: 'winds', clef: 'treble', minWrittenMidi: N(10, 3), homeWrittenMidi: N(0, 5), maxWrittenMidi: N(7, 6) },
-  { id: 'bassoon', name: 'Bassoon', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(10, 1), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(4, 5) },
-  { id: 'trombone', name: 'Trombone', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(5, 5) },
-  { id: 'euphonium', name: 'Euphonium', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 2), homeWrittenMidi: N(5, 3), maxWrittenMidi: N(10, 4) },
-  { id: 'tuba', name: 'Tuba', transposition: 'concert', tunerInstrument: 'winds', clef: 'bass', minWrittenMidi: N(4, 1), homeWrittenMidi: N(5, 2), maxWrittenMidi: N(5, 4) },
-  { id: 'violin', name: 'Violin', transposition: 'concert', tunerInstrument: 'strings', clef: 'treble', minWrittenMidi: N(7, 3), homeWrittenMidi: N(9, 4), maxWrittenMidi: N(4, 7) },
-  { id: 'viola', name: 'Viola', transposition: 'concert', tunerInstrument: 'strings', clef: 'alto', minWrittenMidi: N(0, 3), homeWrittenMidi: N(2, 4), maxWrittenMidi: N(4, 6) },
-  { id: 'cello', name: 'Cello', transposition: 'concert', tunerInstrument: 'strings', clef: 'bass', minWrittenMidi: N(0, 2), homeWrittenMidi: N(2, 3), maxWrittenMidi: N(0, 6) },
-  { id: 'voice', name: 'Voice', transposition: 'concert', tunerInstrument: 'voice', clef: 'treble', minWrittenMidi: N(0, 3), homeWrittenMidi: N(0, 4), maxWrittenMidi: N(0, 6) },
-] as const
+export {
+  BALANCE_INSTRUMENTS,
+  clampWrittenMidi,
+  getBalanceInstrument,
+  inferBalanceInstrument,
+  resolveBalanceInstrumentId,
+} from './balanceInstruments'
 
 const SCALE_INTERVALS: Record<Exclude<BalanceScaleType, 'melodicMinor'>, readonly number[]> = {
   major: [0, 2, 4, 5, 7, 9, 11, 12],
@@ -73,19 +56,29 @@ export function midiToBalanceNoteName(midi: number, flats = prefersFlats(midi)):
   return `${(flats ? FLAT_NAMES : SHARP_NAMES)[pitchClass]}${octave}`
 }
 
-export function getBalanceInstrument(id: string): BalanceInstrument {
-  return BALANCE_INSTRUMENTS.find((instrument) => instrument.id === id) ?? BALANCE_INSTRUMENTS[0]!
+export interface BalanceNoteSpelling {
+  letter: 'C' | 'D' | 'E' | 'F' | 'G' | 'A' | 'B'
+  accidental: 'flat' | 'sharp' | null
+  octave: number
 }
 
-export function inferBalanceInstrument(
-  transposition: TunerTranspositionId,
-  profile: BalanceInstrument['tunerInstrument'],
-): BalanceInstrument {
-  return (
-    BALANCE_INSTRUMENTS.find(
-      (instrument) => instrument.transposition === transposition && instrument.tunerInstrument === profile,
-    ) ?? BALANCE_INSTRUMENTS.find((instrument) => instrument.transposition === transposition) ?? BALANCE_INSTRUMENTS[0]!
-  )
+/**
+ * The written spelling behind a note name, split into the parts notation needs.
+ *
+ * Shares `prefersFlats` with `midiToBalanceNoteName`, so the letter the staff
+ * puts a notehead on is always the letter the label prints. Deriving the staff
+ * position from MIDI independently would sit B♭ on the A line with a sharp
+ * beside it while the card overhead said "B♭".
+ */
+export function balanceNoteSpelling(midi: number): BalanceNoteSpelling {
+  const rounded = Math.round(midi)
+  const pitchClass = ((rounded % 12) + 12) % 12
+  const name = (prefersFlats(rounded) ? FLAT_NAMES : SHARP_NAMES)[pitchClass]!
+  return {
+    letter: name[0] as BalanceNoteSpelling['letter'],
+    accidental: name.includes('♭') ? 'flat' : name.includes('♯') ? 'sharp' : null,
+    octave: Math.floor(rounded / 12) - 1,
+  }
 }
 
 function octaveIntervals(base: readonly number[], octaves: 1 | 2): number[] {
@@ -156,10 +149,6 @@ export function buildBalanceTargets(
   }
 
   return buildBalanceTargetsFromWritten(written, instrument)
-}
-
-export function clampWrittenMidi(midi: number, instrument: BalanceInstrument): number {
-  return Math.max(instrument.minWrittenMidi, Math.min(instrument.maxWrittenMidi, Math.round(midi)))
 }
 
 export function routineSummary(

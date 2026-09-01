@@ -45,12 +45,22 @@ export const STAFF_LINE_Y_LIST = [
   STAFF_LINE_YPX.E4,
 ] as const
 
-export const STAFF_JUMPER_CLEFS = ['treble', 'bass'] as const
+/**
+ * Every clef this notation map can draw. Alto is here for Balance, which
+ * notates a viola's target note; it is deliberately not one of the clefs Staff
+ * Jumper offers to read in (see `STAFF_JUMPER_READING_CLEFS`), because that
+ * game has no alto instruments and no alto ranges.
+ */
+export const STAFF_JUMPER_CLEFS = ['treble', 'bass', 'alto'] as const
 export type StaffJumperClef = (typeof STAFF_JUMPER_CLEFS)[number]
+
+/** The clefs Staff Jumper's own setup offers. */
+export const STAFF_JUMPER_READING_CLEFS = ['treble', 'bass'] as const
 
 export const CLEF_LABELS: Record<StaffJumperClef, string> = {
   treble: 'Treble',
   bass: 'Bass',
+  alto: 'Alto',
 }
 
 /** Visual midpoint of the five-line staff. */
@@ -140,6 +150,7 @@ export const TIME_SIGNATURE_FONT_SIZE = STAFF_SPACE_PX * 2.05
 export const TIME_SIGNATURE_YPX: Record<StaffJumperClef, { top: number; bottom: number }> = {
   treble: { top: STAFF_TOP_Y + STAFF_LINE_GAP, bottom: STAFF_TOP_Y + STAFF_LINE_GAP * 3 },
   bass: { top: STAFF_TOP_Y + STAFF_LINE_GAP, bottom: STAFF_TOP_Y + STAFF_LINE_GAP * 3 },
+  alto: { top: STAFF_TOP_Y + STAFF_LINE_GAP, bottom: STAFF_TOP_Y + STAFF_LINE_GAP * 3 },
 }
 
 export type StemDirection = 'up' | 'down'
@@ -203,6 +214,8 @@ export const SIGNATURE_TO_NOTE_GAP = Math.round(STAFF_SPACE_PX * 0.62)
 export const CLEF_ANCHOR_YPX: Record<StaffJumperClef, number> = {
   treble: STAFF_TOP_Y + STAFF_LINE_GAP * 3,
   bass: STAFF_TOP_Y + STAFF_LINE_GAP * 1,
+  /** The C clef's waist sits on the middle line. */
+  alto: STAFF_TOP_Y + STAFF_LINE_GAP * 2,
 }
 
 /** Horizontal spacing between noteheads (world px). */
@@ -224,6 +237,10 @@ export type StaffNoteLetter = (typeof STAFF_NOTE_LETTERS)[number]
 const BOTTOM_LINE_NOTE: Record<StaffJumperClef, { letter: StaffNoteLetter; octave: number }> = {
   treble: { letter: 'E', octave: 4 },
   bass: { letter: 'G', octave: 2 },
+  // The C clef names the middle line, so alto reads C4 there and F3 at the
+  // bottom. Everything else in this file is derived, so this one row is all
+  // the positioning a viola needs.
+  alto: { letter: 'F', octave: 3 },
 }
 
 function diatonicIndex(letter: StaffNoteLetter, octave: number): number {

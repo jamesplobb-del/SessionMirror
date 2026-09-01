@@ -10,6 +10,7 @@ import DroneSoundWheel from './audioPractice/DroneSoundWheel'
 import PitchInsightsScreen from './audioPractice/PitchInsightsScreen'
 import TunerTranspositionMenu from './audioPractice/TunerTranspositionMenu'
 import TuningGauge from './audioPractice/TuningGauge'
+import { useTunerWash } from '../hooks/useTunerWash'
 import { triggerLightHaptic } from '../utils/haptics'
 import {
   formatDisplayCents,
@@ -187,6 +188,7 @@ function LiveAudioTunerPane({
   hapticsEnabled,
   insightsEnabled = false,
   audioToolsEnabled = true,
+  inTuneGlow = 0,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -199,8 +201,10 @@ function LiveAudioTunerPane({
   hapticsEnabled?: boolean
   insightsEnabled?: boolean
   audioToolsEnabled?: boolean
+  inTuneGlow?: number
 }) {
   const notifyTutorial = useTutorialAction()
+  const stageRef = useRef<HTMLDivElement>(null)
   const [droneOpen, setDroneOpen] = useState(false)
   const [transpositionOpen, setTranspositionOpen] = useState(false)
   const [insightsOpen, setInsightsOpen] = useState(false)
@@ -221,6 +225,13 @@ function LiveAudioTunerPane({
     ? `Drone active. Written pitches ${activeDronePitchNames.join(', ')} for ${transposition.label}`
     : `Drone off. Pitches will be shown as written for ${transposition.label}`
   const tunerHapticsEnabled = drone?.hapticsEnabled ?? hapticsEnabled
+
+  useTunerWash(
+    stageRef,
+    pitchActive ? readout.cents : null,
+    inTuneGlow,
+    true,
+  )
 
   const toggleDrone = () => {
     triggerLightHaptic(tunerHapticsEnabled)
@@ -250,23 +261,18 @@ function LiveAudioTunerPane({
 
   return (
     <div
-      className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--${pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
+      ref={stageRef}
+      className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--continuous-wash pitch-audio-stage--${pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
     >
       <div className="pitch-living-canvas">
         <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
         <TuningGauge readout={readout} />
 
-        <div className="pitch-living-canvas__direction" aria-hidden>
-          <span>Sharp</span>
-          <span>Flat</span>
-        </div>
-
         {audioToolsEnabled && (drone || onTunerTranspositionChange || insightsEnabled) ? (
           <>
             <div
-              className={`pitch-living-tool-rail ${
-                drone ? 'pitch-living-tool-rail--with-drone' : ''
-              }`}
+              className="pitch-living-tool-rail pitch-living-tools-chip"
+              role="toolbar"
               aria-label="Tuner tools"
             >
               {drone ? (
@@ -283,8 +289,6 @@ function LiveAudioTunerPane({
                   title={droneOpen ? 'Hide drone' : `Open drone · ${droneStatus}`}
                 >
                   <Music2 aria-hidden />
-                  <span>Drone</span>
-                  <small>{droneStatus}</small>
                 </button>
               ) : null}
 
@@ -295,7 +299,7 @@ function LiveAudioTunerPane({
                   onClick={openInsights}
                   aria-haspopup="dialog"
                   aria-label="Open Pitch Insights"
-                  title="Open Pitch Insights"
+                  title="Pitch Insights"
                 >
                   <BarChart3 aria-hidden />
                 </button>
@@ -312,11 +316,10 @@ function LiveAudioTunerPane({
                   onClick={toggleTransposition}
                   aria-expanded={transpositionOpen}
                   aria-controls="pitch-living-transposition-panel"
-                  title={transpositionOpen ? 'Hide tuner settings' : 'Open tuner settings'}
+                  aria-label={`Open tuner settings. Written pitch ${transposition.shortLabel}`}
+                  title={transpositionOpen ? 'Hide tuner settings' : `Tuner settings · ${transposition.shortLabel}`}
                 >
                   <Settings aria-hidden />
-                  <span>Settings</span>
-                  <small>{transposition.shortLabel}</small>
                 </button>
               ) : null}
             </div>
@@ -441,10 +444,6 @@ function LivingPitchWidgetPane({
       <div className="pitch-living-canvas pitch-widget-living__canvas">
         <PitchChartCanvas canvasRef={canvasRef} glass fill living />
         <TuningGauge readout={readout} />
-        <div className="pitch-living-canvas__direction" aria-hidden>
-          <span>Sharp</span>
-          <span>Flat</span>
-        </div>
       </div>
     </div>
   )
@@ -461,6 +460,7 @@ function LivePitchTunerAudio({
   tunerInstrument = 'voice',
   tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
+  onTunerInstrumentChange,
   hapticsEnabled,
   liveMicOnly = false,
   drone,
@@ -640,9 +640,11 @@ function LivePitchTunerAudio({
               tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
+              onTunerInstrumentChange={onTunerInstrumentChange}
               hapticsEnabled={hapticsEnabled}
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
+              inTuneGlow={playbackTracker.inTuneGlow}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
@@ -653,9 +655,11 @@ function LivePitchTunerAudio({
               tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
+              onTunerInstrumentChange={onTunerInstrumentChange}
               hapticsEnabled={hapticsEnabled}
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
+              inTuneGlow={liveTracker.inTuneGlow}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -686,6 +690,7 @@ export default function LivePitchTuner({
   tunerInstrument = 'voice',
   tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
+  onTunerInstrumentChange,
   hapticsEnabled,
   pitchSource = 'media',
   widgetPresentation = 'compact',
@@ -734,6 +739,7 @@ export default function LivePitchTuner({
         tunerInstrument={tunerInstrument}
         tunerTransposition={tunerTransposition}
         onTunerTranspositionChange={onTunerTranspositionChange}
+        onTunerInstrumentChange={onTunerInstrumentChange}
         hapticsEnabled={hapticsEnabled}
         liveMicOnly={liveMicOnly}
         drone={drone}

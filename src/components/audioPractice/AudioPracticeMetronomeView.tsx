@@ -25,6 +25,12 @@ import {
 } from './audioPracticeMetronome'
 import MetronomeAudioSelect from './MetronomeAudioSelect'
 import MetronomeBeatDisplay from './MetronomeBeatDisplay'
+import RhythmCellGlyph from './RhythmCellGlyph'
+import {
+  getPulseNotation,
+  getRhythmCellNotation,
+  rhythmCellHint,
+} from '../../metronome/metronomeNotation'
 import { useTutorialAction } from '../../context/TutorialContext'
 import {
   METRONOME_VISUAL_STYLES,
@@ -100,7 +106,8 @@ export default function AudioPracticeMetronomeView({
     subdivision,
     feelId,
     pulseModeId,
-    bpmSymbol,
+    pulseCount,
+    pulseName,
     soundId,
     playing,
     setBpm,
@@ -127,16 +134,16 @@ export default function AudioPracticeMetronomeView({
     { minBpm: AUDIO_PRACTICE_MIN_BPM, maxBpm: AUDIO_PRACTICE_MAX_BPM },
   )
 
-  const feelOptions = getPracticeFeelOptions(meter, pulseModeId)
   const rhythmOptions = getPracticeRhythmOptions(meter, pulseModeId)
+  const feelOptions = getPracticeFeelOptions(meter, pulseModeId)
   const pulseModeOptions = practiceMeterHasPulseChoice(meter)
     ? getPracticePulseModeOptions(meter)
     : []
-  const showBeatGrouping =
-    feelOptions.length > 1 && (meter.endsWith('/8') || meter.endsWith('/16'))
-  // Time + Rhythm + Sound + View, plus the two conditional selectors.
-  const selectorCount =
-    4 + (pulseModeOptions.length > 0 ? 1 : 0) + (showBeatGrouping ? 1 : 0)
+  // BPM counts the conducting pulse, so 6/8 at 120 is dotted quarters, not
+  // eighths. Without the note beside the number the same 120 means three
+  // different tempos depending on how the bar is being conducted.
+  const pulseNotation = getPulseNotation(meter, pulseCount)
+  const secondaryControlCount = (pulseModeOptions.length > 1 ? 1 : 0) + (feelOptions.length > 1 ? 1 : 0)
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -329,6 +336,17 @@ export default function AudioPracticeMetronomeView({
               role="group"
               aria-label={`${bpm} beats per minute. Swipe up or down to change tempo.`}
             >
+              {!editingBpm ? (
+                <span className="audio-practice-metronome__tempo-label">
+                  <RhythmCellGlyph
+                    notation={pulseNotation}
+                    height={20}
+                    title={pulseName}
+                    className="audio-practice-metronome__tempo-note"
+                  />
+                  <span>= BPM</span>
+                </span>
+              ) : null}
               <div className="audio-practice-metronome__bpm-center">
                 {editingBpm ? (
                   <input
@@ -359,9 +377,8 @@ export default function AudioPracticeMetronomeView({
                       openBpmEditor()
                     }}
                   >
-                    <span className="audio-practice-metronome__tempo-label">{bpmSymbol} = BPM</span>
                     <span className="metronome-audio-stage__bpm-value">{bpm}</span>
-                    <span className="metronome-audio-stage__bpm-label">Tempo</span>
+                    <span className="metronome-audio-stage__bpm-label">BPM</span>
                   </button>
                 )}
               </div>
@@ -390,14 +407,20 @@ export default function AudioPracticeMetronomeView({
             </PracticeControlButton>
           </div>
 
-          <section
-            className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel audio-practice-metronome__selectors--under-orbit pointer-events-auto shrink-0"
-            aria-label="Metronome time, rhythm, and accent"
+        </header>
+
+        <MetronomeBeatDisplay interactive />
+      </div>
+
+      <div className="audio-practice-metronome__bottom-dock shrink-0">
+        <section
+          className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel pointer-events-auto shrink-0"
+          aria-label="Metronome time, rhythm, sound, and view"
+        >
+          <div
+            className="audio-practice-metronome__select-row audio-practice-metronome__select-row--primary"
+            data-control-count="4"
           >
-            <div
-              className="audio-practice-metronome__select-row audio-practice-metronome__select-row--primary"
-              data-control-count={selectorCount}
-            >
             <MetronomeAudioSelect
               label="Time"
               ariaLabel="Time signature"
@@ -405,34 +428,21 @@ export default function AudioPracticeMetronomeView({
               options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
               onChange={handleMeterChange}
             />
-            {pulseModeOptions.length > 0 ? (
-              <MetronomeAudioSelect
-                label="Tempo unit"
-                ariaLabel="Conducting pulse (what BPM means)"
-                value={pulseModeId}
-                options={pulseModeOptions}
-                onChange={handlePulseModeChange}
-              />
-            ) : null}
             <MetronomeAudioSelect
               label="Rhythm"
               ariaLabel="Rhythm subdivision"
               value={subdivision}
-              options={rhythmOptions.map((option) => ({
-                value: option.value,
-                label: option.name,
-              }))}
+              options={rhythmOptions.map((option) => {
+                const notation = getRhythmCellNotation(meter, option.value, pulseCount)
+                return {
+                  value: option.value,
+                  label: option.name,
+                  hint: rhythmCellHint(notation),
+                  glyph: <RhythmCellGlyph notation={notation} height={20} />,
+                }
+              })}
               onChange={handleSubdivisionChange}
             />
-            {showBeatGrouping ? (
-              <MetronomeAudioSelect
-                label="Feel"
-                ariaLabel="Beat grouping feel"
-                value={feelId ?? feelOptions[0].value}
-                options={feelOptions}
-                onChange={handleFeelChange}
-              />
-            ) : null}
             <MetronomeAudioSelect<AudioPracticeClickSoundId>
               label="Sound"
               ariaLabel="Metronome click sound"
@@ -450,56 +460,93 @@ export default function AudioPracticeMetronomeView({
               options={METRONOME_VISUAL_STYLES.map(({ id, label }) => ({
                 value: id,
                 label,
+                shortLabel:
+                  id === 'ribbon'
+                    ? 'Ribbon'
+                    : id === 'vertical'
+                      ? 'Vertical'
+                      : id === 'horizontal'
+                        ? 'Horizontal'
+                        : 'Columns',
               }))}
               onChange={setMetronomeVisualStyle}
             />
-            </div>
-          </section>
-        </header>
+          </div>
 
-        <MetronomeBeatDisplay interactive />
-      </div>
-
-      <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
-        <div
-          className="audio-practice-metronome__transport-row pointer-events-auto"
-          role="group"
-          aria-label="Metronome transport"
-        >
-          {onOpenProgram ? (
-            <PracticeControlButton
-              label="Open practice program"
-              onPress={onOpenProgram}
-              dataTutorial="metronome-program"
-              className="metronome-audio-stage__program-btn audio-practice-metronome__program-btn"
+          {/*
+            * How the bar is conducted, kept off the primary row so it only
+            * appears for the meters that actually offer a choice. Pulse is what
+            * BPM counts (6/8 in 2 dotted quarters vs in 6 eighths); Feel is how
+            * an odd bar groups (7/8 as 2+2+3 vs 3+2+2).
+            */}
+          {secondaryControlCount > 0 ? (
+            <div
+              className="audio-practice-metronome__select-row audio-practice-metronome__select-row--secondary"
+              data-control-count={secondaryControlCount}
             >
-              <ListMusic className="h-5 w-5" strokeWidth={2.2} aria-hidden />
-              <span>Program</span>
-            </PracticeControlButton>
+              {pulseModeOptions.length > 1 ? (
+                <MetronomeAudioSelect
+                  label="Pulse"
+                  ariaLabel="Conducting pulse, the note BPM counts"
+                  value={pulseModeId}
+                  options={pulseModeOptions}
+                  onChange={handlePulseModeChange}
+                />
+              ) : null}
+              {feelOptions.length > 1 ? (
+                <MetronomeAudioSelect
+                  label="Feel"
+                  ariaLabel="Beat grouping feel"
+                  value={feelId ?? feelOptions[0].value}
+                  options={feelOptions}
+                  onChange={handleFeelChange}
+                />
+              ) : null}
+            </div>
           ) : null}
-          <PracticeControlButton
-            label={playing ? 'Stop metronome' : 'Start metronome'}
-            haptic={false}
-            onPress={handleTogglePlay}
-            className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+        </section>
+
+        <footer className="metronome-audio-stage__controls audio-practice-metronome__controls shrink-0">
+          <div
+            className="audio-practice-metronome__transport-row pointer-events-auto"
+            role="group"
+            aria-label="Metronome transport"
           >
-            {playing ? (
-              <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-            ) : (
-              <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
-            )}
-          </PracticeControlButton>
-          <PracticeControlButton
-            label="Tap tempo"
-            haptic={false}
-            onPress={handleTapTempo}
-            dataTutorial="metronome-tap-tempo"
-            className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
-          >
-            Tap Tempo
-          </PracticeControlButton>
-        </div>
-      </footer>
+            {onOpenProgram ? (
+              <PracticeControlButton
+                label="Open practice program"
+                onPress={onOpenProgram}
+                dataTutorial="metronome-program"
+                className="metronome-audio-stage__program-btn audio-practice-metronome__program-btn"
+              >
+                <ListMusic className="h-5 w-5" strokeWidth={2.2} aria-hidden />
+                <span>Program</span>
+              </PracticeControlButton>
+            ) : null}
+            <PracticeControlButton
+              label={playing ? 'Stop metronome' : 'Start metronome'}
+              haptic={false}
+              onPress={handleTogglePlay}
+              className={`metronome-audio-stage__play-btn audio-practice-metronome__play-btn ${playing ? 'metronome-audio-stage__btn--active' : ''}`}
+            >
+              {playing ? (
+                <Pause className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+              ) : (
+                <Play className="h-6 w-6" strokeWidth={2.4} aria-hidden />
+              )}
+            </PracticeControlButton>
+            <PracticeControlButton
+              label="Tap tempo"
+              haptic={false}
+              onPress={handleTapTempo}
+              dataTutorial="metronome-tap-tempo"
+              className="metronome-audio-stage__tap-btn audio-practice-metronome__tap-btn"
+            >
+              Tap Tempo
+            </PracticeControlButton>
+          </div>
+        </footer>
+      </div>
     </div>
   )
 }

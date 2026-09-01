@@ -31,10 +31,6 @@ interface LabsOverlayProps {
   onNavigate: (route: LabsRoute) => void
   onRequestMicStream: GameMicRequest
   onReleaseMicStream: () => void
-  onTunerSettingsChange: (settings: {
-    tunerInstrument: TunerInstrument
-    tunerTransposition: TunerTranspositionId
-  }) => void
 }
 
 export default function LabsOverlay({
@@ -51,7 +47,6 @@ export default function LabsOverlay({
   onNavigate,
   onRequestMicStream,
   onReleaseMicStream,
-  onTunerSettingsChange,
 }: LabsOverlayProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const routeRef = useRef(route)
@@ -200,7 +195,6 @@ export default function LabsOverlay({
                 micPermissionBlocked={micPermissionBlocked}
                 micPermissionPending={micPermissionPending}
                 onRequestMicStream={onRequestMicStream}
-                onTunerSettingsChange={onTunerSettingsChange}
                 onBack={() => onNavigate('menu')}
               />
             </Suspense>

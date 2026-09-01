@@ -23,10 +23,11 @@ const E_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
 const S_SUB = ['off', '8ths', 'triplets', '16ths'] as MetronomeSubdivision[]
 
 /**
- * Dotted-quarter (compound) pulses divide into 3 by nature, so "triplets" and
- * "8ths" both resolve to 3 ticks per pulse — the same rhythm under two names.
- * Compound modes therefore offer only the divisions that differ: the natural
- * 3 eighths, and 6 sixteenths.
+ * Dotted (compound) pulses divide into 3 by nature, so "triplets" and "8ths"
+ * both resolve to 3 ticks per pulse — the same rhythm under two names. Under a
+ * dotted HALF pulse "triplets" is not even a tuplet: it is the three plain
+ * quarters the beat is made of. Compound modes therefore offer only the
+ * divisions that differ: the natural 3, and 6.
  */
 const C_SUB = ['off', '8ths', '16ths'] as MetronomeSubdivision[]
 
@@ -96,7 +97,7 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
     },
     {
       id: 'dotted-half', label: 'Dotted half', bpmSymbol: '𝅗𝅥·', pulseCount: 2, pulseUnit: 'dotted-half',
-      pulseName: 'Dotted Half', compound: true, defaultSubdivision: '8ths', availableSubdivisions: Q_SUB,
+      pulseName: 'Dotted Half', compound: true, defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
       // Compound duple accents like 2/4.
       defaultAccentLevels: ['strong', 'weak'],
     },

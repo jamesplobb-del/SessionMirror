@@ -472,8 +472,10 @@
   width: 100%;
   height: 100%;
   place-items: center;
-  color: var(--arcade-muted);
-  background: #f4f3ef;
+  color: #4a7099;
+  /* The sky Balance is about to paint. This was a warm beige, so a cold launch
+     flashed a screen from a different app before the game appeared. */
+  background: linear-gradient(180deg, #a9dcf5 0%, #cbeefe 46%, #e6f7ff 100%);
   font-size: 0.82rem;
   font-weight: 700;
 }

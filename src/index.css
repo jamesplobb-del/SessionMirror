@@ -8020,7 +8020,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   font-size: clamp(0.72rem, 2.7vw, 0.88rem);
 }
 
-.app-ui-overlay--audio-mode
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__tempo-card
   .audio-practice-metronome__tempo-scrubber
   .metronome-audio-stage__bpm-value {
@@ -8032,7 +8032,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-practice-metronome__visual
   text-shadow: none;
 }
 
-.app-ui-overlay--audio-mode
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__tempo-card
   .audio-practice-metronome__tempo-scrubber
   .metronome-audio-stage__bpm-label {
@@ -8540,5 +8540,368 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-control-pill {
 
   .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .metronome-orbit__ring {
     --orbit-size: min(78vw, clamp(13.5rem, 36dvh, 18rem));
+  }
+}
+
+/* Final metronome layout guard: dark-theme rules above predate the living
+   visual layout and must not restore the retired tempo card backdrop. */
+html.app-dark-mode
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__tempo-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-strip {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+  width: min(calc(100% - 2rem), 29rem);
+}
+
+/* Pulse Ribbon fidelity guard — mirrors the approved motion study. */
+.app-ui-overlay--audio-mode .audio-practice-top-tabs,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+  min-height: 3.25rem;
+  gap: 0.125rem;
+  padding: 0.3125rem;
+  border-radius: 1.5rem;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__btn,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
+  min-height: 2.625rem;
+  padding-block: 0.25rem;
+  border-width: 1px;
+  border-radius: 1.125rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-top-tabs__btn--active,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn--active {
+  border-width: 1px;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__tempo-card,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-strip {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__tempo-card {
+  padding-top: 0.1rem;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber {
+  min-height: 5.75rem;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-value {
+  color: var(--audio-text-primary);
+  font-size: clamp(4rem, 18vw, 5.125rem);
+  font-weight: 400;
+  line-height: 0.84;
+  letter-spacing: -0.045em;
+}
+
+.app-ui-overlay--audio-mode
+  .audio-practice-metronome__tempo-card
+  .audio-practice-metronome__tempo-scrubber
+  .metronome-audio-stage__bpm-label {
+  display: block;
+  margin-top: 0.5rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__visual--large {
+  min-height: 0;
+  padding-block: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-live-stage__canvas {
+  min-height: clamp(14rem, 31dvh, 17rem);
+  max-height: 17rem;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome {
+  height: 100%;
+  padding-bottom: 0;
+  overflow: hidden !important;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__body {
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__bottom-dock {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.45rem, 1dvh, 0.65rem);
+  width: 100%;
+  margin-top: auto;
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__controls,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__transport-row {
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors {
+  min-height: 4.125rem;
+  padding: 0.3rem;
+  border-color: color-mix(in srgb, var(--audio-text-primary) 6%, transparent);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 0.9rem 2.2rem color-mix(in srgb, var(--audio-text-primary) 6%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 88%, transparent);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors
+  .metronome-audio-select__label {
+  top: 0.48rem;
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors
+  .metronome-audio-select__control {
+  min-height: 3.625rem;
+  padding: 1.45rem 0.3rem 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors
+  .metronome-audio-select
+  + .metronome-audio-select {
+  border-left-color: color-mix(in srgb, var(--audio-text-primary) 8%, transparent);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors
+  .metronome-audio-select__selection::before,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors
+  .metronome-audio-select__chevron {
+  display: none;
+}
+
+/* Compound / odd meters add a second selector row (Pulse, Feel). Each entry is
+   just a label plus one value, so lay it out as a single thin centered line
+   rather than a full-height stacked control — otherwise the row reserves the
+   same tall box as the primary selectors and leaves dead space beneath it. */
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__select-row--secondary
+  .metronome-audio-select {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding-block: 0.5rem;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__select-row--secondary
+  .metronome-audio-select__label {
+  position: static;
+  width: auto;
+  transform: none;
+  flex: 0 0 auto;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__select-row--secondary
+  .metronome-audio-select__field {
+  width: auto;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__select-row--secondary
+  .metronome-audio-select__control {
+  min-height: 0;
+  padding: 0;
+  font-size: clamp(0.66rem, 2.15vw, 0.78rem);
+}
+
+.metronome-beat-marker__halo {
+  width: 2.2rem;
+  height: 2.2rem;
+}
+
+.metronome-beat-marker__number {
+  color: color-mix(in srgb, var(--audio-text-primary) 76%, var(--audio-text-secondary));
+  font-size: clamp(1rem, 4vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.metronome-beat-marker--accented .metronome-beat-marker__number {
+  color: var(--audio-blue);
+}
+
+.metronome-beat-marker--downbeat .metronome-beat-marker__number {
+  color: var(--audio-gold);
+}
+
+.metronome-beat-markers--compact .metronome-beat-marker__number {
+  font-size: clamp(0.86rem, 3.2vw, 0.96rem);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active {
+  color: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active
+  .metronome-beat-marker__number {
+  color: var(--audio-blue);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active
+  .metronome-beat-marker__halo {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--audio-blue) 10%, transparent);
+  box-shadow:
+    0 0 0 0.32rem color-mix(in srgb, var(--audio-blue) 4%, transparent),
+    0 0.55rem 1.25rem color-mix(in srgb, var(--audio-blue) 13%, transparent);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active.metronome-beat-marker--downbeat {
+  color: var(--audio-gold);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active.metronome-beat-marker--downbeat
+  .metronome-beat-marker__number {
+  color: var(--audio-gold);
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .metronome-beat-marker--active.metronome-beat-marker--downbeat
+  .metronome-beat-marker__halo {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--audio-gold) 11%, transparent);
+  box-shadow:
+    0 0 0 0.32rem color-mix(in srgb, var(--audio-gold) 4%, transparent),
+    0 0.55rem 1.25rem color-mix(in srgb, var(--audio-gold) 13%, transparent);
+}
+
+html.app-dark-mode
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__selectors {
+  border-color: rgba(226, 232, 240, 0.08);
+  box-shadow:
+    0 0.9rem 2.2rem rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+/* Carry the white control surfaces into both phone edges, then ease back to
+   the quiet stage color. The status- and home-indicator safe areas are part
+   of this same paint plane, so no horizontal color seam can form. */
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome {
+  --metronome-edge-surface: #ffffff;
+  background: linear-gradient(
+    180deg,
+    var(--metronome-edge-surface) 0%,
+    var(--audio-bg-base) 21%,
+    var(--audio-bg-base) 72%,
+    var(--metronome-edge-surface) 100%
+  ) !important;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome-layer,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__body,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__bottom-dock {
+  background: transparent !important;
+}
+
+html.app-dark-mode .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome {
+  --metronome-edge-surface: #0f1726;
+}
+
+@media (max-width: 420px) {
+  .app-ui-overlay--audio-mode .audio-practice-top-tabs,
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+    min-height: 3rem;
+  }
+
+  .app-ui-overlay--audio-mode .audio-practice-top-tabs__btn,
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
+    min-height: 2.375rem;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-height: 740px) {
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .audio-practice-metronome__visual--large {
+    min-height: 0;
+    padding-block: 0;
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .metronome-live-stage__canvas {
+    min-height: clamp(10.5rem, 27dvh, 12.5rem);
+    max-height: 12.5rem;
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .audio-practice-metronome__selectors {
+    min-height: 3.625rem;
+  }
+
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+    .audio-practice-metronome__selectors
+    .metronome-audio-select__control {
+    min-height: 3.25rem;
   }
 }

@@ -1,22 +1,27 @@
 import { useEffect } from 'react'
-import { applyDarkHudStatusBar } from '../utils/nativeStatusBar'
+import { applyDarkHudStatusBar, applyLightAudioStatusBar } from '../utils/nativeStatusBar'
 import { registerKeepAwakeLifecycle, setKeepAwakeDesired } from '../utils/keepScreenAwake'
 
 interface UseAppShellPoliciesOptions {
   keepAwake: boolean
   /** Re-apply status bar after HUD surface changes (sheets / review). */
   hudSurface: 'idle' | 'sheet' | 'review'
+  lightStatusBarSurface?: boolean
 }
 
-export function useAppShellPolicies({ keepAwake, hudSurface }: UseAppShellPoliciesOptions): void {
+export function useAppShellPolicies({
+  keepAwake,
+  hudSurface,
+  lightStatusBarSurface = false,
+}: UseAppShellPoliciesOptions): void {
   useEffect(() => {
     registerKeepAwakeLifecycle()
-    void applyDarkHudStatusBar()
-  }, [])
+    void (lightStatusBarSurface ? applyLightAudioStatusBar() : applyDarkHudStatusBar())
+  }, [lightStatusBarSurface])
 
   useEffect(() => {
-    void applyDarkHudStatusBar()
-  }, [hudSurface])
+    void (lightStatusBarSurface ? applyLightAudioStatusBar() : applyDarkHudStatusBar())
+  }, [hudSurface, lightStatusBarSurface])
 
   useEffect(() => {
     setKeepAwakeDesired(keepAwake)
