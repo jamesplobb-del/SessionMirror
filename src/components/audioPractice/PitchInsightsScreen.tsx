@@ -2,13 +2,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   BarChart3,
   ChevronLeft,
-  ChevronRight,
   Clock3,
-  Minus,
   Plus,
   RotateCcw,
-  TrendingDown,
-  TrendingUp,
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -180,21 +176,6 @@ function confidenceLabel(insight: NotePitchInsight): string {
   return `${plural(insight.observationCount, 'note held', 'notes held')} · ±${Math.round(margin)}¢ margin`
 }
 
-/** Same statistic as confidenceLabel without repeating the observation
- * count, for spots that already show the count as a standalone number. */
-function marginLabel(insight: NotePitchInsight): string {
-  const margin = marginOfErrorCents(insight)
-  return margin == null ? 'Too early to tell' : `±${Math.round(margin)}¢ margin`
-}
-
-function tendencyLabel(insight: NotePitchInsight): string {
-  if (insight.confidence === 'collecting') return 'Collecting data'
-  if (insight.consistency !== 'Variable') return insight.tendency
-  return insight.tendency === 'Centered'
-    ? 'Variable around center'
-    : `${insight.tendency} · variable`
-}
-
 /** Plain-language row verdict for the compact note rows — same underlying
  * consistency/tendency fields as tendencyLabel, said the way you'd say it
  * to a student rather than as a statistics label. */
@@ -222,12 +203,13 @@ function rowVerdict(insight: NotePitchInsight): string {
  * day detail screens too. Purely decorative; the surrounding text already
  * carries the reading, so it's hidden from assistive tech.
  */
-function PitchRail({ cents, size = 'hero' }: { cents: number; size?: 'hero' | 'mini' }) {
+function PitchRail({ cents, size = 'hero' }: { cents: number; size?: 'hero' | 'mini' | 'thin' }) {
   const clamped = Math.max(-PITCH_RAIL_RANGE_CENTS, Math.min(PITCH_RAIL_RANGE_CENTS, cents))
   const position = 50 + (clamped / PITCH_RAIL_RANGE_CENTS) * 50
   const zone = zoneForCents(cents)
   const goodHalf = (PITCH_INSIGHTS_THRESHOLDS.centeredCents / PITCH_RAIL_RANGE_CENTS) * 50
   const closeHalf = (PITCH_INSIGHTS_THRESHOLDS.slightTendencyCents / PITCH_RAIL_RANGE_CENTS) * 50
+  const showZero = size === 'hero' || size === 'thin'
 
   return (
     <div className={`pitch-insights-rail pitch-insights-rail--${size}`} aria-hidden="true">
@@ -240,11 +222,79 @@ function PitchRail({ cents, size = 'hero' }: { cents: number; size?: 'hero' | 'm
         className="pitch-insights-rail__zone pitch-insights-rail__zone--good"
         style={{ left: `${50 - goodHalf}%`, width: `${goodHalf * 2}%` }}
       />
-      {size === 'hero' ? <div className="pitch-insights-rail__zero" /> : null}
+      {showZero ? <div className="pitch-insights-rail__zero" /> : null}
       <div
         className={`pitch-insights-rail__dot pitch-insights-rail__dot--${zone}`}
         style={{ left: `${position}%` }}
       />
+    </div>
+  )
+}
+
+const DAY_STRIP_COUNT = 14
+
+function DayStrip({
+  days,
+  focusedKey,
+  onSelectAll,
+  onSelectDay,
+}: {
+  days: PitchPracticeDaySummary[]
+  focusedKey: string | 'all'
+  onSelectAll: () => void
+  onSelectDay: (key: string) => void
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const chronological = useMemo(
+    () => [...days].slice(0, DAY_STRIP_COUNT).reverse(),
+    [days],
+  )
+
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    const selected = scroller?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!scroller || !selected) return
+    const left = selected.offsetLeft - scroller.clientWidth / 2 + selected.offsetWidth / 2
+    scroller.scrollTo({ left: Math.max(0, left), behavior: 'smooth' })
+  }, [focusedKey, chronological])
+
+  return (
+    <div
+      ref={scrollerRef}
+      className="pitch-insights-day-strip"
+      role="tablist"
+      aria-label="Practice days"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={focusedKey === 'all'}
+        className={`pitch-insights-day-strip__cell ${focusedKey === 'all' ? 'is-active' : ''}`}
+        onClick={onSelectAll}
+      >
+        All
+      </button>
+      {chronological.map((day) => {
+        const zone = zoneForCents(day.typicalCents)
+        const selected = focusedKey === day.key
+        return (
+          <button
+            key={day.key}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-label={`${formatDayHeading(day)}, ${formatCents(day.typicalCents)}`}
+            className={`pitch-insights-day-strip__cell ${selected ? 'is-active' : ''}`}
+            onClick={() => onSelectDay(day.key)}
+          >
+            <small>{monthFormatter.format(day.startAt)}</small>
+            <span>
+              <strong>{dayNumberFormatter.format(day.startAt)}</strong>
+              <span className={`pitch-insights-day-strip__dot pitch-insights-day-strip__dot--${zone}`} />
+            </span>
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -266,47 +316,55 @@ function heroStatusWord(tendency: PitchTendency): string {
 
 function PitchInsightsHero({
   observations,
+  overallObservations,
   registerNote,
+  dayLabel,
+  warmUpNote,
 }: {
   observations: PitchObservation[]
+  overallObservations: PitchObservation[]
   registerNote: string | null
+  dayLabel: string | null
+  warmUpNote: string | null
 }) {
   const trend = useMemo(() => summarizeOverallPitchTrend(observations), [observations])
+  const overall = useMemo(
+    () => summarizeOverallPitchTrend(overallObservations),
+    [overallObservations],
+  )
   if (observations.length === 0) return null
 
   const tendency = tendencyForCents(trend.overallCents)
   const zone = zoneForCents(trend.overallCents)
-  const improving = trend.deltaCents != null && trend.deltaCents > 0
+  const improving = overall.deltaCents != null && overall.deltaCents > 0
+  const status = heroStatusWord(tendency)
+  const title = dayLabel ? `${dayLabel} · ${status.toLowerCase()}` : status
 
   return (
     <section
       className={`pitch-insights-hero pitch-insights-hero--${zone}`}
-      aria-label={`Overall intonation: ${heroStatusWord(tendency)}, ${formatCents(trend.overallCents)} median`}
+      aria-label={`${dayLabel ? `${dayLabel}: ` : ''}${status}, ${formatCents(trend.overallCents)} median`}
     >
-      <span className="pitch-insights-hero__eyebrow">Across every note you play</span>
-      <strong className="pitch-insights-hero__status">{heroStatusWord(tendency)}</strong>
-      <PitchRail cents={trend.overallCents} size="hero" />
-      <div className="pitch-insights-hero__ticks" aria-hidden="true">
-        <span>flat</span>
-        <span>centered</span>
-        <span>sharp</span>
-      </div>
+      <strong className="pitch-insights-hero__status">{title}</strong>
+      <PitchRail cents={trend.overallCents} size="thin" />
       <p className="pitch-insights-hero__sub">
-        {trend.deltaCents != null ? (
+        {overall.deltaCents != null ? (
           <>
             <strong className={improving ? 'is-improving' : ''}>
-              {improving ? 'Getting closer' : 'Recent shift'}
+              {improving
+                ? `${Math.round(Math.abs(overall.deltaCents))}¢ closer`
+                : `${Math.round(Math.abs(overall.deltaCents))}¢ from center`}
             </strong>
-            {' — '}
-            {Math.round(Math.abs(trend.deltaCents))}
-            ¢ {improving ? 'nearer center' : 'from center'} than{' '}
-            {PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days ago
+            {` than ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days ago`}
           </>
         ) : (
           `${formatCents(trend.overallCents)} median across ${plural(observations.length, 'note held', 'notes held')}`
         )}
       </p>
-      {registerNote ? <p className="pitch-insights-hero__register">{registerNote}</p> : null}
+      {dayLabel ? null : registerNote ? (
+        <p className="pitch-insights-hero__register">{registerNote}</p>
+      ) : null}
+      {warmUpNote ? <p className="pitch-insights-hero__register">{warmUpNote}</p> : null}
     </section>
   )
 }
@@ -558,9 +616,11 @@ function PitchInsightsNoteRow({
       {collecting ? (
         <span className="pitch-insights-row__collecting">Collecting</span>
       ) : (
-        <PitchRail cents={insight.typicalCents} size="mini" />
+        <>
+          <PitchRail cents={insight.typicalCents} size="mini" />
+          <span className="pitch-insights-row__cents">{formatCents(insight.typicalCents)}</span>
+        </>
       )}
-      <ChevronRight aria-hidden />
     </button>
   )
 }
@@ -628,35 +688,23 @@ function InsightDetail({
       </button>
 
       <header className="pitch-insights-detail__hero">
-        <div>
-          <span>{confidenceLabel(insight)}</span>
+        <span>{confidenceLabel(insight)}</span>
+        <div className="pitch-insights-detail__hero-row">
           <h2>{displayName}</h2>
-          <p>{describePitchInsight({ ...insight, noteName: displayName })}</p>
+          <strong>
+            {insight.confidence === 'collecting' ? 'Learning' : formatCents(insight.typicalCents)}
+          </strong>
         </div>
-        <strong>{insight.confidence === 'collecting' ? 'Learning' : formatCents(insight.typicalCents)}</strong>
+        {hasTendency ? <PitchRail cents={insight.typicalCents} size="thin" /> : null}
+        <p>{describePitchInsight({ ...insight, noteName: displayName })}</p>
+        {improvement != null ? (
+          <p className={`pitch-insights-detail__delta ${improving ? 'is-improving' : ''}`}>
+            {improving
+              ? `${Math.round(improvement)}¢ closer than ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days ago`
+              : 'Recent shift against the last 14 days'}
+          </p>
+        ) : null}
       </header>
-
-      <div className="pitch-insights-detail__metrics">
-        <article>
-          <span>Tendency</span>
-          <strong>{hasTendency ? formatCents(insight.typicalCents) : '—'}</strong>
-          <small>{tendencyLabel(insight)}</small>
-        </article>
-        <article>
-          <span>Notes held</span>
-          <strong>{insight.observationCount}</strong>
-          <small>{marginLabel(insight)}</small>
-        </article>
-        <article>
-          <span>Consistency</span>
-          <strong>{hasTendency ? insight.consistency : '—'}</strong>
-          <small>
-            {hasTendency
-              ? `Spread ±${Math.round(insight.typicalVariability)}¢`
-              : 'Not enough yet'}
-          </small>
-        </article>
-      </div>
 
       <section className="pitch-insights-detail__trend-card">
         <header>
@@ -664,34 +712,12 @@ function InsightDetail({
             <span>Recent trend</span>
             <strong>Last {Math.min(24, insight.observationCount)} held</strong>
           </div>
-          {improvement != null ? (
-            <div className={`pitch-insights-trend-label ${improving ? 'is-improving' : ''}`}>
-              {improving ? <TrendingDown aria-hidden /> : <TrendingUp aria-hidden />}
-              {improving ? `${Math.round(improvement)}¢ closer to center` : 'Recent shift'}
-            </div>
-          ) : (
-            <div className="pitch-insights-trend-label">
-              <Minus aria-hidden /> Building history
-            </div>
-          )}
         </header>
-        <p className="pitch-insights-detail__trend-basis">
-          {improvement != null
-            ? `Last ${PITCH_INSIGHTS_THRESHOLDS.recentWindowDays} days vs. everything before.`
-            : 'Keep playing — a trend needs a couple more weeks of history.'}
-        </p>
         {hasTendency ? (
           <TrendSparkline observations={insight.observations} />
         ) : (
-          <div className="pitch-insights-trend__empty">
-            Keep playing to see a trend.
-          </div>
+          <div className="pitch-insights-trend__empty">Keep playing to see a trend.</div>
         )}
-        <div className="pitch-insights-detail__comparison">
-          <span>
-            {scopeLabel} <strong>{hasTendency ? formatCents(insight.typicalCents) : '—'}</strong>
-          </span>
-        </div>
       </section>
     </motion.div>
   )
@@ -738,12 +764,12 @@ function PracticeDayDetail({
       </button>
 
       <header className="pitch-insights-detail__hero pitch-insights-day-detail__hero">
-        <div>
-          <span>Practice day</span>
+        <span>Practice day</span>
+        <div className="pitch-insights-detail__hero-row">
           <h2>{formatDayHeading(day)}</h2>
-          <p>{fullDateFormatter.format(day.startAt)}</p>
+          <strong>{formatCents(day.typicalCents)}</strong>
         </div>
-        <strong>{formatCents(day.typicalCents)}</strong>
+        <p>{fullDateFormatter.format(day.startAt)}</p>
       </header>
 
       <div className="pitch-insights-detail__metrics">
@@ -955,10 +981,10 @@ function PracticeDaysScreen({
                 className="pitch-insights-day-row__open"
                 onClick={() => onOpenDay(day.key)}
               >
-                <span className="pitch-insights-day-row__date" aria-hidden>
-                  <small>{monthFormatter.format(day.startAt)}</small>
-                  <strong>{dayNumberFormatter.format(day.startAt)}</strong>
-                </span>
+                <span
+                  className={`pitch-insights-day-row__dot pitch-insights-day-row__dot--${zoneForCents(day.typicalCents)}`}
+                  aria-hidden
+                />
                 <span className="pitch-insights-day-row__copy">
                   <strong>{formatDayHeading(day)}</strong>
                   <small>
@@ -969,7 +995,6 @@ function PracticeDaysScreen({
                 <span className="pitch-insights-day-row__cents">
                   {formatCents(day.typicalCents)}
                 </span>
-                <ChevronRight aria-hidden />
               </button>
               <Pressable
                 type="button"
@@ -1009,6 +1034,7 @@ export default function PitchInsightsScreen({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null)
+  const [focusedDayKey, setFocusedDayKey] = useState<string | 'all'>('all')
   const [selectedMidi, setSelectedMidi] = useState<number | null>(null)
   const [overviewRoute, setOverviewRoute] = useState<'notes' | 'days' | null>(null)
   const [showAllDays, setShowAllDays] = useState(false)
@@ -1024,6 +1050,7 @@ export default function PitchInsightsScreen({
     }
   })
   const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false)
+  const didInitDayFocusRef = useRef(false)
 
   const removeInstrument = useCallback((id: string) => {
     setAddedInstruments((current) => {
@@ -1168,6 +1195,8 @@ export default function PitchInsightsScreen({
     if (!isOpen) {
       setSelectedMidi(null)
       setSelectedDayKey(null)
+      setFocusedDayKey('all')
+      didInitDayFocusRef.current = false
       setOverviewRoute(null)
       setShowAllDays(false)
       setResettingKey(null)
@@ -1206,16 +1235,53 @@ export default function PitchInsightsScreen({
 
   const days = useMemo(() => summarizePitchPracticeDays(visibleObservations), [visibleObservations])
   const selectedDay = days.find((day) => day.key === selectedDayKey) ?? null
-  const scopedObservations = selectedDay?.observations ?? visibleObservations
-  const allInsights = useMemo(
+  const focusedDay =
+    focusedDayKey === 'all' ? null : (days.find((day) => day.key === focusedDayKey) ?? null)
+
+  useEffect(() => {
+    if (!isOpen || days.length === 0) return
+    if (!didInitDayFocusRef.current) {
+      didInitDayFocusRef.current = true
+      setFocusedDayKey(days[0]!.key)
+      return
+    }
+    if (focusedDayKey !== 'all' && !days.some((day) => day.key === focusedDayKey)) {
+      setFocusedDayKey(days[0]?.key ?? 'all')
+    }
+  }, [days, focusedDayKey, isOpen])
+
+  const scopedObservations = focusedDay?.observations ?? visibleObservations
+  const focusedInsights = useMemo(
     () => aggregatePitchInsights(scopedObservations),
     [scopedObservations],
   )
-
-  const worthReviewing = useMemo(() => rankNotesWorthReviewing(allInsights), [allInsights])
+  const allInsights = useMemo(
+    () => aggregatePitchInsights(visibleObservations),
+    [visibleObservations],
+  )
+  const selectedDayInsights = useMemo(
+    () => (selectedDay ? aggregatePitchInsights(selectedDay.observations) : []),
+    [selectedDay],
+  )
+  const worthReviewing = useMemo(
+    () => rankNotesWorthReviewing(focusedInsights),
+    [focusedInsights],
+  )
   const registerNote = useMemo(() => describeRegisterPattern(allInsights), [allInsights])
+  const warmUpNote = useMemo(() => {
+    if (!focusedDay) return null
+    const firstSession = [...focusedDay.sessions].sort(
+      (left, right) => left.startedAt - right.startedAt,
+    )[0]
+    return firstSession ? describeWarmUpDrift(firstSession) : null
+  }, [focusedDay])
 
-  const selected = allInsights.find((insight) => insight.midiNote === selectedMidi) ?? null
+  const selectionInsights = selectedDay
+    ? selectedDayInsights
+    : overviewRoute === 'notes'
+      ? allInsights
+      : focusedInsights
+  const selected = selectionInsights.find((insight) => insight.midiNote === selectedMidi) ?? null
   const displayProfile = getTunerTransposition(transpositionId)
   const overallMedian = useMemo(
     () => median(visibleObservations.map((observation) => observation.centsOffset)),
@@ -1255,6 +1321,7 @@ export default function PitchInsightsScreen({
         await deletePitchObservationsInRange(day.startAt, day.endAt)
         setSelectedMidi(null)
         if (selectedDayKey === day.key) setSelectedDayKey(null)
+        if (focusedDayKey === day.key) setFocusedDayKey('all')
       } catch (error) {
         console.warn('[PitchInsights] Failed to reset practice day', error)
         await showAlert({
@@ -1266,7 +1333,7 @@ export default function PitchInsightsScreen({
         setResettingKey(null)
       }
     },
-    [selectedDayKey, showAlert, showConfirm],
+    [focusedDayKey, selectedDayKey, showAlert, showConfirm],
   )
 
   // A reset (this day, or all) can empty the practice-days or all-notes
@@ -1298,6 +1365,8 @@ export default function PitchInsightsScreen({
       await clearPitchObservations()
       setSelectedMidi(null)
       setSelectedDayKey(null)
+      setFocusedDayKey('all')
+      didInitDayFocusRef.current = false
     } catch (error) {
       console.warn('[PitchInsights] Failed to reset all history', error)
       await showAlert({
@@ -1324,7 +1393,7 @@ export default function PitchInsightsScreen({
       <div className="pitch-insights-screen">
         <header className="pitch-insights-screen__topbar">
           <div className="pitch-insights-screen__title-wrap">
-            <h2>Pitch Insights</h2>
+            <h2>Insights</h2>
           </div>
           <Pressable
             type="button"
@@ -1346,14 +1415,22 @@ export default function PitchInsightsScreen({
                 key={`detail-${selectedDayKey ?? 'all'}-${selected.midiNote}`}
                 insight={selected}
                 displayName={formatNoteName(selected.midiNote, selected.noteName)}
-                scopeLabel={selectedDay ? formatDayHeading(selectedDay) : 'All notes'}
+                scopeLabel={
+                  selectedDay
+                    ? formatDayHeading(selectedDay)
+                    : overviewRoute === 'notes'
+                      ? 'All notes'
+                      : focusedDay
+                        ? formatDayHeading(focusedDay)
+                        : 'Overview'
+                }
                 onBack={() => setSelectedMidi(null)}
               />
             ) : selectedDay ? (
               <PracticeDayDetail
                 key={`day-${selectedDay.key}`}
                 day={selectedDay}
-                insights={allInsights}
+                insights={selectedDayInsights}
                 formatNoteName={formatNoteName}
                 displayLabel={displayProfile.shortLabel}
                 resetting={resettingKey === selectedDay.key}
@@ -1404,7 +1481,7 @@ export default function PitchInsightsScreen({
                     empties the screen, and when this sat inside the content
                     branch it vanished with everything else — leaving no way to
                     switch back. */}
-                {!loading && !loadError ? (
+                {!loading && !loadError && showInstrumentFilter ? (
                   <>
                     <div
                       className="pitch-insights-instrument-filter"
@@ -1528,18 +1605,28 @@ export default function PitchInsightsScreen({
                   </div>
                 ) : (
                   <>
-                    <PitchInsightsHero observations={scopedObservations} registerNote={registerNote} />
-
-
+                    <DayStrip
+                      days={days}
+                      focusedKey={focusedDayKey}
+                      onSelectAll={() => {
+                        triggerLightHaptic(hapticFeedback)
+                        setFocusedDayKey('all')
+                      }}
+                      onSelectDay={(dayKey) => {
+                        triggerLightHaptic(hapticFeedback)
+                        setFocusedDayKey(dayKey)
+                      }}
+                    />
+                    <PitchInsightsHero
+                      observations={scopedObservations}
+                      overallObservations={visibleObservations}
+                      registerNote={registerNote}
+                      dayLabel={focusedDay ? formatDayHeading(focusedDay) : null}
+                      warmUpNote={warmUpNote}
+                    />
 
                     {worthReviewing.length > 0 ? (
                       <section className="pitch-insights-list" aria-label="Notes worth reviewing">
-                        <header>
-                          <div>
-                            <span>Worth a look</span>
-                            <strong>Your least centered pitches</strong>
-                          </div>
-                        </header>
                         <div className="pitch-insights-list__rows">
                           {worthReviewing.map((insight) => (
                             <PitchInsightsNoteRow
@@ -1553,49 +1640,26 @@ export default function PitchInsightsScreen({
                       </section>
                     ) : null}
 
-                    <section className="pitch-insights-list" aria-label="More">
-                      <header>
-                        <div>
-                          <span>More</span>
-                        </div>
-                      </header>
-                      <div className="pitch-insights-list__rows">
-                        <button
-                          type="button"
-                          className="pitch-insights-link-row"
-                          onClick={() => {
-                            triggerLightHaptic(hapticFeedback)
-                            setOverviewRoute('notes')
-                          }}
-                        >
-                          <div className="pitch-insights-link-row__copy">
-                            <strong>All notes</strong>
-                            <span>Every pitch you’ve held</span>
-                          </div>
-                          <span className="pitch-insights-link-row__count">
-                            {plural(allInsights.length, 'note')}
-                          </span>
-                          <ChevronRight aria-hidden />
-                        </button>
-                        <button
-                          type="button"
-                          className="pitch-insights-link-row"
-                          onClick={() => {
-                            triggerLightHaptic(hapticFeedback)
-                            setOverviewRoute('days')
-                          }}
-                        >
-                          <div className="pitch-insights-link-row__copy">
-                            <strong>Practice days</strong>
-                            <span>Sessions grouped by date</span>
-                          </div>
-                          <span className="pitch-insights-link-row__count">
-                            {plural(days.length, 'day')}
-                          </span>
-                          <ChevronRight aria-hidden />
-                        </button>
-                      </div>
-                    </section>
+                    <nav className="pitch-insights-footer" aria-label="More history">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerLightHaptic(hapticFeedback)
+                          setOverviewRoute('notes')
+                        }}
+                      >
+                        All notes · {allInsights.length}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerLightHaptic(hapticFeedback)
+                          setOverviewRoute('days')
+                        }}
+                      >
+                        Days · {days.length}
+                      </button>
+                    </nav>
                   </>
                 )}
               </motion.div>

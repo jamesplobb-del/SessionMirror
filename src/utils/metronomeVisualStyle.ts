@@ -1,28 +1,31 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * Which visual the metronome stage draws. All four read tempo from motion
+ * Which visual the metronome stage draws. All five read tempo from motion
  * alone, so the beat stays followable with the sound muted or with the phone
  * across the room.
  *
  * Purely presentational — deliberately kept out of the shared audio engine's
  * snapshot so changing it never touches click scheduling.
  */
-export type MetronomeVisualStyle = 'ribbon' | 'vertical' | 'horizontal' | 'columns'
+export type MetronomeVisualStyle = 'ribbon' | 'vertical' | 'horizontal' | 'columns' | 'pulse'
 
 export const METRONOME_VISUAL_STYLES = [
   { id: 'ribbon', label: 'Pulse Ribbon' },
   { id: 'vertical', label: 'Vertical Bounce' },
   { id: 'horizontal', label: 'Horizontal Bounce' },
   { id: 'columns', label: 'Pulse Columns' },
+  { id: 'pulse', label: 'Stage Pulse' },
 ] as const satisfies ReadonlyArray<{ id: MetronomeVisualStyle; label: string }>
 
 const STORAGE_KEY = 'besttake.metronome.visualStyle'
 const DEFAULT_STYLE: MetronomeVisualStyle = 'ribbon'
 
+const KNOWN = new Set<MetronomeVisualStyle>(METRONOME_VISUAL_STYLES.map((item) => item.id))
+
 function parse(value: string | null): MetronomeVisualStyle {
-  if (value === 'ribbon' || value === 'vertical' || value === 'horizontal' || value === 'columns') {
-    return value
+  if (value && KNOWN.has(value as MetronomeVisualStyle)) {
+    return value as MetronomeVisualStyle
   }
   // Preserve the nearest equivalent for existing installs. The retired bars
   // view becomes Pulse Columns; Orbit and Pendulum return to the new default.

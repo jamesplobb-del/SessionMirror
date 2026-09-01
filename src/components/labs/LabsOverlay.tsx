@@ -170,6 +170,8 @@ export default function LabsOverlay({
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}
+              tunerInstrument={tunerInstrument}
+              tunerTransposition={tunerTransposition}
               onOpenStaffJumper={() => onNavigate('staff-jumper')}
               onOpenBalance={() => onNavigate('balance')}
               onOpenLearnInstrument={() => onNavigate('learn-instrument')}

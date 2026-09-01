@@ -354,3 +354,30 @@ export function describePitchInsight(insight: NotePitchInsight): string {
   const direction = insight.typicalCents < 0 ? 'flat' : 'sharp'
   return `${insight.noteName} typically sits ${cents} ${cents === 1 ? 'cent' : 'cents'} ${direction}.`
 }
+
+/** Pitch-class token from a tuner note name (`Bb4` → `Bb`, `F#5` → `F#`). */
+export function pitchClassFromNoteName(noteName: string): string {
+  const match = /^([A-G](?:#|b|♭)?)(.*)$/i.exec(noteName.trim())
+  return match?.[1] ?? noteName
+}
+
+/**
+ * One quiet line for the live tuner. Silent while still collecting, and
+ * silent for notes that already sit on center — the caret covers that.
+ */
+export function describeLivePitchCoach(
+  insight: NotePitchInsight,
+  writtenPitchClass: string,
+): string | null {
+  if (insight.confidence === 'collecting') return null
+  if (insight.tendency === 'Centered' && insight.consistency !== 'Variable') return null
+
+  if (insight.tendency === 'Centered') {
+    return `${writtenPitchClass} usually wanders around center`
+  }
+
+  const cents = Math.round(Math.abs(insight.typicalCents))
+  const signed = `${insight.typicalCents < 0 ? '-' : '+'}${cents}`
+  const varies = insight.consistency === 'Variable' ? ', and varies' : ''
+  return `Usually ${signed}¢ on this ${writtenPitchClass}${varies}`
+}

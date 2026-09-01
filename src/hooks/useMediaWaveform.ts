@@ -6,6 +6,8 @@ interface UseMediaWaveformOptions {
   filePath: string
   mediaUrl: string
   barCount?: number
+  /** When false, return [] until real peaks exist instead of a placeholder shape. */
+  placeholder?: boolean
 }
 
 /**
@@ -71,13 +73,15 @@ export function useMediaWaveform({
   filePath,
   mediaUrl,
   barCount = 72,
+  placeholder = true,
 }: UseMediaWaveformOptions): number[] {
   const resolvedSrc = useCapacitorVideoSrc(filePath, mediaUrl)
-  const [peaks, setPeaks] = useState<number[]>(() => fallbackPeaks(barCount))
+  const emptyPeaks = placeholder ? fallbackPeaks(barCount) : []
+  const [peaks, setPeaks] = useState<number[]>(() => emptyPeaks)
 
   useEffect(() => {
     if (!resolvedSrc) {
-      setPeaks(fallbackPeaks(barCount))
+      setPeaks(placeholder ? fallbackPeaks(barCount) : [])
       return
     }
 
@@ -105,7 +109,7 @@ export function useMediaWaveform({
         console.info('[Waveform] skipping decode — media too large for the WebView', {
           byteLength,
         })
-        setPeaks(fallbackPeaks(barCount))
+        setPeaks(placeholder ? fallbackPeaks(barCount) : [])
         return
       }
 
@@ -117,7 +121,7 @@ export function useMediaWaveform({
           console.info('[Waveform] skipping decode — media too large for the WebView', {
             byteLength: arrayBuffer.byteLength,
           })
-          setPeaks(fallbackPeaks(barCount))
+          setPeaks(placeholder ? fallbackPeaks(barCount) : [])
           return
         }
         const AudioContextCtor =
@@ -132,7 +136,7 @@ export function useMediaWaveform({
       } catch (error) {
         console.warn('Waveform decode failed:', error)
         if (!cancelled) {
-          setPeaks(fallbackPeaks(barCount))
+          setPeaks(placeholder ? fallbackPeaks(barCount) : [])
         }
       } finally {
         void audioContext?.close().catch(() => undefined)
@@ -142,7 +146,7 @@ export function useMediaWaveform({
     return () => {
       cancelled = true
     }
-  }, [barCount, filePath, mediaUrl, resolvedSrc])
+  }, [barCount, filePath, mediaUrl, placeholder, resolvedSrc])
 
   return peaks
 }

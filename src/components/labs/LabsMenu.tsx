@@ -1,8 +1,22 @@
-import { useState } from 'react'
-import { Check, Gamepad2, Music4, Play, Trophy, Wind, X } from 'lucide-react'
-import balanceShot from '../../assets/games/balance.jpg'
-import learnInstrumentShot from '../../assets/games/learn-instrument.jpg'
-import staffJumperShot from '../../assets/games/staff-jumper.jpg'
+import { useMemo, useState } from 'react'
+import { Check, ChevronRight, Trophy } from 'lucide-react'
+import Pressable from '../ui/Pressable'
+import BalanceArcadeShell from '../../labs/balance/BalanceArcadeShell'
+import BalanceInstrumentPicker from '../../labs/balance/BalanceInstrumentPicker'
+import '../../labs/balance/balance-arcade.css'
+import { inferBalanceInstrument, getBalanceInstrument } from '../../labs/balance/balanceInstruments'
+import { midiToBalanceNoteName } from '../../labs/balance/balanceMusic'
+import {
+  balanceCurrentStreak,
+  balanceDailyChallenge,
+  balanceDailyIsComplete,
+  balanceDayKey,
+} from '../../labs/balance/balanceDaily'
+import {
+  formatBalanceDuration,
+  loadBalanceBestMs,
+  loadBalanceData,
+} from '../../labs/balance/balanceStorage'
 import {
   getPracticeGameCharacter,
   loadPracticeGameCharacter,
@@ -10,198 +24,265 @@ import {
   savePracticeGameCharacter,
   type PracticeGameCharacterId,
 } from '../../labs/practiceGameCharacters'
+import {
+  loadLastPracticeGame,
+  loadPracticeGameInstrumentId,
+  saveLastPracticeGame,
+  savePracticeGameInstrumentId,
+  type PracticeGameId,
+} from '../../labs/practiceGameInstrument'
 import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumper/staffJumperMusicLogic'
-import { formatBalanceDuration, loadBalanceBestMs } from '../../labs/balance/balanceStorage'
 import { INSTRUMENTS as LEARN_INSTRUMENTS } from '../../labs/learnInstrument/instrumentData'
-import Pressable from '../ui/Pressable'
+import type { TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerTranspositionId } from '../../utils/tunerTransposition'
+import HallDoorWorld from './HallDoorWorlds'
+
+type PlazaPage = 'plaza' | 'instrument' | 'character'
 
 interface LabsMenuProps {
   hapticFeedback: boolean
+  tunerInstrument: TunerInstrument
+  tunerTransposition: TunerTranspositionId
   onOpenStaffJumper: () => void
   onOpenBalance: () => void
   onOpenLearnInstrument: () => void
   onBack: () => void
 }
-/** Kept in step with the lesson data so the card never goes stale. */
+
 const LEARN_INSTRUMENT_COUNT = LEARN_INSTRUMENTS.length
+
+function openGame(
+  id: PracticeGameId,
+  open: Record<PracticeGameId, () => void>,
+): void {
+  saveLastPracticeGame(id)
+  open[id]()
+}
 
 export default function LabsMenu({
   hapticFeedback,
+  tunerInstrument,
+  tunerTransposition,
   onOpenStaffJumper,
   onOpenBalance,
   onOpenLearnInstrument,
   onBack,
 }: LabsMenuProps) {
+  const [page, setPage] = useState<PlazaPage>('plaza')
+  const [characterId, setCharacterId] = useState<PracticeGameCharacterId>(loadPracticeGameCharacter)
+  const [instrumentId, setInstrumentId] = useState(() => {
+    const saved = loadPracticeGameInstrumentId()
+    const id =
+      saved ?? inferBalanceInstrument(tunerTransposition, tunerInstrument).id
+    savePracticeGameInstrumentId(id)
+    return id
+  })
+  const character = getPracticeGameCharacter(characterId)
+  const instrument = getBalanceInstrument(instrumentId)
   const staffJumperBest = loadStaffJumperBestScore()
   const balanceBest = loadBalanceBestMs()
-  const [selectedCharacterId, setSelectedCharacterId] = useState<PracticeGameCharacterId>(
-    loadPracticeGameCharacter,
+  const balanceData = loadBalanceData(instrumentId)
+  const dayKey = balanceDayKey()
+  const challenge = useMemo(
+    () => balanceDailyChallenge(instrumentId, dayKey),
+    [dayKey, instrumentId],
   )
-  const selectedCharacter = getPracticeGameCharacter(selectedCharacterId)
+  const streak = balanceCurrentStreak(balanceData.daily, dayKey)
+  const dailyDone = balanceDailyIsComplete(balanceData.daily, dayKey)
+  const lastGame = loadLastPracticeGame() ?? 'balance'
+  const openers = {
+    'staff-jumper': onOpenStaffJumper,
+    balance: onOpenBalance,
+    'learn-instrument': onOpenLearnInstrument,
+  } as const
 
   const selectCharacter = (id: PracticeGameCharacterId) => {
-    setSelectedCharacterId(id)
+    setCharacterId(id)
     savePracticeGameCharacter(id)
+    setPage('plaza')
   }
 
-  return (
-    <div className="arcade-menu flex min-h-0 flex-1 flex-col">
-      <div className="arcade-menu__topbar">
-        <div className="arcade-wordmark">
-          <span className="arcade-wordmark__mark" aria-hidden>
-            <Gamepad2 />
-          </span>
-          <span>
-            <strong>
-              Practice Games <span className="arcade-wordmark__beta">(Beta)</span>
-            </strong>
-            <span>BestTake</span>
-          </span>
-        </div>
-        <Pressable
-          type="button"
-          intensity="icon"
-          hapticFeedback={hapticFeedback}
-          onClick={onBack}
-          className="arcade-icon-button"
-          aria-label="Close Games"
-        >
-          <X aria-hidden />
-        </Pressable>
-      </div>
+  const selectInstrument = (id: string) => {
+    const next = getBalanceInstrument(id)
+    setInstrumentId(next.id)
+    savePracticeGameInstrumentId(next.id)
+    setPage('plaza')
+  }
 
-      <header className="arcade-menu__hero">
-        <p className="arcade-kicker">Play your instrument</p>
-        <h1>Choose a game</h1>
-        <p>Your microphone hears every note — no buttons, no tapping.</p>
-      </header>
+  if (page === 'instrument') {
+    return (
+      <BalanceInstrumentPicker
+        instrumentId={instrumentId}
+        hapticFeedback={hapticFeedback}
+        onBack={() => setPage('plaza')}
+        onSelect={selectInstrument}
+        backLabel="Back to Play"
+        lede="Games follow your horn's own range."
+      />
+    )
+  }
 
-      <section className="arcade-character-picker" aria-labelledby="arcade-character-title">
-        <header>
-          <span>
-            <small>Character</small>
-            <h2 id="arcade-character-title">{selectedCharacter.name}</h2>
-          </span>
-          <p>Staff Jumper &amp; Balance</p>
-        </header>
-        <div className="arcade-character-picker__rail" role="radiogroup" aria-label="Game character">
-          {PRACTICE_GAME_CHARACTERS.map((character) => {
-            const selected = selectedCharacterId === character.id
+  if (page === 'character') {
+    return (
+      <BalanceArcadeShell
+        title="Character"
+        hapticFeedback={hapticFeedback}
+        onBack={() => setPage('plaza')}
+        backLabel="Back to Play"
+        className="balance-arcade--plaza"
+      >
+        <h1 className="balance-display balance-display--page">Your Player</h1>
+        <p className="balance-subdisplay">Staff Jumper and Balance</p>
+        <div className="balance-plaza__characters" role="radiogroup" aria-label="Game character">
+          {PRACTICE_GAME_CHARACTERS.map((option) => {
+            const selected = option.id === characterId
             return (
               <Pressable
-                key={character.id}
+                key={option.id}
                 type="button"
                 intensity="soft"
                 hapticFeedback={hapticFeedback}
-                className={`arcade-character-option ${selected ? 'is-selected' : ''}`}
+                className={`balance-plaza__character ${selected ? 'is-selected' : ''}`}
                 role="radio"
                 aria-checked={selected}
-                aria-label={`Use ${character.name} in Staff Jumper and Balance`}
-                onClick={() => selectCharacter(character.id)}
+                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
+                onClick={() => selectCharacter(option.id)}
               >
-                <span aria-hidden>
+                <span className="balance-plaza__character-art" aria-hidden>
                   <img
-                    src={character.asset}
+                    src={option.asset}
                     alt=""
                     draggable={false}
-                    style={{ transform: `scale(${character.scale})` }}
+                    style={{ transform: `scale(${option.scale})` }}
                   />
-                  {selected && <Check />}
+                  {selected ? <Check /> : null}
+                </span>
+                <strong>{option.name}</strong>
+              </Pressable>
+            )
+          })}
+        </div>
+      </BalanceArcadeShell>
+    )
+  }
+
+  const doors: Array<{
+    id: PracticeGameId
+    title: string
+    line: string
+    world: 'staff' | 'balance' | 'learn'
+  }> = [
+    {
+      id: 'staff-jumper',
+      title: 'Staff Jumper',
+      line: staffJumperBest ? `Best ${staffJumperBest}` : 'Sight reading',
+      world: 'staff',
+    },
+    {
+      id: 'balance',
+      title: 'Balance',
+      line: !dailyDone
+        ? challenge.name
+        : balanceBest > 0
+          ? `Best ${formatBalanceDuration(balanceBest)}`
+          : 'Hold your note',
+      world: 'balance',
+    },
+    {
+      id: 'learn-instrument',
+      title: 'Learn',
+      line: `${LEARN_INSTRUMENT_COUNT} instruments`,
+      world: 'learn',
+    },
+  ]
+
+  return (
+    <BalanceArcadeShell
+      title="Play"
+      hapticFeedback={hapticFeedback}
+      onBack={onBack}
+      backLabel="Close Games"
+      stat={streak > 0 ? { label: 'Streak', value: `${streak} day` } : null}
+      className="balance-arcade--plaza balance-arcade--hall"
+      scrollBody={false}
+    >
+      <h1 className="sr-only">Practice Games</h1>
+
+      <Pressable
+        intensity="soft"
+        hapticFeedback={hapticFeedback}
+        className="balance-instrument-pill balance-instrument-pill--quiet"
+        onClick={() => setPage('instrument')}
+        aria-label={`Instrument ${instrument.name}. Change instrument`}
+      >
+        <span>
+          <small>Instrument</small>
+          <strong>{instrument.name}</strong>
+        </span>
+        <b>
+          {midiToBalanceNoteName(instrument.minWrittenMidi)}–
+          {midiToBalanceNoteName(instrument.maxWrittenMidi)}
+        </b>
+        <ChevronRight aria-hidden />
+      </Pressable>
+
+      <div className="balance-hall">
+        <div className="balance-hall__doors" role="navigation" aria-label="Games">
+          {doors.map((door) => {
+            const current = lastGame === door.id
+            return (
+              <Pressable
+                key={door.id}
+                type="button"
+                intensity="soft"
+                squish={false}
+                haptic="medium"
+                hapticFeedback={hapticFeedback}
+                className={`balance-door balance-door--${door.world} ${current ? 'is-open' : ''}`}
+                aria-current={current ? 'true' : undefined}
+                aria-label={`${current ? 'Continue in' : 'Enter'} ${door.title}. ${door.line}`}
+                onClick={() => openGame(door.id, openers)}
+              >
+                <span className={`balance-door__world balance-door__world--${door.world}`} aria-hidden>
+                  <HallDoorWorld world={door.world} characterSrc={character.asset} />
+                </span>
+                <span className="balance-door__plaque">
+                  {current ? <em>Continue</em> : null}
+                  <strong>{door.title}</strong>
+                  <small>
+                    {door.line.startsWith('Best ') ? <Trophy aria-hidden /> : null}
+                    {door.line}
+                  </small>
                 </span>
               </Pressable>
             )
           })}
         </div>
-      </section>
 
-      <div className="arcade-menu__section-head">
-        <h2>Games</h2>
-        <span>3 available</span>
+        <div className="balance-hall__threshold">
+          <div className="balance-hall__floor" aria-hidden />
+          <Pressable
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
+            className={`balance-hall__player is-${lastGame === 'staff-jumper' ? 'staff' : lastGame === 'learn-instrument' ? 'learn' : 'balance'}`}
+            onClick={() => setPage('character')}
+            aria-label={`Character ${character.name}, waiting at the door. Change player`}
+          >
+            <span className="balance-hall__player-art" aria-hidden>
+              <img
+                src={character.asset}
+                alt=""
+                draggable={false}
+                style={{ transform: `scale(${character.scale})` }}
+              />
+            </span>
+          </Pressable>
+        </div>
       </div>
 
-      <ul className="arcade-game-list">
-        <li>
-          <Pressable
-            type="button"
-            intensity="normal"
-            hapticFeedback={hapticFeedback}
-            onClick={onOpenLearnInstrument}
-            className="arcade-game-card arcade-game-card--wind"
-            aria-label="Open Learn Your Instrument"
-          >
-            <span className="arcade-game-card__copy">
-              <span className="arcade-game-card__badge">
-                <Wind aria-hidden /> Note by note
-              </span>
-              <h3>Learn Your Instrument</h3>
-              <p>See the note, match the fingering chart, and play it.</p>
-              <span className="arcade-game-card__meta">
-                <span>{LEARN_INSTRUMENT_COUNT} instruments · beginner</span>
-              </span>
-            </span>
-            <span className="arcade-game-card__art arcade-game-card__art--wind" aria-hidden>
-              <img className="arcade-game-card__shot" src={learnInstrumentShot} alt="" decoding="async" />
-              <span className="arcade-game-card__go"><Play aria-hidden /></span>
-            </span>
-          </Pressable>
-        </li>
-        <li>
-          <Pressable
-            type="button"
-            intensity="normal"
-            hapticFeedback={hapticFeedback}
-            onClick={onOpenStaffJumper}
-            className="arcade-game-card arcade-game-card--staff"
-            aria-label={`Play Staff Jumper. Personal best ${staffJumperBest}`}
-          >
-            <span className="arcade-game-card__copy">
-              <span className="arcade-game-card__badge">
-                <Music4 aria-hidden /> Sight reading
-              </span>
-              <h3>Staff Jumper</h3>
-              <p>Read the note under the player and hop it across the staff.</p>
-              <span className="arcade-game-card__meta">
-                <span>
-                  <Trophy aria-hidden /> Best {staffJumperBest || '—'}
-                </span>
-              </span>
-            </span>
-            <span className="arcade-game-card__art arcade-game-card__art--staff" aria-hidden>
-              <img className="arcade-game-card__shot" src={staffJumperShot} alt="" decoding="async" />
-              <span className="arcade-game-card__go">
-                <Play aria-hidden />
-              </span>
-            </span>
-          </Pressable>
-        </li>
-        <li>
-          <Pressable
-            type="button"
-            intensity="normal"
-            hapticFeedback={hapticFeedback}
-            onClick={onOpenBalance}
-            className="arcade-game-card arcade-game-card--balance"
-            aria-label={`Play Balance. Personal best ${balanceBest > 0 ? formatBalanceDuration(balanceBest) : 'none'}`}
-          >
-            <span className="arcade-game-card__copy">
-              <span className="arcade-game-card__badge">Long tones</span>
-              <h3>Balance</h3>
-              <p>Hold the note in tune to keep your player moving.</p>
-              <span className="arcade-game-card__meta">
-                <span><Trophy aria-hidden /> Best {balanceBest > 0 ? formatBalanceDuration(balanceBest) : '—'}</span>
-              </span>
-            </span>
-            <span className="arcade-game-card__art arcade-game-card__art--balance" aria-hidden>
-              <img className="arcade-game-card__shot" src={balanceShot} alt="" decoding="async" />
-              <span className="arcade-game-card__go"><Play aria-hidden /></span>
-            </span>
-          </Pressable>
-        </li>
-      </ul>
-
-      <p className="arcade-menu__footer-note">
-        Microphone access is required. Nothing is recorded — pitch is read live and discarded.
+      <p className="balance-hall__hint">
+        Tap a door to go in · tap {character.name} to change player
       </p>
-    </div>
+    </BalanceArcadeShell>
   )
 }

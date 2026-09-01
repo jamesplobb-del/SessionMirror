@@ -11,6 +11,7 @@ import PitchInsightsScreen from './audioPractice/PitchInsightsScreen'
 import TunerTranspositionMenu from './audioPractice/TunerTranspositionMenu'
 import TuningGauge from './audioPractice/TuningGauge'
 import { useTunerWash } from '../hooks/useTunerWash'
+import { useLivePitchCoach } from '../hooks/useLivePitchCoach'
 import { triggerLightHaptic } from '../utils/haptics'
 import {
   formatDisplayCents,
@@ -24,6 +25,7 @@ import {
 import type { TunerInstrument } from '../utils/pitchConfig'
 import {
   DEFAULT_TUNER_TRANSPOSITION,
+  concertPitchFromWrittenMidi,
   getTunerTransposition,
   getWrittenPitchLabel,
   transposePitchReadout,
@@ -189,6 +191,7 @@ function LiveAudioTunerPane({
   insightsEnabled = false,
   audioToolsEnabled = true,
   inTuneGlow = 0,
+  coachEnabled = false,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -202,6 +205,7 @@ function LiveAudioTunerPane({
   insightsEnabled?: boolean
   audioToolsEnabled?: boolean
   inTuneGlow?: number
+  coachEnabled?: boolean
 }) {
   const notifyTutorial = useTutorialAction()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -212,6 +216,16 @@ function LiveAudioTunerPane({
   const pitchZone = pitchActive ? getIntonationZone(readout.cents) : 'idle'
   const droneActive = Boolean(drone?.activeNotes.length)
   const transposition = getTunerTransposition(tunerTransposition)
+  const concertMidi = pitchActive
+    ? Math.round(readout.midi) - transposition.writtenOffsetSemitones
+    : null
+  const coach = useLivePitchCoach({
+    enabled: coachEnabled,
+    concertMidi,
+    writtenNoteName: readout.noteName,
+    transpositionId: tunerTransposition,
+    suppressed: droneActive,
+  })
   const activeDronePitchNames = (drone?.activeNotes ?? []).map((pitchClass) =>
     getWrittenPitchLabel(pitchClass, drone?.octave ?? 4, tunerTransposition).noteName,
   )
@@ -225,6 +239,31 @@ function LiveAudioTunerPane({
     ? `Drone active. Written pitches ${activeDronePitchNames.join(', ')} for ${transposition.label}`
     : `Drone off. Pitches will be shown as written for ${transposition.label}`
   const tunerHapticsEnabled = drone?.hapticsEnabled ?? hapticsEnabled
+  const catchConcert =
+    drone && pitchActive
+      ? concertPitchFromWrittenMidi(readout.midi, tunerTransposition)
+      : null
+  const catchOctave = catchConcert
+    ? Math.min(8, Math.max(0, catchConcert.octave))
+    : null
+  const holdingCaughtNote = Boolean(
+    catchConcert &&
+      catchOctave !== null &&
+      drone?.activeNotes.length === 1 &&
+      drone.activeNotes[0] === catchConcert.pitchClass &&
+      drone.octave === catchOctave,
+  )
+
+  const catchNote = () => {
+    if (!drone || !catchConcert || catchOctave === null) return
+    onDroneInteraction?.()
+    if (holdingCaughtNote) {
+      drone.onSetNotes([])
+      return
+    }
+    triggerLightHaptic(tunerHapticsEnabled)
+    drone.onGlissNote(catchConcert.pitchClass, catchOctave)
+  }
 
   useTunerWash(
     stageRef,
@@ -266,7 +305,17 @@ function LiveAudioTunerPane({
     >
       <div className="pitch-living-canvas">
         <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
-        <TuningGauge readout={readout} />
+        <TuningGauge
+          readout={readout}
+          coach={coach}
+          onCatchNote={drone ? catchNote : undefined}
+          catchPressed={holdingCaughtNote}
+          catchLabel={
+            holdingCaughtNote
+              ? `Release ${readout.noteName} drone`
+              : `Hold ${readout.noteName} as a drone`
+          }
+        />
 
         {audioToolsEnabled && (drone || onTunerTranspositionChange || insightsEnabled) ? (
           <>
@@ -660,6 +709,7 @@ function LivePitchTunerAudio({
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
               inTuneGlow={liveTracker.inTuneGlow}
+              coachEnabled={liveMicOnly}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">

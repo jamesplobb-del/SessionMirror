@@ -31,6 +31,7 @@ import {
   getBalanceInstrument,
   inferBalanceInstrument,
 } from './balanceMusic'
+import { loadPracticeGameInstrumentId } from '../practiceGameInstrument'
 import {
   balanceCurrentStreak,
   balanceDailyChallenge,
@@ -75,7 +76,12 @@ export default function BalanceScreen({
   onBack,
 }: BalanceScreenProps) {
   const initialInstrument = useMemo(
-    () => inferBalanceInstrument(tunerTransposition, tunerInstrument),
+    () => {
+      const saved = loadPracticeGameInstrumentId()
+      return saved
+        ? getBalanceInstrument(saved)
+        : inferBalanceInstrument(tunerTransposition, tunerInstrument)
+    },
     [tunerInstrument, tunerTransposition],
   )
   const mediaRef = useRef<HTMLMediaElement | null>(null)

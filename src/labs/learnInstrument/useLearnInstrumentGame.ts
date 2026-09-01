@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import type { AcceptedPitchFrame } from '../../hooks/useLivePitchTracker'
 import { triggerSuccessHaptic } from '../../utils/haptics'
 import { centsFromMidi } from '../../utils/pitchUtils'
+import { canonicalInstrumentIdFromLesson, savePracticeGameInstrumentId } from '../practiceGameInstrument'
 import {
   INSTRUMENTS,
   LESSON_GOALS,
@@ -446,6 +447,8 @@ export function useLearnInstrumentGame(
       selectedGoalId: goalId,
       completedLessonIdsByInstrument: completedRef.current,
     })
+    const canonicalId = canonicalInstrumentIdFromLesson(instrumentId)
+    if (canonicalId) savePracticeGameInstrumentId(canonicalId)
   }, [])
 
   const completeLesson = useCallback((instrument: Instrument) => {

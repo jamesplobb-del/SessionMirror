@@ -28,6 +28,23 @@ function useBeatTick(playing: boolean, beatPulseId: number, subTickIndex: number
   return tick
 }
 
+/** Height above the floor. Lands on 0 at the click, hangs, then falls. */
+function gravityHeight(beatFraction: number, peak: number): number {
+  if (beatFraction <= 0) return 0
+  if (beatFraction < 0.16) {
+    const t = beatFraction / 0.16
+    return peak * (1 - (1 - t) ** 3)
+  }
+  const t = (beatFraction - 0.16) / 0.84
+  return peak * (1 - t ** 2.4)
+}
+
+function landingSquash(beatFraction: number): number {
+  if (beatFraction < 0.1) return 0.7 + (beatFraction / 0.1) * 0.3
+  if (beatFraction > 0.88) return 1 - ((beatFraction - 0.88) / 0.12) * 0.3
+  return 1
+}
+
 export default function MetronomeBeatDisplay({ interactive = true }: MetronomeBeatDisplayProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const visualStyle = useMetronomeVisualStyle()
@@ -124,6 +141,8 @@ function visualLabel(style: MetronomeVisualStyle): string {
       return 'Horizontal Bounce'
     case 'columns':
       return 'Pulse Columns'
+    case 'pulse':
+      return 'Stage Pulse'
     default:
       return 'Pulse Ribbon'
   }
@@ -170,6 +189,8 @@ function MetronomeVisual({
         className={`metronome-bounce metronome-bounce--horizontal metronome-bounce--direction-${pulseKey % 2 === 0 ? 'left' : 'right'} metronome-pulse-tone--${pulseTone}`}
       >
         <div className="metronome-bounce__guide" />
+        <span className="metronome-bounce__station metronome-bounce__station--start" />
+        <span className="metronome-bounce__station metronome-bounce__station--end" />
         <span key={pulseKey} className="metronome-bounce__orb" />
         <span key={`impact-${pulseKey}`} className="metronome-bounce__impact" />
       </div>
@@ -185,16 +206,24 @@ function MetronomeVisual({
         {Array.from({ length: beatsPerBar }, (_, index) => {
           const level = accentLevels[index] ?? 'weak'
           const active = playing && beatIndex === index
+          const elapsed = playing && index < beatIndex
           return (
             <span
               key={`${index}-${active ? pulseKey : 'idle'}`}
-              className={`metronome-columns__column ${index === 0 ? 'metronome-columns__column--downbeat' : ''} ${level === 'silent' ? 'metronome-columns__column--silent' : ''} ${active ? 'metronome-columns__column--active' : ''}`}
+              className={`metronome-columns__column ${index === 0 ? 'metronome-columns__column--downbeat' : ''} ${level === 'silent' ? 'metronome-columns__column--silent' : ''} ${active ? 'metronome-columns__column--active' : ''} ${elapsed ? 'metronome-columns__column--elapsed' : ''}`}
+              style={{ '--column-index': index } as CSSProperties}
             >
               <i />
             </span>
           )
         })}
       </div>
+    )
+  }
+
+  if (style === 'pulse') {
+    return (
+      <StagePulse playing={playing} pulseKey={pulseKey} tone={pulseTone} downbeat={downbeat} />
     )
   }
 
@@ -206,6 +235,40 @@ function MetronomeVisual({
       reducedMotion={reducedMotion}
       tone={pulseTone}
     />
+  )
+}
+
+function StagePulse({
+  playing,
+  pulseKey,
+  tone,
+  downbeat,
+}: {
+  playing: boolean
+  pulseKey: number
+  tone: 'gold' | 'blue-strong' | 'blue'
+  downbeat: boolean
+}) {
+  return (
+    <div
+      className={`metronome-stage-pulse metronome-pulse-tone--${tone} ${downbeat ? 'metronome-stage-pulse--downbeat' : ''}`}
+    >
+      {playing ? (
+        <>
+          <span key={`ring-${pulseKey}`} className="metronome-stage-pulse__ring" />
+          <span
+            key={`ring-late-${pulseKey}`}
+            className="metronome-stage-pulse__ring metronome-stage-pulse__ring--late"
+          />
+        </>
+      ) : (
+        <span className="metronome-stage-pulse__ring metronome-stage-pulse__ring--idle" />
+      )}
+      <span
+        key={playing ? `core-${pulseKey}` : 'core-idle'}
+        className={`metronome-stage-pulse__core ${playing ? 'metronome-stage-pulse__core--playing' : ''}`}
+      />
+    </div>
   )
 }
 
@@ -228,11 +291,13 @@ function PulseRibbon({
   const glowId = `metronome-soft-glow-${id}`
   const mainPathRef = useRef<SVGPathElement>(null)
   const ghostPathRefs = useRef<Array<SVGPathElement | null>>([])
+  const travelGroupRef = useRef<SVGGElement>(null)
   const travelGlowRef = useRef<SVGCircleElement>(null)
   const travelCoreRef = useRef<SVGCircleElement>(null)
   const strikeRingRef = useRef<SVGCircleElement>(null)
   const strikeDotRef = useRef<SVGCircleElement>(null)
   const dropGuideRef = useRef<SVGLineElement>(null)
+  const glowStopRef = useRef<SVGStopElement>(null)
   const elapsedRef = useRef(0)
   const previousTimeRef = useRef(0)
   const beatStartedAtRef = useRef(0)
@@ -251,7 +316,7 @@ function PulseRibbon({
       const pulseEnvelope = Math.exp(-Math.pow((x - 180) / 62, 2))
       const base = Math.sin(x * 0.032 + time * 0.0018 + ghostOffset) * 4.4 * breath
       const detail = Math.sin(x * 0.068 - time * 0.00135 + ghostOffset * 1.7) * 1.8
-      const pulse = Math.sin((x - 180) * 0.1) * impact * 20 * pulseEnvelope
+      const pulse = Math.sin((x - 180) * 0.1) * impact * (tone === 'gold' ? 28 : 20) * pulseEnvelope
       return 112 + base + detail + pulse
     }
 
@@ -267,14 +332,17 @@ function PulseRibbon({
     const draw = (now: number) => {
       const delta = Math.min(64, now - previousTimeRef.current)
       previousTimeRef.current = now
-      if (!reducedMotion) elapsedRef.current += delta * (playing ? 1 : 0.32)
+      if (!reducedMotion) elapsedRef.current += delta * (playing ? 1 : 0.22)
 
-      const beatFraction = playing
-        ? Math.min(0.999, Math.max(0, (now - beatStartedAtRef.current) / beatDurationMs))
-        : 0
-      const impact = playing ? Math.exp(-beatFraction * 9) : 0
-      const bounceHeight = playing ? Math.sin(beatFraction * Math.PI) * 76 : 0
+      const beatFraction =
+        playing && !reducedMotion
+          ? Math.min(0.999, Math.max(0, (now - beatStartedAtRef.current) / beatDurationMs))
+          : 0
+      const impact = playing ? (reducedMotion ? 0.55 : Math.exp(-beatFraction * 9)) : 0
+      const peak = tone === 'gold' ? 88 : 74
+      const bounceHeight = playing && !reducedMotion ? gravityHeight(beatFraction, peak) : 0
       const ballY = 112 - bounceHeight
+      const squash = playing && !reducedMotion ? landingSquash(beatFraction) : 1
       const elapsed = elapsedRef.current
       const pulseColor = tone === 'gold' ? '#f5a300' : '#1598ff'
 
@@ -287,29 +355,35 @@ function PulseRibbon({
       })
 
       const strikeY = waveY(180, elapsed, impact)
-      travelGlowRef.current?.setAttribute('cy', ballY.toFixed(1))
-      travelCoreRef.current?.setAttribute('cy', ballY.toFixed(1))
+      const scaleX = (1 + (1 - squash) * 1.15).toFixed(3)
+      travelGroupRef.current?.setAttribute(
+        'transform',
+        `translate(180 ${ballY.toFixed(1)}) scale(${scaleX} ${squash.toFixed(3)})`,
+      )
       travelCoreRef.current?.setAttribute('stroke', pulseColor)
       if (travelGlowRef.current) {
-        travelGlowRef.current.style.opacity = String(playing ? 0.58 + 0.36 * Math.exp(-beatFraction * 6) : 0.46)
+        travelGlowRef.current.style.opacity = String(
+          playing ? 0.5 + 0.5 * Math.exp(-beatFraction * 5.5) : 0.38,
+        )
       }
+      glowStopRef.current?.setAttribute('stop-color', pulseColor)
       strikeRingRef.current?.setAttribute('cy', strikeY.toFixed(1))
-      strikeRingRef.current?.setAttribute('r', String(8 + impact * 28))
+      strikeRingRef.current?.setAttribute('r', String(8 + impact * 36))
       if (strikeRingRef.current) {
-        strikeRingRef.current.style.opacity = String(0.1 + impact * 0.8)
+        strikeRingRef.current.style.opacity = String(0.08 + impact * 0.9)
         strikeRingRef.current.style.stroke = pulseColor
       }
       strikeDotRef.current?.setAttribute('cy', strikeY.toFixed(1))
       if (strikeDotRef.current) {
         strikeDotRef.current.style.fill = pulseColor
-        strikeDotRef.current.style.opacity = String(0.42 + impact * 0.56)
+        strikeDotRef.current.style.opacity = String(0.38 + impact * 0.62)
       }
       dropGuideRef.current?.setAttribute('y1', ballY.toFixed(1))
       dropGuideRef.current?.setAttribute('y2', strikeY.toFixed(1))
       if (dropGuideRef.current) {
         dropGuideRef.current.style.stroke = pulseColor
         dropGuideRef.current.style.opacity = String(
-          playing ? 0.08 + (1 - Math.sin(beatFraction * Math.PI)) * 0.24 : 0.08,
+          playing ? 0.1 + (bounceHeight / Math.max(1, peak)) * 0.28 : 0.06,
         )
       }
 
@@ -334,7 +408,7 @@ function PulseRibbon({
           <radialGradient id={pulseGradientId}>
             <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
             <stop offset="35%" stopColor="#ffffff" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#1598ff" stopOpacity="0" />
+            <stop offset="100%" ref={glowStopRef} stopColor="#1598ff" stopOpacity="0" />
           </radialGradient>
           <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="5" />
@@ -355,16 +429,18 @@ function PulseRibbon({
         <path ref={mainPathRef} className="metronome-ribbon__main" stroke={`url(#${gradientId})`} />
         <circle ref={strikeRingRef} className="metronome-ribbon__strike-ring" cx="180" cy="112" r="8" />
         <circle ref={strikeDotRef} className="metronome-ribbon__strike-dot" cx="180" cy="112" r="3" />
-        <circle
-          ref={travelGlowRef}
-          className="metronome-ribbon__travel-glow"
-          cx="180"
-          cy="112"
-          r="18"
-          fill={`url(#${pulseGradientId})`}
-          filter={`url(#${glowId})`}
-        />
-        <circle ref={travelCoreRef} className="metronome-ribbon__travel-core" cx="180" cy="112" r="4.6" />
+        <g ref={travelGroupRef} className="metronome-ribbon__travel" transform="translate(180 112)">
+          <circle
+            ref={travelGlowRef}
+            className="metronome-ribbon__travel-glow"
+            cx="0"
+            cy="0"
+            r="20"
+            fill={`url(#${pulseGradientId})`}
+            filter={`url(#${glowId})`}
+          />
+          <circle ref={travelCoreRef} className="metronome-ribbon__travel-core" cx="0" cy="0" r="5.2" />
+        </g>
       </svg>
     </div>
   )

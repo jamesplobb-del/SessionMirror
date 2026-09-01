@@ -667,6 +667,17 @@
     overflow: visible;
   }
 
+  .app-ui-overlay--audio-practice-record .audio-mode-home.audio-record-stage {
+    display: flex;
+    grid-template-columns: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 0.35rem;
+  }
+
   .app-ui-overlay--audio-mode .audio-mode-hero {
     min-height: 0;
     justify-content: center;
@@ -1697,6 +1708,11 @@
     min-height: 8rem;
     margin-top: 0.85rem;
     font-size: clamp(7rem, 13vw, 8.75rem);
+  }
+
+  .pitch-living-readout__coach {
+    max-width: 20rem;
+    font-size: 0.88rem;
   }
 
   .pitch-living-readout__detail {

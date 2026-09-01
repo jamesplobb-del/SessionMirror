@@ -16,6 +16,7 @@
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome,
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner,
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-record,
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-timeline {
   background: var(--audio-bg-base) !important;
 }
@@ -793,7 +794,8 @@ html.app-dark-mode
   transform: translateY(-0.15rem);
 }
 
-.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap {
+.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap,
+.app-ui-overlay--audio-practice-record .audio-tuner-take-pills-wrap {
   padding-top: 0.32rem;
 }
 
@@ -1394,6 +1396,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
   .metronome-audio-select__menu {
   top: auto;
   bottom: calc(100% + 0.42rem);
+  max-height: min(16.75rem, 46vh);
 }
 
 .app-ui-overlay--audio-mode .metronome-live-stage.audio-practice-metronome__visual--large {
@@ -1447,9 +1450,12 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
     radial-gradient(ellipse at 34% 52%, rgba(247, 166, 0, 0.2), transparent 50%),
     radial-gradient(ellipse at 66% 48%, rgba(21, 152, 255, 0.22), transparent 54%);
   filter: blur(20px);
-  opacity: 0.92;
-  animation: metronome-ribbon-halo-breathe 3.2s ease-in-out infinite;
+  opacity: 0.42;
   pointer-events: none;
+}
+
+.metronome-live-stage--playing .metronome-ribbon__halo {
+  opacity: 0.88;
 }
 
 .metronome-ribbon svg {
@@ -1539,8 +1545,8 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
 .metronome-bounce__orb {
   position: absolute;
   z-index: 2;
-  width: clamp(0.88rem, 3.8vw, 1.12rem);
-  height: clamp(0.88rem, 3.8vw, 1.12rem);
+  width: clamp(1rem, 4.2vw, 1.28rem);
+  height: clamp(1rem, 4.2vw, 1.28rem);
   border: 2px solid rgba(255, 255, 255, 0.88);
   border-radius: 50%;
   background: var(--metronome-pulse-color, var(--audio-blue));
@@ -1570,7 +1576,7 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
 }
 
 .metronome-live-stage--playing .metronome-bounce--vertical .metronome-bounce__orb {
-  animation: metronome-bounce-vertical var(--beat-duration) cubic-bezier(0.4, 0, 0.6, 1) both;
+  animation: metronome-bounce-vertical var(--beat-duration) linear both;
 }
 
 .metronome-bounce--vertical .metronome-bounce__impact {
@@ -1598,6 +1604,28 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
 }
 
 .metronome-bounce--horizontal.metronome-bounce--direction-left .metronome-bounce__orb {
+  left: 96%;
+}
+
+.metronome-bounce__station {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1.5px solid color-mix(in srgb, var(--audio-blue) 55%, transparent);
+  border-radius: 50%;
+  background: var(--audio-surface, #fff);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.metronome-bounce__station--start {
+  left: 4%;
+  border-color: color-mix(in srgb, var(--audio-gold) 70%, transparent);
+}
+
+.metronome-bounce__station--end {
   left: 96%;
 }
 
@@ -1629,7 +1657,13 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
 }
 
 .metronome-live-stage--playing .metronome-bounce__impact {
-  animation: metronome-bounce-impact 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: metronome-bounce-impact min(320ms, var(--beat-duration)) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.metronome-pulse-tone--gold .metronome-bounce--vertical .metronome-bounce__impact,
+.metronome-pulse-tone--gold .metronome-bounce--horizontal .metronome-bounce__impact {
+  width: 2.55rem;
+  height: 2.55rem;
 }
 
 .metronome-live-stage--idle .metronome-bounce__orb {
@@ -1662,17 +1696,23 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
   background: color-mix(in srgb, var(--audio-blue) 7%, transparent);
 }
 
+.metronome-columns__column--downbeat {
+  max-width: 2.55rem;
+}
+
 .metronome-columns__column i {
   display: block;
   width: 100%;
-  height: 20%;
+  height: 18%;
   border-radius: inherit;
   background: linear-gradient(to top, var(--audio-blue), color-mix(in srgb, var(--audio-blue) 52%, white));
   box-shadow: 0 0 1.1rem rgba(21, 152, 255, 0.2);
   transform-origin: bottom;
+  transition: height 200ms ease, opacity 200ms ease;
 }
 
 .metronome-columns__column--downbeat i {
+  height: 24%;
   background: linear-gradient(to top, var(--audio-gold), color-mix(in srgb, var(--audio-gold) 52%, white));
   box-shadow: 0 0 1.1rem rgba(247, 166, 0, 0.22);
 }
@@ -1681,16 +1721,23 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
   opacity: 0.25;
 }
 
+.metronome-live-stage--playing .metronome-columns__column--elapsed i {
+  height: 48%;
+  opacity: 0.78;
+}
+
+.metronome-live-stage--playing .metronome-columns__column--downbeat.metronome-columns__column--elapsed i {
+  height: 56%;
+}
+
 .metronome-live-stage--playing .metronome-columns__column--active i {
-  animation: metronome-column-pulse var(--beat-duration) cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: metronome-column-pulse var(--beat-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: none;
 }
 
 .metronome-live-stage--idle .metronome-columns__column i {
-  animation: metronome-column-idle 3.4s ease-in-out infinite alternate;
-}
-
-.metronome-live-stage--idle .metronome-columns__column:nth-child(2n) i {
-  animation-delay: -1.7s;
+  animation: metronome-column-idle 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--column-index, 0) * -0.32s);
 }
 
 .metronome-columns--compact {
@@ -1753,6 +1800,15 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
 
 .metronome-beat-marker--downbeat {
   color: var(--audio-gold);
+}
+
+.metronome-beat-marker--downbeat .metronome-beat-marker__halo {
+  width: 1.95rem;
+  height: 1.95rem;
+}
+
+.metronome-beat-marker--downbeat .metronome-beat-marker__number {
+  font-size: clamp(0.8rem, 2.8vw, 0.96rem);
 }
 
 .metronome-beat-marker--silent {
@@ -1840,27 +1896,34 @@ html.app-dark-mode .metronome-columns__column {
   background: color-mix(in srgb, var(--audio-blue) 11%, transparent);
 }
 
-@keyframes metronome-ribbon-halo-breathe {
-  0%, 100% { opacity: 0.62; transform: scale(0.96, 0.84); }
-  50% { opacity: 0.92; transform: scale(1.04, 1.04); }
-}
-
 @keyframes metronome-bounce-vertical {
-  0% { bottom: calc(15% - 0.48rem); transform: translateX(-50%) scale(1.12, 0.88); }
-  12% { transform: translateX(-50%) scale(0.94, 1.06); }
-  50% { bottom: calc(88% - 0.48rem); transform: translateX(-50%) scale(1); }
-  88% { transform: translateX(-50%) scale(0.96, 1.04); }
-  100% { bottom: calc(15% - 0.48rem); transform: translateX(-50%) scale(1.12, 0.88); }
+  0% { bottom: calc(15% - 0.48rem); transform: translateX(-50%) scale(1.28, 0.7); }
+  10% { bottom: calc(86% - 0.48rem); transform: translateX(-50%) scale(0.94, 1.08); }
+  18% { bottom: calc(88% - 0.48rem); transform: translateX(-50%) scale(1); }
+  38% { bottom: calc(84% - 0.48rem); transform: translateX(-50%) scale(1); }
+  58% { bottom: calc(64% - 0.48rem); transform: translateX(-50%) scale(1); }
+  78% { bottom: calc(36% - 0.48rem); transform: translateX(-50%) scale(1.04, 0.94); }
+  100% { bottom: calc(15% - 0.48rem); transform: translateX(-50%) scale(1.28, 0.7); }
 }
 
 @keyframes metronome-bounce-horizontal-right {
-  from { left: 4%; }
-  to { left: 96%; }
+  0% { left: 4%; transform: translate(-50%, -50%) scale(1.24, 0.78); }
+  12% { left: 7%; transform: translate(-50%, -50%) scale(1); }
+  32% { left: 18%; transform: translate(-50%, -50%) scale(1); }
+  52% { left: 36%; transform: translate(-50%, -50%) scale(1); }
+  72% { left: 62%; transform: translate(-50%, -50%) scale(1); }
+  88% { left: 84%; transform: translate(-50%, -50%) scale(1.06, 0.92); }
+  100% { left: 96%; transform: translate(-50%, -50%) scale(1.24, 0.78); }
 }
 
 @keyframes metronome-bounce-horizontal-left {
-  from { left: 96%; }
-  to { left: 4%; }
+  0% { left: 96%; transform: translate(-50%, -50%) scale(1.24, 0.78); }
+  12% { left: 93%; transform: translate(-50%, -50%) scale(1); }
+  32% { left: 82%; transform: translate(-50%, -50%) scale(1); }
+  52% { left: 64%; transform: translate(-50%, -50%) scale(1); }
+  72% { left: 38%; transform: translate(-50%, -50%) scale(1); }
+  88% { left: 16%; transform: translate(-50%, -50%) scale(1.06, 0.92); }
+  100% { left: 4%; transform: translate(-50%, -50%) scale(1.24, 0.78); }
 }
 
 @keyframes metronome-bounce-impact {
@@ -1874,14 +1937,13 @@ html.app-dark-mode .metronome-columns__column {
 }
 
 @keyframes metronome-column-pulse {
-  0% { height: 100%; filter: brightness(1.08); }
-  42% { height: 48%; }
-  100% { height: 20%; filter: brightness(1); }
+  0%, 14% { height: 100%; filter: brightness(1.14); }
+  100% { height: 48%; filter: brightness(1); }
 }
 
 @keyframes metronome-column-idle {
-  from { height: 16%; opacity: 0.58; }
-  to { height: 34%; opacity: 0.88; }
+  0%, 100% { height: 16%; opacity: 0.55; }
+  50% { height: 38%; opacity: 0.92; }
 }
 
 @keyframes metronome-marker-impact {
@@ -1909,7 +1971,11 @@ html.app-dark-mode .metronome-columns__column {
   .metronome-bounce__impact,
   .metronome-columns__column i,
   .metronome-beat-marker__halo,
-  .metronome-live-stage__glow {
+  .metronome-live-stage__glow,
+  .metronome-stage-pulse__ring,
+  .metronome-stage-pulse__core,
+  .audio-practice-metronome__stage-wash,
+  .metronome-audio-stage__bpm-value--pulse {
     animation: none !important;
   }
 
@@ -1983,7 +2049,7 @@ html.app-dark-mode .metronome-bounce__orb {
   );
   opacity: 0;
   pointer-events: none;
-  animation: metronome-stage-glow 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: metronome-stage-glow var(--beat-duration, 640ms) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes metronome-stage-glow {
@@ -1998,6 +2064,178 @@ html.app-dark-mode .metronome-live-stage__glow {
     color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 9%, transparent) 42%,
     transparent 68%
   );
+}
+
+.metronome-live-stage--pulse .metronome-live-stage__glow {
+  width: 175%;
+  height: 220%;
+}
+
+.metronome-live-stage--pulse .metronome-beat-markers {
+  width: min(88%, 30rem);
+}
+
+.metronome-live-stage--pulse .metronome-beat-marker__halo {
+  width: 2.15rem;
+  height: 2.15rem;
+}
+
+.metronome-live-stage--pulse .metronome-beat-marker--downbeat .metronome-beat-marker__halo {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.metronome-live-stage--pulse .metronome-beat-marker__number {
+  font-size: clamp(0.82rem, 3vw, 1rem);
+}
+
+.metronome-stage-pulse {
+  position: relative;
+  display: grid;
+  width: min(92%, 28rem);
+  height: 100%;
+  min-height: 8.5rem;
+  place-items: center;
+}
+
+.metronome-stage-pulse__ring {
+  position: absolute;
+  width: min(82%, 17.5rem);
+  aspect-ratio: 1;
+  border: 3px solid var(--metronome-pulse-color, var(--audio-blue));
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.metronome-live-stage--playing .metronome-stage-pulse__ring {
+  animation: metronome-stage-pulse-ring var(--beat-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.metronome-live-stage--playing .metronome-stage-pulse__ring--late {
+  animation-delay: calc(var(--beat-duration) * 0.14);
+}
+
+.metronome-stage-pulse--downbeat .metronome-stage-pulse__ring {
+  border-width: 3.5px;
+}
+
+.metronome-stage-pulse__ring--idle {
+  opacity: 0.55;
+  animation: metronome-stage-pulse-idle 2.6s ease-in-out infinite;
+}
+
+.metronome-stage-pulse__core {
+  position: relative;
+  z-index: 1;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 50%;
+  background: var(--metronome-pulse-color, var(--audio-blue));
+  box-shadow: 0 0 0 0.35rem color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 16%, transparent);
+}
+
+.metronome-stage-pulse--downbeat .metronome-stage-pulse__core {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.metronome-live-stage--playing .metronome-stage-pulse__core--playing {
+  animation: metronome-stage-pulse-core var(--beat-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes metronome-stage-pulse-ring {
+  0% { opacity: 0.9; transform: scale(0.22); }
+  100% { opacity: 0; transform: scale(1.42); }
+}
+
+@keyframes metronome-stage-pulse-core {
+  0% { transform: scale(1.65); }
+  28% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+@keyframes metronome-stage-pulse-idle {
+  0%, 100% { opacity: 0.22; transform: scale(0.82); }
+  50% { opacity: 0.5; transform: scale(1.08); }
+}
+
+.audio-practice-metronome {
+  position: relative;
+}
+
+.audio-practice-metronome__body,
+.audio-practice-metronome__bottom-dock {
+  position: relative;
+  z-index: 1;
+}
+
+.audio-practice-metronome__stage-wash {
+  position: absolute;
+  z-index: 0;
+  inset: -12% -28% 8%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 32%,
+    color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 42%, transparent) 0%,
+    color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 14%, transparent) 40%,
+    transparent 68%
+  );
+  pointer-events: none;
+}
+
+.audio-practice-metronome__stage-wash--playing {
+  animation: metronome-stage-wash var(--beat-duration, 640ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.audio-practice-metronome__stage-wash--idle {
+  animation: metronome-stage-wash-idle 2.8s ease-in-out infinite;
+}
+
+.audio-practice-metronome--stage-pulse .metronome-audio-stage__bpm-value--pulse {
+  display: inline-block;
+  transform-origin: center bottom;
+}
+
+.audio-practice-metronome--stage-pulse .metronome-audio-stage__bpm-value--tick-0 {
+  animation: metronome-bpm-pulse-a var(--beat-duration, 640ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.audio-practice-metronome--stage-pulse .metronome-audio-stage__bpm-value--tick-1 {
+  animation: metronome-bpm-pulse-b var(--beat-duration, 640ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes metronome-stage-wash {
+  0% { opacity: 1; transform: scale(0.86); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+@keyframes metronome-stage-wash-idle {
+  0%, 100% { opacity: 0.28; transform: scale(0.94); }
+  50% { opacity: 0.52; transform: scale(1); }
+}
+
+@keyframes metronome-bpm-pulse-a {
+  0% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+@keyframes metronome-bpm-pulse-b {
+  0% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+html.app-dark-mode .audio-practice-metronome__stage-wash {
+  background: radial-gradient(
+    circle at 50% 32%,
+    color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 36%, transparent) 0%,
+    color-mix(in srgb, var(--metronome-pulse-color, var(--audio-blue)) 12%, transparent) 40%,
+    transparent 70%
+  );
+}
+
+html.app-dark-mode .metronome-bounce__station {
+  background: var(--audio-surface, #141414);
 }
 
 /* ── Notation glyphs ─────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { ChevronsUpDown, ListMusic, Minus, Pause, Play, Plus } from 'lucide-react'
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { useTapTempo } from '../../hooks/useTapTempo'
 import {
@@ -110,6 +110,9 @@ export default function AudioPracticeMetronomeView({
     pulseName,
     soundId,
     playing,
+    beatIndex,
+    beatPulseId,
+    accentLevels,
     setBpm,
     setMeter,
     setSubdivision,
@@ -144,6 +147,12 @@ export default function AudioPracticeMetronomeView({
   // different tempos depending on how the bar is being conducted.
   const pulseNotation = getPulseNotation(meter, pulseCount)
   const secondaryControlCount = (pulseModeOptions.length > 1 ? 1 : 0) + (feelOptions.length > 1 ? 1 : 0)
+  const stagePulse = visualStyle === 'pulse'
+  const beatDurationMs = Math.round((60 / Math.max(1, bpm)) * 1000)
+  const activeAccent = accentLevels[beatIndex] ?? 'weak'
+  const washTone =
+    beatIndex === 0 ? 'gold' : activeAccent === 'strong' || activeAccent === 'medium' ? 'blue-strong' : 'blue'
+  const pulseTick = playing ? beatPulseId % 2 : 0
 
   useEffect(() => {
     currentBpmRef.current = bpm
@@ -303,9 +312,21 @@ export default function AudioPracticeMetronomeView({
 
   return (
     <div
-      className="metronome-audio-stage audio-practice-metronome flex min-h-0 flex-1 flex-col overflow-hidden"
+      className={`metronome-audio-stage audio-practice-metronome flex min-h-0 flex-1 flex-col overflow-hidden${stagePulse ? ' audio-practice-metronome--stage-pulse' : ''}${playing ? ' audio-practice-metronome--playing' : ''}`}
       data-practice-mode="metronome-tab"
+      style={
+        stagePulse
+          ? ({ '--beat-duration': `${beatDurationMs}ms` } as CSSProperties)
+          : undefined
+      }
     >
+      {stagePulse ? (
+        <span
+          key={playing ? beatPulseId : 'idle'}
+          className={`audio-practice-metronome__stage-wash metronome-pulse-tone--${washTone} ${playing ? 'audio-practice-metronome__stage-wash--playing' : 'audio-practice-metronome__stage-wash--idle'}`}
+          aria-hidden
+        />
+      ) : null}
       <div className="audio-practice-metronome__body min-h-0 flex-1">
         <header className="metronome-audio-stage__hero audio-practice-metronome__tempo-card shrink-0">
           <div
@@ -377,7 +398,15 @@ export default function AudioPracticeMetronomeView({
                       openBpmEditor()
                     }}
                   >
-                    <span className="metronome-audio-stage__bpm-value">{bpm}</span>
+                    <span
+                      className={`metronome-audio-stage__bpm-value${
+                        stagePulse && playing
+                          ? ` metronome-audio-stage__bpm-value--pulse metronome-audio-stage__bpm-value--tick-${pulseTick}`
+                          : ''
+                      }`}
+                    >
+                      {bpm}
+                    </span>
                     <span className="metronome-audio-stage__bpm-label">BPM</span>
                   </button>
                 )}
@@ -467,7 +496,9 @@ export default function AudioPracticeMetronomeView({
                       ? 'Vertical'
                       : id === 'horizontal'
                         ? 'Horizontal'
-                        : 'Columns',
+                        : id === 'pulse'
+                          ? 'Pulse'
+                          : 'Columns',
               }))}
               onChange={setMetronomeVisualStyle}
             />

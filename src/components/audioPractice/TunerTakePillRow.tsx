@@ -140,6 +140,7 @@ export interface TunerTakePillRowProps {
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
   challengerTake: Take | null
   compact?: boolean
+  ariaLabel?: string
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onPinCurrentAsBest?: () => void
@@ -152,6 +153,7 @@ export default function TunerTakePillRow({
   libraryBenchmarkPlayback,
   challengerTake,
   compact = false,
+  ariaLabel = 'Takes',
   onExpandBenchmark,
   onExpandChallenger,
   onPinCurrentAsBest,
@@ -161,7 +163,7 @@ export default function TunerTakePillRow({
   return (
     <div
       className={`audio-tuner-take-pills ${compact ? 'audio-tuner-take-pills--compact' : ''}`}
-      aria-label="Tuner takes"
+      aria-label={ariaLabel}
     >
       <TunerTakePill
         label={compact ? 'Best' : 'Best'}

@@ -5,7 +5,8 @@
  * is what the stage's inset vignette used to do. `rim`/`spread` feed the
  * full-viewport bloom on the overlay, so in-tune can be dramatic without any
  * layer having an edge inside the screen. */
-html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) {
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner),
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record) {
   --tuner-ui-hue: #1598ff;
   --tuner-ui-strength: 0%;
   --tuner-ui-feather-strength: 0%;
@@ -58,13 +59,21 @@ html.app-audio-mode:has(
 }
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner),
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record),
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) body,
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record) body,
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) #root,
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record) #root,
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) .app-shell--audio-mode,
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record) .app-shell--audio-mode,
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   .app-shell--audio-mode
   .camera-background,
-.app-ui-overlay--audio-practice-tuner {
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-shell--audio-mode
+  .camera-background,
+.app-ui-overlay--audio-practice-tuner,
+.app-ui-overlay--audio-practice-record {
   background-color: color-mix(
     in srgb,
     var(--tuner-ui-hue) var(--tuner-ui-strength),
@@ -74,7 +83,9 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
-  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner,
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-record {
   background-color: color-mix(
     in srgb,
     var(--tuner-ui-hue) var(--tuner-ui-strength),
@@ -84,7 +95,8 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 /* The one glow allowed to have an edge, because its edge IS the screen edge. */
-.app-ui-overlay--audio-practice-tuner {
+.app-ui-overlay--audio-practice-tuner,
+.app-ui-overlay--audio-practice-record {
   box-shadow:
     inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-strength), transparent),
     inset 0 0 var(--tuner-rim-spread)
@@ -100,6 +112,12 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   background: transparent !important;
 }
 
+.app-ui-overlay--audio-practice-record .audio-mode-home-layer {
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+}
+
 .app-ui-overlay--audio-practice-tuner .audio-practice-tuner-shell {
   padding: 0;
   border: 0;
@@ -110,7 +128,8 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
  * its own — a solid bar here was the top half of the two-tone split under the
  * tabs. The active segment keeps its highlight, which is all that is needed to
  * tell the tabs apart. */
-.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs {
+.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs,
+.app-ui-overlay--audio-practice-record .audio-practice-top-tabs {
   display: grid;
   width: min(calc(100% - 1.35rem), 28rem);
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -125,7 +144,8 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   -webkit-backdrop-filter: none;
 }
 
-.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn {
+.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn,
+.app-ui-overlay--audio-practice-record .audio-practice-top-tabs__btn {
   min-height: 2.34rem;
   padding: 0.4rem 0.2rem;
   border: 1px solid transparent;
@@ -145,7 +165,8 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
     box-shadow 360ms ease;
 }
 
-.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active {
+.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active,
+.app-ui-overlay--audio-practice-record .audio-practice-top-tabs__btn--active {
   border-color: rgba(247, 166, 0, 0.64);
   background: rgba(255, 255, 255, 0.82);
   color: #a56b00;
@@ -187,7 +208,8 @@ html.app-dark-mode
   box-shadow: none;
 }
 
-.app-ui-overlay--audio-practice-tuner .app-hud-bottom {
+.app-ui-overlay--audio-practice-tuner .app-hud-bottom,
+.app-ui-overlay--audio-practice-record .app-hud-bottom {
   background: transparent !important;
   box-shadow: none;
 }
@@ -448,7 +470,8 @@ html.app-dark-mode
 
 :is(
     .app-ui-overlay--audio-practice-tuner,
-    .app-ui-overlay--audio-practice-metronome
+    .app-ui-overlay--audio-practice-metronome,
+    .app-ui-overlay--audio-practice-record
   )
   .control-deck__expand-trigger {
   display: grid;
@@ -468,7 +491,8 @@ html.app-dark-mode
 
 :is(
     .app-ui-overlay--audio-practice-tuner,
-    .app-ui-overlay--audio-practice-metronome
+    .app-ui-overlay--audio-practice-metronome,
+    .app-ui-overlay--audio-practice-record
   )
   .control-deck__expand-trigger
   svg {
@@ -478,7 +502,8 @@ html.app-dark-mode
 
 :is(
     .app-ui-overlay--audio-practice-tuner,
-    .app-ui-overlay--audio-practice-metronome
+    .app-ui-overlay--audio-practice-metronome,
+    .app-ui-overlay--audio-practice-record
   )
   .control-deck__collapse-trigger {
   position: absolute;
@@ -500,7 +525,8 @@ html.app-dark-mode
 
 :is(
     .app-ui-overlay--audio-practice-tuner,
-    .app-ui-overlay--audio-practice-metronome
+    .app-ui-overlay--audio-practice-metronome,
+    .app-ui-overlay--audio-practice-record
   )
   .control-deck__collapse-trigger
   svg {
@@ -593,11 +619,52 @@ html.app-dark-mode
     text-shadow 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+button.pitch-living-readout__note--catch {
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+button.pitch-living-readout__note--catch:focus-visible {
+  outline: 2px solid rgba(21, 152, 255, 0.55);
+  outline-offset: 6px;
+  border-radius: 12px;
+}
+
 .pitch-living-readout__note small {
   margin-top: 8px;
   font-size: 0.27em;
   font-weight: 700;
   opacity: 0.64;
+}
+
+.pitch-living-readout__coach {
+  max-width: 16.5rem;
+  margin: 2px 0 0;
+  color: rgba(23, 48, 74, 0.5);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  animation: pitch-coach-in 280ms ease;
+}
+
+@keyframes pitch-coach-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .pitch-living-readout__detail {
@@ -745,17 +812,15 @@ html.app-dark-mode
   right: max(8px, env(safe-area-inset-right));
   bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
   left: max(8px, env(safe-area-inset-left));
-  max-height: min(40%, 176px);
-  padding: 8px;
+  max-height: min(42%, 188px);
+  padding: 10px 8px 8px;
   overflow: hidden;
-  border: 1px solid rgba(21, 152, 255, 0.2);
-  border-radius: 14px;
-  background: rgba(250, 252, 255, 0.95);
+  border: 1px solid rgba(23, 26, 34, 0.08);
+  border-radius: 18px;
+  background: var(--audio-surface, #ffffff);
   box-shadow:
-    0 18px 44px rgba(18, 33, 52, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(24px) saturate(1.12);
-  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+    0 18px 44px rgba(23, 26, 34, 0.16),
+    0 2px 8px rgba(23, 26, 34, 0.06);
 }
 
 .pitch-living-transposition-panel {
@@ -993,101 +1058,58 @@ html.app-dark-mode
   box-shadow: none;
 }
 
-.pitch-living-drone-panel .harmonic-ribbon__viewport-shell {
-  border: 1px solid rgba(21, 152, 255, 0.12);
-  background: rgba(238, 247, 255, 0.78);
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__viewport-shell::before {
-  background: linear-gradient(90deg, rgba(238, 247, 255, 0.96), transparent);
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__viewport-shell::after {
-  background: linear-gradient(270deg, rgba(238, 247, 255, 0.96), transparent);
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__center-mark {
-  background: var(--audio-gold, #f7a600);
-  box-shadow: 0 0 9px rgba(247, 166, 0, 0.34);
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__rail {
-  gap: 4px;
-  padding-block: 5px;
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__note {
-  width: 39px;
-  height: 39px;
-  flex-basis: 39px;
-  align-items: center;
-  border-color: rgba(21, 152, 255, 0.14);
-  color: #41617e;
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__note span {
-  font-size: 13px;
-}
-
 .pitch-living-drone-panel .harmonic-ribbon__controls {
   display: grid;
-  grid-template-columns: 38px minmax(74px, 1fr) 104px 38px;
+  grid-template-columns: 36px minmax(0, 1fr) 108px 36px;
   gap: 6px;
-  padding-top: 7px;
+  padding-top: 8px;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon__power,
 .pitch-living-drone-panel .harmonic-ribbon__close {
   display: grid;
-  width: 38px;
-  min-width: 38px;
-  height: 38px;
-  min-height: 38px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
-  border: 1px solid rgba(21, 152, 255, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.84);
-  color: var(--audio-blue, #1598ff);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #6c7077;
   place-items: center;
 }
 
+.pitch-living-drone-panel .harmonic-ribbon__power:active,
+.pitch-living-drone-panel .harmonic-ribbon__close:active {
+  background: rgba(23, 26, 34, 0.06);
+}
+
 .pitch-living-drone-panel .harmonic-ribbon__power--active {
-  border-color: var(--audio-gold-border, rgba(247, 166, 0, 0.45));
-  background: var(--audio-gold-soft, rgba(247, 166, 0, 0.12));
-  color: #9a6200;
+  background: var(--audio-gold-soft, rgba(247, 166, 0, 0.14));
+  color: #8a5e00;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon__power svg,
 .pitch-living-drone-panel .harmonic-ribbon__close svg {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon__mode {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  background: rgba(21, 152, 255, 0.08);
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__mode .harmonic-ribbon__mode--active {
-  color: #8a5e00;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon__octave {
-  width: 104px;
-  min-width: 104px;
+  width: 108px;
+  min-width: 108px;
   flex-basis: auto;
-  grid-template-columns: 31px 42px 31px;
-  border-color: rgba(21, 152, 255, 0.14);
-  background: rgba(255, 255, 255, 0.74);
+  grid-template-columns: 32px 44px 32px;
 }
 
 .pitch-living-drone-panel .harmonic-ribbon__octave button {
-  width: 31px;
-  height: 38px;
-}
-
-.pitch-living-drone-panel .harmonic-ribbon__octave strong {
-  color: #8a5e00;
+  width: 32px;
+  height: 36px;
 }
 
 @keyframes pitch-live-breathe {
@@ -1203,8 +1225,8 @@ html.app-dark-mode
 .harmonic-ribbon__viewport-shell {
   position: relative;
   overflow: hidden;
-  border-radius: 9px;
-  background: var(--audio-bg-base, #f7f8fa);
+  border-radius: 12px;
+  background: rgba(23, 26, 34, 0.035);
 }
 
 .harmonic-ribbon__viewport-shell::before,
@@ -1213,32 +1235,51 @@ html.app-dark-mode
   z-index: 3;
   top: 0;
   bottom: 0;
-  width: 32px;
+  width: 36px;
   content: "";
   pointer-events: none;
 }
 
 .harmonic-ribbon__viewport-shell::before {
   left: 0;
-  background: linear-gradient(90deg, var(--audio-bg-base, #f7f8fa), transparent);
+  background: linear-gradient(90deg, var(--audio-surface, #ffffff), transparent);
 }
 
 .harmonic-ribbon__viewport-shell::after {
   right: 0;
-  background: linear-gradient(270deg, var(--audio-bg-base, #f7f8fa), transparent);
+  background: linear-gradient(270deg, var(--audio-surface, #ffffff), transparent);
 }
 
 .harmonic-ribbon__center-mark {
   position: absolute;
   z-index: 4;
-  top: 3px;
-  bottom: 3px;
+  top: 6px;
+  bottom: 6px;
   left: 50%;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--audio-gold, #f7a600);
+  width: 0;
+  background: transparent;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+.harmonic-ribbon__center-mark::before,
+.harmonic-ribbon__center-mark::after {
+  position: absolute;
+  left: 50%;
+  width: 11px;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--audio-gold, #f7a600);
+  transform: translateX(-50%);
+  content: "";
+}
+
+.harmonic-ribbon__center-mark::before {
+  top: 0;
+}
+
+.harmonic-ribbon__center-mark::after {
+  bottom: 0;
 }
 
 .harmonic-ribbon__viewport {
@@ -1259,55 +1300,74 @@ html.app-dark-mode
   display: flex;
   width: max-content;
   align-items: center;
-  gap: 5px;
-  padding: 5px min(calc(50vw - 23px), 287px);
+  gap: 2px;
+  padding: 10px min(calc(50vw - 22px), 287px);
 }
 
 .harmonic-ribbon__note {
+  appearance: none;
   display: flex;
-  width: 46px;
-  height: 42px;
-  flex: 0 0 46px;
-  align-items: baseline;
+  width: 44px;
+  height: 48px;
+  flex: 0 0 44px;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
-  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
-  border-radius: 8px;
-  background: var(--audio-surface, #ffffff);
-  box-shadow: 0 2px 6px rgba(23, 26, 34, 0.05);
-  color: var(--audio-text-secondary, #6c7077);
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #6c7077;
+  font: inherit;
   scroll-snap-align: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
   transition:
-    border-color 120ms ease,
-    background 120ms ease,
-    color 120ms ease,
-    transform 120ms ease;
+    color 140ms ease,
+    background 140ms ease;
 }
 
 .harmonic-ribbon__note span {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .harmonic-ribbon__note small {
+  margin-top: 3px;
   color: currentColor;
-  font-size: 8px;
-  opacity: 0.62;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.48;
 }
 
-.harmonic-ribbon__note--active {
-  border-color: var(--audio-blue-border, rgba(21, 152, 255, 0.45));
-  background: var(--audio-blue-soft, rgba(21, 152, 255, 0.12));
-  color: #0c6bbf;
+.harmonic-ribbon__note--accidental span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.harmonic-ribbon__note--active:not(.harmonic-ribbon__note--root) {
+  color: #a07412;
 }
 
 .harmonic-ribbon__note--root,
 .harmonic-ribbon__note--gliss {
-  border-color: var(--audio-gold-border, rgba(247, 166, 0, 0.45));
-  background: var(--audio-gold-soft, rgba(247, 166, 0, 0.12));
-  box-shadow: 0 5px 13px rgba(247, 166, 0, 0.16);
+  background: transparent;
   color: #8a5e00;
-  transform: translateY(-1px);
+}
+
+.harmonic-ribbon__note--root span,
+.harmonic-ribbon__note--gliss span {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.harmonic-ribbon__note:focus-visible {
+  outline: 2px solid rgba(21, 152, 255, 0.45);
+  outline-offset: -2px;
 }
 
 .harmonic-ribbon__controls {
@@ -1318,26 +1378,25 @@ html.app-dark-mode
   display: grid;
   min-width: 0;
   flex: 1 1 auto;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
   padding: 2px;
-  border-radius: 8px;
-  background: var(--audio-bg-base, #f7f8fa);
+  border-radius: 10px;
+  background: rgba(23, 26, 34, 0.05);
 }
 
 .harmonic-ribbon__mode button {
   min-height: 32px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
-  color: var(--audio-text-secondary, #6c7077);
+  color: #6c7077;
   font-size: 11px;
   font-weight: 700;
 }
 
 .harmonic-ribbon__mode .harmonic-ribbon__mode--active {
-  background: var(--audio-surface, #ffffff);
-  box-shadow: 0 1px 5px rgba(23, 26, 34, 0.1);
+  background: #ffffff;
   color: #8a5e00;
 }
 
@@ -1346,9 +1405,9 @@ html.app-dark-mode
   flex: 0 0 119px;
   grid-template-columns: 34px 51px 34px;
   align-items: center;
-  border: 1px solid var(--audio-divider, rgba(23, 26, 34, 0.08));
-  border-radius: 8px;
-  background: var(--audio-bg-base, #f7f8fa);
+  border: 0;
+  border-radius: 10px;
+  background: rgba(23, 26, 34, 0.05);
 }
 
 .harmonic-ribbon__octave button {
@@ -1527,6 +1586,13 @@ html.app-dark-mode
   font-size: 0.6rem;
 }
 
+.pitch-widget-living .pitch-living-readout__coach {
+  max-width: 11rem;
+  margin-top: 0.15rem;
+  color: rgba(226, 235, 244, 0.62);
+  font-size: 0.58rem;
+}
+
 .pitch-widget-living .pitch-living-readout__detail strong {
   color: rgba(248, 251, 254, 0.9);
   font-size: 0.75rem;
@@ -1544,14 +1610,23 @@ html.app-dark-mode
 }
 
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner),
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record),
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) body,
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record) body,
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner) #root,
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record) #root,
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
+  .app-shell--audio-mode,
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   .app-shell--audio-mode,
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   .app-shell--audio-mode
   .camera-background,
-html.app-dark-mode .app-ui-overlay--audio-practice-tuner {
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-shell--audio-mode
+  .camera-background,
+html.app-dark-mode .app-ui-overlay--audio-practice-tuner,
+html.app-dark-mode .app-ui-overlay--audio-practice-record {
   background-color: color-mix(
     in srgb,
     var(--tuner-ui-hue) var(--tuner-ui-dark-strength),
@@ -1560,7 +1635,9 @@ html.app-dark-mode .app-ui-overlay--audio-practice-tuner {
 }
 
 html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
-  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner,
+html.app-dark-mode.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-record {
   background-color: color-mix(
     in srgb,
     var(--tuner-ui-hue) var(--tuner-ui-dark-strength),
@@ -1596,6 +1673,9 @@ html.app-dark-mode
 
 html.app-dark-mode
   .app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs,
+html.app-dark-mode
+  .app-ui-overlay--audio-practice-record
   .audio-practice-top-tabs {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(8, 18, 27, 0.32);
@@ -1603,12 +1683,18 @@ html.app-dark-mode
 
 html.app-dark-mode
   .app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn,
+html.app-dark-mode
+  .app-ui-overlay--audio-practice-record
   .audio-practice-top-tabs__btn {
   color: rgba(239, 246, 252, 0.68);
 }
 
 html.app-dark-mode
   .app-ui-overlay--audio-practice-tuner
+  .audio-practice-top-tabs__btn--active,
+html.app-dark-mode
+  .app-ui-overlay--audio-practice-record
   .audio-practice-top-tabs__btn--active {
   border-color: rgba(247, 166, 0, 0.62);
   background: rgba(255, 255, 255, 0.07);
@@ -1620,6 +1706,9 @@ html.app-dark-mode
 
 html.app-dark-mode
   .app-ui-overlay--audio-practice-tuner
+  .app-hud-bottom,
+html.app-dark-mode
+  .app-ui-overlay--audio-practice-record
   .app-hud-bottom {
   background: transparent !important;
 }
@@ -1710,6 +1799,7 @@ html.app-dark-mode .pitch-living-readout__detail strong {
 }
 
 html.app-dark-mode .pitch-living-readout__detail,
+html.app-dark-mode .pitch-living-readout__coach,
 html.app-dark-mode .pitch-living-canvas__direction,
 html.app-dark-mode .harmonic-ribbon__eyebrow {
   color: #aeb9c8;
@@ -1763,8 +1853,8 @@ html.app-dark-mode .pitch-living-transposition-trigger--active svg {
 }
 
 html.app-dark-mode .pitch-living-drone-panel {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(15, 24, 36, 0.96);
+  border-color: rgba(238, 244, 250, 0.1);
+  background: #1a1e26;
 }
 
 html.app-dark-mode .pitch-living-transposition-panel {
@@ -1791,34 +1881,53 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon {
   box-shadow: none;
 }
 
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__viewport-shell,
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__mode,
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__octave {
-  border-color: rgba(91, 174, 238, 0.16);
-  background: rgba(30, 48, 68, 0.72);
+html.app-dark-mode .harmonic-ribbon__viewport-shell {
+  background: rgba(238, 244, 250, 0.05);
 }
 
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__viewport-shell::before {
-  background: linear-gradient(90deg, rgba(30, 48, 68, 0.96), transparent);
+html.app-dark-mode .harmonic-ribbon__viewport-shell::before {
+  background: linear-gradient(90deg, #1a1e26, transparent);
 }
 
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__viewport-shell::after {
-  background: linear-gradient(270deg, rgba(30, 48, 68, 0.96), transparent);
+html.app-dark-mode .harmonic-ribbon__viewport-shell::after {
+  background: linear-gradient(270deg, #1a1e26, transparent);
 }
 
-html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__note,
+html.app-dark-mode .harmonic-ribbon__note {
+  color: #9eabbc;
+}
+
+html.app-dark-mode .harmonic-ribbon__note--active:not(.harmonic-ribbon__note--root) {
+  color: #e0b15a;
+}
+
+html.app-dark-mode .harmonic-ribbon__note--root,
+html.app-dark-mode .harmonic-ribbon__note--gliss {
+  color: #ffd081;
+}
+
+html.app-dark-mode .harmonic-ribbon__mode,
+html.app-dark-mode .harmonic-ribbon__octave {
+  background: rgba(238, 244, 250, 0.06);
+}
+
+html.app-dark-mode .harmonic-ribbon__mode .harmonic-ribbon__mode--active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffd081;
+}
+
 html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power,
 html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__close {
-  border-color: rgba(91, 174, 238, 0.16);
-  background: rgba(17, 29, 44, 0.82);
-  color: #b9d8f0;
+  color: #9eabbc;
 }
 
-html.app-dark-mode
-  .pitch-living-drone-panel
-  .harmonic-ribbon__mode
-  .harmonic-ribbon__mode--active {
-  background: rgba(247, 166, 0, 0.14);
+html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power:active,
+html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__close:active {
+  background: rgba(238, 244, 250, 0.07);
+}
+
+html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
+  background: rgba(247, 166, 0, 0.16);
   color: #ffd081;
 }
 
@@ -1865,7 +1974,7 @@ html.app-dark-mode
   }
 
   .harmonic-ribbon__note {
-    height: 36px;
+    height: 42px;
   }
 
   .harmonic-ribbon__controls {
@@ -1904,7 +2013,8 @@ html.app-dark-mode
     transition: none;
   }
 
-  .pitch-living-readout__status > span {
+  .pitch-living-readout__status > span,
+  .pitch-living-readout__coach {
     animation: none;
   }
 }

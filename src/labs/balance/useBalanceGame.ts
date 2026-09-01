@@ -9,6 +9,7 @@ import {
 } from 'react'
 import type { AcceptedPitchFrame } from '../../hooks/useLivePitchTracker'
 import { loadPracticeGameCharacter } from '../practiceGameCharacters'
+import { savePracticeGameInstrumentId } from '../practiceGameInstrument'
 import { triggerSuccessHaptic } from '../../utils/haptics'
 import { startBalanceCountIn, startBalanceTone, type BalanceCountInHandle, type DroneHandle } from './balanceAudio'
 import { balanceReducer, createBalanceState } from './balanceEngine'
@@ -450,6 +451,7 @@ export function useBalanceGame({
       setData(next)
       saveBalanceData(next)
       dispatch({ type: 'UPDATE_SETTINGS', settings, bestBalancedMs: getBalanceBestMs(next) })
+      if (typeof patch.instrumentId === 'string') savePracticeGameInstrumentId(patch.instrumentId)
       /*
        * Deliberately does NOT write the instrument back to the app-wide tuner.
        * The pitch tracker is already handed this instrument's own profile for

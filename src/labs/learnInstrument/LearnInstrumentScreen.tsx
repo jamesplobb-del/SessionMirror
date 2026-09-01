@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import { GAME_TEST_INPUT } from '../gameTestInput'
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw, Settings } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
+import BalanceArcadeShell from '../balance/BalanceArcadeShell'
 import {
   useLivePitchTracker,
   type PitchSourceHealth,
@@ -18,6 +19,7 @@ import {
   type StaffPitch,
 } from './instrumentData'
 import './learn-instrument.css'
+import '../balance/balance-arcade.css'
 
 interface LearnInstrumentScreenProps {
   streamRef: RefObject<MediaStream | null>
@@ -88,6 +90,7 @@ export default function LearnInstrumentScreen({
   const game = useLearnInstrumentGame({ hapticFeedback })
   const headingRef = useRef<HTMLHeadingElement | null>(null)
   const previousPhaseRef = useRef(game.state.phase)
+  const [showOptions, setShowOptions] = useState(false)
 
   const sharedMicReady = Boolean(
     streamRef.current?.getAudioTracks().some((track) => track.readyState === 'live'),
@@ -205,31 +208,91 @@ export default function LearnInstrumentScreen({
             : 'Play a note to test your microphone'
 
     return (
-      <main className="li-screen li-setup">
-        <header className="li-setup__head">
-          <Pressable
-            intensity="icon"
-            hapticFeedback={hapticFeedback}
-            className="li-icon-button"
-            onClick={onBack}
-            aria-label="Back to Practice Games"
-          >
-            <ArrowLeft aria-hidden />
-          </Pressable>
-          <h1 ref={headingRef} tabIndex={-1}>
-            Learn Your Instrument
-          </h1>
-        </header>
-
-        <div className="li-setup__body">
-          <section className="li-step" aria-labelledby="li-step-instrument">
-            <h2 id="li-step-instrument">
-              <span className="li-step__number" aria-hidden>
-                1
+      <BalanceArcadeShell
+        title="Learn"
+        hapticFeedback={hapticFeedback}
+        onBack={onBack}
+        backLabel="Back to Practice Games"
+        className="balance-arcade--ready"
+        footer={
+          <div className="balance-ready__dock">
+            <Pressable
+              haptic="medium"
+              hapticFeedback={hapticFeedback}
+              className="balance-cta"
+              onClick={handleStart}
+              disabled={micPermissionPending}
+            >
+              <Play aria-hidden />
+              {micPermissionPending ? 'Connecting…' : 'Play'}
+            </Pressable>
+            <Pressable
+              intensity="soft"
+              hapticFeedback={hapticFeedback}
+              onClick={() => void onRequestMicStream({ forceRecovery: true })}
+              aria-label={`${micLabel}. Tap to reconnect the microphone.`}
+              className={`balance-quick__mic ${hasPitch ? 'is-live' : ''} ${micTrouble ? 'is-error' : ''}`}
+            >
+              <Mic aria-hidden />
+              <span>
+                <b>{micLabel}</b>
+                <small>
+                  {game.totalTargetCount} notes · {game.selectedCourse.description}
+                </small>
               </span>
-              Pick your instrument
-            </h2>
+              <strong>{hasPitch ? readout.noteName : '—'}</strong>
+            </Pressable>
+          </div>
+        }
+      >
+        <div>
+          <h1 ref={headingRef} tabIndex={-1} className="balance-display balance-display--page">
+            Learn
+          </h1>
+          <p className="balance-subdisplay">{game.selectedInstrument.name}</p>
+        </div>
 
+        <div className="balance-goal-row" role="radiogroup" aria-label="Lesson">
+          {LESSON_GOALS.map((goal) => {
+            const selected = game.state.goalId === goal.id
+            return (
+              <Pressable
+                key={goal.id}
+                intensity="soft"
+                hapticFeedback={hapticFeedback}
+                className={`balance-goal ${selected ? 'is-selected' : ''}`}
+                role="radio"
+                aria-checked={selected}
+                aria-label={`${goal.title}. ${goal.description}. Tap to choose this lesson.`}
+                onClick={() => game.selectGoal(goal.id)}
+              >
+                <span>
+                  <strong>{goal.title}</strong>
+                  <small>{goal.description}</small>
+                </span>
+                {selected ? <Check aria-hidden /> : <ChevronRight aria-hidden />}
+              </Pressable>
+            )
+          })}
+        </div>
+        <p className="balance-ready__hint">Tap a lesson to choose it</p>
+
+        <Pressable
+          intensity="soft"
+          hapticFeedback={hapticFeedback}
+          className="balance-textlink"
+          onClick={() => setShowOptions((open) => !open)}
+          aria-expanded={showOptions}
+        >
+          <Settings aria-hidden /> {showOptions ? 'Hide options' : 'More options'}
+        </Pressable>
+
+        {showOptions ? (
+          <section className="balance-card" aria-label="Instrument">
+            <p className="balance-card__title">Instrument</p>
+            <p className="balance-card__line">
+              {game.selectedInstrument.clef} clef · {game.selectedCourse.description}
+            </p>
             {INSTRUMENT_GROUPS.map((group) => (
               <div key={group.id} className="li-picker">
                 <h3>{group.label}</h3>
@@ -256,71 +319,8 @@ export default function LearnInstrumentScreen({
               </div>
             ))}
           </section>
-
-          <section className="li-step" aria-labelledby="li-step-goal">
-            <h2 id="li-step-goal">
-              <span className="li-step__number" aria-hidden>
-                2
-              </span>
-              Pick your goal
-            </h2>
-
-            <div className="li-goals" role="radiogroup" aria-label="Goal">
-              {LESSON_GOALS.map((goal) => {
-                const selected = game.state.goalId === goal.id
-                return (
-                  <Pressable
-                    key={goal.id}
-                    intensity="soft"
-                    hapticFeedback={hapticFeedback}
-                    className={`li-goal ${selected ? 'is-selected' : ''}`}
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={`${goal.title}. ${goal.description}`}
-                    onClick={() => game.selectGoal(goal.id)}
-                  >
-                    <span className="li-goal__copy">
-                      <strong>{goal.title}</strong>
-                      <small>{goal.description}</small>
-                    </span>
-                    <span className="li-goal__tick" aria-hidden>
-                      {selected ? <Check /> : null}
-                    </span>
-                  </Pressable>
-                )
-              })}
-            </div>
-
-            <p className="li-step__note">
-              {game.totalTargetCount} notes · {game.selectedCourse.description} ·{' '}
-              {game.selectedInstrument.clef} clef
-            </p>
-          </section>
-        </div>
-
-        <footer className="li-setup__foot">
-          <Pressable
-            intensity="soft"
-            hapticFeedback={hapticFeedback}
-            onClick={() => void onRequestMicStream({ forceRecovery: true })}
-            aria-label={`${micLabel}. Tap to reconnect the microphone.`}
-            className={`li-mic ${hasPitch ? 'is-live' : ''} ${micTrouble ? 'is-error' : ''}`}
-          >
-            <Mic aria-hidden />
-            <span>{micLabel}</span>
-          </Pressable>
-          <Pressable
-            haptic="medium"
-            hapticFeedback={hapticFeedback}
-            className="li-button li-button--primary li-button--wide"
-            onClick={handleStart}
-            disabled={micPermissionPending}
-          >
-            <Play aria-hidden />
-            {micPermissionPending ? 'Connecting…' : 'Start'}
-          </Pressable>
-        </footer>
-      </main>
+        ) : null}
+      </BalanceArcadeShell>
     )
   }
 

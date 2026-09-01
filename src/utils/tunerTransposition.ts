@@ -265,6 +265,19 @@ export function getWrittenPitchLabel(
   }
 }
 
+/** Inverse of `getWrittenPitchLabel` — concert pitch from a written MIDI note. */
+export function concertPitchFromWrittenMidi(
+  writtenMidi: number,
+  transposition: TunerTranspositionId,
+): { pitchClass: number; octave: number } {
+  const concertMidi =
+    Math.round(writtenMidi) - getTunerTransposition(transposition).writtenOffsetSemitones
+  return {
+    pitchClass: ((concertMidi % 12) + 12) % 12,
+    octave: Math.floor(concertMidi / 12) - 1,
+  }
+}
+
 /** Convert a concert-pitch detection into the instrument's written note. */
 export function transposePitchReadout(
   readout: PitchReadout,

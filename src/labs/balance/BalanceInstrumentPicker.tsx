@@ -10,6 +10,8 @@ interface BalanceInstrumentPickerProps {
   hapticFeedback: boolean
   onBack: () => void
   onSelect: (instrumentId: string) => void
+  backLabel?: string
+  lede?: string
 }
 
 /** Printed order — brass, woodwind, strings, then everything else. */
@@ -32,6 +34,8 @@ export default function BalanceInstrumentPicker({
   hapticFeedback,
   onBack,
   onSelect,
+  backLabel = 'Back to Balance home',
+  lede = "Levels follow your horn's own range.",
 }: BalanceInstrumentPickerProps) {
   const families = [...FAMILY_ORDER].filter((family) =>
     BALANCE_INSTRUMENTS.some((instrument) => instrument.family === family),
@@ -42,11 +46,11 @@ export default function BalanceInstrumentPicker({
       title="Instrument"
       hapticFeedback={hapticFeedback}
       onBack={onBack}
-      backLabel="Back to Balance home"
+      backLabel={backLabel}
       className="balance-arcade--picker"
     >
       <h1 className="balance-display balance-display--page">Your Instrument</h1>
-      <p className="balance-subdisplay">Levels follow your horn&apos;s own range.</p>
+      <p className="balance-subdisplay">{lede}</p>
 
       {families.map((family) => (
         <section key={family} className="balance-picker__group">

@@ -1077,17 +1077,20 @@ body.settings-branch-open * {
   }
 }
 
-.app-ui-overlay--audio-practice-tuner {
+.app-ui-overlay--audio-practice-tuner,
+.app-ui-overlay--audio-practice-record {
   background: transparent;
 }
 
-.app-ui-overlay--audio-practice-tuner .app-hud-bottom {
+.app-ui-overlay--audio-practice-tuner .app-hud-bottom,
+.app-ui-overlay--audio-practice-record .app-hud-bottom {
   gap: 0.45rem;
   padding-top: 0.15rem;
   padding-bottom: 0.08rem;
 }
 
-.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap {
+.app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills-wrap,
+.app-ui-overlay--audio-practice-record .audio-tuner-take-pills-wrap {
   padding: 0 0.75rem 0.15rem;
 }
 
@@ -1115,7 +1118,8 @@ body.settings-branch-open * {
   padding-bottom: 0.125rem;
 }
 
-.app-ui-overlay--audio-practice-tuner .control-deck {
+.app-ui-overlay--audio-practice-tuner .control-deck,
+.app-ui-overlay--audio-practice-record .control-deck {
   padding-top: 0.2rem;
 }
 
@@ -1257,6 +1261,7 @@ body.settings-branch-open * {
 }
 
 .audio-practice-metronome {
+  position: relative;
   padding-inline: 0.6rem;
   padding-bottom: max(0.2rem, env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;

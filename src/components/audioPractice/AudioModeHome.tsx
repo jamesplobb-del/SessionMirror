@@ -2,7 +2,6 @@ import {
   memo,
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -11,36 +10,23 @@ import {
   type RefObject,
 } from 'react'
 import { motion } from 'framer-motion'
-import { LoaderCircle, Pause, Play, RotateCw, Star, X } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
-import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import { useLiveRecordingWaveform } from '../../hooks/useLiveRecordingWaveform'
+import { useMediaWaveform } from '../../hooks/useMediaWaveform'
+import { useRecordWash } from '../../hooks/useRecordWash'
+import { useWrittenTakeWaveform } from '../../hooks/useWrittenTakeWaveform'
 import { stopEventBubble } from '../../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../../utils/haptics'
 import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
+import type { RecordWashMode } from '../../utils/recordWash'
 import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
 
-const EMPTY_WAVEFORM_PEAKS = [
-  0.18, 0.28, 0.42, 0.58, 0.72, 0.84, 0.92, 0.98, 0.92, 0.84, 0.72, 0.58, 0.42, 0.28, 0.18, 0.22,
-  0.34, 0.48, 0.62, 0.76, 0.88, 0.94, 0.88, 0.76, 0.62, 0.48, 0.34, 0.22, 0.3, 0.44, 0.58, 0.7, 0.8,
-  0.88, 0.8, 0.7, 0.58, 0.44, 0.3, 0.24, 0.36, 0.5, 0.64, 0.78, 0.86, 0.78, 0.64, 0.5, 0.36, 0.24,
-  0.2, 0.32, 0.46, 0.6, 0.74, 0.86, 0.74, 0.6, 0.46, 0.32, 0.2, 0.26, 0.38, 0.52, 0.66, 0.8,
-]
-
-const LIVE_WAVEFORM_FUTURE_PEAKS = [
-  0.055, 0.045, 0.07, 0.04, 0.06, 0.035, 0.05, 0.04, 0.065, 0.035, 0.055, 0.04, 0.05, 0.035, 0.045,
-  0.04, 0.035, 0.04,
-]
-const IDLE_RECORDING_WAVEFORM_PEAKS = [
-  0.1, 0.13, 0.09, 0.17, 0.12, 0.21, 0.16, 0.25, 0.19, 0.32, 0.24, 0.38, 0.29, 0.46, 0.34, 0.41,
-  0.27, 0.36, 0.22, 0.3, 0.18, 0.26, 0.15, 0.22, 0.12, 0.19, 0.14, 0.24, 0.17, 0.31, 0.23, 0.4,
-  0.28, 0.48, 0.35, 0.43, 0.3, 0.37, 0.24, 0.33, 0.2, 0.29, 0.16, 0.25, 0.13, 0.21, 0.15, 0.27,
-  0.19, 0.35, 0.25, 0.42, 0.31, 0.38, 0.26, 0.32, 0.21, 0.28, 0.17, 0.23, 0.14, 0.19, 0.11, 0.15,
-  0.1, 0.12,
-]
-const MIN_VISIBLE_WAVEFORM_PEAK = 0.035
+const MIN_VISIBLE_WAVEFORM_PEAK = 0.02
+const HEARING_ENERGY = 0.14
+const STAGE_BARS = 96
 
 interface RibbonPoint {
   x: number
@@ -63,30 +49,29 @@ function smoothPath(points: RibbonPoint[]): string {
   return path
 }
 
-function createRibbonPath(peaks: number[], phase = 0): string {
+function createRibbonPath(peaks: number[], widthRatio = 1): string {
   if (peaks.length === 0) return ''
-  const width = 1000
+  const width = 1000 * Math.max(0.04, Math.min(1, widthRatio))
   const centerY = 90
-  const maxAmplitude = 38
+  const maxAmplitude = 52
   const smoothedPeaks = peaks.map((peak, index) => {
     const previous = peaks[Math.max(0, index - 1)]
     const next = peaks[Math.min(peaks.length - 1, index + 1)]
     return previous * 0.24 + peak * 0.52 + next * 0.24
   })
-  const sampledPeaks = smoothedPeaks.filter((_, index) => index % 3 === 0)
-  if ((smoothedPeaks.length - 1) % 3 !== 0) sampledPeaks.push(smoothedPeaks.at(-1) ?? 0)
+  const sampledPeaks = smoothedPeaks.filter((_, index) => index % 2 === 0)
+  if ((smoothedPeaks.length - 1) % 2 !== 0) sampledPeaks.push(smoothedPeaks.at(-1) ?? 0)
 
   const points = sampledPeaks.map((peak, index) => {
     const progress = index / Math.max(1, sampledPeaks.length - 1)
-    const taper = 0.28 + Math.pow(Math.sin(progress * Math.PI), 0.8) * 0.72
+    const taper = 0.22 + Math.pow(Math.sin(progress * Math.PI), 0.8) * 0.78
+    const energy = Math.max(MIN_VISIBLE_WAVEFORM_PEAK, peak)
     const direction =
-      Math.sin(index * 1.37 + progress * Math.PI * 0.7 + phase + 0.4) * 0.66 +
-      Math.sin(index * 0.58 - phase * 0.52 + 1.2) * 0.34
+      Math.sin(index * 1.37 + progress * Math.PI * 0.7 + 0.4) * 0.66 +
+      Math.sin(index * 0.58 + 1.2) * 0.34
     return {
       x: 22 + progress * (width - 44),
-      y:
-        centerY +
-        direction * (2.5 + Math.max(MIN_VISIBLE_WAVEFORM_PEAK, peak) * maxAmplitude) * taper,
+      y: centerY + direction * energy * maxAmplitude * taper,
     }
   })
   return smoothPath(points)
@@ -100,136 +85,43 @@ function formatDuration(seconds?: number): string {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
 }
 
-interface AudioModeTakeCardProps {
-  label: string
-  tone: 'current' | 'best'
-  take: Take | null
-  libraryPlayback?: LibraryPlaybackReference | null
-  onOpen?: () => void
-  onFavorite?: () => void
-  onClear?: () => void
-  readiness?: { status: 'preparing' | 'ready' | 'error'; durationSeconds?: number; message?: string }
-  onRetryPreparation?: () => void
-  hapticFeedback?: boolean
-}
-
 type ScrubPhase = 'start' | 'move' | 'end'
 
-function AudioRecordingWaveform({
-  isRecording,
-  ready,
-  streamRef,
-  streamGeneration,
-}: {
-  isRecording: boolean
-  ready: boolean
-  streamRef: RefObject<MediaStream | null>
-  streamGeneration: number
-}) {
-  const livePeaks = useLiveRecordingWaveform({
-    active: ready || isRecording,
-    streamRef,
-    streamGeneration,
-  })
-  const [motionPhase, setMotionPhase] = useState(0)
-  const displayedPeaks = useMemo(() => {
-    const reactivePeaks = livePeaks.map((peak, index) =>
-      Math.max(peak, IDLE_RECORDING_WAVEFORM_PEAKS[index % IDLE_RECORDING_WAVEFORM_PEAKS.length] * 0.34),
-    )
-    return isRecording ? [...reactivePeaks, ...LIVE_WAVEFORM_FUTURE_PEAKS] : reactivePeaks
-  }, [isRecording, livePeaks])
-  const gradientId = useId().replace(/:/g, '')
-  const ribbonPath = useMemo(
-    () => createRibbonPath(displayedPeaks, motionPhase),
-    [displayedPeaks, motionPhase],
-  )
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let animationFrame = 0
-    let lastUpdate = 0
-    const startTime = performance.now()
-    const animate = (timestamp: number) => {
-      if (timestamp - lastUpdate >= 48) {
-        const duration = isRecording ? 820 : 1750
-        setMotionPhase((timestamp - startTime) / duration)
-        lastUpdate = timestamp
-      }
-      animationFrame = window.requestAnimationFrame(animate)
-    }
-    animationFrame = window.requestAnimationFrame(animate)
-    return () => window.cancelAnimationFrame(animationFrame)
-  }, [isRecording])
-
-  return (
-    <div
-      className={`audio-recording-waveform audio-breathing-ribbon ${
-        isRecording
-          ? 'audio-recording-waveform--recording audio-breathing-ribbon--recording'
-          : 'audio-recording-waveform--idle audio-breathing-ribbon--idle'
-      }`}
-      aria-hidden
-    >
-      <svg
-        className="audio-breathing-ribbon__canvas"
-        viewBox="0 0 1000 180"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="var(--audio-gold)" />
-            <stop offset="42%" stopColor="var(--audio-blue)" />
-            <stop offset="100%" stopColor="var(--audio-blue)" />
-          </linearGradient>
-        </defs>
-        <path
-          className="audio-breathing-ribbon__glow"
-          d={ribbonPath}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          className="audio-breathing-ribbon__reflection"
-          d={ribbonPath}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          className="audio-breathing-ribbon__body"
-          d={ribbonPath}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-    </div>
-  )
-}
-
-function AudioWaveform({
-  tone,
-  active,
-  peaks,
-  progress,
+function RecordStageRibbon({
+  currentPeaks,
+  bestPeaks,
+  widthRatio,
+  playhead,
+  recording,
+  playing,
+  activeTone,
   onScrub,
-  disabled = false,
-  hapticFeedback = true,
+  disabled,
+  hapticFeedback,
 }: {
-  tone: 'current' | 'best'
-  active: boolean
-  peaks: number[]
-  progress: number
+  currentPeaks: number[]
+  bestPeaks: number[]
+  widthRatio: number
+  playhead: number
+  recording: boolean
+  playing: boolean
+  activeTone: 'current' | 'best' | 'live'
   onScrub: (progress: number, phase: ScrubPhase) => void
-  disabled?: boolean
-  hapticFeedback?: boolean
+  disabled: boolean
+  hapticFeedback: boolean
 }) {
-  const safeProgress = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0
   const [dragProgress, setDragProgress] = useState<number | null>(null)
-  const dragProgressRef = useRef(safeProgress)
   const hapticMilestoneRef = useRef(-1)
-  const displayedProgress = dragProgress ?? safeProgress
+  const displayedProgress = dragProgress ?? playhead
+  const currentPath = useMemo(
+    () => createRibbonPath(currentPeaks, widthRatio),
+    [currentPeaks, widthRatio],
+  )
+  const bestPath = useMemo(() => createRibbonPath(bestPeaks, 1), [bestPeaks])
+  const writeHeadX = 22 + widthRatio * 956
+  const playheadX = 22 + displayedProgress * 956
+  const currentThick = activeTone !== 'best'
+  const bestThick = activeTone === 'best'
 
   const updateDragProgress = (
     clientX: number,
@@ -239,10 +131,8 @@ function AudioWaveform({
     const nextProgress = rect.width > 0
       ? Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       : displayedProgress
-    dragProgressRef.current = nextProgress
     setDragProgress(nextProgress)
     onScrub(nextProgress, phase)
-
     if (phase !== 'move' || !hapticFeedback) return
     const milestone = Math.floor(nextProgress * 4)
     if (milestone !== hapticMilestoneRef.current) {
@@ -256,9 +146,7 @@ function AudioWaveform({
     event.preventDefault()
     event.stopPropagation()
     hapticMilestoneRef.current = -1
-    if (hapticFeedback) {
-      void triggerDragStartHaptic()
-    }
+    if (hapticFeedback) void triggerDragStartHaptic()
     updateDragProgress(event.clientX, event.currentTarget.getBoundingClientRect(), 'start')
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -285,7 +173,6 @@ function AudioWaveform({
     if (disabled) return
     const step = event.shiftKey ? 0.1 : 0.025
     let nextProgress: number | null = null
-
     if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
       nextProgress = Math.max(0, displayedProgress - step)
     } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
@@ -295,7 +182,6 @@ function AudioWaveform({
     } else if (event.key === 'End') {
       nextProgress = 1
     }
-
     if (nextProgress === null) return
     event.preventDefault()
     event.stopPropagation()
@@ -306,16 +192,14 @@ function AudioWaveform({
 
   return (
     <div
-      className={`audio-mode-waveform audio-mode-waveform--${tone} ${
-        active ? 'audio-mode-waveform--active' : ''
-      } ${dragProgress !== null ? 'audio-mode-waveform--scrubbing' : ''} ${
-        disabled ? 'audio-mode-waveform--disabled' : ''
-      }`}
-      role="slider"
-      aria-label="Take waveform"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(displayedProgress * 100)}
+      className={`audio-record-ribbon ${recording ? 'audio-record-ribbon--recording' : ''} ${
+        playing ? 'audio-record-ribbon--playing' : ''
+      } ${disabled ? 'audio-record-ribbon--disabled' : ''}`}
+      role={disabled ? 'img' : 'slider'}
+      aria-label={recording ? 'Recording waveform' : 'Take waveform'}
+      aria-valuemin={disabled ? undefined : 0}
+      aria-valuemax={disabled ? undefined : 100}
+      aria-valuenow={disabled ? undefined : Math.round(displayedProgress * 100)}
       aria-disabled={disabled}
       tabIndex={disabled ? -1 : 0}
       onPointerDown={handlePointerDown}
@@ -325,212 +209,116 @@ function AudioWaveform({
       onKeyDown={handleKeyDown}
       onClick={stopEventBubble}
     >
-      {peaks.map((peak, index) => (
-        <span
-          key={index}
-          className={
-            index / Math.max(1, peaks.length - 1) > displayedProgress
-              ? 'audio-mode-waveform__bar audio-mode-waveform__bar--future'
-              : 'audio-mode-waveform__bar'
-          }
-          style={{
-            height: `${Math.round(5 + peak * 25)}px`,
-            animationDelay: active ? `${index * 18}ms` : undefined,
-          }}
-        />
-      ))}
-      <span className="audio-mode-waveform__playhead" style={{ left: `${displayedProgress * 100}%` }} />
+      <svg className="audio-record-ribbon__canvas" viewBox="0 0 1000 180" preserveAspectRatio="none">
+        {recording ? (
+          <line
+            className="audio-record-ribbon__baseline"
+            x1="22"
+            y1="90"
+            x2="978"
+            y2="90"
+          />
+        ) : null}
+        {bestPath ? (
+          <path
+            className={`audio-record-ribbon__ghost ${bestThick ? 'audio-record-ribbon__ghost--active' : ''}`}
+            d={bestPath}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        {currentPath ? (
+          <path
+            className={`audio-record-ribbon__body audio-record-ribbon__body--${
+              recording ? 'record' : currentThick ? 'current' : 'dim'
+            }`}
+            d={currentPath}
+            fill="none"
+            vectorEffect="non-scaling-stroke"
+          />
+        ) : null}
+        {recording ? (
+          <line
+            className="audio-record-ribbon__write-head"
+            x1={writeHeadX}
+            y1="38"
+            x2={writeHeadX}
+            y2="142"
+          />
+        ) : null}
+        {(playing || dragProgress !== null) && !recording ? (
+          <line
+            className="audio-record-ribbon__playhead"
+            x1={playheadX}
+            y1="28"
+            x2={playheadX}
+            y2="152"
+          />
+        ) : null}
+      </svg>
     </div>
   )
 }
 
-function AudioModeTakeCard({
-  label,
+function RecordTraceKey({
   tone,
-  take,
-  libraryPlayback = null,
-  onOpen,
-  onFavorite,
+  label,
+  playing,
+  onPlay,
+  onPin,
   onClear,
-  readiness,
-  onRetryPreparation,
-  hapticFeedback = true,
-}: AudioModeTakeCardProps) {
-  const {
-    playbackItem,
-    hasMedia,
-    isPlaying,
-    durationSeconds,
-    currentTime,
-    playbackProgress,
-    displayName,
-    togglePlayback,
-    openTake,
-    audioPlayback,
-    isCurrentItem,
-  } = useAudioModeTakeItem({ tone, take, libraryPlayback })
-  const isPreparing = readiness?.status === 'preparing'
-  const preparationFailed = readiness?.status === 'error'
-  const playable = hasMedia && !isPreparing && !preparationFailed
-  const knownDurationSeconds = readiness?.durationSeconds ?? durationSeconds
-  const waveformDurationSeconds =
-    Number.isFinite(knownDurationSeconds) && knownDurationSeconds > 0 ? knownDurationSeconds : 0
-  const waveformProgress =
-    waveformDurationSeconds > 0 && Number.isFinite(currentTime)
-      ? Math.max(0, Math.min(1, currentTime / waveformDurationSeconds))
-      : playbackProgress
-  const waveformPeaks = useMediaWaveform({
-    filePath: playable ? playbackItem?.filePath ?? '' : '',
-    mediaUrl: playable ? playbackItem?.mediaUrl ?? '' : '',
-    barCount: 64,
-  })
-  const displayPeaks = waveformPeaks.length > 0 ? waveformPeaks : EMPTY_WAVEFORM_PEAKS
-
-  useEffect(() => {
-    if (!playable || !playbackItem) return
-    audioPlayback.prime(playbackItem)
-  }, [audioPlayback.prime, playable, playbackItem])
-
-  const handleWaveformScrub = useCallback(
-    (progress: number, phase: ScrubPhase) => {
-      if (!playable || !playbackItem) return
-      if (waveformDurationSeconds <= 0) {
-        if (phase === 'start') audioPlayback.play(playbackItem)
-        return
-      }
-      const nextTime = progress * waveformDurationSeconds
-      if (isCurrentItem || audioPlayback.matchesCurrentSource(playbackItem)) {
-        audioPlayback.seek(nextTime)
-      } else if (phase === 'start') {
-        audioPlayback.play(playbackItem, { startTime: nextTime })
-      }
-    },
-    [audioPlayback, isCurrentItem, playable, playbackItem, waveformDurationSeconds]
-  )
-
+}: {
+  tone: 'current' | 'best'
+  label: string
+  playing: boolean
+  onPlay: () => void
+  onPin?: () => void
+  onClear?: () => void
+}) {
   return (
-    <motion.article
-      className={`audio-mode-take-card audio-mode-take-card--${tone} ${
-        hasMedia ? '' : 'audio-mode-take-card--empty'
-      } ${isPreparing ? 'audio-mode-take-card--preparing' : ''} ${
-        preparationFailed ? 'audio-mode-take-card--error' : ''
+    <div
+      className={`audio-record-key audio-record-key--${tone} ${
+        playing ? 'audio-record-key--playing' : ''
       }`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={iosHudDim}
-      style={motionGpuLayer}
-      onClick={() => {
-        if (playable) openTake(onOpen)
-      }}
     >
-      <div className="audio-mode-take-card__chrome">
-        <span className="audio-mode-take-card__pill">{label}</span>
-        <div className="audio-mode-take-card__actions">
-          {tone === 'current' && playable && (
-            <Pressable
-              type="button"
-              intensity="icon"
-              haptic="light"
-              onClick={(event) => {
-                event.stopPropagation()
-                onFavorite?.()
-              }}
-              className="audio-mode-take-card__mini-btn audio-mode-take-card__mini-btn--best"
-              aria-label="Pin Current Take as Best Take"
-            >
-              <Star className="h-4 w-4 fill-current" />
-            </Pressable>
-          )}
-          {hasMedia && (
-            <Pressable
-              type="button"
-              intensity="icon"
-              haptic="light"
-              onClick={(event) => {
-                event.stopPropagation()
-                onClear?.()
-              }}
-              className="audio-mode-take-card__mini-btn"
-              aria-label={`Clear ${label}`}
-            >
-              <X className="h-4 w-4" />
-            </Pressable>
-          )}
-        </div>
-      </div>
-
-      <div className="audio-mode-take-card__media">
+      <Pressable
+        type="button"
+        intensity="soft"
+        squish={false}
+        haptic="light"
+        onClick={onPlay}
+        className="audio-record-key__play"
+        aria-pressed={playing}
+        aria-label={playing ? `Pause ${label}` : `Play ${label}`}
+      >
+        <span className="audio-record-key__swatch" aria-hidden />
+        {label}
+      </Pressable>
+      {onPin ? (
         <Pressable
           type="button"
           intensity="icon"
-          squish={false}
           haptic="light"
-          disabled={!playable && !preparationFailed}
-          onClick={(event) => {
-            event.stopPropagation()
-            if (preparationFailed) {
-              onRetryPreparation?.()
-              return
-            }
-            if (playable) togglePlayback()
-          }}
-          onPointerDown={stopEventBubble}
-          className="audio-mode-take-card__play"
-          aria-label={
-            isPreparing
-              ? 'Preparing take playback'
-              : preparationFailed
-                ? 'Retry preparing take playback'
-                : isPlaying
-                  ? 'Pause take'
-                  : 'Play take'
-          }
+          onClick={onPin}
+          className="audio-record-key__action audio-record-key__action--pin"
+          aria-label="Pin Current as Best"
         >
-          {isPreparing ? (
-            <LoaderCircle className="h-5 w-5 animate-spin" strokeWidth={2.2} />
-          ) : preparationFailed ? (
-            <RotateCw className="h-5 w-5" strokeWidth={2.2} />
-          ) : isPlaying ? (
-            <Pause className="h-5 w-5 fill-[#171A22]" />
-          ) : (
-            <Play className="ml-0.5 h-5 w-5 fill-[#171A22]" />
-          )}
+          <Star className="h-3 w-3 fill-current" />
         </Pressable>
-        <div className="audio-mode-take-card__playback-column">
-          <div className="audio-mode-take-card__title-row">
-            <div className="audio-mode-take-card__title-copy">
-              <div className="audio-mode-take-card__name-line">
-                <h3>{displayName}</h3>
-                {playable && (
-                  <span className="audio-mode-take-card__duration">
-                    <span aria-hidden />
-                    {formatDuration(knownDurationSeconds)}
-                  </span>
-                )}
-              </div>
-              {!playable && (
-                <p>
-                  {isPreparing
-                    ? 'Preparing playback...'
-                    : preparationFailed
-                      ? readiness?.message ?? 'Playback preparation failed.'
-                      : 'Ready for a new take'}
-                </p>
-              )}
-            </div>
-          </div>
-          <AudioWaveform
-            tone={tone}
-            active={isPlaying}
-            peaks={displayPeaks}
-            progress={playable ? waveformProgress : 0}
-            onScrub={handleWaveformScrub}
-            disabled={!playable}
-            hapticFeedback={hapticFeedback}
-          />
-        </div>
-      </div>
-    </motion.article>
+      ) : null}
+      {onClear ? (
+        <Pressable
+          type="button"
+          intensity="icon"
+          haptic="light"
+          onClick={onClear}
+          className="audio-record-key__action"
+          aria-label={`Clear ${label}`}
+        >
+          <X className="h-3 w-3" />
+        </Pressable>
+      ) : null}
+    </div>
   )
 }
 
@@ -543,13 +331,10 @@ interface AudioModeHomeProps {
   challengerTake: Take | null
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
-  onExpandBenchmark?: () => void
-  onExpandChallenger?: () => void
+  showTakeKeys?: boolean
   onPinCurrentAsBest?: () => void
   onClearBenchmark?: () => void
   onClearChallenger?: () => void
-  takeReadiness?: Record<string, { status: 'preparing' | 'ready' | 'error'; durationSeconds?: number; message?: string }>
-  onRetryTakePreparation?: (takeId: string) => void
   hapticFeedback?: boolean
 }
 
@@ -562,79 +347,201 @@ function AudioModeHome({
   challengerTake,
   benchmarkTake,
   libraryBenchmarkPlayback,
-  onExpandBenchmark,
-  onExpandChallenger,
+  showTakeKeys = true,
   onPinCurrentAsBest,
   onClearBenchmark,
   onClearChallenger,
-  takeReadiness = {},
-  onRetryTakePreparation,
   hapticFeedback = true,
 }: AudioModeHomeProps) {
-  const status = isRecording ? 'Recording' : ready ? 'Ready' : 'Preparing'
-  const hint = isRecording
-    ? 'Recording audio… tap stop when finished'
-    : 'Tap the center control to start recording'
+  const stageRef = useRef<HTMLElement | null>(null)
+  const [holdWritten, setHoldWritten] = useState(false)
+
+  const livePeaks = useLiveRecordingWaveform({
+    active: ready || isRecording,
+    streamRef,
+    streamGeneration,
+  })
+  const { peaks: writtenPeaks, writeProgress, reset: resetWritten } = useWrittenTakeWaveform(
+    isRecording,
+    livePeaks,
+  )
+
+  const currentItem = useAudioModeTakeItem({ tone: 'current', take: challengerTake })
+  const bestItem = useAudioModeTakeItem({
+    tone: 'best',
+    take: benchmarkTake,
+    libraryPlayback: libraryBenchmarkPlayback,
+  })
+
+  const currentMediaPeaks = useMediaWaveform({
+    filePath: currentItem.hasMedia ? currentItem.playbackItem?.filePath ?? '' : '',
+    mediaUrl: currentItem.hasMedia ? currentItem.playbackItem?.mediaUrl ?? '' : '',
+    barCount: STAGE_BARS,
+    placeholder: false,
+  })
+  const bestMediaPeaks = useMediaWaveform({
+    filePath: bestItem.hasMedia ? bestItem.playbackItem?.filePath ?? '' : '',
+    mediaUrl: bestItem.hasMedia ? bestItem.playbackItem?.mediaUrl ?? '' : '',
+    barCount: STAGE_BARS,
+    placeholder: false,
+  })
+
+  useEffect(() => {
+    if (isRecording) setHoldWritten(true)
+  }, [isRecording])
+
+  useEffect(() => {
+    if (isRecording || challengerTake) return
+    setHoldWritten(false)
+    resetWritten()
+  }, [challengerTake, isRecording, resetWritten])
+
+  useEffect(() => {
+    if (currentItem.hasMedia && currentItem.playbackItem) {
+      currentItem.audioPlayback.prime(currentItem.playbackItem)
+    }
+  }, [currentItem.audioPlayback, currentItem.hasMedia, currentItem.playbackItem])
+
+  useEffect(() => {
+    if (bestItem.hasMedia && bestItem.playbackItem) {
+      bestItem.audioPlayback.prime(bestItem.playbackItem)
+    }
+  }, [bestItem.audioPlayback, bestItem.hasMedia, bestItem.playbackItem])
+
+  const liveEnergy = useMemo(() => {
+    if (livePeaks.length === 0) return 0
+    const tail = livePeaks.slice(-4)
+    return tail.reduce((sum, peak) => sum + peak, 0) / tail.length
+  }, [livePeaks])
+
+  const listening = !isRecording && !currentItem.isPlaying && !bestItem.isPlaying && liveEnergy >= HEARING_ENERGY
+  const showLiveRibbon = !isRecording && !holdWritten && !currentItem.hasMedia
+  const currentPeaks = isRecording || (holdWritten && writtenPeaks.length > 0)
+    ? writtenPeaks
+    : currentItem.hasMedia
+      ? currentMediaPeaks
+      : showLiveRibbon
+        ? livePeaks
+        : []
+  const bestPeaks = bestItem.hasMedia ? bestMediaPeaks : []
+  const widthRatio = isRecording ? writeProgress : 1
+  const activeTake = bestItem.isPlaying ? bestItem : currentItem
+  const playhead = activeTake.isPlaying || activeTake.isCurrentItem ? activeTake.playbackProgress : 0
+  const playing = currentItem.isPlaying || bestItem.isPlaying
+  const activeTone: 'current' | 'best' | 'live' = bestItem.isPlaying
+    ? 'best'
+    : showLiveRibbon
+      ? 'live'
+      : 'current'
+
+  const washMode: RecordWashMode = isRecording
+    ? 'recording'
+    : bestItem.isPlaying
+      ? 'playing-best'
+      : currentItem.isPlaying
+        ? 'playing-current'
+        : listening
+          ? 'hearing'
+          : 'idle'
+
+  useRecordWash(stageRef, washMode, liveEnergy, true)
+
+  const status = isRecording
+    ? 'Recording'
+    : !ready
+      ? 'Preparing'
+      : playing
+        ? 'Playing'
+        : listening
+          ? 'Listening'
+          : 'Ready'
+  const timerSeconds = isRecording
+    ? elapsed
+    : playing
+      ? activeTake.currentTime
+      : 0
+
+  const handleWaveformScrub = useCallback(
+    (progress: number, phase: ScrubPhase) => {
+      const target = bestItem.isPlaying ? bestItem : currentItem.hasMedia ? currentItem : bestItem
+      if (!target.hasMedia || !target.playbackItem) return
+      const duration = target.durationSeconds
+      if (duration <= 0) {
+        if (phase === 'start') target.audioPlayback.play(target.playbackItem)
+        return
+      }
+      const nextTime = progress * duration
+      if (target.isCurrentItem || target.audioPlayback.matchesCurrentSource(target.playbackItem)) {
+        target.audioPlayback.seek(nextTime)
+      } else if (phase === 'start') {
+        target.audioPlayback.play(target.playbackItem, { startTime: nextTime })
+      }
+    },
+    [bestItem, currentItem],
+  )
+
+  const canScrub = !isRecording && (currentItem.hasMedia || bestItem.hasMedia)
+  const showCurrentKey =
+    showTakeKeys && !isRecording && (currentItem.hasMedia || (holdWritten && writtenPeaks.length > 0))
+  const showBestKey = showTakeKeys && !isRecording && bestItem.hasMedia
 
   return (
-    <section className="audio-mode-home pointer-events-auto">
+    <section
+      ref={stageRef}
+      className={`audio-mode-home audio-record-stage audio-record-stage--${washMode} pointer-events-auto`}
+    >
       <motion.div
-        className={`audio-mode-hero ${isRecording ? 'audio-mode-hero--recording' : ''}`}
+        className="audio-record-readout"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={iosHudDim}
+        style={motionGpuLayer}
       >
-        <div
-          className={`audio-mode-status-pill ${
-            isRecording ? 'audio-mode-status-pill--recording' : ''
-          }`}
-          role="status"
-          aria-live="polite"
-        >
-          <span className="audio-mode-status-pill__dot" aria-hidden />
-          <strong>{status}</strong>
-          <span className="audio-mode-status-pill__divider" aria-hidden>·</span>
-          <time>{formatDuration(isRecording ? elapsed : 0)}</time>
-        </div>
-        <AudioRecordingWaveform
-          isRecording={isRecording}
-          ready={ready}
-          streamRef={streamRef}
-          streamGeneration={streamGeneration}
-        />
-        <p>{hint}</p>
+        <p className="audio-record-readout__status" role="status" aria-live="polite">
+          <span aria-hidden />
+          {status}
+        </p>
+        <p className="audio-record-readout__time">
+          <time>{formatDuration(timerSeconds)}</time>
+        </p>
       </motion.div>
 
-      <div className="audio-mode-take-stack">
-        <AudioModeTakeCard
-          label="Current Take"
-          tone="current"
-          take={challengerTake}
-          onOpen={onExpandChallenger}
-          onFavorite={onPinCurrentAsBest}
-          onClear={onClearChallenger}
-          readiness={challengerTake ? takeReadiness[challengerTake.id] : undefined}
-          onRetryPreparation={
-            challengerTake ? () => onRetryTakePreparation?.(challengerTake.id) : undefined
-          }
-          hapticFeedback={hapticFeedback}
-        />
-        <AudioModeTakeCard
-          label="Best Take"
-          tone="best"
-          take={benchmarkTake}
-          libraryPlayback={libraryBenchmarkPlayback}
-          onOpen={
-            Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined
-          }
-          onClear={onClearBenchmark}
-          readiness={benchmarkTake ? takeReadiness[benchmarkTake.id] : undefined}
-          onRetryPreparation={
-            benchmarkTake ? () => onRetryTakePreparation?.(benchmarkTake.id) : undefined
-          }
-          hapticFeedback={hapticFeedback}
-        />
-      </div>
+      <RecordStageRibbon
+        currentPeaks={currentPeaks}
+        bestPeaks={isRecording || holdWritten || currentItem.hasMedia || bestItem.hasMedia ? bestPeaks : []}
+        widthRatio={widthRatio}
+        playhead={playhead}
+        recording={isRecording}
+        playing={playing}
+        activeTone={activeTone}
+        onScrub={handleWaveformScrub}
+        disabled={!canScrub}
+        hapticFeedback={hapticFeedback}
+      />
+
+      {showCurrentKey || showBestKey ? (
+        <div className="audio-record-keys" aria-label="Takes">
+          {showBestKey ? (
+            <RecordTraceKey
+              tone="best"
+              label="Best"
+              playing={bestItem.isPlaying}
+              onPlay={bestItem.togglePlayback}
+              onClear={onClearBenchmark}
+            />
+          ) : null}
+          {showCurrentKey ? (
+            <RecordTraceKey
+              tone="current"
+              label="Current"
+              playing={currentItem.isPlaying}
+              onPlay={currentItem.togglePlayback}
+              onPin={currentItem.hasMedia ? onPinCurrentAsBest : undefined}
+              onClear={onClearChallenger}
+            />
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }

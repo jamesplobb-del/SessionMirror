@@ -290,7 +290,9 @@ function DroneSoundWheel({
                   data-ribbon-absolute={pitch.absolute}
                   className={`harmonic-ribbon__note ${active ? 'harmonic-ribbon__note--active' : ''} ${
                     isRoot ? 'harmonic-ribbon__note--root' : ''
-                  } ${glissing ? 'harmonic-ribbon__note--gliss' : ''}`}
+                  } ${glissing ? 'harmonic-ribbon__note--gliss' : ''} ${
+                    writtenPitch.label.length > 1 ? 'harmonic-ribbon__note--accidental' : ''
+                  }`}
                   aria-label={`Written ${writtenPitch.noteName}; sounds concert ${soundingPitch.noteName}${active ? '; active drone note' : ''}`}
                   aria-pressed={active}
                   onClick={() => handleNoteClick(pitch)}
