@@ -1,9 +1,9 @@
-import astronautAsset from '../assets/practice-characters/astronaut.webp'
-import birdAsset from '../assets/practice-characters/bird.webp'
-import catAsset from '../assets/practice-characters/cat.webp'
-import foxAsset from '../assets/practice-characters/fox.webp'
-import robotAsset from '../assets/practice-characters/robot.webp'
-import trumpeterAsset from '../assets/practice-characters/trumpeter.webp'
+import astronautAsset from '../assets/practice-characters/astronaut.svg'
+import birdAsset from '../assets/practice-characters/bird.svg'
+import catAsset from '../assets/practice-characters/cat.svg'
+import foxAsset from '../assets/practice-characters/fox.svg'
+import robotAsset from '../assets/practice-characters/robot.svg'
+import trumpeterAsset from '../assets/practice-characters/trumpeter.png'
 
 export type PracticeGameCharacterId =
   | 'trumpeter'
@@ -22,12 +22,12 @@ export interface PracticeGameCharacter {
 }
 
 export const PRACTICE_GAME_CHARACTERS: readonly PracticeGameCharacter[] = [
-  { id: 'trumpeter', name: 'Trumpeter', asset: trumpeterAsset, scale: 1.04 },
-  { id: 'cat', name: 'Cat', asset: catAsset, scale: 1.05 },
-  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 1.04 },
-  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 1.06 },
-  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 1.04 },
-  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 1.03 },
+  { id: 'trumpeter', name: 'Trumpeter', asset: trumpeterAsset, scale: 1 },
+  { id: 'cat', name: 'Cat', asset: catAsset, scale: 0.96 },
+  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 0.96 },
+  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 0.96 },
+  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 0.96 },
+  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 0.96 },
 ] as const
 
 const CHARACTER_STORAGE_KEY = 'besttake.practiceGames.character'
