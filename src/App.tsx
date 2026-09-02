@@ -587,11 +587,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isReviewOpen = reviewSlot !== null
   const isLabsOpen = labsRoute !== null
-  const isExperimentalOpen =
-    isLabsOpen || isCreatorStudioPickerOpen || creatorStudioTake !== null || multitrackOpen
+  const isDimmedExperimentalOpen =
+    isCreatorStudioPickerOpen || creatorStudioTake !== null || multitrackOpen
+  const isExperimentalOpen = isLabsOpen || isDimmedExperimentalOpen
   const hudModalState: 'idle' | 'sheet' | 'review' = isReviewOpen
     ? 'review'
-    : isVaultOpen || isSettingsOpen || isExperimentalOpen
+    : isVaultOpen || isSettingsOpen || isDimmedExperimentalOpen
     ? 'sheet'
     : 'idle'
 
@@ -3386,30 +3387,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pausePipVideos()
       setYoutubeUrl(null)
       setBenchmarkBinding({ source: 'take', refId: id })
-      setBenchmarkId((prevBenchmark) => {
-        setChallengerId((current) => {
-          if (current === id) {
-            if (prevBenchmark && prevBenchmark !== id) {
-              return prevBenchmark
-            }
-            const sorted = sortTakes(takes, sortMode)
-            const pinnedIndex = sorted.findIndex((take) => take.id === id)
-            if (pinnedIndex >= 0 && pinnedIndex < sorted.length - 1) {
-              return sorted[pinnedIndex + 1].id
-            }
-            return null
+      setBenchmarkId(id)
+      setChallengerId((current) => {
+        if (current === id) {
+          if (benchmarkId && benchmarkId !== id) {
+            return benchmarkId
           }
-          if (current && current !== id) return current
-          const other = takes.find((take) => take.id !== id)
-          return other?.id ?? null
-        })
-        return id
+          const sorted = sortTakes(takes, sortMode)
+          const pinnedIndex = sorted.findIndex((take) => take.id === id)
+          if (pinnedIndex >= 0 && pinnedIndex < sorted.length - 1) {
+            return sorted[pinnedIndex + 1].id
+          }
+          return null
+        }
+        if (current && current !== id) return current
+        const other = takes.find((take) => take.id !== id)
+        return other?.id ?? null
       })
       if (activeProjectIdRef.current) {
-        void setProjectBestTake(activeProjectIdRef.current, id)
+        void setProjectBestTake(activeProjectIdRef.current, id).catch((error) => {
+          console.error('[BestTake] Failed to persist Best Take selection', error)
+        })
       }
     },
     [
+      benchmarkId,
       pausePipVideos,
       releaseAutoRecordSuppress,
       settings.hapticFeedback,
@@ -4362,7 +4364,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                   transition={iosHudDim}
                   style={{
-                    ...motionGpuLayer,
                     pointerEvents: audioPracticeSheetOpen
                       ? 'none'
                       : overlayPointerCapture

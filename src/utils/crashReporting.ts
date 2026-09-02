@@ -47,11 +47,9 @@ export function initCrashReporting(): void {
       tracesSampleRate: 0,
 
       // --- Privacy ---------------------------------------------------------
-      // BestTake records video and audio of the user. Session Replay captures
-      // the screen, which here means the live camera preview — it stays off
-      // permanently, not merely sampled at zero.
-      replaysSessionSampleRate: 0,
-      replaysOnErrorSampleRate: 0,
+      // BestTake records video and audio of the user. Do not install Sentry's
+      // Replay integration: it could capture the live camera preview. The
+      // Capacitor SDK does not accept the browser-only replay sampling keys.
       sendDefaultPii: false,
 
       beforeSend(event) {

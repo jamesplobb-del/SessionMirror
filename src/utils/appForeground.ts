@@ -23,12 +23,13 @@ let recoveryTimer: number | null = null
 let lastForegroundDispatchAt = 0
 const FOREGROUND_DISPATCH_DEDUPE_MS = 250
 
-function setAppInForeground(foreground: boolean) {
-  if (appInForeground === foreground) return
+function setAppInForeground(foreground: boolean): boolean {
+  if (appInForeground === foreground) return false
   appInForeground = foreground
   for (const listener of listeners) {
     listener(foreground)
   }
+  return true
 }
 
 function dispatchLifecycleEvent(eventName: string, reason: string): void {
@@ -81,12 +82,12 @@ export function requestInteractiveMediaRecovery(reason: string): void {
 }
 
 function markForeground(reason: string): void {
-  setAppInForeground(true)
+  if (!setAppInForeground(true)) return
   dispatchForeground(reason)
 }
 
 function markBackground(reason: string): void {
-  setAppInForeground(false)
+  if (!setAppInForeground(false)) return
   dispatchBackground(reason)
 }
 

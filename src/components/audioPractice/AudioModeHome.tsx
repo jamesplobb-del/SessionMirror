@@ -1,7 +1,6 @@
 import {
   memo,
   useCallback,
-  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -9,15 +8,12 @@ import {
   type PointerEvent,
   type RefObject,
 } from 'react'
-import { motion } from 'framer-motion'
 import { LoaderCircle, Pause, Play, RotateCw, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
-import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import { useLiveRecordingWaveform } from '../../hooks/useLiveRecordingWaveform'
 import { stopEventBubble } from '../../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../../utils/haptics'
-import { iosHudDim, motionGpuLayer } from '../../utils/motionPresets'
 import type { Take } from '../../types'
 import type { LibraryPlaybackReference } from '../../types/library'
 
@@ -282,18 +278,6 @@ function AudioModeTakeCard({
     waveformDurationSeconds > 0 && Number.isFinite(currentTime)
       ? Math.max(0, Math.min(1, currentTime / waveformDurationSeconds))
       : playbackProgress
-  const waveformPeaks = useMediaWaveform({
-    filePath: playable ? playbackItem?.filePath ?? '' : '',
-    mediaUrl: playable ? playbackItem?.mediaUrl ?? '' : '',
-    barCount: 64,
-  })
-  const displayPeaks = waveformPeaks.length > 0 ? waveformPeaks : EMPTY_WAVEFORM_PEAKS
-
-  useEffect(() => {
-    if (!playable || !playbackItem) return
-    audioPlayback.prime(playbackItem)
-  }, [audioPlayback.prime, playable, playbackItem])
-
   const handleWaveformScrub = useCallback(
     (progress: number, phase: ScrubPhase) => {
       if (!playable || !playbackItem) return
@@ -312,16 +296,12 @@ function AudioModeTakeCard({
   )
 
   return (
-    <motion.article
+    <article
       className={`audio-mode-take-card audio-mode-take-card--${tone} ${
         hasMedia ? '' : 'audio-mode-take-card--empty'
       } ${isPreparing ? 'audio-mode-take-card--preparing' : ''} ${
         preparationFailed ? 'audio-mode-take-card--error' : ''
       }`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={iosHudDim}
-      style={motionGpuLayer}
       onClick={() => {
         if (playable) openTake(onOpen)
       }}
@@ -425,7 +405,7 @@ function AudioModeTakeCard({
           <AudioWaveform
             tone={tone}
             active={isPlaying}
-            peaks={displayPeaks}
+            peaks={EMPTY_WAVEFORM_PEAKS}
             progress={playable ? waveformProgress : 0}
             onScrub={handleWaveformScrub}
             disabled={!playable}
@@ -433,7 +413,7 @@ function AudioModeTakeCard({
           />
         </div>
       </div>
-    </motion.article>
+    </article>
   )
 }
 
@@ -479,11 +459,8 @@ function AudioModeHome({
 
   return (
     <section className="audio-mode-home pointer-events-auto">
-      <motion.div
+      <div
         className={`audio-mode-hero ${isRecording ? 'audio-mode-hero--recording' : ''}`}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={iosHudDim}
       >
         <div
           className={`audio-mode-status-pill ${
@@ -503,7 +480,7 @@ function AudioModeHome({
           streamGeneration={streamGeneration}
         />
         <p>{hint}</p>
-      </motion.div>
+      </div>
 
       <div className="audio-mode-take-stack">
         <AudioModeTakeCard
