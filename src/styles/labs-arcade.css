@@ -5,7 +5,11 @@
   --arcade-surface: rgba(255, 255, 255, 0.88);
   --arcade-orange: #f59e0b;
   --arcade-blue: #2398e8;
-  background: #f6f8fb;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% -8%, rgba(255, 196, 92, 0.16), transparent 34%),
+    radial-gradient(circle at 8% 108%, rgba(35, 152, 232, 0.08), transparent 32%),
+    #f4f6fb;
   color: var(--arcade-ink);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
@@ -173,10 +177,10 @@
   padding: clamp(0.75rem, 1.8vh, 1rem) clamp(0.75rem, 3vw, 1rem)
     clamp(0.75rem, 1.8vh, 1rem) clamp(0.85rem, 3.4vw, 1.15rem);
   border: 1px solid rgba(255, 255, 255, 0.95);
-  border-radius: 1.35rem;
+  border-radius: 1.45rem;
   text-align: left;
-  background: rgba(255, 255, 255, 0.84);
-  box-shadow: 0 15px 38px rgba(30, 41, 59, 0.08), inset 0 0 0 1px rgba(15, 23, 42, 0.025);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.86));
+  box-shadow: 0 18px 42px rgba(30, 41, 59, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   isolation: isolate;
 }
 
@@ -302,7 +306,9 @@
 }
 
 .arcade-game-card__art--staff {
-  background: linear-gradient(145deg, #f9fbff, #e8f3fd);
+  background:
+    radial-gradient(circle at 78% 18%, rgba(66, 182, 245, 0.22), transparent 42%),
+    linear-gradient(145deg, #f9fbff, #e8f3fd);
   box-shadow: inset 0 0 0 1px rgba(34, 113, 165, 0.08);
 }
 
@@ -349,7 +355,9 @@
 }
 
 .arcade-game-card__art--balance {
-  background: linear-gradient(180deg, #a9ddf5 0 68%, #cde8c5 68%);
+  background:
+    radial-gradient(circle at 70% 12%, rgba(255, 255, 255, 0.55), transparent 36%),
+    linear-gradient(180deg, #9ed4f2 0 62%, #d5efc8 62%);
   box-shadow: inset 0 0 0 1px rgba(33, 101, 90, 0.08);
   perspective: 260px;
 }
@@ -1263,4 +1271,125 @@
   .arcade-mic-check--live .arcade-mic-check__icon span {
     animation: none;
   }
+
+  .game-world-travel,
+  .game-world-travel * {
+    animation: none !important;
+  }
+}
+
+/* Travel into the selected game world — perspective rush, not a page fade. */
+.game-world-travel {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  animation: game-world-travel-veil 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.game-world-travel__sky,
+.game-world-travel__layer,
+.game-world-travel__core,
+.game-world-travel__vignette {
+  position: absolute;
+  inset: 0;
+}
+
+.game-world-travel__sky {
+  background:
+    radial-gradient(circle at 50% 118%, rgba(255, 255, 255, 0.55), transparent 42%),
+    linear-gradient(180deg, #8ec8ef 0%, #d7eefc 46%, #f6f8fb 100%);
+}
+
+.game-world-travel--staff .game-world-travel__sky {
+  background:
+    radial-gradient(circle at 50% 110%, rgba(186, 224, 255, 0.7), transparent 40%),
+    linear-gradient(180deg, #123a5c 0%, #1f6ea3 48%, #e8f4ff 100%);
+}
+
+.game-world-travel--balance .game-world-travel__sky {
+  background:
+    radial-gradient(circle at 70% 18%, rgba(255, 255, 255, 0.5), transparent 32%),
+    linear-gradient(180deg, #7ec4ee 0%, #c8edfd 52%, #d7f2ff 100%);
+}
+
+.game-world-travel__layer {
+  background-repeat: no-repeat;
+  transform-origin: 50% 70%;
+}
+
+.game-world-travel__layer--far {
+  background:
+    radial-gradient(ellipse 38% 10% at 22% 38%, rgba(255, 255, 255, 0.72), transparent 72%),
+    radial-gradient(ellipse 46% 12% at 78% 32%, rgba(255, 255, 255, 0.6), transparent 70%);
+  animation: game-world-travel-rush-far 780ms cubic-bezier(0.16, 0.84, 0.32, 1) both;
+}
+
+.game-world-travel__layer--mid {
+  background:
+    radial-gradient(ellipse 58% 16% at 30% 58%, rgba(255, 255, 255, 0.88), transparent 70%),
+    radial-gradient(ellipse 52% 14% at 76% 62%, rgba(255, 255, 255, 0.8), transparent 68%);
+  animation: game-world-travel-rush-mid 780ms cubic-bezier(0.16, 0.84, 0.32, 1) both;
+}
+
+.game-world-travel__layer--near {
+  background:
+    radial-gradient(ellipse 80% 22% at 18% 86%, rgba(255, 255, 255, 0.96), transparent 64%),
+    radial-gradient(ellipse 76% 20% at 88% 90%, rgba(255, 255, 255, 0.94), transparent 62%);
+  animation: game-world-travel-rush-near 780ms cubic-bezier(0.16, 0.84, 0.32, 1) both;
+}
+
+.game-world-travel--staff .game-world-travel__layer--mid {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.22) 0 2px,
+      transparent 2px 18px
+    ),
+    radial-gradient(ellipse 58% 16% at 30% 58%, rgba(186, 224, 255, 0.5), transparent 70%);
+  mask-image: linear-gradient(180deg, transparent 8%, #000 28%, #000 78%, transparent 100%);
+}
+
+.game-world-travel--balance .game-world-travel__core {
+  left: 50%;
+  top: 42%;
+  width: 0.22rem;
+  height: 58%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f6b51f, #d88912);
+  box-shadow: 0 0 24px rgba(246, 181, 31, 0.35);
+  transform: translateX(-50%);
+  animation: game-world-travel-rope 780ms cubic-bezier(0.16, 0.84, 0.32, 1) both;
+}
+
+.game-world-travel__vignette {
+  background: radial-gradient(circle at 50% 48%, transparent 36%, rgba(12, 22, 38, 0.28) 100%);
+}
+
+@keyframes game-world-travel-veil {
+  0% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes game-world-travel-rush-far {
+  0% { transform: translate3d(0, 8%, 0) scale(0.72); opacity: 0.45; }
+  100% { transform: translate3d(0, -18%, 0) scale(1.55); opacity: 0; }
+}
+
+@keyframes game-world-travel-rush-mid {
+  0% { transform: translate3d(0, 14%, 0) scale(0.78); opacity: 0.7; }
+  100% { transform: translate3d(0, -28%, 0) scale(1.85); opacity: 0; }
+}
+
+@keyframes game-world-travel-rush-near {
+  0% { transform: translate3d(0, 22%, 0) scale(0.86); opacity: 0.95; }
+  100% { transform: translate3d(0, -42%, 0) scale(2.2); opacity: 0; }
+}
+
+@keyframes game-world-travel-rope {
+  0% { transform: translateX(-50%) scaleY(0.55); opacity: 0.2; }
+  55% { opacity: 1; }
+  100% { transform: translateX(-50%) scaleY(1.8); opacity: 0; }
 }

@@ -80,11 +80,11 @@
 
 .app-ui-overlay--audio-mode .metronome-audio-select__label {
   position: absolute;
-  left: 0.6rem;
-  top: 0.27rem;
+  left: 0.55rem;
+  top: 0.22rem;
   z-index: 2;
   padding: 0;
-  font-size: 0.54rem;
+  font-size: 0.52rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0;
@@ -105,16 +105,16 @@
   align-items: flex-end;
   justify-content: flex-start;
   width: 100%;
-  min-height: 2.55rem;
-  padding: 0.92rem 1.72rem 0.24rem 0.6rem;
+  min-height: 2.22rem;
+  padding: 0.78rem 1.58rem 0.32rem 0.55rem;
   border: 1px solid rgba(23, 26, 34, 0.075);
   border-radius: 0.62rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  background: var(--audio-surface);
   color: var(--audio-text-primary);
   font-family: var(--audio-font);
   font-size: 0.78rem;
   font-weight: 650;
-  line-height: 1.08;
+  line-height: 1;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 4px 12px rgba(23, 26, 34, 0.055);
   appearance: none;
   -webkit-appearance: none;
@@ -217,6 +217,10 @@
   max-width: min(100%, 23.5rem);
   margin: clamp(0.06rem, 0.25vh, 0.16rem) auto 0;
   padding: 0.08rem 0.06rem 0;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__select-row--primary {
+  align-items: start;
 }
 
 .app-ui-overlay--audio-mode .audio-practice-metronome__selectors--dropdown {
@@ -1206,4 +1210,38 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
   box-shadow: 0 8px 20px rgba(23, 26, 34, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
   -webkit-backdrop-filter: blur(16px) saturate(1.08);
   backdrop-filter: blur(16px) saturate(1.08);
+}
+
+/*
+ * Metronome stage used four close whites (#fff, #f8f9fb, #f7f8fa, #f4f6f8)
+ * plus leftover dark-layer fallbacks, so the strip under the transport read
+ * as a discoloration. Keep one paper color all the way through the HUD gap.
+ */
+.app-ui-overlay--audio-mode .audio-practice-metronome-scrim,
+.app-ui-overlay--audio-mode .audio-practice-metronome-layer,
+.app-ui-overlay--audio-mode .audio-practice-metronome-shell,
+.app-ui-overlay--audio-mode .audio-practice-metronome,
+.app-ui-overlay--audio-mode .audio-practice-metronome__body,
+.app-ui-overlay--audio-mode .audio-practice-metronome__controls,
+.app-ui-overlay--audio-mode .metronome-audio-stage,
+.app-ui-overlay--audio-mode .metronome-audio-stage__controls {
+  background: var(--audio-bg-base) !important;
+  background-image: none !important;
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome {
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-practice-metronome .app-hud-bottom {
+  background: var(--audio-bg-base) !important;
+}
+
+.app-ui-overlay--audio-mode .audio-practice-metronome__select-row {
+  align-items: start;
+}
+
+.app-ui-overlay--audio-mode .metronome-audio-select__value {
+  line-height: 1.05;
 }

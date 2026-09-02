@@ -7,6 +7,7 @@ import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
+import GameWorldTravel from './GameWorldTravel'
 import LabsMenu from './LabsMenu'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
@@ -157,15 +158,16 @@ export default function LabsOverlay({
           key="labs-overlay"
           className="labs-overlay fixed inset-0 z-[135] flex flex-col"
           tabIndex={-1}
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, scale: 1.12, filter: 'blur(14px)' }}
+          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+          exit={{ opacity: 0, scale: 1.06, filter: 'blur(8px)' }}
           transition={iosSpringSnappy}
           style={motionGpuLayer}
           role="dialog"
           aria-modal="true"
           aria-label="Practice Games"
         >
+          <GameWorldTravel isOpen={isOpen} route={route} />
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}

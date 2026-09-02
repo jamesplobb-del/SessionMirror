@@ -40,7 +40,9 @@
   --sj-muted: #767d89;
   --sj-hair: rgba(22, 24, 29, 0.09);
   --sj-paper: #ffffff;
-  background: #f2f1ee;
+  background:
+    radial-gradient(circle at 88% -8%, rgba(35, 152, 232, 0.1), transparent 34%),
+    #f4f6fb;
   gap: 0.85rem;
 }
 
@@ -108,9 +110,9 @@
 /* ── Hero: the exercise, drawn ── */
 .sj-hero {
   padding: 0.95rem 1rem 0.8rem;
-  border-radius: 0.9rem;
+  border-radius: 1.2rem;
   background: var(--sj-paper);
-  box-shadow: 0 1px 0 var(--sj-hair);
+  box-shadow: 0 16px 36px rgba(22, 24, 29, 0.06);
 }
 
 .sj-hero__top {
@@ -183,9 +185,9 @@
 
 /* ── Collapsible settings groups ── */
 .sj-group {
-  border-radius: 0.9rem;
+  border-radius: 1.15rem;
   background: var(--sj-paper);
-  box-shadow: 0 1px 0 var(--sj-hair);
+  box-shadow: 0 12px 28px rgba(22, 24, 29, 0.05);
 }
 
 .sj-group__head {
