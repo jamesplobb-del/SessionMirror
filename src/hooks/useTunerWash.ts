@@ -1,9 +1,5 @@
-import { useEffect, useRef, type RefObject } from 'react'
-import {
-  getTunerWashTarget,
-  IDLE_TUNER_WASH,
-  type TunerWashTarget,
-} from '../utils/pitchUtils'
+import { useEffect, type RefObject } from 'react'
+import { getTunerWashTarget, type TunerWashTarget } from '../utils/pitchUtils'
 
 const WASH_VARS = [
   '--tuner-ui-hue',
@@ -16,22 +12,6 @@ const WASH_VARS = [
   '--tuner-rim-spread',
   '--pitch-stage-hue',
 ] as const
-
-function toward(current: number, target: number, dt: number, tau: number): number {
-  return current + (target - current) * (1 - Math.exp(-dt / Math.max(0.04, tau)))
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const match = /^#([0-9a-f]{6})$/i.exec(hex)
-  if (!match) return null
-  const value = Number.parseInt(match[1], 16)
-  return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 }
-}
-
-function rgbToHex(color: { r: number; g: number; b: number }): string {
-  const channel = (value: number) => Math.round(value).toString(16).padStart(2, '0')
-  return `#${channel(color.r)}${channel(color.g)}${channel(color.b)}`
-}
 
 function applyWash(el: HTMLElement | null, wash: TunerWashTarget) {
   if (!el) return
@@ -61,58 +41,20 @@ export function useTunerWash(
   inTuneGlow: number,
   enabled: boolean,
 ) {
-  const centsRef = useRef(cents)
-  const glowRef = useRef(inTuneGlow)
-  centsRef.current = cents
-  glowRef.current = inTuneGlow
+  useEffect(() => {
+    if (!enabled) return
+    const target = getTunerWashTarget(cents, inTuneGlow)
+    applyWash(stageRef.current, target)
+    const overlay = stageRef.current?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
+    if (overlay) {
+      applyWash(overlay, target)
+      applyWash(document.documentElement, target)
+    }
+  }, [cents, enabled, inTuneGlow, stageRef])
 
   useEffect(() => {
     if (!enabled) return
-
-    const current = { ...IDLE_TUNER_WASH }
-    let hue = hexToRgb(current.hue) ?? { r: 21, g: 152, b: 255 }
-    let last = performance.now()
-    let frame = 0
-
-    applyWash(stageRef.current, current)
-    const overlay = stageRef.current?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
-    if (overlay) {
-      applyWash(overlay, current)
-      applyWash(document.documentElement, current)
-    }
-
-    const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
-      last = now
-      const target = getTunerWashTarget(centsRef.current, glowRef.current)
-      const targetHue = hexToRgb(target.hue) ?? hue
-      hue = {
-        r: toward(hue.r, targetHue.r, dt, 0.55),
-        g: toward(hue.g, targetHue.g, dt, 0.55),
-        b: toward(hue.b, targetHue.b, dt, 0.55),
-      }
-      current.hue = rgbToHex(hue)
-      current.strength = toward(current.strength, target.strength, dt, 0.55)
-      current.feather = toward(current.feather, target.feather, dt, 0.55)
-      current.darkStrength = toward(current.darkStrength, target.darkStrength, dt, 0.55)
-      current.center = toward(current.center, target.center, dt, 0.55)
-      current.rim = toward(current.rim, target.rim, dt, 0.55)
-      current.rimGlow = toward(current.rimGlow, target.rimGlow, dt, 0.55)
-      current.rimSpread = toward(current.rimSpread, target.rimSpread, dt, 0.55)
-
-      const stage = stageRef.current
-      applyWash(stage, current)
-      const overlay = stage?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
-      if (overlay) {
-        applyWash(overlay, current)
-        applyWash(document.documentElement, current)
-      }
-      frame = requestAnimationFrame(tick)
-    }
-
-    frame = requestAnimationFrame(tick)
     return () => {
-      cancelAnimationFrame(frame)
       const stage = stageRef.current
       const overlay = stage?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
       clearWash(stage)

@@ -303,12 +303,12 @@ export function getTunerWashTarget(
   if (abs <= TUNING_GREEN_CENTS) {
     return {
       hue,
-      strength: 18 + glow * 14,
+      strength: 25 + glow * 17,
       feather: 8 + glow * 3,
       darkStrength: 36 + glow * 16,
-      center: 22 + glow * 44,
-      rim: 32 + glow * 20,
-      rimGlow: 18 + glow * 16,
+      center: 32 + glow * 50,
+      rim: 42 + glow * 24,
+      rimGlow: 27 + glow * 19,
       rimSpread: 42 + glow * 40,
     }
   }
@@ -317,12 +317,12 @@ export function getTunerWashTarget(
     const close = (abs - TUNING_GREEN_CENTS) / (TUNING_YELLOW_CENTS - TUNING_GREEN_CENTS)
     return {
       hue,
-      strength: 22 + close * 2,
+      strength: 30 + close * 3,
       feather: 10,
       darkStrength: 42 + close * 2,
-      center: 48 + close * 4,
-      rim: 34 + close * 2,
-      rimGlow: 21 + close * 2,
+      center: 58 + close * 5,
+      rim: 44 + close * 3,
+      rimGlow: 30 + close * 3,
       rimSpread: 46 + close * 2,
     }
   }
@@ -330,12 +330,12 @@ export function getTunerWashTarget(
   const far = Math.min(1, (abs - TUNING_YELLOW_CENTS) / 28)
   return {
     hue,
-    strength: 26 + far * 6,
+    strength: 35 + far * 8,
     feather: 10,
     darkStrength: 46 + far * 4,
-    center: 54 + far * 4,
-    rim: 38 + far * 6,
-    rimGlow: 25 + far * 4,
+    center: 64 + far * 5,
+    rim: 49 + far * 7,
+    rimGlow: 34 + far * 5,
     rimSpread: 54 + far * 10,
   }
 }

@@ -170,12 +170,12 @@
   background: rgba(255, 255, 255, 0.92);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    0 0.22rem 0 rgba(154, 187, 210, 0.55),
-    0 0.4rem 0.9rem rgba(30, 84, 138, 0.14);
+    0 0.14rem 0.32rem rgba(30, 84, 138, 0.12),
+    0 0.5rem 1rem rgba(30, 84, 138, 0.1);
 }
 
 .balance-round-button svg { width: 1.25rem; height: 1.25rem; stroke-width: 2.6; }
-.balance-round-button:active { transform: translateY(0.15rem); box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 0.07rem 0 rgba(154,187,210,0.55); }
+.balance-round-button:active { box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 0.08rem 0.2rem rgba(30,84,138,0.12); }
 
 .balance-arcade__bar-stat {
   position: absolute;
@@ -233,83 +233,89 @@
  * detail is most of what separates a game button from a web button.
  */
 .balance-cta {
-  --edge: var(--orange-edge);
-  --edge-height: 0.34rem;
   position: relative;
   display: inline-flex;
   width: 100%;
-  min-height: 3.5rem;
+  min-height: 3.4rem;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.9rem 1.4rem;
-  border-radius: 1.15rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 1.3rem;
   color: #fff;
-  background: linear-gradient(180deg, var(--orange) 0%, var(--orange-mid) 58%, var(--orange-mid) 100%);
+  background: linear-gradient(180deg, #ffab35 0%, #f2891a 100%);
+  /*
+   * Depth from light, not from a solid slab underneath.
+   *
+   * These used to sit on a hard offset edge in a darker shade of themselves,
+   * with stamped text shadows and wide-tracked caps — the arcade-cabinet
+   * convention, which read as retro rather than current. The colour now lifts
+   * off the page on two tinted shadows: a tight one for contact, a wide soft
+   * one for the lift.
+   *
+   * The press is deliberately left to Pressable's own spring scale. The old
+   * rule tried to sink the button onto its edge with a CSS transform, which
+   * framer-motion's inline transform overrode anyway — so the sink never
+   * actually happened. With the edge gone, the scale is the right press.
+   */
   box-shadow:
-    inset 0 0.13rem 0 rgba(255, 255, 255, 0.5),
-    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
-    0 var(--edge-height) 0 var(--edge),
-    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(150, 82, 12, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 0.14rem 0.32rem rgba(170, 92, 10, 0.24),
+    0 0.6rem 1.35rem rgba(170, 92, 10, 0.28);
   font-family: var(--display-font);
-  font-size: 1.22rem;
-  font-weight: 900;
-  letter-spacing: 0.045em;
-  text-transform: uppercase;
-  text-shadow: 0 0.1rem 0 rgba(133, 70, 6, 0.45);
-  transition: transform 90ms ease, box-shadow 90ms ease;
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: 0.004em;
+  transition: box-shadow 150ms ease, filter 150ms ease;
 }
 
-.balance-cta svg { width: 1.3rem; height: 1.3rem; stroke-width: 3; }
+.balance-cta svg { width: 1.2rem; height: 1.2rem; stroke-width: 2.6; }
 
 .balance-cta:active {
-  transform: translateY(var(--edge-height));
   box-shadow:
-    inset 0 0.13rem 0 rgba(255, 255, 255, 0.4),
-    0 0 0 var(--edge),
-    0 0.2rem 0.4rem rgba(150, 82, 12, 0.26);
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0.1rem 0.24rem rgba(170, 92, 10, 0.24);
+  filter: brightness(0.97);
 }
 
-/*
- * A designed stone state, not a filter. `grayscale()` desaturated the hard
- * edge along with the face and produced a muddy tan — and this is the state a
- * new player sees most, on the trail's locked button.
- */
 .balance-cta:disabled {
-  --edge: var(--locked-edge);
   filter: none;
   opacity: 1;
-  color: #7c8b99;
-  background: linear-gradient(180deg, #e6edf3 0%, var(--locked-mid) 100%);
-  text-shadow: none;
+  color: #8a99a7;
+  background: linear-gradient(180deg, #eef3f7 0%, #e2e9f0 100%);
   box-shadow:
-    inset 0 0.13rem 0 rgba(255, 255, 255, 0.75),
-    0 var(--edge-height) 0 var(--locked-edge),
-    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(90, 116, 138, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 0.12rem 0.3rem rgba(90, 116, 138, 0.14);
 }
 
-.balance-cta--small { min-height: 2.9rem; padding: 0.6rem 1.1rem; font-size: 0.98rem; --edge-height: 0.28rem; }
+.balance-cta--small { min-height: 2.85rem; padding: 0.6rem 1.05rem; font-size: 0.96rem; border-radius: 1.05rem; }
 
 .balance-cta--blue {
-  --edge: var(--blue-edge);
-  background: linear-gradient(180deg, #6fb6ee 0%, var(--blue-mid) 58%, var(--blue-mid) 100%);
-  text-shadow: 0 0.1rem 0 rgba(24, 70, 115, 0.45);
+  background: linear-gradient(180deg, #5cabec 0%, #3585d0 100%);
   box-shadow:
-    inset 0 0.13rem 0 rgba(255, 255, 255, 0.45),
-    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
-    0 var(--edge-height) 0 var(--edge),
-    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(30, 84, 138, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 0.14rem 0.32rem rgba(26, 74, 122, 0.24),
+    0 0.6rem 1.35rem rgba(26, 74, 122, 0.28);
+}
+
+.balance-cta--blue:active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0.1rem 0.24rem rgba(26, 74, 122, 0.24);
 }
 
 .balance-cta--green {
-  --edge: var(--green-edge);
-  background: linear-gradient(180deg, #6fdcab 0%, var(--green) 58%, var(--green) 100%);
-  text-shadow: 0 0.1rem 0 rgba(24, 96, 70, 0.4);
+  background: linear-gradient(180deg, #5fd3a3 0%, #34ab7d 100%);
   box-shadow:
-    inset 0 0.13rem 0 rgba(255, 255, 255, 0.45),
-    inset 0 -0.1rem 0 rgba(0, 0, 0, 0.08),
-    0 var(--edge-height) 0 var(--edge),
-    0 calc(var(--edge-height) + 0.42rem) 0.85rem rgba(26, 110, 80, 0.28);
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 0.14rem 0.32rem rgba(22, 100, 72, 0.22),
+    0 0.6rem 1.35rem rgba(22, 100, 72, 0.26);
+}
+
+.balance-cta--green:active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0.1rem 0.24rem rgba(22, 100, 72, 0.22);
 }
 
 /* The quiet third action — "More options", "Quick Play". */
@@ -369,12 +375,14 @@
   padding: 0.3rem 0.85rem;
   border-radius: 999px;
   color: #fff;
-  background: linear-gradient(180deg, #63aeea, var(--blue-mid));
-  box-shadow: 0 0.18rem 0 var(--blue-edge), 0 0.4rem 0.7rem rgba(30, 84, 138, 0.24);
+  background: linear-gradient(180deg, #5cabec, #3585d0);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 0.28rem 0.6rem rgba(26, 74, 122, 0.24);
   font-family: var(--display-font);
   font-size: 0.76rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
@@ -921,6 +929,114 @@
   font-size: 0.74rem;
   font-weight: 700;
   text-align: center;
+}
+
+/* Games menu: short horizontal cards with a genuinely useful, wide preview.
+   The previous three-door layout stretched to the full phone height and made
+   each game image a narrow, ambiguous sliver. */
+.balance-arcade--games .balance-arcade__body {
+  width: min(100%, 38rem);
+  max-width: 38rem;
+  gap: 0.65rem;
+}
+
+.balance-game-list {
+  width: 100%;
+  gap: 0.55rem;
+}
+
+.balance-game-list .arcade-game-card {
+  min-height: 7.6rem;
+  grid-template-columns: minmax(0, 1fr) clamp(8.2rem, 38vw, 11rem);
+  gap: 0.7rem;
+  padding: 0.58rem 0.58rem 0.58rem 0.78rem;
+  border-radius: 1.2rem;
+}
+
+.balance-game-list .arcade-game-card.is-current {
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--gold) 72%, transparent),
+    0 0.5rem 1.15rem rgba(30, 84, 138, 0.1);
+}
+
+.balance-game-list .arcade-game-card__art {
+  width: 100%;
+  min-height: 6.45rem;
+  max-height: none;
+  align-self: center;
+  aspect-ratio: 16 / 10;
+  border-radius: 0.9rem;
+}
+
+.balance-game-list .arcade-game-card__copy > p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.balance-games__character {
+  display: grid;
+  width: 100%;
+  min-height: 3.8rem;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.35rem 0.72rem 0.35rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 1.05rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.8);
+  text-align: left;
+}
+
+.balance-games__character > span:first-child {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: end center;
+  overflow: hidden;
+  border-radius: 0.8rem;
+  background: var(--blue-pale);
+}
+
+.balance-games__character img {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  object-position: bottom;
+}
+
+.balance-games__character > span:nth-child(2) {
+  display: grid;
+}
+
+.balance-games__character small {
+  color: var(--ink-faint);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.balance-games__character strong {
+  font-family: var(--display-font);
+  font-size: 0.95rem;
+}
+
+.balance-games__character > svg {
+  width: 1rem;
+  color: var(--ink-faint);
+}
+
+@media (max-width: 360px) {
+  .balance-game-list .arcade-game-card {
+    grid-template-columns: minmax(0, 1fr) 7.4rem;
+  }
+
+  .balance-game-list .arcade-game-card__copy > p {
+    display: none;
+  }
 }
 
 /* --------------------------------------------------------- quick play ---- */
@@ -1621,17 +1737,65 @@
 .balance-screen--arcade .balance-mic-check.is-live { background: #e9f9f1; box-shadow: 0 0.2rem 0 #bfe6d3; }
 .balance-screen--arcade .balance-mic-check.is-error { background: #fdeeea; box-shadow: 0 0.2rem 0 #f0cfc5; }
 
+/* ---------------------------------------------------- option chips ---- */
+
+/*
+ * One chip for every game's options.
+ *
+ * The three games had drifted into three different controls: Learn drew a
+ * hairline box that turned *solid black* when chosen, Staff Jumper used
+ * underlined text tabs, and Balance had a chip with a thinner edge than the
+ * cards around it. None of them read as the same app, and the black fill in
+ * particular landed like a desktop form control dropped into a pastel sky.
+ *
+ * They are all cut from the card slab now — white face, hard bottom edge, and
+ * a blue ring plus blue edge when chosen — so picking an option feels like
+ * pressing a game button rather than ticking a field. Scoped under the arcade
+ * shell so it beats each game's own stylesheet whatever the import order.
+ */
+.balance-arcade .li-choice,
+.balance-arcade .sj-option,
 .balance-screen--arcade .balance-choice-row button,
 .balance-screen--arcade .balance-routine-editor__saved button {
-  border-radius: 0.85rem;
-  box-shadow: 0 0.16rem 0 #dbe4ec;
+  min-height: 3rem;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-radius: var(--r-sm, 0.9rem);
+  color: var(--ink, #123a6b);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 var(--edge-2, 0.24rem) 0 var(--card-edge, #d3e3ef);
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: box-shadow 120ms ease;
 }
 
+.balance-arcade .li-choice:active,
+.balance-arcade .sj-option:active,
+.balance-screen--arcade .balance-choice-row button:active,
+.balance-screen--arcade .balance-routine-editor__saved button:active {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0.06rem 0 var(--card-edge, #d3e3ef);
+}
+
+.balance-arcade .li-choice.is-selected,
+.balance-arcade .sj-option.sj-option--on,
 .balance-screen--arcade .balance-choice-row button.is-selected,
 .balance-screen--arcade .balance-routine-editor__saved button.is-selected {
-  color: #fff;
-  background: linear-gradient(180deg, #63aeea, #3d8fd8);
-  box-shadow: 0 0.16rem 0 #275f97;
+  color: var(--ink, #123a6b);
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 0.14rem var(--blue-mid, #3d8fd8),
+    0 var(--edge-2, 0.24rem) 0 var(--blue-edge, #275f97);
+}
+
+/* Staff Jumper's rows were built for underlined text, so the chips need room
+   to sit as chips rather than being crushed against their label. */
+.balance-arcade .sj-options {
+  gap: 0.45rem;
 }
 
 /* The play screen's target card now carries the level name, which is longer
@@ -1737,3 +1901,47 @@
 .balance-picker__staff { flex: 0 0 auto; overflow: visible; opacity: 0.85; }
 
 .balance-picker__check { width: 1.2rem; height: 1.2rem; color: var(--blue-mid); stroke-width: 3; }
+
+/* ------------------------------------------- shared state screens ---- */
+
+/*
+ * Staff Jumper's paused and run-complete screens moved onto the arcade shell,
+ * so they need the two variants that layout asks for: a 2x2 stat block (four
+ * figures read better paired than squeezed into the three-column award row)
+ * and a quiet tertiary button for the exit that should not compete with
+ * "Play again".
+ */
+.balance-award__stats--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.balance-cta--quiet {
+  color: var(--ink-soft);
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 1px rgba(30, 84, 138, 0.08),
+    0 0.12rem 0.3rem rgba(30, 84, 138, 0.1),
+    0 0.5rem 1rem rgba(30, 84, 138, 0.08);
+}
+
+.balance-award__note {
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.balance-card__line--tight {
+  margin: 0.35rem 0 0;
+}
+
+.balance-award .balance-pill {
+  justify-self: center;
+}
+
+.balance-award {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+}

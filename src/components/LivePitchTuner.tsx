@@ -317,10 +317,15 @@ function LiveAudioTunerPane({
           }
         />
 
+        <div className="pitch-living-canvas__direction" aria-hidden>
+          <span>Sharp</span>
+          <span>Flat</span>
+        </div>
+
         {audioToolsEnabled && (drone || onTunerTranspositionChange || insightsEnabled) ? (
           <>
             <div
-              className="pitch-living-tool-rail pitch-living-tools-chip"
+              className={`pitch-living-tool-rail ${drone ? 'pitch-living-tool-rail--with-drone' : ''}`}
               role="toolbar"
               aria-label="Tuner tools"
             >
@@ -338,6 +343,8 @@ function LiveAudioTunerPane({
                   title={droneOpen ? 'Hide drone' : `Open drone · ${droneStatus}`}
                 >
                   <Music2 aria-hidden />
+                  <span>Drone</span>
+                  <small>{droneStatus}</small>
                 </button>
               ) : null}
 
@@ -369,6 +376,8 @@ function LiveAudioTunerPane({
                   title={transpositionOpen ? 'Hide tuner settings' : `Tuner settings · ${transposition.shortLabel}`}
                 >
                   <Settings aria-hidden />
+                  <span>Settings</span>
+                  <small>{transposition.shortLabel}</small>
                 </button>
               ) : null}
             </div>

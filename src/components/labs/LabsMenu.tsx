@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Check, ChevronRight, Trophy } from 'lucide-react'
+import { Check, ChevronRight, Music4, Play, Trophy, Wind } from 'lucide-react'
+import balanceShot from '../../assets/games/balance.jpg'
+import learnInstrumentShot from '../../assets/games/learn-instrument.jpg'
+import staffJumperShot from '../../assets/games/staff-jumper.jpg'
 import Pressable from '../ui/Pressable'
 import BalanceArcadeShell from '../../labs/balance/BalanceArcadeShell'
 import BalanceInstrumentPicker from '../../labs/balance/BalanceInstrumentPicker'
@@ -35,7 +38,6 @@ import { loadBestScore as loadStaffJumperBestScore } from '../../labs/staffJumpe
 import { INSTRUMENTS as LEARN_INSTRUMENTS } from '../../labs/learnInstrument/instrumentData'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
-import HallDoorWorld from './HallDoorWorlds'
 
 type PlazaPage = 'plaza' | 'instrument' | 'character'
 
@@ -171,12 +173,16 @@ export default function LabsMenu({
     title: string
     line: string
     world: 'staff' | 'balance' | 'learn'
+    description: string
+    image: string
   }> = [
     {
       id: 'staff-jumper',
       title: 'Staff Jumper',
       line: staffJumperBest ? `Best ${staffJumperBest}` : 'Sight reading',
       world: 'staff',
+      description: 'Read the note under your player and hop across the staff.',
+      image: staffJumperShot,
     },
     {
       id: 'balance',
@@ -187,12 +193,16 @@ export default function LabsMenu({
           ? `Best ${formatBalanceDuration(balanceBest)}`
           : 'Hold your note',
       world: 'balance',
+      description: 'Hold the shown pitch in tune to keep your player moving.',
+      image: balanceShot,
     },
     {
       id: 'learn-instrument',
       title: 'Learn',
       line: `${LEARN_INSTRUMENT_COUNT} instruments`,
       world: 'learn',
+      description: 'Match the written note and the real fingering chart, one note at a time.',
+      image: learnInstrumentShot,
     },
   ]
 
@@ -203,8 +213,7 @@ export default function LabsMenu({
       onBack={onBack}
       backLabel="Close Games"
       stat={streak > 0 ? { label: 'Streak', value: `${streak} day` } : null}
-      className="balance-arcade--plaza balance-arcade--hall"
-      scrollBody={false}
+      className="balance-arcade--plaza balance-arcade--games"
     >
       <h1 className="sr-only">Practice Games</h1>
 
@@ -226,63 +235,60 @@ export default function LabsMenu({
         <ChevronRight aria-hidden />
       </Pressable>
 
-      <div className="balance-hall">
-        <div className="balance-hall__doors" role="navigation" aria-label="Games">
-          {doors.map((door) => {
-            const current = lastGame === door.id
-            return (
+      <ul className="arcade-game-list balance-game-list" aria-label="Games">
+        {doors.map((door) => {
+          const current = lastGame === door.id
+          const accentClass = door.world === 'learn' ? 'wind' : door.world
+          return (
+            <li key={door.id}>
               <Pressable
-                key={door.id}
                 type="button"
-                intensity="soft"
+                intensity="normal"
                 squish={false}
                 haptic="medium"
                 hapticFeedback={hapticFeedback}
-                className={`balance-door balance-door--${door.world} ${current ? 'is-open' : ''}`}
+                className={`arcade-game-card arcade-game-card--${accentClass} ${current ? 'is-current' : ''}`}
                 aria-current={current ? 'true' : undefined}
-                aria-label={`${current ? 'Continue in' : 'Enter'} ${door.title}. ${door.line}`}
+                aria-label={`${current ? 'Continue' : 'Play'} ${door.title}. ${door.description}`}
                 onClick={() => openGame(door.id, openers)}
               >
-                <span className={`balance-door__world balance-door__world--${door.world}`} aria-hidden>
-                  <HallDoorWorld world={door.world} characterSrc={character.asset} />
+                <span className="arcade-game-card__copy">
+                  <span className="arcade-game-card__badge">
+                    {door.world === 'staff' ? <Music4 aria-hidden /> : door.world === 'learn' ? <Wind aria-hidden /> : null}
+                    {current ? 'Continue' : door.line}
+                  </span>
+                  <h3>{door.title}</h3>
+                  <p>{door.description}</p>
+                  <span className="arcade-game-card__meta">
+                    <span>
+                      {door.line.startsWith('Best ') ? <Trophy aria-hidden /> : null}
+                      {door.line}
+                    </span>
+                  </span>
                 </span>
-                <span className="balance-door__plaque">
-                  {current ? <em>Continue</em> : null}
-                  <strong>{door.title}</strong>
-                  <small>
-                    {door.line.startsWith('Best ') ? <Trophy aria-hidden /> : null}
-                    {door.line}
-                  </small>
+                <span className={`arcade-game-card__art arcade-game-card__art--${accentClass}`} aria-hidden>
+                  <img className="arcade-game-card__shot" src={door.image} alt="" decoding="async" />
+                  <span className="arcade-game-card__go"><Play aria-hidden /></span>
                 </span>
               </Pressable>
-            )
-          })}
-        </div>
+            </li>
+          )
+        })}
+      </ul>
 
-        <div className="balance-hall__threshold">
-          <div className="balance-hall__floor" aria-hidden />
-          <Pressable
-            intensity="soft"
-            hapticFeedback={hapticFeedback}
-            className={`balance-hall__player is-${lastGame === 'staff-jumper' ? 'staff' : lastGame === 'learn-instrument' ? 'learn' : 'balance'}`}
-            onClick={() => setPage('character')}
-            aria-label={`Character ${character.name}, waiting at the door. Change player`}
-          >
-            <span className="balance-hall__player-art" aria-hidden>
-              <img
-                src={character.asset}
-                alt=""
-                draggable={false}
-                style={{ transform: `scale(${character.scale})` }}
-              />
-            </span>
-          </Pressable>
-        </div>
-      </div>
-
-      <p className="balance-hall__hint">
-        Tap a door to go in · tap {character.name} to change player
-      </p>
+      <Pressable
+        intensity="soft"
+        hapticFeedback={hapticFeedback}
+        className="balance-games__character"
+        onClick={() => setPage('character')}
+        aria-label={`Character ${character.name}. Change player`}
+      >
+        <span aria-hidden>
+          <img src={character.asset} alt="" draggable={false} />
+        </span>
+        <span><small>Player</small><strong>{character.name}</strong></span>
+        <ChevronRight aria-hidden />
+      </Pressable>
     </BalanceArcadeShell>
   )
 }

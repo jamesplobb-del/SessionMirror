@@ -67,11 +67,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var lastBridgeFrameTime: CFTimeInterval = 0
     private var pendingBridgeSample: CMSampleBuffer?
     private var isBridgeEncoding = false
+    private var bridgeGeneration: UInt64 = 0
+    private var nextBridgeFrameId: UInt64 = 0
+    private var bridgeFrameAwaitingAck: UInt64?
+    private var consecutiveBridgeAckTimeouts = 0
+    private let bridgeFrameAckTimeout: TimeInterval = 0.25
+    private let bridgeMaxAckTimeouts = 3
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     /// Preview JPEG pump — recording uses AVCaptureMovieFileOutput at full session resolution.
-    private var bridgeFramesPerSecondFull: Double { isPad ? 50 : 60 }
+    private var bridgeFramesPerSecondFull: Double { isPad ? 30 : 24 }
     /// Keep expand-mode live preview usable during recording + YouTube play-along while still avoiding a full 60fps bridge flood.
-    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 40
+    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 20
     // Preview-only pump sizing. The recorded movie file uses a separate
     // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
@@ -101,7 +107,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var previewUsesFrontCamera = true
 
     /// Delivers JPEG base64 (no data-URL prefix) to the Capacitor plugin for canvas preview in the WebView.
-    var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int) -> Void)?
+    var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int, _ frameId: UInt64) -> Void)?
 
     /// Delivers mono Float32 PCM chunks (base64, sampleRate, sampleCount) for the JS pitch tracker.
     var onAudioTapChunk: ((_ pcmBase64: String, _ sampleRate: Double, _ sampleCount: Int) -> Void)?
@@ -1215,8 +1221,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     func enableFrameBridge() {
         frameBridgeQueue.async {
+            guard !self.isFrameBridgeActive else { return }
+            self.bridgeGeneration &+= 1
             self.isFrameBridgeActive = true
             self.lastBridgeFrameTime = 0
+            self.pendingBridgeSample = nil
+            self.isBridgeEncoding = false
+            self.bridgeFrameAwaitingAck = nil
+            self.consecutiveBridgeAckTimeouts = 0
         }
     }
 
@@ -1233,9 +1245,25 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
     func disableFrameBridge() {
         frameBridgeQueue.async {
+            self.bridgeGeneration &+= 1
             self.isFrameBridgeActive = false
             self.pendingBridgeSample = nil
             self.isBridgeEncoding = false
+            self.bridgeFrameAwaitingAck = nil
+            self.consecutiveBridgeAckTimeouts = 0
+        }
+    }
+
+    /// The Capacitor notify call only confirms that a message was enqueued for
+    /// WebKit. It does not mean WebKit has received, decoded, or painted the
+    /// JPEG. Wait for the canvas consumer to acknowledge the frame before
+    /// sending another large payload so IPC can never grow without bound.
+    func acknowledgePreviewFrame(_ frameId: UInt64) {
+        frameBridgeQueue.async {
+            guard self.bridgeFrameAwaitingAck == frameId else { return }
+            self.bridgeFrameAwaitingAck = nil
+            self.consecutiveBridgeAckTimeouts = 0
+            self.drainBridgeFrames()
         }
     }
 
@@ -2549,7 +2577,12 @@ extension NativeCameraRecordingEngine {
     }
 
     private func drainBridgeFrames() {
-        guard isFrameBridgeActive, !isBridgeEncoding, let sample = pendingBridgeSample else { return }
+        guard
+            isFrameBridgeActive,
+            !isBridgeEncoding,
+            bridgeFrameAwaitingAck == nil,
+            let sample = pendingBridgeSample
+        else { return }
 
         let now = CACurrentMediaTime()
         guard now - lastBridgeFrameTime >= effectiveBridgeFrameInterval() else { return }
@@ -2557,18 +2590,43 @@ extension NativeCameraRecordingEngine {
         lastBridgeFrameTime = now
         pendingBridgeSample = nil
         isBridgeEncoding = true
+        let generation = bridgeGeneration
 
         frameEncodeQueue.async { [weak self] in
             guard let self = self else { return }
             let payload = self.jpegPayload(from: sample, mirrored: false)
-            let handler = self.onPreviewFrame
 
-            DispatchQueue.main.async {
-                if self.isFrameBridgeActive, let payload = payload {
-                    handler?(payload.0, payload.1, payload.2)
-                }
+            self.frameBridgeQueue.async {
+                guard self.bridgeGeneration == generation else { return }
                 self.isBridgeEncoding = false
-                self.frameBridgeQueue.async {
+                guard self.isFrameBridgeActive, let payload = payload else {
+                    self.drainBridgeFrames()
+                    return
+                }
+
+                self.nextBridgeFrameId &+= 1
+                let frameId = self.nextBridgeFrameId
+                self.bridgeFrameAwaitingAck = frameId
+                let handler = self.onPreviewFrame
+
+                DispatchQueue.main.async {
+                    handler?(payload.0, payload.1, payload.2, frameId)
+                }
+
+                self.frameBridgeQueue.asyncAfter(deadline: .now() + self.bridgeFrameAckTimeout) {
+                    guard
+                        self.bridgeGeneration == generation,
+                        self.bridgeFrameAwaitingAck == frameId
+                    else { return }
+                    self.consecutiveBridgeAckTimeouts += 1
+                    guard self.consecutiveBridgeAckTimeouts < self.bridgeMaxAckTimeouts else {
+                        // Keep this frame in-flight. A late acknowledgement can
+                        // resume delivery, while a permanently stalled WebKit
+                        // process can never accumulate more than three JPEGs.
+                        print("[NativeCameraFrameBridge] delivery paused waiting for WebKit frame acknowledgement")
+                        return
+                    }
+                    self.bridgeFrameAwaitingAck = nil
                     self.drainBridgeFrames()
                 }
             }

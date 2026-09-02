@@ -8,6 +8,17 @@ export interface NativeCameraPreviewFrameEvent {
   dataUrl?: string
   width?: number
   height?: number
+  frameId?: number
+}
+
+async function acknowledgeNativePreviewFrame(frameId?: number): Promise<void> {
+  if (!Number.isSafeInteger(frameId) || (frameId ?? -1) < 0) return
+  try {
+    await BestTakeAudioPlugin.ackNativeCameraPreviewFrame({ frameId: frameId as number })
+  } catch {
+    // Older native bundles do not expose acknowledgements. The native timeout
+    // still prevents a stalled consumer from freezing the preview permanently.
+  }
 }
 
 function extractJpegBase64(event: NativeCameraPreviewFrameEvent): string | null {
@@ -102,10 +113,9 @@ export function createNativePreviewFramePump(
 } {
   let cancelled = false
   let latestFrame: NativeCameraPreviewFrameEvent | null = null
-  let decodeGeneration = 0
   let decoding = false
-  let activeBitmap: ImageBitmap | null = null
-  let pendingBitmap: ImageBitmap | null = null
+  let displayedBitmap: ImageBitmap | null = null
+  let pendingFrame: { bitmap: ImageBitmap; frameId?: number } | null = null
   let rafId: number | null = null
 
   const cancelRaf = () => {
@@ -122,23 +132,38 @@ export function createNativePreviewFramePump(
       if (cancelled) return
 
       const canvas = canvasRef.current
-      const bitmap = pendingBitmap
-      if (!canvas || !bitmap) return
+      const frame = pendingFrame
+      if (!frame) return
 
-      pendingBitmap = null
-      drawCoverFrameOnCanvas(canvas, bitmap, bitmap.width, bitmap.height)
+      pendingFrame = null
+      if (!canvas) {
+        frame.bitmap.close()
+        void acknowledgeNativePreviewFrame(frame.frameId)
+        return
+      }
+
+      drawCoverFrameOnCanvas(canvas, frame.bitmap, frame.bitmap.width, frame.bitmap.height)
+      displayedBitmap?.close()
+      displayedBitmap = frame.bitmap
       onFrameDrawn?.()
+      void acknowledgeNativePreviewFrame(frame.frameId)
     })
   }
 
   const stop = () => {
     cancelled = true
-    latestFrame = null
+    if (latestFrame) {
+      void acknowledgeNativePreviewFrame(latestFrame.frameId)
+      latestFrame = null
+    }
     cancelRaf()
-    activeBitmap?.close()
-    activeBitmap = null
-    pendingBitmap?.close()
-    pendingBitmap = null
+    displayedBitmap?.close()
+    displayedBitmap = null
+    if (pendingFrame) {
+      pendingFrame.bitmap.close()
+      void acknowledgeNativePreviewFrame(pendingFrame.frameId)
+      pendingFrame = null
+    }
   }
 
   const decodeLoop = async () => {
@@ -148,22 +173,23 @@ export function createNativePreviewFramePump(
     while (latestFrame && !cancelled) {
       const frame = latestFrame
       latestFrame = null
-      const generation = ++decodeGeneration
 
       try {
         const decoded = await decodeNativePreviewFrame(frame)
-        if (cancelled || generation !== decodeGeneration) {
+        if (cancelled) {
           decoded.bitmap.close()
+          void acknowledgeNativePreviewFrame(frame.frameId)
           continue
         }
 
-        activeBitmap?.close()
-        activeBitmap = decoded.bitmap
-        pendingBitmap?.close()
-        pendingBitmap = decoded.bitmap
+        if (pendingFrame) {
+          pendingFrame.bitmap.close()
+          void acknowledgeNativePreviewFrame(pendingFrame.frameId)
+        }
+        pendingFrame = { bitmap: decoded.bitmap, frameId: frame.frameId }
         scheduleDraw()
       } catch {
-        /* skip bad frame */
+        void acknowledgeNativePreviewFrame(frame.frameId)
       }
     }
 
@@ -176,6 +202,9 @@ export function createNativePreviewFramePump(
   return {
     push: (event: NativeCameraPreviewFrameEvent) => {
       if (cancelled || !extractJpegBase64(event)) return
+      if (latestFrame) {
+        void acknowledgeNativePreviewFrame(latestFrame.frameId)
+      }
       latestFrame = event
       void decodeLoop()
     },

@@ -335,6 +335,18 @@ function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
   )
 }
 
+function isMicrophonePermissionError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('name' in error)) return false
+  const name = String((error as { name?: unknown }).name ?? '')
+  return (
+    name === 'NotAllowedError' ||
+    name === 'PermissionDeniedError' ||
+    name === 'SecurityError' ||
+    name === 'NotFoundError' ||
+    name === 'DevicesNotFoundError'
+  )
+}
+
 function logPitchGetUserMediaEvent(
   phase: string,
   payload: Record<string, unknown> = {},
@@ -1501,10 +1513,19 @@ function drawPitchCanvas(
   const traceHistory = isLivingAudio
     ? centsHistory.slice(-traceHistoryLength)
     : centsHistory
+  // The newest sample always lands on the last x position, so mapping the
+  // history across the full width put the live head exactly on the right
+  // edge -- the dot, its glow and the horizon caret were all drawn half off
+  // screen. The head is the one part of the trace you actually watch while
+  // playing, so hold back enough room for its widest glow.
+  const traceHeadroom = Math.min(
+    width * 0.12,
+    isLivingAudio ? 11 : isAudioGlass || theme === 'glass-legacy' ? 17 : isWidgetGlass ? 13 : 8,
+  )
   const tracePoints = buildTraceDisplayPoints(
     traceHistory,
     traceHistoryLength,
-    width,
+    Math.max(1, width - traceHeadroom),
     centsToY,
     graphSmoothWindow,
     isLivingAudio ? Math.min(traceEndBlend, LIVING_TRACE_END_BLEND_MAX) : traceEndBlend,
@@ -1858,6 +1879,20 @@ export function useLivePitchTracker(
     let attachAttempt = 0
     const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 120 : 36
 
+    /**
+     * Leaving a practice game tears the shared mic down and immediately starts
+     * rebuilding it, and an iOS re-acquire routinely takes a second or more.
+     * A flat 80ms poll across that window meant ~12 attach attempts a second,
+     * each walking the graph and touching the bridge, for the whole rebuild —
+     * which is the stall you feel on the way out of a game. Stay responsive
+     * for the first handful of tries (a warm stream really is back in ~100ms),
+     * then ease off rather than hammer.
+     */
+    const waitStep = (baseMs: number) => {
+      if (attachAttempt <= 3) return baseMs
+      return Math.min(600, Math.round(baseMs * 2 ** Math.min(4, attachAttempt - 3)))
+    }
+
     const scheduleRetry = (delayMs: number) => {
       if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
       if (retryTimer !== null) {
@@ -1983,7 +2018,7 @@ export function useLivePitchTracker(
             allowStandaloneMicFallback && attachAttempt >= 6
 
           if (requireSharedStream && !sharedStreamLive && !canFallbackToStandaloneMic) {
-            scheduleRetry(80)
+            scheduleRetry(waitStep(80))
             return
           }
 
@@ -2038,11 +2073,19 @@ export function useLivePitchTracker(
         }
         safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
         graphRef.current = graph
-      } catch {
+      } catch (error) {
+        if (sourceRef.current === 'microphone' && isMicrophonePermissionError(error)) {
+          // Permission cannot change during a timer loop. Retrying here every
+          // 120ms only burns CPU and floods the bridge/log while the user is
+          // moving between tuner and game screens. A later user interaction
+          // or foreground recovery still gives the microphone a fresh attempt.
+          publishSourceHealth('stalled')
+          return
+        }
         if (sourceRef.current === 'microphone' && attachAttempt >= 6) {
           publishSourceHealth('stalled')
         }
-        scheduleRetry(sourceRef.current === 'microphone' ? 120 : 80)
+        scheduleRetry(waitStep(sourceRef.current === 'microphone' ? 120 : 80))
       } finally {
         // A previous media-key generation may finish after a new attachment
         // has started. It must not clear the new generation's in-flight guard.

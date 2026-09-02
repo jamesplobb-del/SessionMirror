@@ -44,6 +44,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stopNativeCameraPreview", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPassthrough", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ackNativeCameraPreviewFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeTunerMonitor", returnType: CAPPluginReturnPromise),
@@ -106,11 +107,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     override public func load() {
         super.load()
-        nativeCameraEngine.onPreviewFrame = { [weak self] jpegBase64, width, height in
+        nativeCameraEngine.onPreviewFrame = { [weak self] jpegBase64, width, height, frameId in
             self?.notifyListeners("nativeCameraPreviewFrame", data: [
                 "jpegBase64": jpegBase64,
                 "width": width,
                 "height": height,
+                "frameId": NSNumber(value: frameId),
             ])
         }
         nativeCameraEngine.onAudioTapChunk = { [weak self] pcmBase64, sampleRate, sampleCount in
@@ -1630,6 +1632,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func setNativeCameraFrameBridgeEnabled(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? false
         nativeCameraEngine.setFrameBridgeExternallyRequested(enabled)
+        call.resolve()
+    }
+
+    @objc func ackNativeCameraPreviewFrame(_ call: CAPPluginCall) {
+        guard let frameId = call.getInt("frameId"), frameId >= 0 else {
+            call.reject("Missing frameId")
+            return
+        }
+        nativeCameraEngine.acknowledgePreviewFrame(UInt64(frameId))
         call.resolve()
     }
 

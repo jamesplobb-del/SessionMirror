@@ -32,7 +32,6 @@ async function bootstrap() {
 
   primeWebStatusBarChrome()
   registerAppForegroundLifecycle()
-  await initializeQuickTunerLaunch()
   // Not awaited — a routine tapped in Messages surfaces through its own
   // store once ready, and shouldn't hold up first paint.
   void initializeRoutineFileOpen()
@@ -46,6 +45,11 @@ async function bootstrap() {
       </AppErrorBoundary>
     </StrictMode>,
   )
+
+  // Native quick-action handoff is allowed to arrive after the shell mounts.
+  // Awaiting this bridge call before React rendered left a completely black
+  // WebView whenever iOS resumed with a busy or recovering plugin queue.
+  void initializeQuickTunerLaunch()
 }
 
 void bootstrap()

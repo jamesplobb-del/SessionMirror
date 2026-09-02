@@ -82,8 +82,6 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   transition: background-color 90ms linear;
 }
 
-html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
-  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner,
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-record {
   background-color: color-mix(
@@ -95,7 +93,6 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 }
 
 /* The one glow allowed to have an edge, because its edge IS the screen edge. */
-.app-ui-overlay--audio-practice-tuner,
 .app-ui-overlay--audio-practice-record {
   box-shadow:
     inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-strength), transparent),
@@ -106,14 +103,66 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
     box-shadow 90ms linear;
 }
 
+/* —— The tuner's colour lives on exactly one plane ——
+ *
+ * It used to be three: a tinted background on the overlay, a rim glow shadow
+ * on the overlay, and this stage's own ::before hue layer. The pitch canvas is
+ * GPU-composited, and the two overlay paints sampled *through* that layer came
+ * out ~20% weaker than the same paints paint directly beside it — a hard,
+ * full-width seam at exactly the canvas's top and bottom edges (measured 13
+ * levels, 17 once the wash was brightened; identical at every column). Trying
+ * to re-paint the canvas with the same colour made it worse, because the
+ * surround was never one colour to begin with.
+ *
+ * So the overlay now holds only the flat base, and all of the hue — wash and
+ * rim together — is painted by this single fixed veil sitting ABOVE the
+ * canvas. One plane, composited once: there is no longer a boundary for it to
+ * be sliced at. The floating chrome is lifted above the veil below so it stays
+ * crisp. */
+html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  background-color: var(--audio-bg-base, #f7f8fa) !important;
+  background-image: none !important;
+  box-shadow: none;
+}
+
+.app-ui-overlay--audio-practice-tuner::after {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  background: color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-ui-strength), transparent);
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-strength), transparent),
+    inset 0 0 var(--tuner-rim-spread)
+      color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-glow-strength), transparent);
+  content: "";
+  pointer-events: none;
+  transition:
+    background-color 90ms linear,
+    box-shadow 90ms linear;
+}
+
+/* Above the veil: the tab bar, the readout, the tool rail and the bottom HUD.
+ * The pitch canvas deliberately sits under it. */
+.app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs,
+.app-ui-overlay--audio-practice-tuner .app-hud-bottom,
+.app-ui-overlay--audio-practice-tuner .control-deck {
+  position: relative;
+  z-index: 6;
+}
+
 .app-ui-overlay--audio-practice-tuner .audio-practice-tuner-layer {
   padding: 0;
   border: 0;
   background: transparent !important;
 }
 
+/* The layer's own card chrome goes, but not its gutter: the take cards are
+ * real cards with rounded corners, and zeroing the padding ran them into both
+ * phone edges so they read as oversized and cut off. The tuner above keeps
+ * `padding: 0` on purpose — its pitch canvas is meant to be full-bleed. */
 .app-ui-overlay--audio-practice-record .audio-mode-home-layer {
-  padding: 0;
+  padding: 0 1rem;
   border: 0;
   background: transparent !important;
 }
@@ -187,6 +236,11 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
  *
  * Scoped to the tab on purpose: Quick Tuner draws the same canvas inside a
  * white card, where the wash and the feather are correct. */
+/* Stays transparent. Painting the surround's own color-mix here was tried and
+ * is worse (seam 17 -> 45 levels): the surround is not one flat paint, it is
+ * the base mix PLUS the overlay's rim glow PLUS this element's own ::before
+ * hue layer, so reproducing only the base mix lands lighter than what sits
+ * beside it. Matching properly means accounting for all three. */
 .app-ui-overlay--audio-practice-tuner .pitch-living-canvas {
   background: transparent;
 }
@@ -572,7 +626,7 @@ html.app-dark-mode
   border: 1px solid rgba(255, 255, 255, 0.92);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
-  color: color-mix(in srgb, var(--pitch-stage-hue) 66%, #17304a);
+  color: color-mix(in srgb, var(--pitch-stage-hue) 80%, #17304a);
   box-shadow:
     0 8px 22px rgba(29, 61, 84, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.98);
@@ -607,7 +661,7 @@ html.app-dark-mode
   justify-content: center;
   min-height: 88px;
   margin: 10px 0 0;
-  color: color-mix(in srgb, var(--pitch-stage-hue) 46%, #17304a);
+  color: color-mix(in srgb, var(--pitch-stage-hue) 64%, #17304a);
   font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: clamp(72px, 20vw, 104px);
   font-weight: 700;
@@ -619,13 +673,17 @@ html.app-dark-mode
     text-shadow 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* No `font: inherit` here. The shorthand resets font-size to the inherited
+ * 16px, and at (0,1,1) this rule outranks `.pitch-living-readout__note` (0,1,0)
+ * — so the moment a note was detected AND the drone was available, the readout
+ * swapped from <p> to <button> and the note name collapsed from 75px to 16px.
+ * The button only needs the chrome reset; the note class owns the type. */
 button.pitch-living-readout__note--catch {
   appearance: none;
   padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
-  font: inherit;
   letter-spacing: inherit;
   text-align: center;
   pointer-events: auto;
@@ -647,15 +705,31 @@ button.pitch-living-readout__note--catch:focus-visible {
   opacity: 0.64;
 }
 
+/* The tendency line is a readout, not a caption. It gets the same glass pill
+ * the status chip wears and the same hue reaction, so the three lines read as
+ * one instrument instead of a label with a stray sentence under it. At 0.5
+ * alpha on a fully washed screen it was very nearly invisible. */
 .pitch-living-readout__coach {
-  max-width: 16.5rem;
-  margin: 2px 0 0;
-  color: rgba(23, 48, 74, 0.5);
-  font-size: 12px;
-  font-weight: 600;
+  max-width: 18rem;
+  margin: 9px 0 0;
+  padding: 4px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: color-mix(in srgb, var(--pitch-stage-hue) 58%, #17304a);
+  box-shadow:
+    0 6px 18px rgba(29, 61, 84, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(22px) saturate(1.12);
+  -webkit-backdrop-filter: blur(22px) saturate(1.12);
+  font-size: 11.5px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.25;
   animation: pitch-coach-in 280ms ease;
+  transition:
+    color 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes pitch-coach-in {
@@ -704,105 +778,132 @@ button.pitch-living-readout__note--catch:focus-visible {
   position: absolute;
   z-index: 5;
   right: auto;
-  bottom: 10px;
+  bottom: max(6px, calc(env(safe-area-inset-bottom) - 6px));
   left: 50%;
-  display: flex;
-  width: auto;
-  height: 48px;
+  display: grid;
+  width: min(360px, calc(100% - 24px));
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  grid-auto-rows: 46px;
   align-items: center;
-  gap: 2px;
-  padding: 4px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow:
-    0 10px 26px rgba(29, 61, 84, 0.1),
-    0 2px 6px rgba(29, 61, 84, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+  gap: 8px;
   transform: translateX(-50%);
-  backdrop-filter: blur(24px) saturate(1.14);
-  -webkit-backdrop-filter: blur(24px) saturate(1.14);
 }
 
 .pitch-living-tool-rail > .pitch-living-drone-trigger {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+  height: 46px;
 }
 
 .pitch-living-drone-trigger {
   position: relative;
-  appearance: none;
-  flex-shrink: 0;
-  margin: 0;
-  border: 0;
-  background: transparent;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  grid-template-columns: 20px 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 7px;
+  padding: 6px 11px;
+  border: 1px solid rgba(21, 152, 255, 0.13);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow:
+    0 12px 30px rgba(29, 61, 84, 0.1),
+    0 2px 7px rgba(29, 61, 84, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
   color: #183149;
-  text-align: center;
-  -webkit-tap-highlight-color: transparent;
+  text-align: left;
+  backdrop-filter: blur(24px) saturate(1.14);
+  -webkit-backdrop-filter: blur(24px) saturate(1.14);
   transition:
     transform 180ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 360ms ease,
     background-color 360ms ease,
-    color 360ms ease;
+    box-shadow 360ms ease;
 }
 
 .pitch-living-drone-trigger svg {
   width: 18px;
   height: 18px;
+  grid-row: 1 / 3;
   color: rgba(33, 86, 123, 0.82);
 }
 
+.pitch-living-drone-trigger span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pitch-living-drone-trigger small {
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(24, 49, 73, 0.58);
+  font-size: 9px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pitch-living-drone-trigger:active {
-  transform: scale(0.94);
+  transform: scale(0.97);
 }
 
-.pitch-living-drone-trigger:focus-visible {
-  outline: 2px solid rgba(21, 152, 255, 0.55);
-  outline-offset: -2px;
+.pitch-living-drone-trigger--active {
+  border-color: rgba(247, 166, 0, 0.46);
+  background: rgba(255, 250, 239, 0.9);
+  box-shadow:
+    0 12px 30px rgba(247, 166, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
 }
 
-.pitch-living-drone-trigger[aria-expanded='true'] {
-  background: rgba(241, 247, 252, 0.96);
-}
-
-.pitch-living-drone-trigger--active,
-.pitch-living-drone-trigger--active[aria-expanded='true'] {
-  background: rgba(255, 250, 239, 0.96);
-}
-
-.pitch-living-drone-trigger--active svg {
+.pitch-living-drone-trigger--active svg,
+.pitch-living-drone-trigger--active span,
+.pitch-living-drone-trigger--active small {
   color: #a86d00;
 }
 
-.pitch-living-transposition-trigger--active,
-.pitch-living-transposition-trigger--active[aria-expanded='true'] {
-  background: rgba(241, 249, 255, 0.96);
+.pitch-living-transposition-trigger--active {
+  border-color: rgba(21, 152, 255, 0.34);
+  background: rgba(241, 249, 255, 0.92);
 }
 
-.pitch-living-transposition-trigger--active svg {
+.pitch-living-transposition-trigger--active svg,
+.pitch-living-transposition-trigger--active span {
   color: #0878c8;
 }
 
+.pitch-living-transposition-trigger--active small {
+  color: rgba(8, 103, 171, 0.72);
+}
+
 .pitch-living-insights-trigger {
-  width: 40px;
-  height: 40px;
-  min-height: 40px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  align-self: center;
+  justify-self: center;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  place-items: center;
+  padding: 0;
+  border-radius: 14px;
+  border-color: rgba(21, 152, 255, 0.18);
+  background: rgba(248, 252, 255, 0.88);
+  text-align: center;
+}
+
+.pitch-living-tool-rail--with-drone .pitch-living-insights-trigger {
+  align-self: center;
+  justify-self: center;
+  grid-row: 1;
 }
 
 .pitch-living-insights-trigger svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  grid-row: auto;
   color: #197cbf;
 }
 

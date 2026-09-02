@@ -65,6 +65,7 @@ export default function PracticeHub({
   onOpenQuickPractice,
   onStartFocusedPractice,
   onCreatePracticeItem,
+  onOpenGames,
   onOpenVault,
   onOpenTuner,
   onOpenMetronome,
@@ -359,6 +360,29 @@ export default function PracticeHub({
                       </Pressable>
 
                       <div className="practice-menu-focus-tools">
+                        <Pressable
+                          type="button"
+                          intensity="soft"
+                          haptic="light"
+                          hapticFeedback={hapticFeedback}
+                          className="practice-menu-shortcut"
+                          onClick={onOpenGames}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.9}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M8 9h8a5 5 0 0 1 4.7 6.7l-.7 2.1a2.4 2.4 0 0 1-4.2.7L14.5 17h-5l-1.3 1.5a2.4 2.4 0 0 1-4.2-.7l-.7-2.1A5 5 0 0 1 8 9Z" />
+                            <path d="M8 12v4M6 14h4M16.5 13.5h.01M18.5 15.5h.01" />
+                          </svg>
+                          <strong>Games</strong>
+                          <small>3 to play</small>
+                        </Pressable>
                         <Pressable
                           type="button"
                           intensity="soft"

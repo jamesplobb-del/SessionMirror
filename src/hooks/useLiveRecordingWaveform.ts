@@ -4,8 +4,10 @@ import { isNativeCameraTestAvailable } from '../utils/nativeCameraTest'
 import { subscribeNativeAudioPitchFrames } from '../utils/nativeAudioPitchTap'
 import { readAnalyserMetrics } from '../utils/audioLevel'
 
-const LIVE_WAVEFORM_BAR_COUNT = 48
-const LIVE_WAVEFORM_INTERVAL_MS = 48
+/* Roughly 2.3 seconds of history at 30fps: dense enough to draw a liquid
+ * silhouette, but bounded so microphone updates stay cheap on older phones. */
+const LIVE_WAVEFORM_BAR_COUNT = 72
+const LIVE_WAVEFORM_INTERVAL_MS = 32
 const MIN_VISIBLE_PEAK = 0.035
 
 function createSilentHistory(): number[] {
@@ -83,7 +85,9 @@ export function useLiveRecordingWaveform({
 
       const target = normalizeInputLevel(rms, peak)
       const previous = envelopeRef.current
-      const response = target >= previous ? 0.72 : 0.3
+      /* Fast attack catches consonants and instrument transients; the gentler
+       * release stops the outline from snapping back into chunky steps. */
+      const response = target >= previous ? 0.8 : 0.18
       const envelope = previous + (target - previous) * response
       envelopeRef.current = envelope
 
@@ -182,4 +186,3 @@ export function useLiveRecordingWaveform({
 
   return history
 }
-

@@ -1013,7 +1013,7 @@ function PracticeDaysScreen({
         </div>
         {days.length > DAY_PREVIEW_COUNT ? (
           <button type="button" className="pitch-insights-days__more" onClick={onToggleShowAllDays}>
-            {showAllDays ? 'Show recent days' : `Show all ${days.length} days`}
+            {showAllDays ? 'Recent days' : 'All days'}
           </button>
         ) : null}
       </section>

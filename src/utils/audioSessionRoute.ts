@@ -348,6 +348,7 @@ export interface BestTakeAudioPluginType {
   stopNativeCameraPreview(): Promise<void>
   setNativeCameraPassthrough(options: { enabled: boolean }): Promise<void>
   setNativeCameraFrameBridgeEnabled(options: { enabled: boolean }): Promise<void>
+  ackNativeCameraPreviewFrame(options: { frameId: number }): Promise<void>
   setNativeCameraPreviewZoom(options: { zoom: number }): Promise<void>
   setNativeAudioTapEnabled(options: { enabled: boolean }): Promise<void>
   startNativeTunerMonitor(options?: {
@@ -415,7 +416,7 @@ export interface BestTakeAudioPluginType {
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'nativeCameraPreviewFrame',
-    listenerFunc: (data: { jpegBase64?: string; dataUrl?: string; width?: number; height?: number }) => void,
+    listenerFunc: (data: { jpegBase64?: string; dataUrl?: string; width?: number; height?: number; frameId?: number }) => void,
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'nativeAudioPitchFrame',

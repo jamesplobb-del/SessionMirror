@@ -7,6 +7,7 @@ import {
   Minus,
   Play,
   Plus,
+  RotateCcw,
   Settings,
   Shuffle,
 } from 'lucide-react'
@@ -777,27 +778,36 @@ export default function StaffJumperScreen({
 
   if (state.phase === 'paused') {
     return (
-      <div className="sj-state-screen">
-        <section className="sj-state-card">
-          <p className="sj-state-label">Paused</p>
-          <h1>Staff Jumper</h1>
-          <dl className="sj-state-stats sj-state-stats--compact">
+      <BalanceArcadeShell
+        title="Staff Jumper"
+        hapticFeedback={hapticFeedback}
+        onBack={resume}
+        backLabel="Resume"
+        stat={{ label: 'Best', value: String(state.bestScore || '—') }}
+      >
+        <div className="balance-arcade__spacer" />
+        <h1 className="balance-display balance-display--page">Paused</h1>
+        <section className="balance-card balance-award">
+          <dl className="balance-award__stats balance-award__stats--pair">
             <div><dt>Score</dt><dd>{state.score}</dd></div>
             <div><dt>Streak</dt><dd>{state.streak}</dd></div>
           </dl>
-          <div className="sj-state-actions">
-            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={resume} className="arcade-primary-button">
-              Resume
+          <div className="balance-award__actions">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={resume} className="balance-cta">
+              <Play aria-hidden /> Resume
             </Pressable>
-            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="arcade-secondary-button">
-              Change settings
-            </Pressable>
-            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="arcade-text-button">
-              Exit game
-            </Pressable>
+            <div className="balance-award__next">
+              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="balance-cta balance-cta--blue balance-cta--small">
+                Settings
+              </Pressable>
+              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="balance-cta balance-cta--small balance-cta--quiet">
+                Exit
+              </Pressable>
+            </div>
           </div>
         </section>
-      </div>
+        <div className="balance-arcade__spacer" />
+      </BalanceArcadeShell>
     )
   }
 
@@ -810,35 +820,49 @@ export default function StaffJumperScreen({
       : 0
 
     return (
-      <div className="sj-state-screen">
-        <section className="sj-state-card">
-          <p className="sj-state-label">Run complete</p>
-          <h1>{state.score}</h1>
-          <p className="sj-state-run-label">
+      <BalanceArcadeShell
+        title="Staff Jumper"
+        hapticFeedback={hapticFeedback}
+        onBack={onBack}
+        backLabel="Back to Practice Games"
+        stat={{ label: 'Best', value: String(state.bestScore || '—') }}
+      >
+        <div className="balance-arcade__spacer" />
+        <h1 className="balance-display balance-display--page">Run Complete</h1>
+
+        <section className="balance-card balance-award">
+          <p className="balance-pill">{state.score} points</p>
+          <p className="balance-card__line balance-card__line--tight">
             {scaleName} · {CLEF_LABELS[state.config.clef]} clef · {RANGE_LABELS[state.config.range]} · {DIFFICULTY_LABELS[state.config.difficulty]}
           </p>
-          <dl className="sj-state-stats">
+
+          <dl className="balance-award__stats balance-award__stats--pair">
             <div><dt>Accuracy</dt><dd>{accuracy}%</dd></div>
             <div><dt>Best streak</dt><dd>{state.bestStreak}</dd></div>
-            <div><dt>Correct notes</dt><dd>{state.correctCount}</dd></div>
+            <div><dt>Correct</dt><dd>{state.correctCount}</dd></div>
             <div><dt>Time</dt><dd>{formatRunTime(durationSeconds)}</dd></div>
           </dl>
-          <p className="sj-state-summary">
+
+          <p className="balance-award__note">
             {state.missCount} {state.missCount === 1 ? 'miss' : 'misses'} · Best {state.bestScore}
           </p>
-          <div className="sj-state-actions">
-            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="arcade-primary-button">
-              Play again
+
+          <div className="balance-award__actions">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="balance-cta">
+              <RotateCcw aria-hidden /> Play Again
             </Pressable>
-            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="arcade-secondary-button">
-              Change settings
-            </Pressable>
-            <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="arcade-text-button">
-              Back to Practice Arcade
-            </Pressable>
+            <div className="balance-award__next">
+              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="balance-cta balance-cta--blue balance-cta--small">
+                Settings
+              </Pressable>
+              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={onBack} className="balance-cta balance-cta--small balance-cta--quiet">
+                Games
+              </Pressable>
+            </div>
           </div>
         </section>
-      </div>
+        <div className="balance-arcade__spacer" />
+      </BalanceArcadeShell>
     )
   }
 

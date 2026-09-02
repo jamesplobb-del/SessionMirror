@@ -1188,6 +1188,51 @@ html.app-dark-mode .audio-record-key--best.audio-record-key--playing {
   max-width: 32rem;
 }
 
+/* Voice Memos-style live meter. Every bar is fed by the microphone history
+   already owned by the recording session; no decorative animation loop and
+   no second microphone are created. */
+.audio-recording-waveform--voice {
+  display: grid;
+  place-items: center;
+  padding-inline: clamp(0.3rem, 2vw, 0.8rem);
+}
+
+.audio-recording-waveform__baseline {
+  position: absolute;
+  right: 0.35rem;
+  left: 0.35rem;
+  top: 50%;
+  height: 1px;
+  background: color-mix(in srgb, var(--audio-divider) 78%, transparent);
+}
+
+.audio-recording-waveform__bars {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 78%;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(1.5px, 0.42vw, 3px);
+}
+
+.audio-recording-waveform__bar {
+  width: clamp(2px, 0.52vw, 3.5px);
+  min-height: 3px;
+  max-height: 100%;
+  flex: 1 1 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--audio-blue), color-mix(in srgb, var(--audio-blue) 54%, var(--audio-gold)));
+  box-shadow: 0 0 0.35rem color-mix(in srgb, var(--audio-blue) 18%, transparent);
+  transition: height 48ms linear, background-color 180ms ease;
+}
+
+.audio-recording-waveform--recording .audio-recording-waveform__bar {
+  background: linear-gradient(180deg, #f05a66, #d52f48);
+  box-shadow: 0 0 0.4rem rgba(230, 56, 79, 0.18);
+}
+
 .audio-breathing-ribbon__canvas {
   position: absolute;
   inset: 0;
@@ -1258,8 +1303,8 @@ html.app-dark-mode .audio-record-key--best.audio-record-key--playing {
 }
 
 .audio-mode-take-card__chrome {
-  min-height: 2.6rem;
-  padding: 0.55rem 0.72rem 0;
+  min-height: 2.3rem;
+  padding: 0.45rem 0.72rem 0;
 }
 
 .audio-mode-take-card__actions {
@@ -1407,6 +1452,260 @@ html.app-dark-mode .audio-record-key--best.audio-record-key--playing {
 @media (prefers-reduced-motion: reduce) {
   .audio-breathing-ribbon__body,
   .audio-breathing-ribbon__reflection {
+    animation: none;
+  }
+}
+
+/* —— Waveform body ——
+   One mirrored, curve-smoothed silhouette per take instead of a row of
+   rectangles. Only fills are painted, so the fixed viewBox can stretch to a
+   card of any height without distorting a stroke. */
+.audio-wave-shape {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.audio-wave-shape__future {
+  fill: color-mix(in srgb, var(--audio-text-primary) 13%, transparent);
+}
+
+/* The unplayed body carries its take's colour rather than sitting neutral
+   grey. Two stacked cards of identical grey waveforms are genuinely hard to
+   tell apart at a glance, and telling them apart is the entire point of this
+   screen. Played still reads as the saturated fill on top of it. */
+.audio-mode-waveform--current .audio-wave-shape__future {
+  fill: color-mix(in srgb, var(--audio-blue) 26%, transparent);
+}
+
+.audio-mode-waveform--best .audio-wave-shape__future {
+  fill: color-mix(in srgb, var(--audio-gold) 30%, transparent);
+}
+
+.audio-wave-shape__played {
+  fill: var(--audio-blue);
+}
+
+.audio-mode-waveform--best .audio-wave-shape__played {
+  fill: var(--audio-gold);
+}
+
+/* During playback these values are fed by the existing Web Audio analyser.
+   The whole silhouette responds as a soft membrane: attacks lift immediately,
+   releases settle gently, and a paused take stays completely still. */
+.audio-mode-waveform {
+  --audio-wave-energy: 0;
+  --audio-wave-scale: 1;
+  --audio-wave-glow: 0px;
+  --audio-wave-reactive-color: var(--audio-blue);
+}
+
+.audio-mode-waveform--best {
+  --audio-wave-reactive-color: var(--audio-gold);
+}
+
+.audio-mode-waveform--active .audio-wave-shape__played {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scaleY(var(--audio-wave-scale));
+  filter: drop-shadow(0 0 var(--audio-wave-glow) color-mix(in srgb, var(--audio-wave-reactive-color) 42%, transparent));
+  will-change: transform, filter;
+}
+
+/* —— Inside Current ——
+   The Record tab is two takes, and Current is the recorder: live mic energy is
+   drawn inside the Current card, so there is no separate hero meter. The
+   `.audio-mode-home--inplace` class is carried through these selectors so the
+   later tablet rules written for the old hero-plus-cards grid cannot reapply. */
+.app-ui-overlay--audio-mode .audio-mode-home.audio-mode-home--inplace {
+  display: flex;
+  width: min(100%, 35rem);
+  grid-template-columns: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  margin-inline: auto;
+  padding: 0 0 clamp(0.3rem, 0.9vh, 0.6rem);
+  overflow: hidden;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-stack {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: stretch;
+  gap: clamp(0.5rem, 1.2vh, 0.8rem);
+  margin-top: clamp(0.15rem, 0.6vh, 0.4rem);
+  margin-bottom: clamp(0.45rem, 1.4vh, 0.9rem);
+}
+
+/* Two halves, and they have to be equal.
+ *
+ * This tab is a comparison: Best on top is the target, Current underneath is
+ * the attempt. Sizing them differently silently says one matters more, and it
+ * also makes the two waveforms impossible to read against each other — the
+ * same take drawn into a 490px box and a 137px box looks like two different
+ * performances. `flex: 1 1 0` splits the column evenly no matter what either
+ * card contains, and `min-height: 0` lets them actually shrink on a short
+ * phone instead of overflowing. */
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card {
+  display: flex;
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 0;
+  flex-direction: column;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card__chrome {
+  flex: 0 0 auto;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card__media {
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card__playback-column {
+  min-height: 0;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card__title-row {
+  flex: 0 0 auto;
+}
+
+/* The waveform is the body of the card, not a strip beneath the title — for
+   both takes now, which is what makes them comparable at a glance.
+ *
+ * It is a band, not the whole remaining box. The SVG stretches a fixed
+ * 100-unit viewBox with preserveAspectRatio="none", so amplitude is relative
+ * to whatever height it is given: let it fill half the screen and a quiet
+ * passage becomes a fat slab while a loud one clips. Capping the band keeps
+ * the vertical scale honest and identical in both cards, which is the only
+ * way the two are actually comparable. */
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-waveform,
+.app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card__live {
+  height: auto;
+  min-height: clamp(3.25rem, 9vh, 5rem);
+  max-height: clamp(4.5rem, 15vh, 8rem);
+  flex: 1 1 auto;
+  align-self: center;
+  width: 100%;
+}
+
+/* An empty slot has no body and no transport — just its label and the hint,
+   sitting centred in the half it owns. The recorder keeps its live band
+   underneath, because that meter is the thing telling you the mic is open. */
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-mode-take-card__media {
+  align-items: center;
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-mode-take-card__playback-column {
+  justify-content: center;
+  text-align: center;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty:not(.audio-mode-take-card--stage)
+  .audio-mode-take-card__playback-column {
+  flex: 0 0 auto;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-mode-take-card__name-line {
+  justify-content: center;
+}
+
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-mode-take-card__title-row p {
+  max-width: none;
+  text-align: center;
+}
+
+/* `__media` carries a left gutter because the play control is absolutely
+   positioned into it. An empty slot has no control, so the gutter collapses —
+   otherwise the centred empty state sits visibly right of centre. */
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-mode-take-card__media {
+  padding-left: 0.78rem;
+}
+
+/* Nothing recorded yet: the resting line sits low and quiet so an empty slot
+   never competes with the take above or below it. */
+.app-ui-overlay--audio-mode .audio-mode-home--inplace
+  .audio-mode-take-card--empty .audio-wave-shape__future {
+  fill: color-mix(in srgb, var(--audio-text-primary) 9%, transparent);
+}
+
+.audio-mode-take-card__live {
+  position: relative;
+  display: none;
+  min-width: 0;
+}
+
+.audio-mode-take-card__live--visible {
+  display: flex;
+}
+
+.audio-live-wave {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Listening before a take exists stays blue; only an armed recording is red,
+   which is what the meter already did in the hero. */
+.audio-live-wave--idle .audio-wave-shape__played {
+  fill: color-mix(in srgb, var(--audio-blue) 42%, transparent);
+}
+
+.audio-live-wave--recording .audio-wave-shape__played {
+  fill: #e6384f;
+}
+
+.audio-mode-take-card--recording {
+  border-color: color-mix(in srgb, #e6384f 46%, var(--audio-divider));
+}
+
+.audio-mode-take-card--recording .audio-mode-take-card__pill {
+  background: #e6384f;
+}
+
+.audio-mode-take-card--recording .audio-mode-take-card__play {
+  border-color: color-mix(in srgb, #e6384f 40%, var(--audio-divider));
+  opacity: 0.5;
+}
+
+.audio-mode-take-card--recording .audio-mode-take-card__duration > span {
+  background: #e6384f;
+  animation: audio-mode-live-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes audio-mode-live-dot {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-mode-waveform--active .audio-wave-shape__played {
+    transform: none;
+    filter: none;
+  }
+
+  .audio-mode-take-card--recording .audio-mode-take-card__duration > span {
     animation: none;
   }
 }

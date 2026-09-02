@@ -31,6 +31,49 @@
   );
 }
 
+/* First paint must never be an empty/black WebView while the main app chunk or
+   a native foreground handoff is still resolving. */
+.app-launch-fallback {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.8rem;
+  color: #183149;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(21, 152, 255, 0.12), transparent 34%),
+    #f5f7f9;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+}
+
+.app-launch-fallback__mark {
+  width: 2.7rem;
+  height: 2.7rem;
+  border: 4px solid rgba(21, 152, 255, 0.18);
+  border-top-color: #1598ff;
+  border-radius: 999px;
+  animation: app-launch-spin 850ms linear infinite;
+}
+
+.app-launch-fallback strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+@keyframes app-launch-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-launch-fallback {
+    color: #eef4fa;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(21, 152, 255, 0.16), transparent 34%),
+      #08121b;
+  }
+}
+
 .app-boot-gate__ambient {
   background: radial-gradient(
       ellipse 48% 38% at 42% 42%,
@@ -770,7 +813,9 @@ body.settings-branch-open * {
   display: flex;
   min-height: clamp(3.6rem, 7.7vh, 4.5rem);
   align-items: center;
-  margin-top: clamp(0.7rem, 1.35vh, 1rem);
+  /* Just enough to separate the take pill from the name below it. The old
+     1rem left a dead band across the middle of every card. */
+  margin-top: clamp(0.3rem, 0.7vh, 0.55rem);
   overflow: hidden;
   padding-left: clamp(4.35rem, 12.5vw, 5.35rem);
 }
@@ -8844,18 +8889,40 @@ html.app-dark-mode
     inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
-/* Carry the white control surfaces into both phone edges, then ease back to
-   the quiet stage color. The status- and home-indicator safe areas are part
-   of this same paint plane, so no horizontal color seam can form. */
+/* One flat stage color, the same one Record and Tuner use.
+ *
+ * This used to ramp to pure white at both edges to "carry the white control
+ * surfaces into the phone edges". The transport buttons are pills, not a
+ * full-width bar, so the bottom ramp painted a band of a second white across
+ * the strip under them — including the home-indicator safe area — that lined
+ * up with nothing on screen. Two whites a few percent apart read as a smudge,
+ * not as depth. The buttons carry their own elevation via --audio-shadow-fab. */
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome {
-  --metronome-edge-surface: #ffffff;
-  background: linear-gradient(
-    180deg,
-    var(--metronome-edge-surface) 0%,
-    var(--audio-bg-base) 21%,
-    var(--audio-bg-base) 72%,
-    var(--metronome-edge-surface) 100%
-  ) !important;
+  background: var(--audio-bg-base) !important;
+}
+
+/* Where the second white was actually coming from.
+ *
+ * The stage clips its own overflow, and it has to — the beat wash is sized to
+ * bleed past its edges. With the home-indicator inset sitting on the overlay,
+ * that clip edge landed a couple of pixels under the transport pills and
+ * guillotined their drop shadows mid-fade. Above the line the page carries the
+ * soft shadow tint of the pills and the selector card; below it, the safe-area
+ * strip is untinted --audio-bg-base. Same color, two different renderings of
+ * it, with a hard seam between — which reads as a brighter white under
+ * Program / Play / Tap Tempo.
+ *
+ * Move the inset off the overlay and onto the transport row itself. The stage
+ * then reaches the physical bottom of the screen, the shadows fade out inside
+ * the clip, and the buttons do not move: max() reproduces the old 0.25rem on
+ * hardware with no home indicator. */
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome {
+  padding-bottom: 0;
+}
+
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
+  .audio-practice-metronome__controls {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
 }
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
@@ -8867,10 +8934,6 @@ html.app-dark-mode
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome
   .audio-practice-metronome__bottom-dock {
   background: transparent !important;
-}
-
-html.app-dark-mode .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome {
-  --metronome-edge-surface: #0f1726;
 }
 
 @media (max-width: 420px) {

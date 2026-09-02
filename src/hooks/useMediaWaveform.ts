@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { useCapacitorVideoSrc } from './useCapacitorVideoSrc'
 import { extractNativeWaveformPeaks } from '../utils/nativeWaveform'
 
@@ -20,6 +21,9 @@ interface UseMediaWaveformOptions {
  * rather than risking the process. Native takes never reach it.
  */
 const MAX_JS_DECODE_BYTES = 48 * 1024 * 1024
+const waveformCache = new Map<string, number[]>()
+const waveformRequests = new Map<string, Promise<number[] | null>>()
+let nativeExtractionQueue: Promise<unknown> = Promise.resolve()
 
 function fallbackPeaks(barCount: number): number[] {
   return Array.from({ length: barCount }, (_, index) => {
@@ -87,20 +91,46 @@ export function useMediaWaveform({
 
     let cancelled = false
     let audioContext: AudioContext | null = null
+    const sourceKey = `${filePath || resolvedSrc}|${barCount}`
+    const cached = waveformCache.get(sourceKey)
+    if (cached) {
+      setPeaks(cached)
+      return
+    }
 
     void (async () => {
       // Native reads the audio track alone, streamed and off the main thread,
       // instead of pulling the whole container through the WebView.
+      let request = waveformRequests.get(sourceKey)
+      if (!request) {
+        request = nativeExtractionQueue.then(() =>
+          extractNativeWaveformPeaks({ filePath, videoUrl: mediaUrl }, barCount),
+        )
+        nativeExtractionQueue = request.catch(() => undefined)
+        waveformRequests.set(sourceKey, request)
+      }
+
       try {
-        const nativePeaks = await extractNativeWaveformPeaks({ filePath, videoUrl: mediaUrl }, barCount)
+        const nativePeaks = await request
         if (cancelled) return
         if (nativePeaks) {
+          waveformCache.set(sourceKey, nativePeaks)
           setPeaks(nativePeaks)
           return
         }
       } catch (error) {
-        console.warn('[Waveform] native extract failed, trying decode', error)
+        console.warn('[Waveform] native extract failed', error)
         if (cancelled) return
+      } finally {
+        if (waveformRequests.get(sourceKey) === request) waveformRequests.delete(sourceKey)
+      }
+
+      // Native iOS must never fetch/decode an entire local movie in WebKit just
+      // to draw a small waveform. That fallback was able to multiply memory
+      // use when Current and Best mounted together and get the process killed.
+      if (Capacitor.isNativePlatform()) {
+        setPeaks(placeholder ? fallbackPeaks(barCount) : [])
+        return
       }
 
       const byteLength = await probeByteLength(resolvedSrc)
@@ -131,7 +161,9 @@ export function useMediaWaveform({
         audioContext = new AudioContextCtor({ latencyHint: 'playback' })
         const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0))
         if (!cancelled) {
-          setPeaks(buildPeaks(decoded, barCount))
+          const decodedPeaks = buildPeaks(decoded, barCount)
+          waveformCache.set(sourceKey, decodedPeaks)
+          setPeaks(decodedPeaks)
         }
       } catch (error) {
         console.warn('Waveform decode failed:', error)

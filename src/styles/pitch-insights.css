@@ -837,7 +837,9 @@ html.app-dark-mode .pitch-insights-screen {
 .pitch-insights-days__more {
   display: block;
   min-height: 2.6rem;
-  margin: 0.65rem auto 0;
+  /* Sits in the section's bottom-right corner rather than centred: it is a
+     scope switch for the list above it, not a call to action. */
+  margin: 0.65rem 0 0 auto;
   border: 0;
   background: transparent;
   padding: 0.4rem 0.9rem;

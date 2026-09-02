@@ -252,6 +252,11 @@ const AUDIO_PLAYBACK_CAPTURE_SUSPEND_MS = 300
 const YOUTUBE_HEADPHONES_TIP_MS = 3200
 const YOUTUBE_EXPAND_TIP_MS = 4500
 
+type AudioTakeReadiness =
+  | { status: 'preparing' }
+  | { status: 'ready'; durationSeconds: number }
+  | { status: 'error'; message: string }
+
 function waitMs(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
@@ -519,6 +524,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [challengerPipPlaying, setChallengerPipPlaying] = useState(false)
   const [reviewPlaybackPlaying, setReviewPlaybackPlaying] = useState(false)
   const [takeDeleteError, setTakeDeleteError] = useState<string | null>(null)
+  const [audioTakeReadiness, setAudioTakeReadiness] = useState<Record<string, AudioTakeReadiness>>(
+    {},
+  )
   const [showPitch, setShowPitch] = useState(false)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
@@ -1347,6 +1355,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const input = audioTakeReadinessInputRef.current.get(takeId)
     if (!input) return null
 
+    setAudioTakeReadiness((current) => ({
+      ...current,
+      [takeId]: { status: 'preparing' },
+    }))
     console.info('[TakeReadiness] playback-source-creation-started', {
       takeId,
       filePath: input.filePath,
@@ -1369,6 +1381,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         durationSeconds: readiness.durationSeconds,
         event: 'loadedmetadata + canplay',
       })
+      setAudioTakeReadiness((current) => ({
+        ...current,
+        [takeId]: { status: 'ready', durationSeconds: readiness.durationSeconds },
+      }))
       console.info('[TakeReadiness] play-enabled', {
         takeId,
         atMs: performance.now(),
@@ -1381,9 +1397,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         message,
         error,
       })
+      setAudioTakeReadiness((current) => ({
+        ...current,
+        [takeId]: { status: 'error', message },
+      }))
       return null
     }
   }, [])
+
+  const handleRetryAudioTakePreparation = useCallback(
+    (takeId: string) => {
+      void prepareAudioTakePlayback(takeId)
+    },
+    [prepareAudioTakePlayback],
+  )
 
   const handleSaveTake = useCallback(
     (payload: RecordingCompletePayload) => {
@@ -1459,6 +1486,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           filePath,
           fallbackUrl: optimisticUrl,
         })
+        setAudioTakeReadiness((current) => ({
+          ...current,
+          [takeId]: { status: 'preparing' },
+        }))
         console.info('[TakeReadiness] recording-stop-received', {
           takeId,
           filePath,
@@ -1812,6 +1843,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           error,
         })
         if (mediaType !== 'audio') return
+        const message = error instanceof Error ? error.message : 'This take could not be prepared.'
+        setAudioTakeReadiness((current) => ({
+          ...current,
+          [takeId]: { status: 'error', message },
+        }))
         if (shouldAutoPlay) {
           pendingAutoPlaybackRef.current = false
           setHandsFreePlaybackPending(false)
@@ -5019,7 +5055,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}
-                            showTakeKeys={settings.showTakeCards}
+                            takeReadiness={audioTakeReadiness}
+                            onRetryTakePreparation={handleRetryAudioTakePreparation}
+                            onExpandBenchmark={handleExpandBenchmark}
+                            onExpandChallenger={handleExpandChallenger}
                             onPinCurrentAsBest={handlePinCurrentAsBest}
                             onClearBenchmark={handleClearAudioBenchmark}
                             onClearChallenger={handleClearAudioChallenger}

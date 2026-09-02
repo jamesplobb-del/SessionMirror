@@ -10,6 +10,15 @@ import {
 const FullBestTakeApp = lazy(() => import('./App'))
 const QuickMetronomeScreen = lazy(() => import('./components/QuickMetronomeScreen'))
 
+function AppLaunchFallback() {
+  return (
+    <main className="app-launch-fallback" role="status" aria-label="Opening BestTake">
+      <span className="app-launch-fallback__mark" aria-hidden />
+      <strong>BestTake</strong>
+    </main>
+  )
+}
+
 interface QuickToolErrorBoundaryProps {
   requestId: string
   onExit: () => void
@@ -106,7 +115,7 @@ export default function RootRouter() {
   }
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AppLaunchFallback />}>
       <FullBestTakeApp />
     </Suspense>
   )
