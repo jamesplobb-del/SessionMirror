@@ -1,10 +1,8 @@
 import { lazy, Suspense } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, type RefObject } from 'react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
-import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import LabsMenu from './LabsMenu'
@@ -150,22 +148,15 @@ export default function LabsOverlay({
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          ref={dialogRef}
-          key="labs-overlay"
-          className="labs-overlay fixed inset-0 z-[135] flex flex-col"
-          tabIndex={-1}
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
-          transition={iosSpringSnappy}
-          style={motionGpuLayer}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Practice Games"
-        >
+    isOpen ? (
+      <div
+        ref={dialogRef}
+        className="labs-overlay fixed inset-0 z-[135] flex flex-col"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Practice Games"
+      >
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}
@@ -198,9 +189,8 @@ export default function LabsOverlay({
               />
             </Suspense>
           )}
-        </motion.div>
-      )}
-    </AnimatePresence>,
+      </div>
+    ) : null,
     document.body,
   )
 }

@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react'
 import QuickTunerScreen from './components/QuickTunerScreen'
+import AppBootGate from './components/ui/AppBootGate'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import {
   dismissQuickTuner,
@@ -106,7 +107,7 @@ export default function RootRouter() {
   }
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AppBootGate />}>
       <FullBestTakeApp />
     </Suspense>
   )

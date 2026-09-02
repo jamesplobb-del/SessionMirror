@@ -23,7 +23,6 @@ async function bootstrap() {
 
   primeWebStatusBarChrome()
   registerAppForegroundLifecycle()
-  await initializeQuickTunerLaunch()
 
   createRoot(rootEl).render(
     <StrictMode>
@@ -32,6 +31,11 @@ async function bootstrap() {
       </AppErrorBoundary>
     </StrictMode>,
   )
+
+  // Mount the application before asking the native quick-launch bridge for a
+  // pending request. A stalled plugin call must never leave WKWebView showing
+  // its black, pre-React canvas after a cold launch or foreground resume.
+  void initializeQuickTunerLaunch()
 }
 
 void bootstrap()

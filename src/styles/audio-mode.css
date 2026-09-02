@@ -892,6 +892,17 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
 }
 
+.audio-recording-waveform::after {
+  position: absolute;
+  right: 4%;
+  left: 4%;
+  height: 1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
 .audio-recording-waveform__bar {
   width: clamp(1.5px, 0.5vw, 2.7px);
   height: 100%;
@@ -945,6 +956,10 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   opacity: 0.9;
 }
 
+.audio-mode-hero--recording .audio-recording-waveform {
+  color: #e6384f;
+}
+
 .audio-recording-waveform--recording .audio-recording-waveform__bar--future {
   color: var(--audio-divider);
   opacity: 0.52;
@@ -962,8 +977,8 @@ html.app-dark-mode .app-ui-overlay--split-open.app-ui-overlay--audio-mode
   left: 72.6%;
   width: 1px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--audio-blue) 62%, transparent);
-  box-shadow: 0 0 0.4rem rgba(21, 152, 255, 0.18);
+  background: color-mix(in srgb, #e6384f 72%, transparent);
+  box-shadow: 0 0 0.4rem rgba(230, 56, 79, 0.24);
   pointer-events: none;
 }
 

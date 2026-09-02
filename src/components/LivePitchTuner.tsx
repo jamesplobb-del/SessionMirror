@@ -283,19 +283,6 @@ function LiveAudioTunerPane({
                 </button>
               ) : null}
 
-              {insightsEnabled ? (
-                <button
-                  type="button"
-                  className="pitch-living-drone-trigger pitch-living-insights-trigger"
-                  onClick={openInsights}
-                  aria-haspopup="dialog"
-                  aria-label="Open Pitch Insights"
-                  title="Open Pitch Insights"
-                >
-                  <BarChart3 aria-hidden />
-                </button>
-              ) : null}
-
               {onTunerTranspositionChange ? (
                 <button
                   type="button"
@@ -312,6 +299,21 @@ function LiveAudioTunerPane({
                   <ArrowRightLeft aria-hidden />
                   <span>Transpose</span>
                   <small>{transposition.shortLabel}</small>
+                </button>
+              ) : null}
+
+              {insightsEnabled ? (
+                <button
+                  type="button"
+                  className="pitch-living-drone-trigger pitch-living-insights-trigger"
+                  onClick={openInsights}
+                  aria-haspopup="dialog"
+                  aria-label="Open Pitch Insights"
+                  title="Open Pitch Insights"
+                >
+                  <BarChart3 aria-hidden />
+                  <span>Pitch Insights</span>
+                  <small>History</small>
                 </button>
               ) : null}
             </div>

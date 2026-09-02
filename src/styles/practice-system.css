@@ -575,20 +575,18 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 .pitch-living-tool-rail {
   position: absolute;
   z-index: 5;
-  right: auto;
-  bottom: max(6px, calc(env(safe-area-inset-bottom) - 6px));
-  left: 50%;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
   display: grid;
-  width: min(360px, calc(100% - 24px));
-  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
-  grid-auto-rows: 46px;
-  align-items: center;
+  width: 110px;
+  max-width: calc(100% - 24px);
+  grid-template-columns: minmax(0, 110px);
+  grid-auto-rows: minmax(46px, auto);
   gap: 8px;
-  transform: translateX(-50%);
 }
 
 .pitch-living-tool-rail > .pitch-living-drone-trigger {
-  height: 46px;
+  grid-column: 1;
 }
 
 .pitch-living-drone-trigger {
@@ -675,41 +673,43 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
 }
 
 .pitch-living-insights-trigger {
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  align-self: center;
-  justify-self: center;
-  grid-column: 2;
-  grid-row: 1;
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-  place-items: center;
-  padding: 0;
-  border-radius: 14px;
+  width: 100%;
+  min-height: 46px;
+  align-self: stretch;
+  grid-column: 1;
+  grid-row: auto;
+  grid-template-columns: 20px 1fr;
+  grid-template-rows: auto auto;
+  justify-items: stretch;
+  padding: 6px 11px;
+  border-radius: 12px;
   border-color: rgba(21, 152, 255, 0.18);
   background: rgba(248, 252, 255, 0.88);
-  text-align: center;
+  text-align: left;
 }
 
 .pitch-living-tool-rail--with-drone .pitch-living-insights-trigger {
-  align-self: center;
-  justify-self: center;
-  grid-row: 1;
+  align-self: stretch;
+  grid-row: auto;
 }
 
 .pitch-living-insights-trigger svg {
-  width: 20px;
-  height: 20px;
-  grid-row: auto;
+  width: 18px;
+  height: 18px;
+  grid-row: 1 / 3;
   color: #197cbf;
+}
+
+.pitch-living-insights-trigger span,
+.pitch-living-insights-trigger small {
+  display: block;
 }
 
 .pitch-living-drone-panel {
   position: absolute;
   z-index: 7;
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
+  bottom: max(8px, env(safe-area-inset-bottom));
   left: max(8px, env(safe-area-inset-left));
   max-height: min(40%, 176px);
   padding: 8px;
@@ -728,7 +728,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-tuner)
   position: absolute;
   z-index: 8;
   right: max(8px, env(safe-area-inset-right));
-  bottom: max(62px, calc(env(safe-area-inset-bottom) + 54px));
+  bottom: max(8px, env(safe-area-inset-bottom));
   left: max(8px, env(safe-area-inset-left));
   display: flex;
   max-height: min(72%, 540px);
