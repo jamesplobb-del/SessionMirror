@@ -144,9 +144,15 @@
 .balance-character-option.is-selected { border-color: rgba(44,154,113,0.55); color: #166b51; background: #eaf8f1; box-shadow: inset 0 0 0 1px rgba(44,154,113,0.12); }
 .balance-character-option__preview { position: relative; display: grid; width: 2.65rem; height: 2.95rem; place-items: end center; }
 .balance-character-option__preview img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; transform-origin: center bottom; user-select: none; -webkit-user-drag: none; }
+.balance-character-option.is-selected .balance-character-option__preview { animation: balance-character-idle 1.9s ease-in-out infinite; }
 .balance-character-option__balancer { position: relative; display: block; width: 1.5rem; height: 2.75rem; }
 .balance-character-option__balancer i { position: absolute; z-index: 2; top: 0; left: 50%; width: 0.92rem; height: 0.92rem; border-radius: 50%; background: #f2a03b; transform: translateX(-50%); }
 .balance-character-option__balancer b { position: absolute; top: 0.72rem; left: 50%; width: 1.25rem; height: 1.85rem; border-radius: 42% 42% 26% 26%; background: #173f67; transform: translateX(-50%); }
+
+@keyframes balance-character-idle {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-0.16rem) rotate(1deg); }
+}
 
 .balance-routine-editor__saved { display: flex; gap: 0.35rem; overflow-x: auto; padding: 0.2rem 0 0.45rem; }
 .balance-routine-editor__saved button { flex: 0 0 auto; }
@@ -429,6 +435,7 @@
   .balance-character__rig,
   .balance-character__arm,
   .balance-character__leg,
+  .balance-character-option__preview,
   .balance-cloud-cluster,
   .balance-cloud-bank,
   .balance-cloud-mound,
