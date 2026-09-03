@@ -1,10 +1,12 @@
 import { ChevronDown, Minus, Plus, Power } from 'lucide-react'
 import {
   useEffect,
+  useLayoutEffect,
   memo,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent,
   type WheelEvent,
 } from 'react'
@@ -18,6 +20,8 @@ import {
 } from '../../utils/tunerTransposition'
 
 const NOTE_COUNT = 12
+/** Width of one compact ribbon note, mirrored in the widget's CSS. */
+const COMPACT_NOTE_WIDTH = 40
 const MIN_OCTAVE = 0
 const MAX_OCTAVE = 8
 const SCROLL_IDLE_MS = 140
@@ -41,6 +45,12 @@ export interface DroneSoundWheelProps {
   hapticsEnabled?: boolean
   /** Changes written labels only; all callbacks continue to receive concert pitch. */
   tunerTransposition?: TunerTranspositionId
+  /**
+   * Ribbon only — no card chrome, power button or chord modes. The floating
+   * drone widget supplies its own transport, and reuses this so the scroll,
+   * the centre mark and the gliss behave exactly as they do in the Tuner tab.
+   */
+  compact?: boolean
 }
 
 interface RibbonPitch {
@@ -90,6 +100,7 @@ function DroneSoundWheel({
   onClose,
   hapticsEnabled = true,
   tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  compact = false,
 }: DroneSoundWheelProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const scrollFrameRef = useRef<number | null>(null)
@@ -100,6 +111,29 @@ function DroneSoundWheel({
     activeNotes[0] ?? null,
   )
   const [glissAbsolute, setGlissAbsolute] = useState<number | null>(null)
+  /*
+   * The full-width ribbon centres its notes with a 50vw rail padding. Inside
+   * the floating widget the viewport is a couple of hundred pixels wide, so
+   * the padding has to come from the viewport itself or the centre mark lands
+   * nowhere near the selected note.
+   */
+  const [railPad, setRailPad] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (!compact) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const measure = () => {
+      const width = viewport.clientWidth
+      if (width > 0) setRailPad(Math.max(0, width / 2 - COMPACT_NOTE_WIDTH / 2))
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [compact])
 
   const root = rootPitchClass ?? activeNotes[0] ?? 0
   const enabled = activeNotes.length > 0
@@ -138,8 +172,10 @@ function DroneSoundWheel({
     )
     if (!viewport || !target) return
     const nextLeft = target.offsetLeft - (viewport.clientWidth - target.offsetWidth) / 2
-    viewport.scrollTo({ left: nextLeft, behavior: 'smooth' })
-  }, [octave, root])
+    // The first pass runs before the rail is padded, which would leave the
+    // ribbon parked off-centre; jump without animation until it is measured.
+    viewport.scrollTo({ left: nextLeft, behavior: railPad === null ? 'auto' : 'smooth' })
+  }, [octave, railPad, root])
 
   useEffect(
     () => () => {
@@ -250,12 +286,8 @@ function DroneSoundWheel({
     return null
   }, [majorActive, minorActive])
 
-  return (
-    <section
-      className="harmonic-ribbon pointer-events-auto"
-      aria-label={`Drone controls. Pitches shown as written for ${transposition.label}`}
-    >
-      <div className="harmonic-ribbon__viewport-shell">
+  const ribbon = (
+    <div className="harmonic-ribbon__viewport-shell">
         <span className="harmonic-ribbon__center-mark" aria-hidden />
         <div
           ref={viewportRef}
@@ -268,7 +300,14 @@ function DroneSoundWheel({
           onPointerCancel={handlePointerEnd}
           onWheel={handleWheel}
         >
-          <div className="harmonic-ribbon__rail">
+          <div
+            className="harmonic-ribbon__rail"
+            style={
+              railPad === null
+                ? undefined
+                : ({ '--ribbon-rail-pad': `${railPad}px` } as CSSProperties)
+            }
+          >
             {RIBBON_PITCHES.map((pitch) => {
               const active = activeNotes.includes(pitch.pitchClass) && pitch.octave === octave
               const isRoot = pitch.pitchClass === root && pitch.octave === octave
@@ -304,7 +343,26 @@ function DroneSoundWheel({
             })}
           </div>
         </div>
-      </div>
+    </div>
+  )
+
+  if (compact) {
+    return (
+      <section
+        className="harmonic-ribbon harmonic-ribbon--compact pointer-events-auto"
+        aria-label={`Drone pitch. Shown as written for ${transposition.label}`}
+      >
+        {ribbon}
+      </section>
+    )
+  }
+
+  return (
+    <section
+      className="harmonic-ribbon pointer-events-auto"
+      aria-label={`Drone controls. Pitches shown as written for ${transposition.label}`}
+    >
+      {ribbon}
 
       <div className="harmonic-ribbon__controls">
         <button

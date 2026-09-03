@@ -29,6 +29,8 @@ import {
 interface DraggableMetronomeWidgetProps {
   boundaryRef: RefObject<HTMLElement | null>
   positionId?: string
+  /** First-run placement, so the widget never spawns on the take cards. */
+  defaultTopOffset?: number
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
   /** Keep the widget visible but prevent a second metronome clock while a native transport owns timing. */
@@ -78,6 +80,7 @@ function MetronomeControlButton({
 export default function DraggableMetronomeWidget({
   boundaryRef,
   positionId = 'main-metronome',
+  defaultTopOffset = 72,
   isTakePlaying = false,
   muteDuringPlayback = true,
   controlsLocked = false,
@@ -165,6 +168,7 @@ export default function DraggableMetronomeWidget({
           bounds.clientHeight,
           width,
           height,
+          defaultTopOffset,
         )
         dragX.set(x)
         dragY.set(y)
@@ -190,7 +194,7 @@ export default function DraggableMetronomeWidget({
     })
 
     return () => window.cancelAnimationFrame(retryFrame)
-  }, [boundaryRef, dragX, dragY, positionId])
+  }, [boundaryRef, defaultTopOffset, dragX, dragY, positionId])
 
   const persistPosition = useCallback(() => {
     saveWidgetPosition(positionId, dragX.get(), dragY.get())

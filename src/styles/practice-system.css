@@ -1402,7 +1402,7 @@ button.pitch-living-readout__note--catch:focus-visible {
   width: max-content;
   align-items: center;
   gap: 2px;
-  padding: 10px min(calc(50vw - 22px), 287px);
+  padding: 10px var(--ribbon-rail-pad, min(calc(50vw - 22px), 287px));
 }
 
 .harmonic-ribbon__note {

@@ -45,7 +45,7 @@ import {
   type DeskSnapshot,
   type WorkspaceDesk,
 } from './utils/workspaceDesks'
-import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from './utils/shareTakeVideo'
+import { shareTakeToSystem } from './utils/shareTakeVideo'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
@@ -310,8 +310,14 @@ interface MainAudioPitchSource {
 
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
-const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
-const DraggableDroneWidget = lazy(() => import('./components/DraggableDroneWidget'))
+/** Cover, swap, reveal — the two halves of the Camera ↔ Tools dissolve. */
+const SURFACE_COVER_MS = 170
+const SURFACE_REVEAL_HOLD_MS = 90
+
+const importMetronomeWidget = () => import('./components/DraggableMetronomeWidget')
+const importDroneWidget = () => import('./components/DraggableDroneWidget')
+const DraggableMetronomeWidget = lazy(importMetronomeWidget)
+const DraggableDroneWidget = lazy(importDroneWidget)
 
 /** Where the last sitting ended. Read once so day two opens on the take, not a menu. */
 const bootSurface = loadLastSurface()
@@ -556,8 +562,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   /** The live room, kept current so a focused take can remember the desk it was played on. */
   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
   const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
-  /** Cross-fade veil painted in the colour of the surface being entered. */
+  /** Dissolve veil painted in the colour of the surface being entered. */
   const [modeVeil, setModeVeil] = useState<RecordingMode | null>(null)
+  const modeVeilTimerRef = useRef<number | null>(null)
+  const modeTransitionRef = useRef(false)
   /** One breath of the record button after Current finishes playing back. */
   const [againPulse, setAgainPulse] = useState(false)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
@@ -2641,14 +2649,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     deferHudMediaPause()
   }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
 
-  const handleRecordingModeChange = useCallback(
+  const applyRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
         // Same sitting, different surface: the tool tab, the pitch overlay and
-        // Take Cards are left exactly as the player had them. A short veil in
-        // the incoming surface's colour turns the swap into a cross-fade.
-        setModeVeil(mode)
+        // Take Cards are left exactly as the player had them.
         // Refresh the cached visual viewport before the audio layout mounts.
         // Otherwise iOS can paint one frame with the camera surface's stale
         // height and clip the bottom deck before its later recovery pass.
@@ -2691,14 +2697,60 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       requestCameraPreviewResume,
     ]
   )
+
+  /**
+   * Camera ↔ Tools as one dissolve.
+   *
+   * The surfaces cannot cross-fade against each other — the camera session is
+   * torn down and the layout is rebuilt the moment the mode flips — so the
+   * swap happens *behind* a veil painted in the colour the destination starts
+   * as. Cover first, switch while nothing is visible, then reveal onto the
+   * ground the new surface already sits on. Doing the swap first, as an
+   * uncovered flip, is what read as a glitch.
+   */
+  const handleRecordingModeChange = useCallback(
+    (mode: RecordingMode) => {
+      if (mode === recordingModeRef.current) {
+        applyRecordingModeChange(mode)
+        return
+      }
+      if (modeTransitionRef.current) return
+      modeTransitionRef.current = true
+      setModeVeil(mode)
+
+      modeVeilTimerRef.current = window.setTimeout(() => {
+        modeVeilTimerRef.current = null
+        applyRecordingModeChange(mode)
+        // Let the incoming surface paint before the veil lifts, so the reveal
+        // lands on a finished screen rather than a half-built one.
+        scheduleAfterPaint(() => {
+          modeVeilTimerRef.current = window.setTimeout(() => {
+            modeVeilTimerRef.current = null
+            modeTransitionRef.current = false
+            setModeVeil(null)
+          }, SURFACE_REVEAL_HOLD_MS)
+        })
+      }, SURFACE_COVER_MS)
+    },
+    [applyRecordingModeChange],
+  )
   const handleRecordingModeChangeRef = useRef(handleRecordingModeChange)
   handleRecordingModeChangeRef.current = handleRecordingModeChange
 
-  useEffect(() => {
-    if (!modeVeil) return
-    const timer = window.setTimeout(() => setModeVeil(null), 460)
-    return () => window.clearTimeout(timer)
-  }, [modeVeil])
+  useEffect(
+    () => () => {
+      if (modeVeilTimerRef.current !== null) window.clearTimeout(modeVeilTimerRef.current)
+    },
+    [],
+  )
+
+  // Warm the floating-widget chunks once the app is idle. Toggling Drone or
+  // Metronome in Workspace should show the widget on the same frame, not after
+  // a network round trip.
+  useEffect(() => scheduleIdle(() => {
+    void importDroneWidget()
+    void importMetronomeWidget()
+  }, 1200), [])
 
   /* ---- The desk stays set ------------------------------------------------
    * Day two opens on the surface day one ended on. Camera is the hook's
@@ -2921,21 +2973,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [applyDeskSnapshot],
   )
 
-  /* ---- Share from the card ---------------------------------------------- */
+  /* ---- Share from the card ----------------------------------------------
+   * One verb for both kinds of take: the system sheet. It carries Messages,
+   * Files and AirDrop, and for a video it is also where "Save Video" lives —
+   * so Share never means a silent write to Photos the player did not ask for.
+   */
   const handleShareTake = useCallback((take: Take) => {
-    if (getTakeMediaType(take) === 'video') {
-      void shareTakeVideo(take).then((result) => {
-        const message = describeSaveTakeResult(result)
-        if (message && !result.ok) showAlertOutsideTree({ message, tone: 'error' })
-      })
-      return
-    }
     void shareTakeToSystem(take).then((result) => {
       if (result.ok) return
+      const isVideo = getTakeMediaType(take) === 'video'
       showAlertOutsideTree({
         message:
           result.reason === 'missing_file'
-            ? 'That take’s audio file is missing, so it can’t be shared.'
+            ? `That take’s ${isVideo ? 'video' : 'audio'} file is missing, so it can’t be shared.`
             : 'Sharing didn’t go through. Try again.',
         tone: 'error',
       })
@@ -3776,6 +3826,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const showFloatingDroneWidget = settings.showDrone && onRecordSurface
   const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended
+
+  /*
+   * First-run placement for the desk widgets. Camera keeps the take tiles
+   * pinned near the top and Tools has the tab strip there, so a widget that
+   * spawned at the default offset landed on top of both. These clear them;
+   * once dragged, the saved position wins.
+   */
+  const deskWidgetTopOffset = recordingMode === 'audio' ? 138 : 196
 
   // Full-screen hands-free presence layer. Uses the same resolver as the control
   // deck carousel so the stage and the record button can never disagree, and
@@ -5105,6 +5163,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         positionId={
                           recordingMode === 'audio' ? 'audio-metronome-widget' : 'main-metronome'
                         }
+                        defaultTopOffset={deskWidgetTopOffset}
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseMetronome}
@@ -5127,6 +5186,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         key={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
                         boundaryRef={appShellRef}
                         positionId={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
+                        defaultTopOffset={deskWidgetTopOffset + 158}
                         droneWaveform={settings.droneWaveform}
                         tunerTransposition={settings.tunerTransposition}
                         hapticFeedback={settings.hapticFeedback}
@@ -5169,9 +5229,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     key={`mode-veil-${modeVeil}`}
                     className={`mode-veil mode-veil--${modeVeil}`}
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 0.92, 0] }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.44, times: [0, 0.4, 1], ease: 'easeInOut' }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
+                    transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
                     aria-hidden
                   />
                 )}

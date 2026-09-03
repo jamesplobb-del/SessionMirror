@@ -57,6 +57,7 @@ let subscriberCount = 0
 let commandSequence = 0
 let restored = false
 let recoveryListenerAttached = false
+let pendingStopTimer: number | null = null
 
 function emit(): void {
   for (const listener of listeners) listener()
@@ -219,16 +220,29 @@ function restoreOnce(volume: number, waveform: DroneWaveform): void {
 
 function retain(): void {
   subscriberCount += 1
+  // A drone started in the Tuner tab has to survive the crossing to Camera:
+  // the tab unmounts a beat before the desk widget mounts, and stopping on
+  // that gap would cut the pitch the player is tuning to.
+  if (pendingStopTimer !== null) {
+    window.clearTimeout(pendingStopTimer)
+    pendingStopTimer = null
+  }
   attachRecoveryListener()
 }
 
 function release(): void {
   subscriberCount = Math.max(0, subscriberCount - 1)
   if (subscriberCount > 0 || !isDroneNativeAvailable()) return
-  // Last listener gone: nothing on screen can show the drone, so stop it.
-  void droneStop().then((state) => {
-    commit({ ...fromNative(state), activeNotes: [], enabled: false })
-  })
+  if (pendingStopTimer !== null) window.clearTimeout(pendingStopTimer)
+  // Nothing on screen can show the drone any more — stop it, unless another
+  // surface picks it up within the handoff window.
+  pendingStopTimer = window.setTimeout(() => {
+    pendingStopTimer = null
+    if (subscriberCount > 0) return
+    void droneStop().then((state) => {
+      commit({ ...fromNative(state), activeNotes: [], enabled: false })
+    })
+  }, 600)
 }
 
 export function useDrone({

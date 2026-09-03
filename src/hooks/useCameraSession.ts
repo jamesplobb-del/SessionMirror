@@ -2083,7 +2083,15 @@ export function useCameraSession({
     setIsRecording(false)
     setIsStopping(false)
     if (preRollMode === 'audio') {
-      recoverAfterNativeAudioRecording()
+      if (recordingModeRef.current === 'audio') {
+        recoverAfterNativeAudioRecording()
+      } else {
+        // The pre-roll was discarded because the player left Tools. Camera is
+        // acquiring its own session now — reopening a WebKit mic here would
+        // only fight it. Just drop the native-capture flag.
+        setNativeAudioCaptureActive(false)
+        requestPitchGraphReattach()
+      }
     }
   }, [recoverAfterNativeAudioRecording])
 
@@ -2788,6 +2796,26 @@ export function useCameraSession({
       setError(null)
       captureSessionEpochRef.current += 1
 
+      // Hands-free keeps a hidden pre-roll writing while it listens. That
+      // recorder belongs to the surface being left: a video pre-roll cannot
+      // outlive the camera bridge, and an audio pre-roll left running under a
+      // fresh camera session both fights it for the mic and makes the first
+      // detection on the new surface "promote" a recorder that no longer
+      // matches the mode. Discard it here, while the mode ref still names the
+      // engine that owns it, so the right native stop is issued. The new
+      // surface's monitor warms its own pre-roll once it settles.
+      let preRollDiscard: Promise<void> | null = null
+      if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
+        if (
+          isNativeVideoRecordingEnabled() &&
+          (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current)
+        ) {
+          preRollDiscard = discardNativeAutoPreRollCaptureRef.current()
+        } else {
+          cancelAutoPreRollCapture()
+        }
+      }
+
       const softAudioHandoff =
         mode === 'audio' && canSoftHandoffToAudio(streamRef.current)
 
@@ -2805,7 +2833,18 @@ export function useCameraSession({
       recordingModeRef.current = mode
 
       if (mode === 'audio') {
-        void stopNativeVideoBridge()
+        if (preRollDiscard) {
+          // Publish the "preview gone" state now so the surface swap is not
+          // held up, but let the pre-roll's movie file finish stopping before
+          // the capture session underneath it is torn down.
+          nativePreviewStartTokenRef.current += 1
+          setNativeLivePreviewActive(false)
+          setNativeLivePreviewSeedUrl(null)
+          nativePreviewActiveRef.current = false
+          void preRollDiscard.catch(() => {}).then(() => stopNativeVideoBridge())
+        } else {
+          void stopNativeVideoBridge()
+        }
       }
 
       if (!softAudioHandoff) {
@@ -2814,7 +2853,15 @@ export function useCameraSession({
       setStreamGeneration((generation) => generation + 1)
       setRecordingMode(mode)
     },
-    [cancelScheduledRelease, detachAllPreviewTargets, isRecording, stopNativeVideoBridge, stopStreamTracks],
+    [
+      cancelAutoPreRollCapture,
+      cancelScheduledRelease,
+      detachAllPreviewTargets,
+      isNativeVideoRecordingEnabled,
+      isRecording,
+      stopNativeVideoBridge,
+      stopStreamTracks,
+    ],
   )
 
   const suspendCameraForBackground = useCallback(() => {

@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { Settings2 } from 'lucide-react'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
 /**
@@ -83,6 +84,9 @@ function HandsFreeStage({
             {formatElapsed(elapsed)}
           </span>
         )}
+        {/* The centre treatment has room for the words; the compact pill on the
+          * dense Tools tabs takes a glyph instead, so the status copy is never
+          * squeezed on a narrow phone. Both open the same card. */}
         {settingsTappable && (
           <button
             type="button"
@@ -90,7 +94,11 @@ function HandsFreeStage({
             onClick={onTapForSettings}
             aria-label="Hands-free settings: quiet gap and start level"
           >
-            Tap for settings
+            {placement === 'chip' ? (
+              <Settings2 aria-hidden />
+            ) : (
+              'Tap for settings'
+            )}
           </button>
         )}
       </div>

@@ -21,6 +21,14 @@ const MONITOR_WARMUP_MS = 280
 // settling time to establish a quiet baseline without making normal speech feel
 // ignored when hands-free mode is first enabled.
 const NATIVE_MONITOR_WARMUP_MS = 180
+// Arming: a fresh monitor must see a few genuinely quiet frames before its
+// first trigger. AVAudioSession activation and the WebKit mic ramp both land
+// as a burst right at the start of the stream, and that burst used to read as
+// an attack the instant hands-free came on. The wait is bounded so a player
+// who is already mid-phrase still gets started — the hidden pre-roll has been
+// writing the whole time, so nothing is lost by arming a beat later.
+const ARM_QUIET_FRAMES = 3
+const ARM_DEADLINE_MS = 600
 const POST_PLAYBACK_WARMUP_MS = 0
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
@@ -561,12 +569,21 @@ export function useAutoSoundRecording({
       setMonitorReady(false)
       let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
       const setupStartedAt = performance.now()
+      // When levels actually began flowing. Native frames only start once
+      // AVCapture has finished (re)configuring the session, which can be well
+      // after we subscribe — so the warm-up and arming clocks start on the
+      // first real frame, not on the subscription.
+      let firstFrameAt: number | null = null
+      let quietFramesSeen = 0
       // Keep an already-triggered take running across a monitor restart. A
       // hidden native pre-roll is different: it must still settle on a quiet
       // baseline, otherwise the capture-session startup samples can be read as
       // an immediate performance attack.
       const performanceAlreadyTriggered =
         autoTriggeredRef.current || startLatchRef.current || isRecordingRef.current
+      // A take already in flight needs no quiet baseline — it is the silence
+      // stop we are watching for now, not a start.
+      let armed = performanceAlreadyTriggered
       if (performanceAlreadyTriggered && isNativePath) {
         monitorWarmUntilRef.current = setupStartedAt
         calibrated = true
@@ -592,6 +609,7 @@ export function useAutoSoundRecording({
 
         lastTickAtRef.current = performance.now()
         if (!performanceAlreadyTriggered) {
+          // Provisional; re-anchored to the first fresh frame inside tick().
           monitorWarmUntilRef.current = performance.now() + NATIVE_MONITOR_WARMUP_MS
         }
         if (!preserveActiveCapture) {
@@ -624,7 +642,8 @@ export function useAutoSoundRecording({
         sampleBufferRef.current = new Float32Array(analyser.fftSize)
         lastTickAtRef.current = performance.now()
 
-        monitorWarmUntilRef.current = performance.now() + MONITOR_WARMUP_MS
+        firstFrameAt = performance.now()
+        monitorWarmUntilRef.current = firstFrameAt + MONITOR_WARMUP_MS
         void warmRecorderRef.current()
       }
 
@@ -720,12 +739,20 @@ export function useAutoSoundRecording({
           return
         }
 
+        if (isNativePath && firstFrameAt === null) {
+          firstFrameAt = now
+          if (!performanceAlreadyTriggered) {
+            monitorWarmUntilRef.current = now + NATIVE_MONITOR_WARMUP_MS
+          }
+        }
+
         if (now < monitorWarmUntilRef.current) {
           // Capture only genuinely quiet startup samples. If the user begins
           // playing immediately, those notes must not become the noise floor
           // and raise the gate above the performance.
           if (metrics.rms < profile.gate * 0.9) {
             calibrationSamples.push(metrics.rms)
+            quietFramesSeen += 1
           }
           loudSinceRef.current = null
           attackSinceRef.current = null
@@ -741,9 +768,26 @@ export function useAutoSoundRecording({
           void warmRecorderRef.current()
         }
 
-        // The short warmup above is enough to reject route-start transients.
-        // Requiring a separate quiet pause here made performances that began
-        // during activation or immediately after playback impossible to start.
+        // Arm on a short quiet baseline, or on the deadline — whichever comes
+        // first. The baseline rejects the session-activation burst that
+        // arrives with the first frames; the deadline keeps a performer who
+        // is already playing from waiting on a pause that never comes.
+        if (!armed) {
+          if (metrics.rms < effectiveGateRef.current * 0.9) {
+            quietFramesSeen += 1
+          }
+          const armClockStartedAt = firstFrameAt ?? setupStartedAt
+          if (
+            quietFramesSeen < ARM_QUIET_FRAMES &&
+            now - armClockStartedAt < ARM_DEADLINE_MS
+          ) {
+            loudSinceRef.current = null
+            attackSinceRef.current = null
+            return
+          }
+          armed = true
+        }
+
         setMonitorReady(true)
 
         if (!isRecordingRef.current) {

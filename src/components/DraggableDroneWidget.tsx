@@ -1,17 +1,16 @@
-import { AnimatePresence, motion, useDragControls, useMotionValue } from 'framer-motion'
+import { motion, useDragControls, useMotionValue } from 'framer-motion'
 import { Minus, Plus, Square, Play } from 'lucide-react'
 import {
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
-  useState,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
+import DroneSoundWheel from './audioPractice/DroneSoundWheel'
 import { useDrone } from '../hooks/useDrone'
-import { useLongPress } from '../hooks/useLongPress'
-import { DRONE_NOTE_STRIP, type DroneWaveform } from '../utils/droneEngine'
+import { type DroneWaveform } from '../utils/droneEngine'
 import {
   clampWidgetPosition,
   getFloatingWidgetTopCenter,
@@ -25,6 +24,8 @@ import { getWrittenPitchLabel, type TunerTranspositionId } from '../utils/tunerT
 interface DraggableDroneWidgetProps {
   boundaryRef: RefObject<HTMLElement | null>
   positionId?: string
+  /** First-run placement, so the widget never spawns on the take cards. */
+  defaultTopOffset?: number
   droneWaveform: DroneWaveform
   tunerTransposition: TunerTranspositionId
   hapticFeedback?: boolean
@@ -34,20 +35,24 @@ interface DraggableDroneWidgetProps {
   onClose?: () => void
 }
 
-const WIDGET_WIDTH = 236
-const COLLAPSED_HEIGHT = 96
+const WIDGET_WIDTH = 268
+const WIDGET_HEIGHT = 150
 /** A (concert) — the note every tuning starts from. */
 const FALLBACK_PITCH_CLASS = 9
 
 /**
  * The metronome widget's sibling: a held pitch that lives on the desk, on
- * Camera and on Audio Record, instead of only inside the Tuner tab. Written
- * note, octave, play/stop. Tap or long-press the note to unfold a one-octave
- * keyboard; the Tuner tab keeps the gauge and the full keyboard.
+ * Camera and on Audio Record, instead of only inside the Tuner tab.
+ *
+ * The note picker is the Tuner tab's own scrolling ribbon, not a second way of
+ * choosing a pitch — scroll it and the drone glides with you. Play/stop and
+ * the octave steppers sit above it; the Tuner tab keeps the gauge, the chord
+ * modes and the full-width ribbon.
  */
 export default function DraggableDroneWidget({
   boundaryRef,
   positionId = 'main-drone',
+  defaultTopOffset = 220,
   droneWaveform,
   tunerTransposition,
   hapticFeedback = true,
@@ -61,7 +66,6 @@ export default function DraggableDroneWidget({
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
   const resumePitchClassRef = useRef<number | null>(null)
-  const [keyboardOpen, setKeyboardOpen] = useState(false)
 
   const drone = useDrone({ volume: 1, waveform: droneWaveform, hapticFeedback })
   const sounding = drone.enabled && drone.activeNotes.length > 0
@@ -79,17 +83,17 @@ export default function DraggableDroneWidget({
         dragX.set(saved.x)
         dragY.set(saved.y)
       } else {
-        const width = widgetRef.current?.offsetWidth ?? WIDGET_WIDTH
-        const height = widgetRef.current?.offsetHeight ?? COLLAPSED_HEIGHT
+        // Sits below where the metronome lands, so the two read as a pair
+        // rather than stacking on the same spot.
         const { x, y } = getFloatingWidgetTopCenter(
           bounds.clientWidth,
           bounds.clientHeight,
-          width,
-          height,
+          WIDGET_WIDTH,
+          WIDGET_HEIGHT,
+          defaultTopOffset,
         )
-        // Sit just under where the metronome lands so the two read as a pair.
         dragX.set(x)
-        dragY.set(y + 148)
+        dragY.set(y)
       }
       positionReadyRef.current = true
       return true
@@ -108,7 +112,7 @@ export default function DraggableDroneWidget({
       if (!positionReadyRef.current) applyPosition()
     })
     return () => window.cancelAnimationFrame(retryFrame)
-  }, [boundaryRef, dragX, dragY, positionId])
+  }, [boundaryRef, defaultTopOffset, dragX, dragY, positionId])
 
   const persistPosition = useCallback(() => {
     saveWidgetPosition(positionId, dragX.get(), dragY.get())
@@ -136,12 +140,6 @@ export default function DraggableDroneWidget({
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [reclampPosition])
-
-  // Opening the keyboard makes the widget taller; keep it on screen.
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(reclampPosition)
-    return () => window.cancelAnimationFrame(frame)
-  }, [keyboardOpen, reclampPosition])
 
   // Same rule as the metronome: quiet while a take plays, back when it ends.
   useEffect(() => {
@@ -181,20 +179,6 @@ export default function DraggableDroneWidget({
     drone.soloNote(heldPitchClass)
   }, [drone, hapticFeedback, heldPitchClass, sounding])
 
-  const chooseNote = useCallback(
-    (pitchClass: number) => {
-      triggerLightHaptic(hapticFeedback)
-      drone.soloNote(pitchClass)
-    },
-    [drone, hapticFeedback],
-  )
-
-  const noteLongPress = useLongPress({
-    onClick: () => setKeyboardOpen((open) => !open),
-    onLongPress: () => setKeyboardOpen(true),
-    hapticFeedback,
-  })
-
   return (
     <motion.div
       ref={widgetRef}
@@ -209,9 +193,9 @@ export default function DraggableDroneWidget({
       className={`drone-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${
         sounding ? 'drone-widget-draggable--sounding' : ''
       }`}
-      initial={{ opacity: 0, scale: 0.94 }}
+      initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.94 }}
+      exit={{ opacity: 0, scale: 0.96 }}
       transition={iosDragRelease}
       style={{ x: dragX, y: dragY, touchAction: 'none', width: WIDGET_WIDTH }}
     >
@@ -219,40 +203,47 @@ export default function DraggableDroneWidget({
         className="ui-orient-spin drone-widget relative w-full rounded-3xl"
         aria-label={`Drone ${written.noteName}${sounding ? ', sounding' : ', silent'}. Drag to move.`}
       >
-        <div
-          className="drone-widget__drag-handle"
-          aria-label="Drag drone"
-          onPointerDown={(event) => {
-            event.stopPropagation()
-            dragControls.start(event)
-          }}
-        />
         <div className={`drone-widget__glow ${sounding ? 'drone-widget__glow--on' : ''}`} aria-hidden />
 
-        {onClose && (
-          <button
-            type="button"
-            data-no-drag
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
+        <div className="drone-widget__chrome">
+          <span
+            className="drone-widget__drag-handle"
+            aria-label="Drag drone"
+            onPointerDown={(event) => {
               event.stopPropagation()
-              drone.silence()
-              onClose()
+              dragControls.start(event)
             }}
-            className="pitch-widget-close pointer-events-auto absolute right-3 top-3 z-30 flex h-[26px] w-[26px] items-center justify-center rounded-full transition hover:bg-white/20 active:scale-95"
-            aria-label="Close drone"
-          >
-            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden className="text-white/90">
-              <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
-        )}
+          />
+          {onClose && (
+            <button
+              type="button"
+              data-no-drag
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                drone.silence()
+                onClose()
+              }}
+              className="drone-widget__close pitch-widget-close"
+              aria-label="Close drone"
+            >
+              <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
+                <path
+                  d="M2.5 2.5l7 7M9.5 2.5l-7 7"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
 
         <div className="drone-widget__row pointer-events-auto">
           <button
             type="button"
             className={`drone-widget__play interactive-native ${sounding ? 'drone-widget__play--on' : ''}`}
-            aria-label={sounding ? 'Stop drone' : 'Start drone'}
+            aria-label={sounding ? 'Stop drone' : `Start ${written.noteName} drone`}
             aria-pressed={sounding}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={toggleSound}
@@ -264,18 +255,11 @@ export default function DraggableDroneWidget({
             )}
           </button>
 
-          <button
-            type="button"
-            className="drone-widget__note"
-            aria-label={`Drone note ${written.noteName}. Tap to choose a note.`}
-            aria-expanded={keyboardOpen}
-            onContextMenu={(event) => event.preventDefault()}
-            {...noteLongPress}
-          >
+          <div className="drone-widget__readout">
             <span className="drone-widget__note-name">{written.label}</span>
             <span className="drone-widget__note-octave">{written.octave}</span>
             <span className="drone-widget__note-caption">Drone</span>
-          </button>
+          </div>
 
           <div className="drone-widget__octave" role="group" aria-label="Octave">
             <button
@@ -301,45 +285,20 @@ export default function DraggableDroneWidget({
           </div>
         </div>
 
-        <AnimatePresence initial={false}>
-          {keyboardOpen && (
-            <motion.div
-              key="keys"
-              className="drone-widget__keys pointer-events-auto"
-              role="listbox"
-              aria-label="Drone note"
-              data-no-drag
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-            >
-              <div className="drone-widget__keys-row">
-                {DRONE_NOTE_STRIP.map(({ pitchClass }) => {
-                  const key = getWrittenPitchLabel(pitchClass, drone.octave, tunerTransposition)
-                  const accidental = key.label.length > 1
-                  const active = sounding && drone.activeNotes.includes(pitchClass)
-                  return (
-                    <button
-                      key={pitchClass}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      aria-label={key.noteName}
-                      className={`drone-widget__key ${accidental ? 'drone-widget__key--accidental' : ''} ${
-                        active ? 'drone-widget__key--active' : ''
-                      }`}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={() => chooseNote(pitchClass)}
-                    >
-                      {key.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="drone-widget__ribbon" data-no-drag>
+          <DroneSoundWheel
+            compact
+            activeNotes={drone.activeNotes}
+            octave={drone.octave}
+            onToggleNote={drone.toggleNote}
+            onGlissNote={drone.glissNote}
+            onSetNotes={drone.setNotes}
+            onIncrementOctave={drone.incrementOctave}
+            onDecrementOctave={drone.decrementOctave}
+            hapticsEnabled={hapticFeedback}
+            tunerTransposition={tunerTransposition}
+          />
+        </div>
       </div>
     </motion.div>
   )

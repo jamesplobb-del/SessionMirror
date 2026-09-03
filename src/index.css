@@ -8981,8 +8981,16 @@ html.app-dark-mode
 
 /* ---- Drone widget: the metronome widget's sibling ---------------------- */
 .drone-widget-draggable {
+  /* Camera: the metronome widget's glass, so the two read as one family over
+   * a live preview. Tools swaps these for the light card below. */
+  --drone-surface: rgba(0, 0, 0, 0.2);
+  --drone-fade: rgba(10, 14, 20, 0.78);
+  --drone-ink: rgba(255, 255, 255, 0.95);
+  --drone-ink-dim: rgba(255, 255, 255, 0.55);
+  --drone-line: rgba(255, 255, 255, 0.1);
+  --drone-tile: rgba(255, 255, 255, 0.07);
   cursor: grab;
-  max-width: min(calc(100vw - 1.5rem), 16rem);
+  max-width: min(calc(100vw - 1.5rem), 18rem);
   filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.18));
   border-radius: 1.5rem;
 }
@@ -8991,32 +8999,81 @@ html.app-dark-mode
   cursor: grabbing;
 }
 
+/* Audio mode paints a light surface; the widget goes white like the pitch card. */
+.app-shell--audio-mode .drone-widget-draggable {
+  --drone-surface: var(--audio-surface, #ffffff);
+  --drone-fade: var(--audio-surface, #ffffff);
+  --drone-ink: var(--audio-text-primary, #171a22);
+  --drone-ink-dim: var(--audio-text-secondary, #6c7077);
+  --drone-line: rgba(23, 26, 34, 0.1);
+  --drone-tile: rgba(23, 26, 34, 0.05);
+  filter: drop-shadow(0 12px 30px rgba(23, 26, 34, 0.16));
+}
+
+/* Glass needs the blur; the light card does not. */
+.app-shell--audio-mode .drone-widget {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .drone-widget {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.875rem 0.75rem 0.6rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem 0.55rem;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.95);
+  background: var(--drone-surface);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  border: 0.5px solid var(--drone-line);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--drone-ink);
+}
+
+/* A band of its own for the handle and the close button, so neither can ever
+ * land on the octave steppers. */
+.drone-widget__chrome {
+  position: relative;
+  height: 1.5rem;
+  flex: 0 0 auto;
 }
 
 .drone-widget__drag-handle {
   position: absolute;
-  top: 0;
+  top: 0.28rem;
   left: 50%;
-  z-index: 2;
+  display: block;
   width: 2.75rem;
-  height: 0.625rem;
+  height: 0.3rem;
   transform: translateX(-50%);
   border-radius: 999px;
   cursor: grab;
   touch-action: none;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--drone-ink-dim);
+  opacity: 0.5;
+}
+
+.drone-widget__drag-handle:active {
+  cursor: grabbing;
+}
+
+.drone-widget__close {
+  position: absolute;
+  top: -0.05rem;
+  right: -0.2rem;
+  display: flex;
+  width: 1.65rem;
+  height: 1.65rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--drone-ink-dim);
+}
+
+.drone-widget__close:active {
+  transform: scale(0.94);
 }
 
 /* Blue is "selected / sounding" in this app; amber stays the downbeat. */
@@ -9026,7 +9083,7 @@ html.app-dark-mode
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 14% 55%, rgba(56, 189, 248, 0.22), transparent 60%);
+  background: radial-gradient(circle at 16% 40%, rgba(56, 189, 248, 0.24), transparent 62%);
   transition: opacity 260ms ease;
 }
 
@@ -9038,11 +9095,17 @@ html.app-dark-mode
 @keyframes drone-widget-breathe {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
 
   50% {
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drone-widget__glow--on {
+    animation: none;
   }
 }
 
@@ -9051,176 +9114,159 @@ html.app-dark-mode
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
 .drone-widget__play {
   display: inline-flex;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.15rem;
+  height: 2.15rem;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  border: 0.5px solid var(--drone-line);
+  background: var(--drone-tile);
+  color: var(--drone-ink);
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
 }
 
 .drone-widget__play--on {
-  background: rgba(56, 189, 248, 0.26);
-  border-color: rgba(125, 211, 252, 0.48);
-  color: rgb(224, 242, 254);
+  background: var(--sm-blue, #27a9f4);
+  border-color: transparent;
+  color: #fff;
 }
 
-.drone-widget__note {
+.drone-widget__readout {
   display: flex;
   flex: 1;
   min-width: 0;
   align-items: baseline;
   justify-content: center;
-  gap: 0.2rem;
-  padding: 0.1rem 0.35rem;
-  border: 0;
-  border-radius: 0.75rem;
-  background: transparent;
-  color: inherit;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.drone-widget__note:active {
-  background: rgba(255, 255, 255, 0.06);
+  gap: 0.18rem;
 }
 
 .drone-widget__note-name {
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .drone-widget__note-octave {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  opacity: 0.72;
+  color: var(--drone-ink-dim);
   font-variant-numeric: tabular-nums;
 }
 
 .drone-widget__note-caption {
   margin-left: 0.3rem;
-  font-size: 0.62rem;
+  color: var(--drone-ink-dim);
+  font-size: 0.58rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.55;
 }
 
 .drone-widget__octave {
   display: flex;
   flex-shrink: 0;
-  gap: 0.3rem;
+  gap: 0.28rem;
 }
 
 .drone-widget__btn {
   display: inline-flex;
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 1.8rem;
+  height: 1.8rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid var(--drone-line);
+  background: var(--drone-tile);
+  color: var(--drone-ink);
 }
 
 .drone-widget__btn:disabled {
   opacity: 0.35;
 }
 
-.drone-widget__keys {
+/* The Tuner tab's ribbon, dropped straight in: same scroll, same centre mark. */
+.drone-widget__ribbon {
   position: relative;
   z-index: 1;
-  overflow: hidden;
 }
 
-.drone-widget__keys-row {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 0.14rem;
-  padding-top: 0.15rem;
-}
-
-.drone-widget__key {
-  height: 2.1rem;
-  min-width: 0;
+.harmonic-ribbon.harmonic-ribbon--compact {
+  width: 100%;
+  margin: 0;
   padding: 0;
-  border: 0.5px solid rgba(255, 255, 255, 0.12);
-  border-radius: 0.35rem;
-  background: rgba(255, 255, 255, 0.86);
-  color: #1c2230;
-  font-size: 0.58rem;
-  font-weight: 600;
-  line-height: 1;
-  transition: background 0.14s ease, color 0.14s ease, transform 0.1s ease;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.drone-widget__key--accidental {
-  background: rgba(20, 24, 32, 0.92);
-  color: rgba(255, 255, 255, 0.9);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__viewport-shell {
+  border-radius: 0.75rem;
+  background: var(--drone-tile);
 }
 
-.drone-widget__key--active {
-  background: var(--sm-blue, #27a9f4);
-  color: #fff;
-  border-color: transparent;
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__viewport-shell::before,
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__viewport-shell::after {
+  width: 1.5rem;
 }
 
-.drone-widget__key:active {
-  transform: scale(0.94);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__viewport-shell::before {
+  background: linear-gradient(90deg, var(--drone-fade), transparent);
 }
 
-/* Audio mode paints a light surface; widgets go white like the pitch card. */
-.app-ui-overlay--audio-mode ~ .drone-display-layer .drone-widget,
-.app-shell--audio-mode .drone-widget {
-  background: var(--audio-surface, #ffffff);
-  color: var(--audio-text-primary, #171a22);
-  border-color: rgba(23, 26, 34, 0.1);
-  box-shadow: 0 12px 32px rgba(23, 26, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__viewport-shell::after {
+  background: linear-gradient(270deg, var(--drone-fade), transparent);
 }
 
-.app-shell--audio-mode .drone-widget__drag-handle {
-  background: rgba(23, 26, 34, 0.18);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__center-mark::before,
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__center-mark::after {
+  width: 9px;
+  height: 2.5px;
 }
 
-.app-shell--audio-mode .drone-widget__play,
-.app-shell--audio-mode .drone-widget__btn {
-  border-color: rgba(23, 26, 34, 0.1);
-  background: rgba(23, 26, 34, 0.05);
-  color: var(--audio-text-primary, #171a22);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__rail {
+  gap: 0;
+  padding-block: 0.34rem;
 }
 
-.app-shell--audio-mode .drone-widget__play--on {
-  background: var(--sm-blue, #27a9f4);
-  border-color: transparent;
-  color: #fff;
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note {
+  width: 40px;
+  height: 2.35rem;
+  flex: 0 0 40px;
+  color: var(--drone-ink-dim);
 }
 
-.app-shell--audio-mode .drone-widget__key {
-  border-color: rgba(23, 26, 34, 0.12);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note span {
+  font-size: 0.85rem;
 }
 
-.app-shell--audio-mode .drone-widget .pitch-widget-close {
-  border: 1px solid rgba(23, 26, 34, 0.1);
-  background: var(--audio-surface, #ffffff);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note small {
+  margin-top: 1px;
+  font-size: 0.5rem;
 }
 
-.app-shell--audio-mode .drone-widget .pitch-widget-close svg {
-  color: var(--audio-text-secondary, #6c7077);
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note--active:not(.harmonic-ribbon__note--root) {
+  color: var(--sm-blue, #27a9f4);
+}
+
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note--root,
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note--gliss {
+  color: var(--drone-ink);
+}
+
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note--root span,
+.harmonic-ribbon.harmonic-ribbon--compact .harmonic-ribbon__note--gliss span {
+  font-size: 1rem;
 }
 
 .drone-display-layer {
@@ -9237,8 +9283,8 @@ html.app-dark-mode
 
 .drone-display-layer .drone-widget-draggable,
 .drone-display-layer .pointer-events-auto,
-.drone-display-layer .pitch-widget-close,
-.drone-display-layer button {
+.drone-display-layer button,
+.drone-display-layer .harmonic-ribbon__viewport {
   pointer-events: auto !important;
 }
 
@@ -9258,7 +9304,9 @@ html.app-dark-mode
 }
 
 .settings-branch-tray__desk {
-  padding: 0.38rem 0.72rem;
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
   border: 0.75px solid var(--tray-tile-border);
   border-radius: 999px;
   background: var(--tray-tile);
@@ -9268,8 +9316,42 @@ html.app-dark-mode
   line-height: 1;
   -webkit-user-select: none;
   user-select: none;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.settings-branch-tray__desk-name {
+  padding: 0.42rem 0.28rem 0.42rem 0.72rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   touch-action: manipulation;
-  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.settings-branch-tray__desk-forget {
+  display: grid;
+  width: 1.55rem;
+  padding: 0 0.42rem 0 0.1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  place-items: center;
+  touch-action: manipulation;
+}
+
+.settings-branch-tray__desk-forget:active {
+  opacity: 1;
+  transform: scale(0.9);
+}
+
+.settings-branch-tray__desk-forget svg {
+  width: 0.72rem;
+  height: 0.72rem;
+  stroke-width: 2.4;
 }
 
 /* The active desk is amber: it is the live position, the downbeat of the room. */
@@ -9388,12 +9470,27 @@ html.app-dark-mode
 }
 
 .hands-free-stage--chip .hands-free-stage__settings {
-  margin: 0 0 0 0.25rem;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.68rem;
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0 -0.25rem 0 0.15rem;
+  padding: 0;
+  align-self: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 1;
+  place-items: center;
   text-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+.hands-free-stage--chip .hands-free-stage__settings svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  stroke-width: 2.1;
 }
 
 .hands-free-card-layer {
@@ -9717,4 +9814,64 @@ html.app-dark-mode .hands-free-card__stepper {
 .compact-take-slot:has(.compact-take-card__share) .compact-take-caption__label {
   box-sizing: border-box;
   padding-right: 2.6rem;
+}
+
+
+/* ---- Desk widgets read as a pair on the light Tools surface ------------- */
+.app-shell--audio-mode .metronome-widget {
+  background: var(--audio-surface, #ffffff);
+  border-color: rgba(23, 26, 34, 0.1);
+  color: var(--audio-text-primary, #171a22);
+  box-shadow:
+    0 12px 30px rgba(23, 26, 34, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.app-shell--audio-mode .metronome-widget-draggable {
+  filter: drop-shadow(0 12px 30px rgba(23, 26, 34, 0.16));
+}
+
+.app-shell--audio-mode .metronome-widget__drag-handle {
+  background: rgba(23, 26, 34, 0.18);
+}
+
+.app-shell--audio-mode .metronome-widget__accent {
+  background: radial-gradient(circle at 18% 50%, rgba(23, 26, 34, 0.09), transparent 58%);
+}
+
+.app-shell--audio-mode .metronome-widget__btn {
+  border-color: rgba(23, 26, 34, 0.1);
+  background: rgba(23, 26, 34, 0.05);
+  color: var(--audio-text-primary, #171a22);
+}
+
+.app-shell--audio-mode .metronome-widget__btn--active {
+  border-color: transparent;
+  background: var(--sm-blue, #27a9f4);
+  color: #fff;
+}
+
+.app-shell--audio-mode .metronome-widget__bpm,
+.app-shell--audio-mode .metronome-widget__bpm-input {
+  color: var(--audio-text-primary, #171a22);
+}
+
+.app-shell--audio-mode .metronome-widget__bpm-label,
+.app-shell--audio-mode .metronome-widget__sync-lock {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.app-shell--audio-mode .metronome-widget__meter-divider {
+  background: rgba(23, 26, 34, 0.12);
+}
+
+.app-shell--audio-mode .metronome-widget .pitch-widget-close {
+  border: 1px solid rgba(23, 26, 34, 0.1);
+  background: var(--audio-surface, #ffffff);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.app-shell--audio-mode .metronome-widget .pitch-widget-close svg {
+  color: var(--audio-text-secondary, #6c7077);
 }

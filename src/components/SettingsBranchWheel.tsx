@@ -7,6 +7,7 @@ import {
   MicVocal,
   Radio,
   Sparkles,
+  X,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -16,7 +17,6 @@ import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
 import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
 import { triggerLightHaptic } from '../utils/haptics'
-import { useLongPress } from '../hooks/useLongPress'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { MAX_WORKSPACE_DESKS, type WorkspaceDesk } from '../utils/workspaceDesks'
 
@@ -83,42 +83,43 @@ interface BranchItem {
 const BRANCH_MOTION = nativeGlideEase
 
 /**
- * One saved desk. Tap applies the whole room; long-press forgets it. The lit
- * chip means the live desk still matches what was saved — drifting from it
+ * One saved desk. Tapping the name sets the whole room; the × forgets it. The
+ * lit chip means the live desk still matches what was saved — drifting from it
  * (changing the bpm, say) dims the chip rather than nagging.
  */
 function DeskChip({
   desk,
   active,
-  hapticFeedback,
   onApply,
   onDelete,
 }: {
   desk: WorkspaceDesk
   active: boolean
-  hapticFeedback: boolean
   onApply: () => void
   onDelete: () => void
 }) {
-  const handlers = useLongPress({
-    onClick: onApply,
-    onLongPress: onDelete,
-    hapticFeedback,
-    strongHapticFeedback: true,
-  })
   return (
-    <button
-      type="button"
-      className={`settings-branch-tray__desk ${NATIVE_SQUISH} ${
-        active ? 'settings-branch-tray__desk--active' : ''
-      }`}
-      aria-pressed={active}
-      aria-label={`${desk.name} desk${active ? ', active' : ''}. Long press to forget.`}
-      onContextMenu={(event) => event.preventDefault()}
-      {...handlers}
+    <span
+      className={`settings-branch-tray__desk ${active ? 'settings-branch-tray__desk--active' : ''}`}
     >
-      {desk.name}
-    </button>
+      <button
+        type="button"
+        className={`settings-branch-tray__desk-name ${NATIVE_SQUISH}`}
+        aria-pressed={active}
+        aria-label={`Set up the ${desk.name} desk${active ? '. Already set up' : ''}`}
+        onClick={onApply}
+      >
+        {desk.name}
+      </button>
+      <button
+        type="button"
+        className="settings-branch-tray__desk-forget"
+        aria-label={`Forget the ${desk.name} desk`}
+        onClick={onDelete}
+      >
+        <X aria-hidden />
+      </button>
+    </span>
   )
 }
 
@@ -459,7 +460,6 @@ export default function SettingsBranchWheel({
                       key={desk.id}
                       desk={desk}
                       active={desk.id === activeDeskId}
-                      hapticFeedback={hapticFeedback}
                       onApply={() => onApplyDesk?.(desk.id)}
                       onDelete={() => confirmDeleteDesk(desk)}
                     />
