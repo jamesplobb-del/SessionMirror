@@ -125,7 +125,11 @@ const MINOR_PATTERN = [0, 2, 3, 5, 7, 8, 10] as const
 
 export type StaffJumperPhase = 'setup' | 'playing' | 'paused' | 'gameover'
 
-export type StaffJumperFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | null
+/**
+ * `missed-beat` is rhythm mode's timeout: the click passed the last moment
+ * the written note could still have been attacked, and nothing was heard.
+ */
+export type StaffJumperFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | 'missed-beat' | null
 
 export interface StaffJumperConfig {
   key: StaffJumperKey
@@ -177,6 +181,20 @@ export interface StaffJumperState {
   timing: StaffJumperTiming
   timingErrorMs: number
   onTimeCount: number
+  /** Landings judged early or late — only rhythm mode fills these in. */
+  earlyCount: number
+  lateCount: number
+  /**
+   * Rhythm mode: what the spacing of the last landing read as, when it was
+   * not the written value — "a dotted quarter" for a quarter played long.
+   * Null when the rhythm was read right or the run is not in rhythm mode.
+   */
+  playedRhythmLabel: string | null
+  /**
+   * Rhythm mode: whether the note just left was held for its written length.
+   * Set as the run moves on from a note of a beat or more; null otherwise.
+   */
+  holdQuality: 'full' | 'short' | null
   /** True while the count-in is still running and pitch is ignored. */
   isCountingIn: boolean
   /**
@@ -770,6 +788,30 @@ export function getRhythmForStep(config: StaffJumperConfig, sequenceStep: number
     config.sessionSeed ?? 1,
     sequenceStep,
   )
+}
+
+/**
+ * Rhythm mode is the metronome.
+ *
+ * With the click sounding, the run follows the click: every note is judged
+ * against the beat it is written on and held for its written length. Without
+ * it the run is paced by the player and timing is only a bonus.
+ */
+export function isRhythmMode(config: Pick<StaffJumperConfig, 'metronome'>): boolean {
+  return config.metronome
+}
+
+/**
+ * The first slot of the bar a step sits in.
+ *
+ * Rhythm mode resumes from the top of the bar rather than mid-bar: the click's
+ * count-in then leads straight into a downbeat, which is how a musician
+ * restarts, and the bar's accents line up with the click's.
+ */
+export function measureStartStep(config: StaffJumperConfig, sequenceStep: number): number {
+  let step = Math.max(0, sequenceStep)
+  while (step > 0 && !getRhythmForStep(config, step).startsMeasure) step -= 1
+  return step
 }
 
 /** World X of a notehead, from accumulated duration-based spacing. */

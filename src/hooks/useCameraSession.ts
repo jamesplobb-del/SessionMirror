@@ -80,6 +80,34 @@ interface UseCameraSessionOptions {
   micInputPreference?: MicInputPreference
 }
 
+/**
+ * Ceiling on how long a camera start will wait for the previous native
+ * teardown. Serialising the handoff is what keeps the preview from racing
+ * itself; waiting on it forever is what would strand the camera.
+ */
+const NATIVE_RELEASE_DEADLINE_MS = 1800
+
+function withNativeReleaseDeadline(work: Promise<void>): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      resolve()
+    }
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      console.warn('[NativeBridge] native release timed out — proceeding')
+      finish()
+    }, NATIVE_RELEASE_DEADLINE_MS)
+    work.then(finish, (error) => {
+      console.warn('[NativeBridge] native release rejected', error)
+      finish()
+    })
+  })
+}
+
 const CAMERA_RELEASE_DELAY_MS = 700
 const FOREGROUND_RESTART_DELAY_MS = 250
 const IOS_CAMERA_RELEASE_DELAY_MS = 700
@@ -718,9 +746,28 @@ export function useCameraSession({
       return
     }
 
+    /*
+     * Every later camera start waits on this promise, so it must always
+     * settle and must never reject: a rejected release propagated straight
+     * out of the bridge acquire (the camera then simply never came back),
+     * and a native call that went missing left the ref pending forever with
+     * the same result. Failing here degrades to the old unserialised
+     * behaviour, which is recoverable — a dead camera is not.
+     */
     const release = (async () => {
-      await stopNativeCameraBridge()
-      await syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
+      try {
+        await withNativeReleaseDeadline(
+          (async () => {
+            await stopNativeCameraBridge()
+            await syncNativeCameraSessionState({
+              previewActive: false,
+              recordingActive: false,
+            })
+          })(),
+        )
+      } catch (error) {
+        console.warn('[NativeBridge] release failed — continuing unserialised', error)
+      }
     })()
     nativeBridgeReleaseInFlightRef.current = release
     try {

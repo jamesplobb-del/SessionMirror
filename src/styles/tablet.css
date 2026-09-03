@@ -507,19 +507,47 @@
     padding-inline: 2rem;
   }
 
-  .settings-group-row {
-    min-height: 5.25rem;
-    padding: 1.1rem 1.2rem;
+  .set-list {
     border-radius: 1.15rem;
   }
 
-  .settings-group-row p:first-child {
+  .set-row {
+    min-height: 3.5rem;
+    padding: 0.65rem 1.2rem 0.65rem 0.9rem;
+  }
+
+  .set-row--switch {
+    min-height: 3.6rem;
+  }
+
+  .set-row + .set-row::before,
+  .set-row + .set-block::before,
+  .set-block + .set-row::before,
+  .set-block + .set-block::before {
+    left: 3.4rem;
+  }
+
+  .set-list--plain .set-row + .set-row::before,
+  .set-list--plain .set-row + .set-block::before,
+  .set-list--plain .set-block + .set-row::before,
+  .set-list--plain .set-block + .set-block::before {
+    left: 1.2rem;
+  }
+
+  .set-block {
+    padding: 0.9rem 1.2rem 1rem;
+  }
+
+  .set-row__label,
+  .set-block__label {
     font-size: 1.02rem;
   }
 
-  .settings-group-row p:last-child {
+  .set-row__sublabel,
+  .set-block__hint,
+  .set-group__footer {
     font-size: 0.88rem;
-    line-height: 1.35;
+    line-height: 1.4;
   }
 
   .native-bottom-sheet--vault {
@@ -1880,7 +1908,8 @@
     max-height: min(88vh, 50rem);
   }
 
-  .settings-drawer-scroll > .space-y-5 {
+  /* iPad: the jump nav becomes a standing sidebar beside the sections. */
+  .settings-drawer-scroll > .set-page {
     display: grid;
     grid-template-columns: 13.5rem minmax(0, 1fr);
     column-gap: 1.5rem;
@@ -1888,11 +1917,7 @@
     align-items: start;
   }
 
-  .settings-drawer-scroll > .space-y-5 > :not([hidden]) ~ :not([hidden]) {
-    margin-top: 0 !important;
-  }
-
-  .settings-drawer-scroll .settings-category-nav {
+  .settings-drawer-scroll .set-nav {
     position: sticky;
     top: 0;
     grid-column: 1;
@@ -1901,32 +1926,31 @@
     margin: 0;
     padding: 0;
     background: transparent;
+    box-shadow: none;
   }
 
-  .settings-drawer-scroll .settings-category-nav::after {
-    content: none;
-  }
-
-  .settings-drawer-scroll .settings-category-nav__track {
+  .settings-drawer-scroll .set-nav__track {
     flex-direction: column;
     gap: 0.3rem;
     overflow: visible;
     padding: 0.4rem;
+    border-radius: 0.95rem;
   }
 
-  .settings-drawer-scroll .settings-category-nav__button {
+  .settings-drawer-scroll .set-nav__button {
     width: 100%;
     min-height: 2.75rem;
     text-align: left;
   }
 
-  .settings-drawer-scroll .settings-group {
+  .settings-drawer-scroll .set-section {
     grid-column: 2;
+    scroll-margin-top: 1rem;
   }
 
-  .settings-group[id^='settings-section-'],
-  #settings-section-more {
-    scroll-margin-top: 1rem;
+  /* Row gap owns the rhythm here, so drop the stacked-phone margin. */
+  .settings-drawer-scroll .set-section + .set-section {
+    margin-top: 0;
   }
 }
 

@@ -27,19 +27,21 @@ export function VaultDrawerSkeleton() {
 
 export function SettingsDrawerSkeleton() {
   return (
-    <div className="space-y-6 pb-2" aria-hidden>
-      {Array.from({ length: 4 }, (_, index) => (
-        <div
-          key={index}
-          className="rounded-2xl border border-stone-200 bg-white px-4 py-3.5"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-40 rounded bg-stone-200/90" />
-              <div className="h-3 w-full rounded bg-stone-100" />
-              <div className="h-3 w-4/5 rounded bg-stone-100" />
-            </div>
-            <div className="h-7 w-12 shrink-0 rounded-full bg-stone-200/90" />
+    <div className="settings-sheet space-y-6 pb-2" aria-hidden>
+      {[2, 3, 2].map((rows, group) => (
+        <div key={group}>
+          <div className="set-skeleton-title" />
+          <div className="set-skeleton-list">
+            {Array.from({ length: rows }, (_, row) => (
+              <div key={row} className="set-skeleton-row">
+                <div className="set-skeleton-tile" />
+                <div
+                  className="set-skeleton-bar"
+                  style={{ width: `${7 + ((group + row) % 3) * 2}rem` }}
+                />
+                <div className="ml-auto set-skeleton-switch" />
+              </div>
+            ))}
           </div>
         </div>
       ))}

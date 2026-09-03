@@ -420,7 +420,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Practice Games',
     body: 'Three games that listen to what you play. Nothing from the mic is saved.',
     bullets: [
-      'Staff Jumper is sight-reading — it listens for pitch, not rhythm',
+      'Staff Jumper is sight-reading — pitch always, and rhythm against the click when the metronome is on',
       'Balance times how long you hold a note dead center',
       'Learn matches the written note to the real fingering, one note at a time',
     ],

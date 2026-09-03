@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
-  RotateCcw,
+  AudioLines,
+  BookOpen,
   ChevronRight,
+  CloudUpload,
+  Gamepad2,
+  Mic,
+  Moon,
+  RotateCcw,
+  Smartphone,
+  Sparkles,
+  VolumeX,
+  Vibrate,
   X,
+  Youtube,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
@@ -36,8 +47,21 @@ interface SettingsDrawerProps {
   onOpenLabs?: () => void
   onOpenQuickTuner?: () => void
   onOpenQuickMetronome?: () => void
-  recordingMode: 'video' | 'audio'
 }
+
+/** iOS-style icon tile fills. Kept off the app's gold/blue signal colors where
+ *  those already mean "live position" and "selected" elsewhere in the UI. */
+const TINT = {
+  indigo: '#5856d6',
+  pink: '#ff2d55',
+  blue: '#1598ff',
+  red: '#ff3b30',
+  green: '#34c759',
+  teal: '#30b0c7',
+  purple: '#af52de',
+  orange: '#ff9500',
+  gray: '#8e8e93',
+} as const
 
 type QuickFunctionDestination = 'tuner' | 'metronome'
 
@@ -188,15 +212,304 @@ const LEARN_APP_SECTIONS: {
   },
 ]
 
-type SettingsSectionId = 'general' | 'recording' | 'tuner' | 'playback' | 'more'
+/**
+ * Scroll a container to the position `resolveTop()` reports, over `duration`,
+ * driven by rAF.
+ *
+ * `scrollTo({ behavior: 'smooth' })` is silently ignored in some WebKit/WKWebView
+ * states, which left the category nav highlighting a section it never scrolled
+ * to. Animating by hand always lands on the target.
+ *
+ * `resolveTop` is re-read when the tween finishes: content above the target can
+ * reflow mid-animation, and re-resolving lands the heading exactly where it
+ * belongs instead of a dozen pixels under the sticky nav.
+ *
+ * Returns a cancel function so a manual scroll can take the wheel back.
+ */
+function animateScrollTop(
+  container: HTMLElement,
+  resolveTop: () => number,
+  duration = 420,
+): () => void {
+  const top = resolveTop()
+  const start = container.scrollTop
+  const distance = top - start
+  if (Math.abs(distance) < 1) {
+    container.scrollTop = top
+    return () => {}
+  }
+
+  let frame = 0
+  let cancelled = false
+  let done = false
+  const began = performance.now()
+
+  const step = (now: number) => {
+    if (cancelled) return
+    const progress = Math.min(1, (now - began) / duration)
+    // Standard iOS ease-out: fast off the mark, settles into the target.
+    const eased = 1 - Math.pow(1 - progress, 3)
+    container.scrollTop = start + distance * eased
+    if (progress < 1) {
+      frame = requestAnimationFrame(step)
+      return
+    }
+    done = true
+    container.scrollTop = resolveTop()
+  }
+
+  frame = requestAnimationFrame(step)
+
+  // rAF is frozen while the page is hidden, so the tween can stall partway (or
+  // never start). Land on the target regardless — arriving is what matters.
+  const settle = window.setTimeout(() => {
+    if (cancelled || done) return
+    cancelAnimationFrame(frame)
+    container.scrollTop = resolveTop()
+  }, duration + 140)
+
+  return () => {
+    cancelled = true
+    cancelAnimationFrame(frame)
+    window.clearTimeout(settle)
+  }
+}
+
+type SettingsSectionId = 'general' | 'recording' | 'tuner' | 'playback' | 'help'
 
 const SETTINGS_SECTIONS: ReadonlyArray<{ id: SettingsSectionId; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'recording', label: 'Recording' },
   { id: 'tuner', label: 'Tuner' },
   { id: 'playback', label: 'Playback' },
-  { id: 'more', label: 'More' },
+  { id: 'help', label: 'Help' },
 ]
+
+/* ---------------------------------------------------------------- primitives */
+
+function SettingsSection({
+  id,
+  title,
+  children,
+}: {
+  id: SettingsSectionId
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section id={`settings-section-${id}`} className="set-section" aria-label={title}>
+      <h3 className="set-section__title">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function SettingsGroup({
+  title,
+  footer,
+  plain = false,
+  children,
+}: {
+  title?: string
+  footer?: ReactNode
+  /** Rows without icon tiles — separators run full width. */
+  plain?: boolean
+  children: ReactNode
+}) {
+  return (
+    <div className="set-group">
+      {title ? <p className="set-group__title">{title}</p> : null}
+      <div className={`set-list${plain ? ' set-list--plain' : ''}`}>{children}</div>
+      {footer ? <p className="set-group__footer">{footer}</p> : null}
+    </div>
+  )
+}
+
+function RowIcon({ icon: Icon, tint }: { icon: typeof Moon; tint: string }) {
+  return (
+    <span className="set-row__icon" style={{ ['--set-icon-bg' as string]: tint }} aria-hidden>
+      <Icon />
+    </span>
+  )
+}
+
+function SwitchRow({
+  icon,
+  tint,
+  label,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  icon: typeof Moon
+  tint: string
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <motion.label
+      className={`set-row set-row--switch ${disabled ? 'opacity-50' : 'cursor-pointer'}`}
+      whileTap={disabled ? undefined : { scale: 0.996 }}
+      transition={iosSpringSnappy}
+    >
+      <RowIcon icon={icon} tint={tint} />
+      <span className="set-row__label">{label}</span>
+      <IOSSwitch
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        ariaLabel={label}
+      />
+    </motion.label>
+  )
+}
+
+function LinkRow({
+  icon,
+  tint,
+  label,
+  value,
+  expanded,
+  onClick,
+  dataTutorial,
+  ariaControls,
+}: {
+  icon: typeof Moon
+  tint: string
+  label: string
+  value?: string
+  /** Present when the row toggles an inline panel — rotates the chevron. */
+  expanded?: boolean
+  onClick: () => void
+  dataTutorial?: string
+  ariaControls?: string
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      haptic="light"
+      onClick={onClick}
+      className="set-row"
+      data-tutorial={dataTutorial}
+      aria-expanded={expanded}
+      aria-controls={ariaControls}
+    >
+      <RowIcon icon={icon} tint={tint} />
+      <span className="set-row__label">{label}</span>
+      {value ? <span className="set-row__value">{value}</span> : null}
+      <ChevronRight
+        className={`set-row__chevron${expanded ? ' set-row__chevron--open' : ''}`}
+        aria-hidden
+      />
+    </Pressable>
+  )
+}
+
+function TopicRow({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      haptic="light"
+      onClick={onClick}
+      className="set-row"
+    >
+      <span className="set-row__label">{label}</span>
+      <ChevronRight className="set-row__chevron" aria-hidden />
+    </Pressable>
+  )
+}
+
+function SliderBlock({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  step,
+  formatValue,
+  onChange,
+}: {
+  label: string
+  hint?: string
+  value: number
+  min: number
+  max: number
+  step: number
+  formatValue: (value: number) => string
+  onChange: (value: number) => void
+}) {
+  const display = formatValue(value)
+
+  return (
+    <div className="set-block">
+      <div className="set-block__head">
+        <span className="set-block__label">{label}</span>
+        <motion.span
+          key={display}
+          initial={{ opacity: 0.55 }}
+          animate={{ opacity: 1 }}
+          transition={iosSpringSnappy}
+          style={motionGpuLayer}
+          className="set-block__value"
+        >
+          {display}
+        </motion.span>
+      </div>
+      {hint ? <p className="set-block__hint">{hint}</p> : null}
+      <input
+        type="range"
+        className="set-slider"
+        aria-label={label}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </div>
+  )
+}
+
+function SegmentBlock<T extends string>({
+  label,
+  hint,
+  value,
+  segments,
+  layoutId,
+  size = 'md',
+  onChange,
+}: {
+  label: string
+  hint?: string
+  value: T
+  segments: { id: T; label: string }[]
+  layoutId: string
+  /** Four or more options need the compact size to stay on one line. */
+  size?: 'sm' | 'md'
+  onChange: (value: T) => void
+}) {
+  return (
+    <div className="set-block">
+      <div className="set-block__head">
+        <span className="set-block__label">{label}</span>
+      </div>
+      {hint ? <p className="set-block__hint">{hint}</p> : null}
+      <IOSSegmentedControl
+        className="mt-2.5"
+        layoutId={layoutId}
+        ariaLabel={label}
+        size={size}
+        value={value}
+        onChange={onChange}
+        segments={segments}
+      />
+    </div>
+  )
+}
 
 function QuickFunctionAccessRow({
   setup,
@@ -212,151 +525,24 @@ function QuickFunctionAccessRow({
       intensity="soft"
       haptic="light"
       onClick={onOpen}
-      className="flex min-h-[4.2rem] w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-stone-50/70"
+      className="set-subrow"
     >
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <strong className="text-sm font-semibold text-stone-900">{setup.title}</strong>
-          <small className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-500">
-            {setup.availability}
-          </small>
+        <span className="set-subrow__title">
+          {setup.title}
+          <small className="set-row__badge">{setup.availability}</small>
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-stone-500">
-          {setup.description}
-        </span>
+        <span className="set-subrow__desc">{setup.description}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-sky-600">
+      <span className="set-subrow__action">
         {setup.action}
-        <ChevronRight className="h-4 w-4" aria-hidden />
+        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
       </span>
     </Pressable>
   )
 }
 
-function SettingToggle({
-  label,
-  description,
-  checked,
-  onChange,
-  disabled = false,
-  hapticFeedback = true,
-}: {
-  label: string
-  description: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-  disabled?: boolean
-  hapticFeedback?: boolean
-}) {
-  return (
-    <motion.label
-      className={`settings-group-row flex min-h-[4.75rem] items-start justify-between gap-4 rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl ${
-        disabled ? 'opacity-50' : 'cursor-pointer'
-      }`}
-      whileTap={disabled ? undefined : { scale: 0.995 }}
-      transition={iosSpringSnappy}
-    >
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-stone-900">{label}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-stone-500">{description}</p>
-      </div>
-      <IOSSwitch
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        ariaLabel={label}
-        hapticFeedback={hapticFeedback}
-      />
-    </motion.label>
-  )
-}
-
-function SettingInstrumentPicker({
-  value,
-  onChange,
-}: {
-  value: TunerInstrument
-  onChange: (value: TunerInstrument) => void
-}) {
-  const activeProfile = getTunerProfile(value)
-
-  return (
-    <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-      <p className="text-sm font-semibold text-stone-900">Source Instrument</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-        Adjusts pitch detection and trace smoothing for the Audio Tuner tab and pitch analysis.
-      </p>
-
-      <IOSSegmentedControl
-        className="mt-3"
-        layoutId="settings-instrument-segment"
-        ariaLabel="Tuner instrument profile"
-        value={value}
-        onChange={onChange}
-        segments={TUNER_INSTRUMENTS.map((instrument) => ({
-          id: instrument,
-          label: getTunerProfile(instrument).label,
-        }))}
-      />
-
-      <p className="mt-2.5 text-[11px] leading-relaxed text-stone-400">{activeProfile.description}</p>
-    </div>
-  )
-}
-
-function SettingSlider({
-  label,
-  description,
-  value,
-  min,
-  max,
-  step,
-  unit,
-  formatValue,
-  onChange,
-}: {
-  label: string
-  description: string
-  value: number
-  min: number
-  max: number
-  step: number
-  unit: string
-  formatValue?: (value: number) => string
-  onChange: (value: number) => void
-}) {
-  const display = formatValue ? formatValue(value) : `${value}${unit}`
-
-  return (
-    <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-stone-900">{label}</p>
-          <p className="mt-0.5 text-xs text-stone-500">{description}</p>
-        </div>
-        <motion.span
-          key={display}
-          initial={{ scale: 0.92, opacity: 0.6 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={iosSpringSnappy}
-          style={motionGpuLayer}
-          className="shrink-0 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold tabular-nums text-stone-700"
-        >
-          {display}
-        </motion.span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2 w-full cursor-pointer accent-sky-500"
-      />
-    </div>
-  )
-}
+/* ------------------------------------------------------------------ drawer */
 
 export default function SettingsDrawer({
   isOpen,
@@ -370,7 +556,6 @@ export default function SettingsDrawer({
   onOpenLabs,
   onOpenQuickTuner,
   onOpenQuickMetronome,
-  recordingMode,
 }: SettingsDrawerProps) {
   const notifyTutorial = useTutorialAction()
   const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
@@ -381,6 +566,10 @@ export default function SettingsDrawer({
   const [quickAccessDestination, setQuickAccessDestination] =
     useState<QuickFunctionDestination>('tuner')
   const settingsScrollRef = useRef<HTMLDivElement>(null)
+  /** Set while a jump-nav scroll animates, so the spy does not fight the target. */
+  const jumpTargetRef = useRef<SettingsSectionId | null>(null)
+  const jumpTimerRef = useRef<number | null>(null)
+  const cancelJumpScrollRef = useRef<(() => void) | null>(null)
   const [activeSettingsSection, setActiveSettingsSection] =
     useState<SettingsSectionId>('general')
   const helpTopicById = useMemo(
@@ -390,28 +579,45 @@ export default function SettingsDrawer({
   const activeHelpTopic: HelpTopic | null = activeHelpTopicId
     ? helpTopicById.get(activeHelpTopicId) ?? null
     : null
+  const activeInstrument = getTunerProfile(settings.tunerInstrument)
+
   useEffect(() => {
     if (!isOpen) {
       setActiveQuickFunctionSetup(null)
       setQuickFunctionsAccessOpen(false)
       setQuickAccessDestination('tuner')
       setActiveSettingsSection('general')
+      jumpTargetRef.current = null
+      cancelJumpScrollRef.current?.()
     }
   }, [isOpen])
+
+  useEffect(() => () => {
+    if (jumpTimerRef.current !== null) window.clearTimeout(jumpTimerRef.current)
+    cancelJumpScrollRef.current?.()
+  }, [])
 
   const handleSettingsScroll = useCallback(() => {
     const container = settingsScrollRef.current
     if (!container) return
+    if (jumpTargetRef.current) return
 
-    const threshold = container.getBoundingClientRect().top + 76
+    // A section counts as current once its heading passes just under the nav.
+    const threshold = container.getBoundingClientRect().top + 82
     let nextSection: SettingsSectionId = SETTINGS_SECTIONS[0].id
     for (const section of SETTINGS_SECTIONS) {
       const element = container.querySelector<HTMLElement>(`#settings-section-${section.id}`)
       if (!element) continue
       if (element.getBoundingClientRect().top <= threshold) nextSection = section.id
-      else break
     }
-    setActiveSettingsSection((current) => current === nextSection ? current : nextSection)
+
+    // The last section can never reach the threshold on a short tail, so claim
+    // it once the list is scrolled to the bottom.
+    if (container.scrollHeight - container.scrollTop - container.clientHeight < 24) {
+      nextSection = SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id
+    }
+
+    setActiveSettingsSection((current) => (current === nextSection ? current : nextSection))
   }, [])
 
   const handleSettingsSectionSelect = useCallback((sectionId: SettingsSectionId) => {
@@ -420,17 +626,36 @@ export default function SettingsDrawer({
     if (!container || !target) return
 
     setActiveSettingsSection(sectionId)
-    const containerTop = container.getBoundingClientRect().top
-    const targetTop = target.getBoundingClientRect().top - containerTop + container.scrollTop
-    container.scrollTo({ top: Math.max(0, targetTop - 66), behavior: 'smooth' })
+    jumpTargetRef.current = sectionId
+    if (jumpTimerRef.current !== null) window.clearTimeout(jumpTimerRef.current)
+    jumpTimerRef.current = window.setTimeout(() => {
+      jumpTargetRef.current = null
+    }, 520)
+
+    // Leave the sticky nav's height clear above the heading.
+    const resolveTop = () => {
+      const containerTop = container.getBoundingClientRect().top
+      const targetTop = target.getBoundingClientRect().top - containerTop + container.scrollTop
+      return Math.max(0, targetTop - 70)
+    }
+    cancelJumpScrollRef.current?.()
+    cancelJumpScrollRef.current = animateScrollTop(container, resolveTop)
   }, [])
 
+  // Keep the active pill in view — horizontally only. scrollIntoView would also
+  // nudge the vertical container, fighting the jump-nav tween mid-flight.
   useEffect(() => {
     if (!isOpen) return
     const activeButton = settingsScrollRef.current?.querySelector<HTMLElement>(
       `[data-settings-section="${activeSettingsSection}"]`,
     )
-    activeButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+    const track = activeButton?.parentElement
+    if (!activeButton || !track) return
+    if (track.scrollWidth <= track.clientWidth) return
+
+    const target =
+      activeButton.offsetLeft - (track.clientWidth - activeButton.offsetWidth) / 2
+    track.scrollLeft = Math.max(0, Math.min(target, track.scrollWidth - track.clientWidth))
   }, [activeSettingsSection, isOpen])
 
   const handleSheetEnterComplete = useCallback(() => {
@@ -489,14 +714,14 @@ export default function SettingsDrawer({
         ariaLabel="Settings"
         motionPreset="premium"
         elevated
-        elevatedLight={recordingMode === 'audio'}
+        elevatedLight
         onEnterComplete={handleSheetEnterComplete}
       >
-      <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
+      <div className="settings-sheet settings-sheet-host flex min-h-0 flex-1 flex-col">
+      <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 px-5 pb-4 pt-3">
         <div className="native-sheet-title-block min-w-0 flex-1">
           <span className="native-sheet-kicker">BestTake</span>
           <h2 className="native-sheet-title">Settings</h2>
-          <p className="native-sheet-subtitle">Choose a section to find what you need quickly</p>
         </div>
         <Pressable
           type="button"
@@ -514,19 +739,19 @@ export default function SettingsDrawer({
       <div
         ref={settingsScrollRef}
         onScroll={handleSettingsScroll}
-        className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-4"
+        className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-3"
       >
         {!contentReady ? (
           <SettingsDrawerSkeleton />
         ) : (
-        <div className="space-y-5 pb-2">
-          <nav className="settings-category-nav" aria-label="Settings sections">
-            <div className="settings-category-nav__track">
+        <div className="set-page pb-2">
+          <nav className="set-nav" aria-label="Settings sections">
+            <div className="set-nav__track">
               {SETTINGS_SECTIONS.map((section) => (
                 <button
                   key={section.id}
                   type="button"
-                  className="settings-category-nav__button"
+                  className="set-nav__button"
                   data-settings-section={section.id}
                   aria-controls={`settings-section-${section.id}`}
                   aria-current={activeSettingsSection === section.id ? 'page' : undefined}
@@ -538,121 +763,136 @@ export default function SettingsDrawer({
             </div>
           </nav>
 
-          <section id="settings-section-general" className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              General
-            </h3>
+          <SettingsSection id="general" title="General">
+            <SettingsGroup footer="Dark Mode restyles sheets, Audio Mode, and every screen that is not backed by the camera.">
+              <SwitchRow
+                icon={Moon}
+                tint={TINT.indigo}
+                label="Dark Mode"
+                checked={settings.darkMode}
+                onChange={(checked) => onUpdate({ darkMode: checked })}
+              />
+              <SwitchRow
+                icon={Vibrate}
+                tint={TINT.pink}
+                label="Haptic Feedback"
+                checked={settings.hapticFeedback}
+                onChange={(checked) => onUpdate({ hapticFeedback: checked })}
+              />
+            </SettingsGroup>
 
-            <SettingToggle
-              label="Dark Mode"
-              description="Uses darker native-style surfaces for Audio Mode, sheets, and non-camera UI."
-              checked={settings.darkMode}
-              onChange={(checked) => onUpdate({ darkMode: checked })}
-            />
+            <SettingsGroup
+              title="Storage"
+              footer="Takes stay on this device either way. Video fills iCloud fast — turn this off if your storage is tight."
+            >
+              <SwitchRow
+                icon={CloudUpload}
+                tint={TINT.blue}
+                label="Back Up Takes to iCloud"
+                checked={settings.backUpTakesToIcloud}
+                onChange={(checked) => onUpdate({ backUpTakesToIcloud: checked })}
+              />
+            </SettingsGroup>
+          </SettingsSection>
 
-            <SettingToggle
-              label="Haptic Feedback"
-              description="Tactile confirmation for important buttons, toggles, recording actions, and long presses."
-              checked={settings.hapticFeedback}
-              onChange={(checked) => onUpdate({ hapticFeedback: checked })}
-            />
-          </section>
+          <SettingsSection id="recording" title="Recording">
+            <SettingsGroup footer="With headphones connected, record through the iPhone's own mic instead of the headset mic.">
+              <SwitchRow
+                icon={Mic}
+                tint={TINT.red}
+                label="Use iPhone Mic"
+                checked={settings.micInputPreference === 'iphone'}
+                onChange={(checked) =>
+                  onUpdate({ micInputPreference: checked ? 'iphone' : 'headphone' })
+                }
+              />
+            </SettingsGroup>
 
-          <section id="settings-section-recording" className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              Audio Recording
-            </h3>
-
-            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-              <p className="text-sm font-semibold text-stone-900">Hands-Free Recording</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                Turn this on from the record controls. It waits for your playing, records the visible take, stops after silence, then plays the take back automatically. These settings tune that behavior.
-              </p>
-            </div>
-
-            <SettingToggle
-              label="Use iPhone Mic"
-              description="When headphones are connected, record with the iPhone microphone instead of the headset mic."
-              checked={settings.micInputPreference === 'iphone'}
-              onChange={(checked) =>
-                onUpdate({ micInputPreference: checked ? 'iphone' : 'headphone' })
-              }
-            />
-
-            <div className="space-y-3 pl-1 pt-1">
-              <SettingSlider
+            <SettingsGroup
+              title="Hands-Free"
+              plain
+              footer="Hands-free waits for you to play, records the take, stops after silence, then plays it straight back. Turn it on from the record button — these two dials tune how it listens."
+            >
+              <SliderBlock
                 label="Stop After Silence"
-                description="Used by Hands-Free Recording to decide when to end a quiet take and begin playback."
+                hint="How long a quiet passage runs before the take ends."
                 value={settings.soundSilenceSeconds}
                 min={0}
                 max={6}
                 step={0.5}
-                unit="s"
                 formatValue={(value) => (value === 0 ? 'Immediate' : `${value}s`)}
                 onChange={(value) => onUpdate({ soundSilenceSeconds: value })}
               />
-
-              <SettingSlider
+              <SliderBlock
                 label="Trigger Sensitivity"
-                description="Used by Hands-Free Recording. Left catches quieter playing; right needs a stronger signal."
+                hint="How loud you have to play before recording starts."
                 value={settings.soundVolumeThreshold}
                 min={1}
                 max={100}
                 step={1}
-                unit=""
                 formatValue={(value) =>
                   value <= 30 ? 'Sensitive' : value >= 70 ? 'Loud only' : 'Balanced'
                 }
                 onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
               />
-            </div>
-          </section>
+            </SettingsGroup>
+          </SettingsSection>
 
-          <section id="settings-section-tuner" className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              Pitch & Tuning
-            </h3>
+          <SettingsSection id="tuner" title="Tuner">
+            <SettingsGroup
+              plain
+              footer={activeInstrument.description}
+            >
+              <SegmentBlock
+                label="Source Instrument"
+                hint="Tunes pitch detection and trace smoothing for the Tuner tab and pitch analysis."
+                value={settings.tunerInstrument}
+                layoutId="settings-instrument-segment"
+                onChange={(tunerInstrument: TunerInstrument) => onUpdate({ tunerInstrument })}
+                segments={TUNER_INSTRUMENTS.map((instrument) => ({
+                  id: instrument,
+                  label: getTunerProfile(instrument).label,
+                }))}
+              />
+            </SettingsGroup>
 
-            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-              <p className="text-sm font-semibold text-stone-900">Pitch Analysis</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                Turn it on from Workspace. The options below choose how pitch is detected and what happens between takes.
-              </p>
-            </div>
+            <SettingsGroup footer="The Tuner tab always listens. This adds the same live readout to Audio Mode and Review between takes.">
+              <SwitchRow
+                icon={AudioLines}
+                tint={TINT.teal}
+                label="Idle Mic Tuner"
+                checked={settings.liveMicTunerEnabled}
+                onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
+              />
+            </SettingsGroup>
 
-            <div className="settings-group-row overflow-hidden rounded-2xl border border-white/70 bg-white/72 shadow-sm backdrop-blur-xl">
-              <Pressable
-                type="button"
-                data-tutorial="quick-tools-access"
-                intensity="soft"
-                haptic="light"
+            <SettingsGroup plain footer="Timbre of the reference tones on the tuner keyboard.">
+              <SegmentBlock
+                label="Drone Waveform"
+                size="sm"
+                value={settings.droneWaveform}
+                layoutId="settings-drone-waveform-segment"
+                onChange={(droneWaveform: DroneWaveform) => onUpdate({ droneWaveform })}
+                segments={DRONE_WAVEFORM_OPTIONS.map((option) => ({
+                  id: option.value,
+                  label: option.label,
+                }))}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup footer="Reach the tuner or metronome from the Lock Screen, Control Center, the Action Button, or Siri — without opening BestTake first.">
+              <LinkRow
+                icon={Smartphone}
+                tint={TINT.purple}
+                label="Open From iOS"
+                expanded={quickFunctionsAccessOpen}
                 onClick={handleQuickFunctionsAccessToggle}
-                className="flex min-h-[4.75rem] w-full items-center gap-3 px-4 py-4 text-left"
-                aria-expanded={quickFunctionsAccessOpen}
-                aria-controls="quick-functions-access-settings"
-              >
-                <span className="min-w-0 flex-1">
-                  <strong className="block text-sm font-semibold text-stone-900">
-                    Quick Tools Access
-                  </strong>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-stone-500">
-                    Open the tuner or metronome directly from iOS.
-                  </span>
-                </span>
-                <ChevronRight
-                  className={`h-4 w-4 shrink-0 text-stone-400 transition-transform ${
-                    quickFunctionsAccessOpen ? 'rotate-90' : ''
-                  }`}
-                  aria-hidden
-                />
-              </Pressable>
-
+                dataTutorial="quick-tools-access"
+                ariaControls="quick-functions-access-settings"
+              />
               <AnimatedExpand open={quickFunctionsAccessOpen}>
-                <div
-                  id="quick-functions-access-settings"
-                  className="border-t border-stone-100"
-                >
-                  <div className="px-4 pb-2 pt-3" data-tutorial="quick-tools-destination">
+                <div id="quick-functions-access-settings" className="set-nested">
+                  <div data-tutorial="quick-tools-destination">
                     <IOSSegmentedControl
                       value={quickAccessDestination}
                       onChange={handleQuickAccessDestinationChange}
@@ -665,16 +905,15 @@ export default function SettingsDrawer({
                       ariaLabel="Quick tool"
                     />
                   </div>
-
-                  <div className="divide-y divide-stone-100">
-                    {QUICK_FUNCTION_SETUPS[quickAccessDestination].map((setup) => (
-                      <QuickFunctionAccessRow
-                        key={`${setup.destination}-${setup.id}`}
-                        setup={setup}
-                        onOpen={() => handleOpenQuickFunctionSetup(setup)}
-                      />
-                    ))}
-                  </div>
+                </div>
+                <div>
+                  {QUICK_FUNCTION_SETUPS[quickAccessDestination].map((setup) => (
+                    <QuickFunctionAccessRow
+                      key={`${setup.destination}-${setup.id}`}
+                      setup={setup}
+                      onOpen={() => handleOpenQuickFunctionSetup(setup)}
+                    />
+                  ))}
 
                   {quickAccessDestination === 'tuner' && onOpenQuickTuner ? (
                     <Pressable
@@ -682,10 +921,10 @@ export default function SettingsDrawer({
                       intensity="soft"
                       haptic="light"
                       onClick={onOpenQuickTuner}
-                      className="flex min-h-12 w-full items-center justify-between border-t border-stone-100 px-4 py-3 text-left text-sm font-semibold text-sky-600 transition-colors hover:bg-sky-50/70"
+                      className="set-subrow set-row--action"
                     >
-                      <span>Test Quick Tuner</span>
-                      <ChevronRight className="h-4 w-4" aria-hidden />
+                      <span className="set-row__label">Test Quick Tuner</span>
+                      <ChevronRight className="set-row__chevron" aria-hidden />
                     </Pressable>
                   ) : null}
 
@@ -695,177 +934,101 @@ export default function SettingsDrawer({
                       intensity="soft"
                       haptic="light"
                       onClick={onOpenQuickMetronome}
-                      className="flex min-h-12 w-full items-center justify-between border-t border-stone-100 px-4 py-3 text-left text-sm font-semibold text-sky-600 transition-colors hover:bg-sky-50/70"
+                      className="set-subrow set-row--action"
                     >
-                      <span>Test Quick Metronome</span>
-                      <ChevronRight className="h-4 w-4" aria-hidden />
+                      <span className="set-row__label">Test Quick Metronome</span>
+                      <ChevronRight className="set-row__chevron" aria-hidden />
                     </Pressable>
                   ) : null}
                 </div>
               </AnimatedExpand>
-            </div>
+            </SettingsGroup>
+          </SettingsSection>
 
-            <div className="pt-1">
-              <SettingInstrumentPicker
-                value={settings.tunerInstrument}
-                onChange={(tunerInstrument) => onUpdate({ tunerInstrument })}
-              />
-            </div>
-
-            <SettingToggle
-              label="Idle Mic Tuner"
-              description="In Audio mode and Review, listen through the microphone between takes instead of showing pitch only during playback. The Tuner tab always listens."
-              checked={settings.liveMicTunerEnabled}
-              onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
-            />
-
-            <div className="settings-group-row rounded-2xl border border-white/70 bg-white/72 px-4 py-4 shadow-sm backdrop-blur-xl">
-              <p className="text-sm font-semibold text-stone-900">Drone Waveform</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                Timbre for reference tones on the tuner keyboard.
-              </p>
-
-              <IOSSegmentedControl
-                className="mt-3"
-                layoutId="settings-drone-waveform-segment"
-                ariaLabel="Drone waveform"
-                value={settings.droneWaveform}
-                onChange={(droneWaveform: DroneWaveform) => onUpdate({ droneWaveform })}
-                segments={DRONE_WAVEFORM_OPTIONS.map((option) => ({
-                  id: option.value,
-                  label: option.label,
-                }))}
-              />
-            </div>
-          </section>
-
-          <section id="settings-section-playback" className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              Playback
-            </h3>
-
-            <div data-tutorial="settings-enhancer">
-              <SettingToggle
-                label="Audio Enhancer"
-                description="Bakes smart EQ, compression, and reverb presets into new recordings, and enhances playback of older takes. Off keeps the original flat mix."
-                checked={hudQuickSettings.audioEnhancerEnabled}
-                onChange={onAudioEnhancerChange}
-              />
-            </div>
-
-            <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
-              <div className="pt-3">
-                <AudioEnhancer
-                  settings={settings.audioEnhancerSettings}
-                  onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
+          <SettingsSection id="playback" title="Playback">
+            <SettingsGroup footer="Bakes EQ, compression, and reverb into new recordings and enhances older takes on playback. Off keeps the flat original.">
+              <div data-tutorial="settings-enhancer">
+                <SwitchRow
+                  icon={Sparkles}
+                  tint={TINT.orange}
+                  label="Audio Enhancer"
+                  checked={hudQuickSettings.audioEnhancerEnabled}
+                  onChange={onAudioEnhancerChange}
                 />
               </div>
-            </AnimatedExpand>
+              <AnimatedExpand open={hudQuickSettings.audioEnhancerEnabled}>
+                <div className="set-nested">
+                  <AudioEnhancer
+                    settings={settings.audioEnhancerSettings}
+                    onChange={(audioEnhancerSettings) => onUpdate({ audioEnhancerSettings })}
+                  />
+                </div>
+              </AnimatedExpand>
+            </SettingsGroup>
 
-            <SettingToggle
-              label="Mute Metronome During Take Playback"
-              description="When the metronome is shown from Workspace, silence its clicks while a take plays. Its timing keeps running so it stays locked when playback ends."
-              checked={settings.muteMetronomeDuringPlayback}
-              onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
-            />
+            <SettingsGroup footer="Both keep other sound out of the take. The metronome's clock keeps running while muted, so it stays locked when playback ends.">
+              <SwitchRow
+                icon={VolumeX}
+                tint={TINT.gray}
+                label="Mute Metronome on Playback"
+                checked={settings.muteMetronomeDuringPlayback}
+                onChange={(checked) => onUpdate({ muteMetronomeDuringPlayback: checked })}
+              />
+              <SwitchRow
+                icon={Youtube}
+                tint={TINT.red}
+                label="Pause YouTube While Recording"
+                checked={settings.excludeYoutubeFromRecording}
+                onChange={(checked) => onUpdate({ excludeYoutubeFromRecording: checked })}
+              />
+            </SettingsGroup>
+          </SettingsSection>
 
-            <SettingToggle
-              label="Keep YouTube Out of Recordings"
-              description="While recording, pauses YouTube reference playback and turns on mic echo cancellation to reduce bleed. Resume playback manually when you are done."
-              checked={settings.excludeYoutubeFromRecording}
-              onChange={(checked) => onUpdate({ excludeYoutubeFromRecording: checked })}
-            />
-          </section>
+          <SettingsSection id="help" title="Help">
+            {onOpenLabs ? (
+              <SettingsGroup footer="Pitch-controlled games for warm-ups. They never touch recording or playback.">
+                <LinkRow
+                  icon={Gamepad2}
+                  tint={TINT.green}
+                  label="Practice Games"
+                  onClick={onOpenLabs}
+                />
+              </SettingsGroup>
+            ) : null}
 
-          <div id="settings-section-more" className="space-y-5">
-          <section className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              Storage
-            </h3>
+            {LEARN_APP_SECTIONS.map((section) => (
+              <SettingsGroup key={section.title} title={section.title} plain>
+                {section.topics.map(({ id, label }) => (
+                  <TopicRow key={id} label={label} onClick={() => setActiveHelpTopicId(id)} />
+                ))}
+              </SettingsGroup>
+            ))}
 
-            <SettingToggle
-              label="Back Up Takes to iCloud"
-              description="Includes your recordings in the device's iCloud backup, so they survive a lost or replaced phone. Video adds up quickly — turn this off if iCloud storage is tight. Takes stay on this device either way."
-              checked={settings.backUpTakesToIcloud}
-              onChange={(checked) => onUpdate({ backUpTakesToIcloud: checked })}
-            />
-          </section>
+            <SettingsGroup>
+              <LinkRow
+                icon={BookOpen}
+                tint={TINT.blue}
+                label="Replay the Welcome Tour"
+                onClick={handleResetTutorials}
+              />
+            </SettingsGroup>
 
-          {onOpenLabs && (
-            <section className="settings-group space-y-3">
-              <h3 className="text-xs font-medium text-stone-400">
-                Practice
-              </h3>
-
+            <SettingsGroup plain>
               <Pressable
                 type="button"
                 intensity="soft"
-                onClick={onOpenLabs}
-                className="settings-group-row flex w-full items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-4 py-4 text-left shadow-sm backdrop-blur-xl"
+                haptic="warning"
+                onClick={onReset}
+                className="set-row set-row--center set-row--destructive"
               >
-                <div>
-                  <p className="text-sm font-semibold text-stone-900">Practice Games</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-stone-500">
-                    Pitch-controlled practice games. Does not affect recording or playback.
-                  </p>
-                </div>
+                <RotateCcw className="h-4 w-4" aria-hidden />
+                <span className="set-row__label">Reset All Settings</span>
               </Pressable>
-            </section>
-          )}
-
-          <section className="settings-group space-y-3">
-            <h3 className="text-xs font-medium text-stone-400">
-              Learn the App
-            </h3>
-
-            <div className="settings-learn-sections">
-              {LEARN_APP_SECTIONS.map((section) => (
-                <div key={section.title} className="settings-learn-section">
-                  <p className="settings-learn-section__title">{section.title}</p>
-                  <div className="settings-learn-list">
-                    {section.topics.map(({ id, label }) => (
-                      <Pressable
-                        key={id}
-                        type="button"
-                        intensity="soft"
-                        haptic="light"
-                        onClick={() => setActiveHelpTopicId(id)}
-                        className="settings-learn-row"
-                      >
-                        <span>{label}</span>
-                        <ChevronRight className="h-4 w-4" />
-                      </Pressable>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="settings-learn-list settings-learn-list--reset">
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  haptic="light"
-                  onClick={handleResetTutorials}
-                  className="settings-learn-row settings-learn-row--reset"
-                >
-                  <span>Reset Tutorials</span>
-                  <RotateCcw className="h-4 w-4" />
-                </Pressable>
-              </div>
-            </div>
-          </section>
-
-          <Pressable
-            type="button"
-            intensity="soft"
-            onClick={onReset}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-stone-200 bg-stone-50 py-2.5 text-xs font-semibold text-stone-600 hover:bg-stone-100"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset to Defaults
-          </Pressable>
-          </div>
+            </SettingsGroup>
+          </SettingsSection>
         </div>
         )}
+      </div>
       </div>
       </AnimatedBottomSheet>
       <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
@@ -883,7 +1046,7 @@ export default function SettingsDrawer({
         zClass={{ backdrop: 'z-[110]', sheet: 'z-[120]' }}
       >
         {activeQuickFunctionSetup ? (
-          <>
+          <div className="settings-sheet flex min-h-0 flex-1 flex-col">
             <div className="native-sheet-header flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-5 pb-4 pt-3">
               <div className="native-sheet-title-block min-w-0 flex-1">
                 <span className="native-sheet-kicker">
@@ -911,7 +1074,7 @@ export default function SettingsDrawer({
                     <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">
                       {index + 1}
                     </span>
-                    <p className="pt-1 text-sm leading-relaxed text-stone-700">{step}</p>
+                    <p className="set-quick-step pt-1 text-sm leading-relaxed text-stone-700">{step}</p>
                   </li>
                 ))}
               </ol>
@@ -920,11 +1083,11 @@ export default function SettingsDrawer({
                   {activeQuickFunctionSetup.note}
                 </p>
               ) : null}
-              <p className="mt-5 text-xs leading-relaxed text-stone-400">
-                iOS owns these customization screens, so BestTake provides the correct steps instead of showing a toggle that cannot change the system assignment.
+              <p className="set-quick-footnote mt-5 text-xs leading-relaxed text-stone-400">
+                iOS owns these customization screens, so BestTake gives you the exact steps instead of a switch that cannot change a system assignment.
               </p>
             </div>
-          </>
+          </div>
         ) : null}
       </AnimatedBottomSheet>
     </>

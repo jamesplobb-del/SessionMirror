@@ -321,7 +321,8 @@ const DraggableDroneWidget = lazy(importDroneWidget)
 /** Where the last sitting ended. Read once so day two opens on the take, not a menu. */
 const bootSurface = loadLastSurface()
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
-const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
+const importSettingsDrawer = () => import('./components/SettingsDrawer')
+const SettingsDrawer = lazy(importSettingsDrawer)
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 const CoachMark = lazy(() => import('./components/CoachMark'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
@@ -561,8 +562,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   /** The live room, kept current so a focused take can remember the desk it was played on. */
   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
   const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
-  /** Cross-fade veil painted in the colour of the surface being entered. */
-  const [modeVeil, setModeVeil] = useState<RecordingMode | null>(null)
   /** One breath of the record button after Current finishes playing back. */
   const [againPulse, setAgainPulse] = useState(false)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
@@ -2693,9 +2692,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
         // Same sitting, different surface: the tool tab, the pitch overlay and
-        // Take Cards are left exactly as the player had them. A short veil in
-        // the incoming surface's colour turns the swap into a cross-fade.
-        setModeVeil(mode)
+        // Take Cards are left exactly as the player had them.
+        //
+        // Deliberately no full-screen veil over the swap. A veil that fades in
+        // after the surfaces have already changed is just a flash on top of a
+        // finished transition — it read as a blink in both directions. The
+        // grounds either side are opaque, so the swap carries itself.
         // Refresh the cached visual viewport before the audio layout mounts.
         // Otherwise iOS can paint one frame with the camera surface's stale
         // height and clip the bottom deck before its later recovery pass.
@@ -2719,7 +2721,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         window.setTimeout(reconcileMetronomeAfterModeSwitch, 1500)
       }
       if (mode === 'audio') {
-        requestCameraAccess('audio')
+        // Acquiring the mic stalls the main thread, and running it on the same
+        // tick as the surface rebuild is what made the crossing stutter. The
+        // camera direction already waits for the paint; this now matches. The
+        // Tools surface shows its own connecting state for the one frame it
+        // costs.
+        scheduleAfterPaint(() => {
+          if (recordingModeRef.current !== 'audio') return
+          requestCameraAccess('audio')
+        })
       }
       if (mode === 'video') {
         scheduleAfterPaint(() => {
@@ -2741,18 +2751,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleRecordingModeChangeRef = useRef(handleRecordingModeChange)
   handleRecordingModeChangeRef.current = handleRecordingModeChange
 
-  useEffect(() => {
-    if (!modeVeil) return
-    const timer = window.setTimeout(() => setModeVeil(null), 460)
-    return () => window.clearTimeout(timer)
-  }, [modeVeil])
-
   // Warm the floating-widget chunks once the app is idle. Toggling Drone or
   // Metronome in Workspace should show the widget on the same frame, not after
   // a network round trip.
   useEffect(() => scheduleIdle(() => {
     void importDroneWidget()
     void importMetronomeWidget()
+    // Settings opens over a live camera; fetching its chunk at that moment is
+    // what made the sheet arrive as a grey skeleton and then pop.
+    void importSettingsDrawer()
   }, 1200), [])
 
   /* ---- The desk stays set ------------------------------------------------
@@ -5178,14 +5185,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 {showFloatingMetronomeWidget && (
                   <Suspense fallback={null}>
                     <AnimatePresence>
+                      {/* One mount, one position, both surfaces. Keying these by
+                          recording mode tore the widget down and built it again on
+                          every Camera ↔ Tools crossing: it replayed its entry spring
+                          at a different saved position while the surface underneath
+                          was still rebuilding, which is what read as lag. Staying put
+                          is also what the desk is supposed to do. */}
                       <DraggableMetronomeWidget
-                        key={
-                          recordingMode === 'audio' ? 'audio-metronome-widget' : 'main-metronome'
-                        }
                         boundaryRef={appShellRef}
-                        positionId={
-                          recordingMode === 'audio' ? 'audio-metronome-widget' : 'main-metronome'
-                        }
+                        positionId="desk-metronome"
                         defaultTopOffset={deskWidgetTopOffset}
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
@@ -5206,9 +5214,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   <Suspense fallback={null}>
                     <AnimatePresence>
                       <DraggableDroneWidget
-                        key={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
                         boundaryRef={appShellRef}
-                        positionId={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
+                        positionId="desk-drone"
                         defaultTopOffset={deskWidgetTopOffset + 158}
                         droneWaveform={settings.droneWaveform}
                         tunerTransposition={settings.tunerTransposition}
@@ -5246,20 +5253,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 onClose={() => setHandsFreeCardOpen(false)}
               />
-              <AnimatePresence>
-                {modeVeil && (
-                  <motion.div
-                    key={`mode-veil-${modeVeil}`}
-                    className={`mode-veil mode-veil--${modeVeil}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: [0, 0.92, 0] }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.44, times: [0, 0.4, 1], ease: 'easeInOut' }}
-                    aria-hidden
-                  />
-                )}
-              </AnimatePresence>
-
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
                 {showMainPitchWidget && mainVideoPitchSource && (
                   <Suspense fallback={null}>
@@ -5362,7 +5355,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         <motion.div
                           key="audio-mode-top-tabs"
                           data-tutorial="audio-mode-tabs"
-                          initial={{ opacity: 0 }}
+                          /* No entry fade: the cream ground flips in the same
+                             frame the mode does, so fading the tabs in after it
+                             showed an empty surface first and read as a stall.
+                             The exit fade stays — leaving can be gradual. */
+                          initial={false}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
                           transition={iosFade}
@@ -5866,7 +5863,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onReplayTutorial={handleReplayOnboardingTutorial}
                     onOpenQuickTuner={handleOpenQuickTunerFromSettings}
                     onOpenQuickMetronome={handleOpenQuickMetronomeFromSettings}
-                    recordingMode={recordingMode}
                   />
 
                   <LabsOverlay

@@ -82,7 +82,6 @@ html.app-dark-mode .native-bottom-sheet--audio-light .vault-drawer-scroll {
   background: var(--audio-bg-base, #0f1929);
 }
 
-html.app-dark-mode .native-bottom-sheet--audio-light .settings-group-row,
 html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-close,
 html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-action-pill {
   border-color: rgba(226, 232, 240, 0.17);

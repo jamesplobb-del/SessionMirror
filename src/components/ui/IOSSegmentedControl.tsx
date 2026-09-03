@@ -35,7 +35,7 @@ export default function IOSSegmentedControl<T extends string>({
 
   return (
     <div
-      className={`relative flex rounded-xl bg-stone-100 ${padding} ${className}`}
+      className={`ios-segmented-track relative flex rounded-xl bg-stone-100 ${padding} ${className}`}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -51,13 +51,15 @@ export default function IOSSegmentedControl<T extends string>({
             onClick={() => onChange(segment.id)}
             haptic="light"
             className={`relative z-10 flex-1 ${buttonClass} ${
-              active ? 'text-stone-900' : 'text-stone-500'
+              active
+                ? 'ios-segmented-label--active text-stone-900'
+                : 'ios-segmented-label--idle text-stone-500'
             }`}
           >
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-[inherit] bg-white shadow-sm ring-1 ring-stone-200/80"
+                className="ios-segmented-thumb absolute inset-0 rounded-[inherit] bg-white shadow-sm ring-1 ring-stone-200/80"
                 transition={iosSpringSnappy}
               />
             )}

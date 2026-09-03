@@ -65,18 +65,6 @@
   background: var(--audio-bg-base, #f7f8fa);
 }
 
-.native-bottom-sheet--audio-light .settings-group > h3 {
-  color: var(--audio-text-secondary, #6c7077);
-}
-
-.native-bottom-sheet--audio-light .settings-group-row {
-  border-color: rgba(23, 26, 34, 0.06);
-  background: var(--audio-surface, #ffffff);
-  box-shadow: var(--audio-shadow-card);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
 html.app-dark-mode .native-sheet-backdrop--audio-light {
   background: rgba(2, 6, 23, 0.55) !important;
 }
@@ -96,19 +84,15 @@ html.app-dark-mode .native-bottom-sheet--audio-light .vault-drawer-scroll {
   background: var(--audio-bg-base, #0b1220);
 }
 
-html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-title,
-html.app-dark-mode .native-bottom-sheet--audio-light .settings-group-row p:first-child {
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-title {
   color: var(--audio-text-primary, #f8fafc);
 }
 
 html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-kicker,
-html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-subtitle,
-html.app-dark-mode .native-bottom-sheet--audio-light .settings-group > h3,
-html.app-dark-mode .native-bottom-sheet--audio-light .settings-group-row p:last-child {
+html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-subtitle {
   color: var(--audio-text-secondary, #aab3c2);
 }
 
-html.app-dark-mode .native-bottom-sheet--audio-light .settings-group-row,
 html.app-dark-mode .native-bottom-sheet--audio-light .vault-take-card,
 html.app-dark-mode .native-bottom-sheet--audio-light .vault-empty-state,
 html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-close,
@@ -116,14 +100,6 @@ html.app-dark-mode .native-bottom-sheet--audio-light .native-sheet-action-pill {
   border-color: rgba(226, 232, 240, 0.1);
   background: var(--audio-surface, rgba(15, 23, 42, 0.82));
   box-shadow: var(--audio-shadow-card);
-}
-
-.native-bottom-sheet--audio-light .settings-group-row p:first-child {
-  color: var(--audio-text-primary, #171a22);
-}
-
-.native-bottom-sheet--audio-light .settings-group-row p:last-child {
-  color: var(--audio-text-secondary, #6c7077);
 }
 
 .native-bottom-sheet--audio-light .vault-take-card {

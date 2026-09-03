@@ -363,6 +363,7 @@ export default function StaffJumperScreen({
     resume,
     noteRemainingMs,
     noteTimeoutMs,
+    beatInBar,
   } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
 
   targetMidiRef.current =
@@ -602,7 +603,12 @@ export default function StaffJumperScreen({
 
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
-              Difficulty <span>{DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]}s per note</span>
+              Difficulty{' '}
+              <span>
+                {draftMetronome
+                  ? 'the click sets the pace'
+                  : `${DIFFICULTY_TIMEOUT_SECONDS[draftDifficulty]}s per note`}
+              </span>
             </p>
             <Options
               label="Difficulty"
@@ -751,7 +757,11 @@ export default function StaffJumperScreen({
             aria-pressed={draftMetronome}
           >
             <span className="sj-field__label">
-              Metronome <span>Counts you in, then keeps the pulse</span>
+              Metronome{' '}
+              <span>
+                Counts you in, then the run follows the click: play each note on its
+                beat and hold it for its written length
+              </span>
             </span>
             <span className={`sj-switch ${draftMetronome ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
@@ -846,6 +856,12 @@ export default function StaffJumperScreen({
           <p className="balance-award__note">
             {state.missCount} {state.missCount === 1 ? 'miss' : 'misses'} · Best {state.bestScore}
           </p>
+          {state.config.metronome && state.correctCount > 0 && (
+            <p className="balance-award__note">
+              On the beat {Math.round((state.onTimeCount / state.correctCount) * 100)}% ·{' '}
+              Early {state.earlyCount} · Late {state.lateCount}
+            </p>
+          )}
 
           <div className="balance-award__actions">
             <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="balance-cta">
@@ -875,6 +891,7 @@ export default function StaffJumperScreen({
       onFallComplete={completeFall}
       turnRemainingMs={noteRemainingMs}
       turnDurationMs={noteTimeoutMs}
+      beatInBar={beatInBar}
     />
   )
 

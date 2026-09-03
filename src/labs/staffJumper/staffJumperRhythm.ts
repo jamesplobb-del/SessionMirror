@@ -664,11 +664,13 @@ export function durationMs(durationUnits: number, meter: MeterSpec, bpm: number)
 }
 
 /**
- * How long the player lingers on a note before hopping to the next one.
+ * How long the player lingers on a note before hopping to the next one, with
+ * the metronome *off*. (With it on, the click paces the run and the player
+ * stands on a note for its full written length — see staffJumperRhythmReading.)
  *
  * Deliberately *not* the note's written length: holding a whole note for its
- * full four beats makes the game feel stalled, and the game does not claim to
- * assess duration anyway. This is a compressed version of the written length —
+ * full four beats makes an unpaced game feel stalled, and without a click the
+ * game does not claim to assess duration. This is a compressed version of the written length —
  * long notes visibly dwell longer than short ones, but the spread is squared
  * off so the longest note costs a beat's worth of pause rather than a bar's.
  *

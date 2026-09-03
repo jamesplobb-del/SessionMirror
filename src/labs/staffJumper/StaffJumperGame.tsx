@@ -9,6 +9,7 @@ import {
   getKeySignatureMarkers,
   getTargetNoteAtStep,
   getVisiblePlatforms,
+  isRhythmMode,
   pitchClassLabel,
   pitchClassesMatch,
   showKeySignature,
@@ -51,6 +52,7 @@ import StaffRest from './StaffRest'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { layoutRhythm } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
+import { describeWrittenRhythm, formatBeats } from './staffJumperRhythmReading'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -61,6 +63,8 @@ interface StaffJumperGameProps {
   onFallComplete: () => void
   turnRemainingMs: number
   turnDurationMs: number
+  /** Rhythm mode: the pulse of the bar the click is on, 0-based. */
+  beatInBar: number | null
 }
 
 /** Visible feet sit above the transparent bottom padding in the source PNG. */
@@ -112,6 +116,32 @@ function flagPath(x: number, y: number, direction: StemDirection): string {
   ].join(' ')
 }
 
+/**
+ * The bar's beats as a row of dots, the current one lit.
+ *
+ * Rhythm mode's replacement for the countdown bar: the question is no longer
+ * "how long until this note times out" but "where in the bar are we", which
+ * is what a musician looks at a conductor for.
+ */
+function BeatStrip({ beat, count }: { beat: number | null; count: number }) {
+  return (
+    <div className="sj-beat-strip" aria-hidden>
+      {Array.from({ length: count }, (_, index) => (
+        <span
+          key={index}
+          className={[
+            'sj-beat-strip__dot',
+            index === 0 ? 'sj-beat-strip__dot--downbeat' : '',
+            beat === index ? 'sj-beat-strip__dot--on' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        />
+      ))}
+    </div>
+  )
+}
+
 function Hearts({ count, max = 3 }: { count: number; max?: number }) {
   return (
     <div className="sj-hud-hearts" aria-label={`${count} hearts remaining`}>
@@ -136,8 +166,10 @@ export default function StaffJumperGame({
   onFallComplete,
   turnRemainingMs,
   turnDurationMs,
+  beatInBar,
 }: StaffJumperGameProps) {
   const config = state.config!
+  const rhythmMode = isRhythmMode(config)
   const target = getTargetNoteAtStep(config, state.sequenceStep)
   const detectedPc = getDetectedPitchClass(readout, config)
   const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
@@ -151,19 +183,32 @@ export default function StaffJumperGame({
     : config.difficulty === 'easy'
       ? target.noteLabel
       : 'See staff'
+  const meterSpec = METERS[config.meter]
+  /** Rhythm mode: the written value under the player, in words. */
+  const writtenRhythm = rhythmMode ? describeWrittenRhythm(target.rhythm, meterSpec) : null
+  const holdBeats = formatBeats(target.rhythm.durationUnits, meterSpec)
+
   const responseHint = target.isRest
-    ? 'Rest — count it through'
-    : detectedPc == null
-      ? config.difficulty === 'easy'
-        ? `Play ${target.noteLabel}`
-        : 'Play the note under the player'
-      : isPlayableMatch
-        ? Math.abs(cents) <= 8
-          ? 'Centered'
-          : 'Hold steady'
-        : isMatch
-          ? `${cents > 0 ? '+' : ''}${cents}¢ from center`
-          : 'Try again'
+    ? rhythmMode
+      ? `Rest — count ${holdBeats}`
+      : 'Rest — count it through'
+    : rhythmMode && state.isSustaining
+      ? `Hold it — ${holdBeats}`
+      : detectedPc == null
+        ? config.difficulty === 'easy'
+          ? rhythmMode
+            ? `Play ${target.noteLabel} ${writtenRhythm!.count}`
+            : `Play ${target.noteLabel}`
+          : rhythmMode
+            ? `Play the note under the player ${writtenRhythm!.count}`
+            : 'Play the note under the player'
+        : isPlayableMatch
+          ? Math.abs(cents) <= 8
+            ? 'Centered'
+            : 'Hold steady'
+          : isMatch
+            ? `${cents > 0 ? '+' : ''}${cents}¢ from center`
+            : 'Try again'
 
   const playfieldRef = useRef<HTMLDivElement>(null)
 
@@ -198,7 +243,6 @@ export default function StaffJumperGame({
     [config.clef, config.difficulty, config.key, config.scaleMode],
   )
 
-  const meterSpec = METERS[config.meter]
   const glyphMetrics = useMusicGlyphMetrics()
 
   /**
@@ -290,14 +334,22 @@ export default function StaffJumperGame({
         ? 'Landed.'
         : state.feedback === 'timeout'
           ? `Time is up. ${state.hearts} hearts left.`
-          : state.feedback === 'wrong'
-            ? `Wrong note. ${state.hearts} hearts left.`
-            : ''
+          : state.feedback === 'missed-beat'
+            ? `Missed the beat. ${state.hearts} hearts left.`
+            : state.feedback === 'wrong'
+              ? `Wrong note. ${state.hearts} hearts left.`
+              : ''
   const targetAnnouncement = target.isRest
-    ? 'Rest. Wait for the next note.'
+    ? rhythmMode
+      ? `Rest for ${holdBeats}.`
+      : 'Rest. Wait for the next note.'
     : config.difficulty === 'easy'
-      ? `Target ${target.noteLabel}.`
-      : `Read the next note for jump ${state.sequenceStep + 1}.`
+      ? rhythmMode
+        ? `Target ${target.noteLabel}, ${writtenRhythm!.name.toLowerCase()}, ${writtenRhythm!.count}.`
+        : `Target ${target.noteLabel}.`
+      : rhythmMode
+        ? `Read the next note, ${writtenRhythm!.name.toLowerCase()}, ${writtenRhythm!.count}.`
+        : `Read the next note for jump ${state.sequenceStep + 1}.`
   const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
 
   const timingLabel =
@@ -308,6 +360,21 @@ export default function StaffJumperGame({
         : state.timing === 'late'
           ? `Late ${Math.abs(state.timingErrorMs)}ms`
           : null
+
+  /**
+   * Rhythm mode's running verdict on the last note: where the attack sat,
+   * what its spacing read as if that was not the written value, and whether
+   * a long note was held through. Stays up until the next note is judged.
+   */
+  const rhythmVerdict = rhythmMode
+    ? [
+        timingLabel,
+        state.playedRhythmLabel ? `sounded like ${state.playedRhythmLabel}` : null,
+        state.holdQuality === 'full' ? 'held' : state.holdQuality === 'short' ? 'cut short' : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : ''
 
   // Player position — visible feet meet the top edge of the current target notehead.
   const targetPlatform = displayedPlatforms.find((p) => p.role === 'target')
@@ -665,7 +732,10 @@ export default function StaffJumperGame({
           {state.isCountingIn && (
             <div className="sj-count-in" role="status">
               <strong>Listen for the count-in</strong>
-              <small>{config.tempoBpm} BPM · {meterSpec.label}</small>
+              <small>
+                {config.tempoBpm} BPM · {meterSpec.label}
+                {rhythmMode ? ' · play on the click' : ''}
+              </small>
             </div>
           )}
 
@@ -685,7 +755,9 @@ export default function StaffJumperGame({
                   ? 'Landed'
                   : state.feedback === 'timeout'
                     ? 'Time’s up'
-                    : 'Wrong note'}
+                    : state.feedback === 'missed-beat'
+                      ? 'Missed the beat'
+                      : 'Wrong note'}
               {timingLabel && <em className={`sj-feedback-toast__timing sj-timing--${state.timing}`}>{timingLabel}</em>}
             </div>
           )}
@@ -700,17 +772,35 @@ export default function StaffJumperGame({
                 <div className="sj-target-note">
                   <small>Target</small>
                   <strong>{targetDisplay}</strong>
+                  {writtenRhythm && (
+                    <span className="sj-target-note__rhythm">
+                      {writtenRhythm.name} · {writtenRhythm.beats}
+                    </span>
+                  )}
                 </div>
                 <div className={`sj-detected-note ${isPlayableMatch ? 'sj-detected-note--match' : ''}`}>
                   <small>Detected</small>
                   <strong>{detectedNote}</strong>
+                  {rhythmMode && (
+                    <span
+                      className={`sj-detected-note__rhythm ${
+                        state.holdQuality === 'short' || state.playedRhythmLabel
+                          ? 'sj-detected-note__rhythm--off'
+                          : ''
+                      }`}
+                    >
+                      {rhythmVerdict || 'Listening for the beat'}
+                    </span>
+                  )}
                 </div>
               </div>
               <p className={`sj-target-dock__hint ${isPlayableMatch ? 'sj-target-dock__hint--match' : ''}`}>
                 {responseHint}
               </p>
+              {/* Rhythm mode is paced by the click, so show the bar instead of a countdown. */}
+              {rhythmMode && <BeatStrip beat={beatInBar} count={meterSpec.pulsesPerMeasure} />}
               {/* Nothing is being timed during a rest, so nothing counts down. */}
-              {!target.isRest && (
+              {!rhythmMode && !target.isRest && (
                 <div
                   className="sj-turn-timer"
                   key={`sj-turn-${state.sequenceStep}-${state.missToken}`}

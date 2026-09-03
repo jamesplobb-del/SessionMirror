@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
   getConcertTonicPitchClass,
@@ -8,13 +8,30 @@ import {
   DIFFICULTY_TIMEOUT_SECONDS,
   isReadoutCorrectPitch,
   isReadoutWrongPitch,
+  isRhythmMode,
   loadBestScore,
+  measureStartStep,
+  pitchClassesMatch,
   saveBestScore,
   type StaffJumperConfig,
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
 import { durationMs, judgeTiming, lingerMs, METERS, secondsPerPulse } from './staffJumperRhythm'
+import {
+  attackWindowClosed,
+  classifyHold,
+  HOLD_DROPOUT_GRACE_MS,
+  holdIsReported,
+  identifyPlayedRhythm,
+  judgeOnset,
+  onsetWindowFor,
+  PITCH_DETECTION_LATENCY_MS,
+  slotDurationMs,
+  unitMs as unitMsFor,
+  writtenIoiUnits,
+  type HoldQuality,
+} from './staffJumperRhythmReading'
 import {
   startClickTrack,
   startDrone,
@@ -64,10 +81,21 @@ function createRunSeed(): number {
 
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
-  | { type: 'NOTE_ACCEPTED'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
+  | {
+      type: 'NOTE_ACCEPTED'
+      quality: 'perfect' | 'good'
+      timing: StaffJumperTiming
+      timingErrorMs: number
+      playedRhythmLabel?: string | null
+    }
   | { type: 'NOTE_COMPLETE' }
   | { type: 'REST_COMPLETE' }
-  | { type: 'MISS'; reason: 'wrong' | 'timeout' }
+  /**
+   * Rhythm mode's hop: the click has reached the next written onset, so the
+   * run moves on whether or not the note that just ended was ever played.
+   */
+  | { type: 'RHYTHM_ADVANCE'; holdQuality: HoldQuality | null }
+  | { type: 'MISS'; reason: 'wrong' | 'timeout' | 'missed-beat' }
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
@@ -100,6 +128,10 @@ function createInitialState(): StaffJumperState {
     timing: null,
     timingErrorMs: 0,
     onTimeCount: 0,
+    earlyCount: 0,
+    lateCount: 0,
+    playedRhythmLabel: null,
+    holdQuality: null,
     isCountingIn: false,
     isSustaining: false,
   }
@@ -145,8 +177,12 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         bestStreak: Math.max(state.bestStreak, streak),
         correctCount: state.correctCount + 1,
         onTimeCount: state.onTimeCount + (onTime ? 1 : 0),
+        earlyCount: state.earlyCount + (action.timing === 'early' ? 1 : 0),
+        lateCount: state.lateCount + (action.timing === 'late' ? 1 : 0),
         timing: action.timing,
         timingErrorMs: action.timingErrorMs,
+        playedRhythmLabel: action.playedRhythmLabel ?? null,
+        holdQuality: null,
         isSustaining: true,
         feedback: action.quality,
         feedbackToken: state.feedbackToken + 1,
@@ -193,10 +229,33 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
       }
     }
 
+    /**
+     * The click reached the next note. Unlike `NOTE_COMPLETE` this does not
+     * need the note to have been accepted: a missed beat still passes, exactly
+     * as it would with a band playing on, and the player hops with it.
+     */
+    case 'RHYTHM_ADVANCE': {
+      if (state.phase !== 'playing' || !state.config) return state
+      const nextStep = state.sequenceStep + 1
+      return {
+        ...state,
+        sequenceStep: nextStep,
+        targetPitchClass: getTargetNoteAtStep(state.config, nextStep).pitchClass,
+        advanceToken: state.advanceToken + 1,
+        isSustaining: false,
+        holdQuality: action.holdQuality,
+      }
+    }
+
     case 'MISS': {
       if (state.phase !== 'playing' || !state.config) return state
       const hearts = Math.max(0, state.hearts - 1)
-      const feedback = action.reason === 'timeout' ? 'timeout' : 'wrong'
+      const feedback =
+        action.reason === 'timeout'
+          ? 'timeout'
+          : action.reason === 'missed-beat'
+            ? 'missed-beat'
+            : 'wrong'
       if (hearts <= 0) {
         const bestScore = saveBestScore(state.score)
         return {
@@ -242,17 +301,27 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
       // timing the dwell died with the pause. Settle it here rather than
       // resuming into a dwell nothing is counting down, or re-judging a note
       // the player has already been paid for.
+      const settledStep =
+        state.isSustaining && state.config ? state.sequenceStep + 1 : state.sequenceStep
+      // Rhythm mode takes it from the top of the bar, so the count-in leads
+      // into a downbeat and the click's accents agree with the barlines. The
+      // notes before the pause in that bar are read again and score again —
+      // a few replayed notes are a small price for a restart that feels like
+      // one a musician would make.
+      const resumeStep =
+        state.config && isRhythmMode(state.config)
+          ? measureStartStep(state.config, settledStep)
+          : settledStep
       const settled =
-        state.isSustaining && state.config
+        state.config && resumeStep !== state.sequenceStep
           ? {
               ...state,
-              sequenceStep: state.sequenceStep + 1,
-              targetPitchClass: getTargetNoteAtStep(state.config, state.sequenceStep + 1)
-                .pitchClass,
+              sequenceStep: resumeStep,
+              targetPitchClass: getTargetNoteAtStep(state.config, resumeStep).pitchClass,
               advanceToken: state.advanceToken + 1,
               isSustaining: false,
             }
-          : state
+          : { ...state, isSustaining: false }
       return {
         ...settled,
         phase: 'playing',
@@ -260,6 +329,8 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         // Resuming replays the count-in, so pitch is ignored until it lands.
         isCountingIn: true,
         timing: null,
+        playedRhythmLabel: null,
+        holdQuality: null,
         pausedDurationMs:
           state.pausedDurationMs +
           (state.pausedAtMs == null ? 0 : Math.max(0, resumedAt - state.pausedAtMs)),
@@ -324,6 +395,31 @@ export function useStaffJumperGame(
    */
   const expectedPulseRef = useRef(0)
   /**
+   * Rhythm mode's grid.
+   *
+   * Pulse 0 of the click is the onset of the step the count-in led into, so a
+   * slot's position on the grid is its unit position minus this origin. Set
+   * when a count-in begins; `wallOriginMs` is the wall-clock moment pulse 0
+   * arrived, which stands in for the audio clock if the context is suspended.
+   */
+  const gridOriginRef = useRef({ units: 0, unitsIntoMeasure: 0, wallOriginMs: 0 })
+  /**
+   * When the pitch class currently sounding first appeared.
+   *
+   * The attack the rhythm is judged on: a pitch that stabilises 30 ms after it
+   * first shows up was attacked 30 ms ago, not now, and a pitch that was
+   * already sounding when the run reached its note was attacked early.
+   */
+  const pitchOnsetRef = useRef<{ pitchClass: number | null; startedAt: number }>({
+    pitchClass: null,
+    startedAt: 0,
+  })
+  /** Grid time and page position of the last accepted attack, for the spacing between notes. */
+  const lastAttackRef = useRef<{ gridMs: number; unitPosition: number } | null>(null)
+  const beatInBarRef = useRef<number | null>(null)
+  /** Pulse within the bar the click is on, for the HUD's beat strip. Null with no clock. */
+  const [beatInBar, setBeatInBar] = useState<number | null>(null)
+  /**
    * Wall-clock backstop for the count-in.
    *
    * The click handle only exists once the audio context has resumed, and on a
@@ -350,6 +446,8 @@ export function useStaffJumperGame(
     const drone = droneRef.current
     droneRef.current = null
     if (drone) void drone.stop()
+    beatInBarRef.current = null
+    setBeatInBar(null)
   }, [])
 
   const startAudio = useCallback((config: StaffJumperConfig) => {
@@ -410,21 +508,28 @@ export function useStaffJumperGame(
     noteDeadlineAtRef.current = null
   }, [])
 
+  const resetAttackTracking = useCallback(() => {
+    pitchOnsetRef.current = { pitchClass: null, startedAt: 0 }
+    lastAttackRef.current = null
+  }, [])
+
   const start = useCallback((config: StaffJumperConfig) => {
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    resetAttackTracking()
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
     // Never inherit the setup preview's seed or a previous run's seed.
     const seeded = { ...config, sessionSeed: createRunSeed() }
     dispatch({ type: 'START', config: seeded })
     startAudio(seeded)
-  }, [resetNoteClock, startAudio])
+  }, [resetAttackTracking, resetNoteClock, startAudio])
 
   const restart = useCallback(() => {
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    resetAttackTracking()
     const config = stateRef.current.config
     resetNoteClock(
       config
@@ -436,7 +541,7 @@ export function useStaffJumperGame(
       dispatch({ type: 'RESTART', config: seeded })
       startAudio(seeded)
     }
-  }, [resetNoteClock, startAudio])
+  }, [resetAttackTracking, resetNoteClock, startAudio])
 
   const backToSetup = useCallback(() => {
     actionLockUntilRef.current = 0
@@ -463,12 +568,13 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = performance.now() + 650
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    resetAttackTracking()
     const config = stateRef.current.config
     dispatch({ type: 'RESUME' })
     // A fresh count-in re-establishes the tempo, and restarting the transport
     // re-anchors the beat clock so the first note back is judged from zero.
     if (config) startAudio(config)
-  }, [startAudio])
+  }, [resetAttackTracking, startAudio])
 
   useEffect(() => {
     const pauseForVisibilityLoss = () => {
@@ -510,7 +616,11 @@ export function useStaffJumperGame(
     lastFeedbackTokenRef.current = state.feedbackToken
     if (state.feedback === 'good' || state.feedback === 'perfect') {
       triggerSuccessHaptic(hapticFeedback)
-    } else if (state.feedback === 'wrong' || state.feedback === 'timeout') {
+    } else if (
+      state.feedback === 'wrong' ||
+      state.feedback === 'timeout' ||
+      state.feedback === 'missed-beat'
+    ) {
       triggerWarningHaptic(hapticFeedback)
     }
   }, [hapticFeedback, state.feedback, state.feedbackToken])
@@ -539,11 +649,69 @@ export function useStaffJumperGame(
     let restResolved = false
 
     /**
-     * When the accepted note stops lingering and the player hops on.
+     * Rhythm mode — the click is the conductor.
      *
-     * Wall clock rather than the click's grid: the run is paced by the player,
-     * not the transport, so this is a dwell — long enough to feel the note's
-     * length — and not an attempt to land the hop on the next beat.
+     * Each slot has an onset and an end on the click's grid. The step advances
+     * when the grid reaches the slot's end, whatever the player did, so the
+     * character stands on a whole note for four beats and a rest for its full
+     * length. The note itself must be attacked inside a window around its
+     * onset (see staffJumperRhythmReading for how wide, and why), and after
+     * the attack the pitch is followed only to report how long it was held.
+     */
+    const rhythmMode = isRhythmMode(state.config!)
+    const bpm = state.config!.tempoBpm
+    const pulseMs = secondsPerPulse(bpm) * 1000
+    const perUnitMs = unitMsFor(stepMeter, bpm)
+    const previousSlot =
+      state.sequenceStep > 0 ? getRhythmForStep(state.config!, state.sequenceStep - 1) : null
+    const onsetWindow = onsetWindowFor(stepRhythm, previousSlot, stepMeter, bpm)
+    const writtenMs = slotDurationMs(stepRhythm, stepMeter, bpm)
+    /** Attack settled — accepted, or given up on when its window closed. */
+    let attackResolved = false
+    let attackAccepted = false
+    /** A wrong note already cost a heart here; the closing window must not cost another. */
+    let heartLostOnThisNote = false
+    let attackWallMs = 0
+    let soundedUntilWallMs = 0
+    let releasedAtWallMs: number | null = null
+    let advanced = false
+
+    // The grid is anchored to the step the count-in leads into.
+    if (state.isCountingIn) {
+      gridOriginRef.current = {
+        units: stepRhythm.unitPosition,
+        unitsIntoMeasure: stepRhythm.unitsIntoMeasure,
+        wallOriginMs: countInUntilMsRef.current - AUDIO_START_GRACE_MS,
+      }
+      lastAttackRef.current = null
+    }
+
+    /** Milliseconds since pulse 0 — negative during the count-in. */
+    const gridNowMs = (now: number) => {
+      const click = clickRef.current
+      if (click && click.isRunning()) return click.pulsesElapsed() * pulseMs
+      return now - gridOriginRef.current.wallOriginMs
+    }
+
+    const publishBeat = (gridMs: number) => {
+      const unitsIntoBar = gridMs / perUnitMs + gridOriginRef.current.unitsIntoMeasure
+      const pulse = Math.floor(unitsIntoBar / stepMeter.pulseUnits)
+      const beat =
+        ((pulse % stepMeter.pulsesPerMeasure) + stepMeter.pulsesPerMeasure) %
+        stepMeter.pulsesPerMeasure
+      if (beatInBarRef.current !== beat) {
+        beatInBarRef.current = beat
+        setBeatInBar(beat)
+      }
+    }
+
+    /**
+     * Free play: when the accepted note stops lingering and the player hops on.
+     *
+     * Wall clock rather than the click's grid: with the metronome off the run
+     * is paced by the player, not the transport, so this is a dwell — long
+     * enough to feel the note's length — and not an attempt to land the hop on
+     * the next beat. Rhythm mode never reads this; it hops on the grid.
      */
     let lingerUntilMs: number | null = null
 
@@ -569,6 +737,13 @@ export function useStaffJumperGame(
       const dt = Math.min(now - lastTs, 50)
       lastTs = now
 
+      // Note when the sounding pitch class began, count-in included: an attack
+      // just ahead of the first beat is an early first note, not a non-event.
+      const detectedNow = getDetectedPitchClass(readoutRef.current, current.config)
+      if (pitchOnsetRef.current.pitchClass !== detectedNow) {
+        pitchOnsetRef.current = { pitchClass: detectedNow, startedAt: now }
+      }
+
       // Hold everything — pitch, the note clock, the lot — until the count-in
       // has played, so warm-up notes over the click cannot score or cost a life.
       const click = clickRef.current
@@ -579,14 +754,157 @@ export function useStaffJumperGame(
         const audioRemainingMs =
           click && click.isRunning() ? click.countInRemainingSec() * 1000 : Number.POSITIVE_INFINITY
         const wallRemainingMs = countInUntilMsRef.current - now
+        if (rhythmMode) publishBeat(gridNowMs(now))
         if (Math.min(audioRemainingMs, wallRemainingMs) > 0) {
           resetTargetDeadline(now)
           rafId = requestAnimationFrame(tick)
           return
         }
         expectedPulseRef.current = click?.isRunning() ? click.pulsesElapsed() : 0
+        // Pulse 0 is now, by whichever clock got here first.
+        gridOriginRef.current.wallOriginMs =
+          now - (click?.isRunning() ? click.pulsesElapsed() * pulseMs : 0)
         resetTargetDeadline(now)
         dispatch({ type: 'COUNT_IN_COMPLETE' })
+        rafId = requestAnimationFrame(tick)
+        return
+      }
+
+      if (rhythmMode) {
+        // The grid is the only clock here; the free-play timeout never runs.
+        resetTargetDeadline(now)
+        const gridMs = gridNowMs(now)
+        publishBeat(gridMs)
+        const slotOnsetMs = (stepRhythm.unitPosition - gridOriginRef.current.units) * perUnitMs
+        const slotEndMs = slotOnsetMs + writtenMs
+        const timing = DIFFICULTY_TIMING[current.config.difficulty]
+        const readoutNow = readoutRef.current
+        const target = current.targetPitchClass
+
+        if (stepRhythm.isRest) {
+          // Silence is read, not played: whatever sounds during a rest is
+          // neither right nor wrong, and the run waits out the written length.
+          if (!advanced && gridMs >= slotEndMs) {
+            advanced = true
+            releasingPitchClassRef.current = null
+            wrongPitchClassRef.current = null
+            dispatch({ type: 'REST_COMPLETE' })
+          }
+          rafId = requestAnimationFrame(tick)
+          return
+        }
+
+        if (!attackResolved) {
+          // The previous note has stopped ringing once the pitch moves or drops out.
+          if (releasingPitchClassRef.current !== detectedNow) {
+            releasingPitchClassRef.current = null
+          }
+          const isReleasingPreviousNote = releasingPitchClassRef.current != null
+
+          if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
+            wrongStableMs = 0
+            wrongPitchClassRef.current = null
+            const soundingForMs = now - pitchOnsetRef.current.startedAt
+            const requiredMs = isReleasingPreviousNote ? REPEATED_NOTE_HOLD_MS : timing.correctMs
+            if (soundingForMs >= requiredMs) {
+              // The attack is when the pitch first appeared, pulled back by the
+              // detector's lag. A note already sounding when its slot arrived
+              // was attacked early; it is credited from the window's edge at
+              // the earliest, so nothing is ever judged against a beat that
+              // belonged to a different note.
+              const rawAttackGridMs = gridMs - soundingForMs - PITCH_DETECTION_LATENCY_MS
+              const attackGridMs = Math.max(rawAttackGridMs, slotOnsetMs - onsetWindow.earlyMs)
+              const errorMs = attackGridMs - slotOnsetMs
+              const placement = judgeOnset(errorMs, onsetWindow)
+
+              // Name the rhythm the spacing from the last attack produced.
+              const lastAttack = lastAttackRef.current
+              const played = lastAttack
+                ? identifyPlayedRhythm(
+                    attackGridMs - lastAttack.gridMs,
+                    writtenIoiUnits(lastAttack, stepRhythm),
+                    stepMeter,
+                    bpm,
+                  )
+                : null
+              lastAttackRef.current = { gridMs: attackGridMs, unitPosition: stepRhythm.unitPosition }
+
+              attackResolved = true
+              attackAccepted = true
+              attackWallMs = now - soundingForMs
+              soundedUntilWallMs = now
+              releasingPitchClassRef.current = detectedNow
+              dispatch({
+                type: 'NOTE_ACCEPTED',
+                quality: Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good',
+                timing: placement,
+                timingErrorMs: Math.round(errorMs),
+                playedRhythmLabel: played && !played.matchesWritten ? played.label : null,
+              })
+            }
+          } else if (
+            !isReleasingPreviousNote &&
+            isReadoutWrongPitch(readoutNow, target, current.config)
+          ) {
+            const wrongPc = detectedNow!
+            if (wrongPitchClassRef.current !== wrongPc) {
+              wrongPitchClassRef.current = wrongPc
+              wrongStableMs = 0
+            }
+            wrongStableMs += dt
+            if (wrongStableMs >= timing.wrongMs && !heartLostOnThisNote) {
+              // One heart for the wrong note; the window stays open so the
+              // right note can still be found before the beat has gone.
+              heartLostOnThisNote = true
+              wrongStableMs = 0
+              wrongPitchClassRef.current = null
+              releasingPitchClassRef.current = wrongPc
+              dispatch({ type: 'MISS', reason: 'wrong' })
+            }
+          } else {
+            wrongStableMs = 0
+            wrongPitchClassRef.current = null
+          }
+
+          // The window closing settles the note; so does the note ending, as a
+          // backstop, so nothing can slip through unjudged.
+          if (
+            !attackResolved &&
+            (attackWindowClosed(gridMs, slotOnsetMs, onsetWindow) || gridMs >= slotEndMs)
+          ) {
+            attackResolved = true
+            // A wrong note still sounding as the beat passes is a wrong note,
+            // not a missed one — that is what the player should be told.
+            const wrongNoteSounding = wrongPitchClassRef.current != null
+            wrongStableMs = 0
+            wrongPitchClassRef.current = null
+            // Whatever is sounding now belongs to the note that just went by.
+            releasingPitchClassRef.current = detectedNow
+            if (!heartLostOnThisNote) {
+              heartLostOnThisNote = true
+              dispatch({ type: 'MISS', reason: wrongNoteSounding ? 'wrong' : 'missed-beat' })
+            }
+          }
+        } else if (attackAccepted && releasedAtWallMs == null) {
+          // Follow the hold. A brief dropout is not a release; a real one is.
+          if (detectedNow != null && pitchClassesMatch(detectedNow, target)) {
+            soundedUntilWallMs = now
+          } else if (now - soundedUntilWallMs > HOLD_DROPOUT_GRACE_MS) {
+            releasedAtWallMs = soundedUntilWallMs
+          }
+        }
+
+        // The click has reached the next written onset: hop, played or not.
+        if (!advanced && gridMs >= slotEndMs) {
+          advanced = true
+          let holdQuality: HoldQuality | null = null
+          if (attackAccepted && holdIsReported(stepRhythm, stepMeter)) {
+            const soundedMs = (releasedAtWallMs ?? now) - attackWallMs
+            holdQuality = classifyHold(soundedMs, writtenMs)
+          }
+          dispatch({ type: 'RHYTHM_ADVANCE', holdQuality })
+        }
+
         rafId = requestAnimationFrame(tick)
         return
       }
@@ -777,5 +1095,7 @@ export function useStaffJumperGame(
     resume,
     noteRemainingMs: Math.max(0, Math.min(configuredTimeoutMs, noteRemainingMsRef.current)),
     noteTimeoutMs: configuredTimeoutMs,
+    /** Rhythm mode: the pulse of the bar the click is on, 0-based; null without a running run. */
+    beatInBar,
   }
 }
