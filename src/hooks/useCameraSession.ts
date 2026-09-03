@@ -59,7 +59,11 @@ import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs, requestPitchGraphReattach } from './useLivePitchTracker'
 import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
-import { setNativeAudioCaptureActive, syncNativeCameraSessionState } from '../utils/cameraSessionState'
+import {
+  forceNativeRecordingMode,
+  setNativeAudioCaptureActive,
+  syncNativeCameraSessionState,
+} from '../utils/cameraSessionState'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
 import { reportError } from '../utils/crashReporting'
@@ -318,6 +322,9 @@ export function useCameraSession({
   const nativePreviewActiveRef = useRef(false)
   const nativePreviewStartTokenRef = useRef(0)
   const nativeBridgeAcquireInFlightRef = useRef<Promise<boolean> | null>(null)
+  const nativeBridgeReleaseInFlightRef = useRef<Promise<void> | null>(null)
+  const queuedAfterNativeReleaseModeRef = useRef<RecordingMode | null>(null)
+  const nativeReleaseResumeArmedRef = useRef(false)
   const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
   const requestCameraAccessRef = useRef<((requestedMode?: RecordingMode) => void) | null>(null)
   const armedAutoAudioRef = useRef<{
@@ -633,6 +640,14 @@ export function useCameraSession({
     if (existingAcquire) return existingAcquire
 
     const acquire = (async (): Promise<boolean> => {
+      const pendingRelease = nativeBridgeReleaseInFlightRef.current
+      if (pendingRelease) {
+        await pendingRelease
+      }
+      if (recordingModeRef.current !== 'video') {
+        return false
+      }
+
       releaseWebKitVideoTracksForNativeBridge()
       if (Capacitor.isNativePlatform()) {
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
@@ -641,6 +656,13 @@ export function useCameraSession({
       // The user may have already switched away from video mode (e.g. into the tuner)
       // while this handoff delay was running — don't start the native bridge for a
       // mode nobody wants anymore.
+      if (recordingModeRef.current !== 'video') {
+        return false
+      }
+
+      // Native rejects bridge starts while its mode mirror still says Audio.
+      // The React mode effect and this async start otherwise race each other.
+      await forceNativeRecordingMode('video')
       if (recordingModeRef.current !== 'video') {
         return false
       }
@@ -689,8 +711,25 @@ export function useCameraSession({
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
     nativePreviewActiveRef.current = false
-    await stopNativeCameraBridge()
-    void syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
+
+    const existingRelease = nativeBridgeReleaseInFlightRef.current
+    if (existingRelease) {
+      await existingRelease
+      return
+    }
+
+    const release = (async () => {
+      await stopNativeCameraBridge()
+      await syncNativeCameraSessionState({ previewActive: false, recordingActive: false })
+    })()
+    nativeBridgeReleaseInFlightRef.current = release
+    try {
+      await release
+    } finally {
+      if (nativeBridgeReleaseInFlightRef.current === release) {
+        nativeBridgeReleaseInFlightRef.current = null
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -763,6 +802,14 @@ export function useCameraSession({
     ) => {
       const epoch = captureSessionEpochRef.current
       setError(null)
+
+      if (mode === 'audio') {
+        const pendingNativeRelease = nativeBridgeReleaseInFlightRef.current
+        if (pendingNativeRelease) {
+          await pendingNativeRelease
+          if (isCaptureSessionStale(epoch, mode, cancelled)) return null
+        }
+      }
 
       if (
         mode === 'video' &&
@@ -912,6 +959,27 @@ export function useCameraSession({
   const requestCameraAccess = useCallback((requestedMode?: RecordingMode) => {
     const mode = requestedMode ?? recordingModeRef.current
     if (isRecordingRef.current) return
+
+    const pendingNativeRelease = nativeBridgeReleaseInFlightRef.current
+    if (mode === 'audio' && pendingNativeRelease) {
+      queuedAfterNativeReleaseModeRef.current = mode
+      if (!nativeReleaseResumeArmedRef.current) {
+        nativeReleaseResumeArmedRef.current = true
+        void pendingNativeRelease.finally(() => {
+          nativeReleaseResumeArmedRef.current = false
+          const queuedMode = queuedAfterNativeReleaseModeRef.current
+          queuedAfterNativeReleaseModeRef.current = null
+          if (
+            queuedMode &&
+            queuedMode === recordingModeRef.current &&
+            !isRecordingRef.current
+          ) {
+            window.setTimeout(() => requestCameraAccessRef.current?.(queuedMode), 0)
+          }
+        })
+      }
+      return
+    }
 
     if (isNativeAudioBridgeEnabled() && mode === 'audio') {
       if (nativePreviewActiveRef.current) {
@@ -2636,9 +2704,16 @@ export function useCameraSession({
     }
 
     if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current) {
-      cancelAutoPreRollCapture()
+      if (
+        isNativeVideoRecordingEnabled() &&
+        (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current)
+      ) {
+        await discardNativeAutoPreRollCaptureRef.current()
+      } else {
+        cancelAutoPreRollCapture()
+      }
     }
-  }, [cancelAutoPreRollCapture, disarmAutoAudioRecorder])
+  }, [cancelAutoPreRollCapture, disarmAutoAudioRecorder, isNativeVideoRecordingEnabled])
 
   const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     console.log('[AudioRecordLifecycle] userPressedStop')

@@ -310,9 +310,8 @@ interface MainAudioPitchSource {
 
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
-/** Cover, swap, reveal — the two halves of the Camera ↔ Tools dissolve. */
-const SURFACE_COVER_MS = 170
-const SURFACE_REVEAL_HOLD_MS = 90
+/** Minimum gap between unforced tuner capture-session rebuilds. */
+const TUNER_MIC_REBUILD_FLOOR_MS = 1500
 
 const importMetronomeWidget = () => import('./components/DraggableMetronomeWidget')
 const importDroneWidget = () => import('./components/DraggableDroneWidget')
@@ -562,10 +561,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   /** The live room, kept current so a focused take can remember the desk it was played on. */
   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
   const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
-  /** Dissolve veil painted in the colour of the surface being entered. */
+  /** Cross-fade veil painted in the colour of the surface being entered. */
   const [modeVeil, setModeVeil] = useState<RecordingMode | null>(null)
-  const modeVeilTimerRef = useRef<number | null>(null)
-  const modeTransitionRef = useRef(false)
   /** One breath of the record button after Current finishes playing back. */
   const [againPulse, setAgainPulse] = useState(false)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
@@ -648,6 +645,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
+  /**
+   * True from the moment a hands-free take finishes until its replay has ended.
+   * Read by background work that rewrites the take file on disk (the Audio
+   * Enhancer bake) so it never swaps the file out from under the decoder that
+   * is streaming it.
+   */
+  const handsFreePlaybackBusyRef = useRef(false)
+  handsFreePlaybackBusyRef.current =
+    pendingAutoPlaybackRef.current || handsFreePlaybackPending || autoPlaybackPlaying
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
   const splitPreviewRef = useRef<HTMLVideoElement>(null)
@@ -1794,6 +1800,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         if (audioEnhancerEnabledRef.current && isNativeCameraPlatform && resolvedFilePath) {
           void (async () => {
             try {
+              // The bake swaps the file on disk (replaceItemAt). Hands-free
+              // replays the take straight away — in camera mode the <video>
+              // streams that very file through range requests, and having it
+              // replaced mid-stream froze the decoder and aborted playback
+              // back to record. Wait for the replay to finish first; the take
+              // plays with the live enhancer in the meantime.
+              const bakeHoldStartedAt = performance.now()
+              while (
+                (handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) &&
+                performance.now() - bakeHoldStartedAt < 120_000
+              ) {
+                await waitMs(250)
+              }
               const fileUri = await resolveNativeFileUri(resolvedFilePath)
               if (!fileUri) return
               await BestTakeAudioPlugin.enhanceTakeAudio({
@@ -2514,6 +2533,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const vaultHydrateInFlightRef = useRef(false)
   /** Blocks ghost-tap reopen after sheet close (tuner tab has high-frequency pitch updates). */
   const overlayOpenSuppressUntilRef = useRef(0)
+  const settingsOpenInFlightRef = useRef(false)
 
   const canOpenOverlaySheet = useCallback(() => {
     return performance.now() >= overlayOpenSuppressUntilRef.current
@@ -2641,20 +2661,41 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
-    if (!canOpenOverlaySheet() || isExperimentalOpen) return
+    if (!canOpenOverlaySheet() || isExperimentalOpen || settingsOpenInFlightRef.current) return
     triggerLightHaptic(settings.hapticFeedback)
-    setShowPitch(false)
-    setIsVaultOpen(false)
-    setIsSettingsOpen(true)
-    deferHudMediaPause()
-  }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
+    const openSettings = () => {
+      settingsOpenInFlightRef.current = false
+      if (!canOpenOverlaySheet() || isExperimentalOpen) return
+      setShowPitch(false)
+      setIsVaultOpen(false)
+      setIsSettingsOpen(true)
+      deferHudMediaPause()
+    }
 
-  const applyRecordingModeChange = useCallback(
+    if (recordingModeRef.current === 'video' && isAutoPreRollCaptureActive()) {
+      settingsOpenInFlightRef.current = true
+      void disarmAutoRecording().finally(openSettings)
+      return
+    }
+
+    openSettings()
+  }, [
+    canOpenOverlaySheet,
+    deferHudMediaPause,
+    disarmAutoRecording,
+    isAutoPreRollCaptureActive,
+    isExperimentalOpen,
+    settings.hapticFeedback,
+  ])
+
+  const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
         // Same sitting, different surface: the tool tab, the pitch overlay and
-        // Take Cards are left exactly as the player had them.
+        // Take Cards are left exactly as the player had them. A short veil in
+        // the incoming surface's colour turns the swap into a cross-fade.
+        setModeVeil(mode)
         // Refresh the cached visual viewport before the audio layout mounts.
         // Otherwise iOS can paint one frame with the camera surface's stale
         // height and clip the bottom deck before its later recovery pass.
@@ -2697,52 +2738,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       requestCameraPreviewResume,
     ]
   )
-
-  /**
-   * Camera ↔ Tools as one dissolve.
-   *
-   * The surfaces cannot cross-fade against each other — the camera session is
-   * torn down and the layout is rebuilt the moment the mode flips — so the
-   * swap happens *behind* a veil painted in the colour the destination starts
-   * as. Cover first, switch while nothing is visible, then reveal onto the
-   * ground the new surface already sits on. Doing the swap first, as an
-   * uncovered flip, is what read as a glitch.
-   */
-  const handleRecordingModeChange = useCallback(
-    (mode: RecordingMode) => {
-      if (mode === recordingModeRef.current) {
-        applyRecordingModeChange(mode)
-        return
-      }
-      if (modeTransitionRef.current) return
-      modeTransitionRef.current = true
-      setModeVeil(mode)
-
-      modeVeilTimerRef.current = window.setTimeout(() => {
-        modeVeilTimerRef.current = null
-        applyRecordingModeChange(mode)
-        // Let the incoming surface paint before the veil lifts, so the reveal
-        // lands on a finished screen rather than a half-built one.
-        scheduleAfterPaint(() => {
-          modeVeilTimerRef.current = window.setTimeout(() => {
-            modeVeilTimerRef.current = null
-            modeTransitionRef.current = false
-            setModeVeil(null)
-          }, SURFACE_REVEAL_HOLD_MS)
-        })
-      }, SURFACE_COVER_MS)
-    },
-    [applyRecordingModeChange],
-  )
   const handleRecordingModeChangeRef = useRef(handleRecordingModeChange)
   handleRecordingModeChangeRef.current = handleRecordingModeChange
 
-  useEffect(
-    () => () => {
-      if (modeVeilTimerRef.current !== null) window.clearTimeout(modeVeilTimerRef.current)
-    },
-    [],
-  )
+  useEffect(() => {
+    if (!modeVeil) return
+    const timer = window.setTimeout(() => setModeVeil(null), 460)
+    return () => window.clearTimeout(timer)
+  }, [modeVeil])
 
   // Warm the floating-widget chunks once the app is idle. Toggling Drone or
   // Metronome in Workspace should show the widget on the same frame, not after
@@ -3438,6 +3441,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     )
   }, [])
 
+  /**
+   * Floor between unforced capture-session rebuilds for the tuner.
+   *
+   * Rebuilding is hardware work, and every caller here is a retry of some
+   * kind. Without a floor a caller that retries on a timer can pin the app to
+   * a continuous AVCaptureSession rebuild, which is what crashed a long tuner
+   * sitting. Forced recovery (returning from the background, the Reactivate
+   * button) goes down a different branch and is not throttled.
+   */
+  const lastTunerMicRebuildAtRef = useRef(0)
+  const claimTunerMicRebuild = useCallback(() => {
+    const now = performance.now()
+    if (now - lastTunerMicRebuildAtRef.current < TUNER_MIC_REBUILD_FLOOR_MS) return false
+    lastTunerMicRebuildAtRef.current = now
+    return true
+  }, [])
+
   const handleRequestTunerMicStream = useCallback(
     async (options?: { forceRecovery?: boolean }): Promise<boolean> => {
       if (isRecording) return false
@@ -3494,6 +3514,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }
 
         if (!micStreamIsLiveForTuner() && !isNativeCaptureSessionActive()) {
+          if (!claimTunerMicRebuild()) return false
           requestCameraAccess('audio')
           return false
         }
@@ -3501,12 +3522,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
 
       if (!micStreamIsLiveForTuner()) {
+        if (!claimTunerMicRebuild()) return false
         requestCameraAccess('audio')
         return false
       }
       return true
     },
-    [isRecording, micStreamIsLiveForTuner, reacquireStreamForAudioRoute, requestCameraAccess]
+    [claimTunerMicRebuild, isRecording, micStreamIsLiveForTuner, reacquireStreamForAudioRoute, requestCameraAccess]
   )
 
   /**
@@ -5082,6 +5104,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
+                pauseNativePreviewUpdates={hudModalState !== 'idle' || quickSettingsOpen}
                 nativeCameraBridgeEnabled={isNativeCameraPlatform}
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
@@ -5229,9 +5252,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     key={`mode-veil-${modeVeil}`}
                     className={`mode-veil mode-veil--${modeVeil}`}
                     initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }}
-                    transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+                    animate={{ opacity: [0, 0.92, 0] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.44, times: [0, 0.4, 1], ease: 'easeInOut' }}
                     aria-hidden
                   />
                 )}

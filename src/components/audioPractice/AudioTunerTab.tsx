@@ -59,6 +59,23 @@ function micStreamIsLive(
   )
 }
 
+/*
+ * Checking whether the mic is live is free; repairing it is not — a repair
+ * reconfigures the whole AVCaptureSession. This poll used to repair every
+ * 500ms for as long as the source stayed down, so any state the mic could not
+ * come back from (another app holding it, a failed route change, a session
+ * that errors on every rebuild) turned into thousands of capture-session
+ * rebuilds a minute, and the app was killed out from under a long sitting.
+ *
+ * Detect often, repair rarely: a handful of attempts on a widening delay, then
+ * stand down to a slow watch and hand the decision to the Reactivate button.
+ * If the mic comes back on its own the watch still picks it up within seconds.
+ */
+const MIC_POLL_LIVE_MS = 1500
+const MIC_POLL_IDLE_MS = 6000
+const MIC_REPAIR_BASE_MS = 600
+const MIC_REPAIR_MAX_ATTEMPTS = 4
+
 export default function AudioTunerTab({
   active,
   streamRef,
@@ -324,6 +341,7 @@ export default function AudioTunerTab({
       micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
       isNativeCaptureSessionActive()
     let retryTimer: number | null = null
+    let repairAttempts = 0
 
     const verifyMicSource = () => {
       if (cancelled) return
@@ -332,23 +350,32 @@ export default function AudioTunerTab({
         micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
         isNativeCaptureSessionActive()
 
-      if (sourceIsLive && !sourceWasLive) {
-        setMicLiveEpoch((epoch) => epoch + 1)
-      }
-      if (
-        !sourceIsLive &&
-        !handsFreeEnabled &&
-        !isRecording &&
-        !permissionRequestInFlight
-      ) {
-        void onRequestMicStream()
+      if (sourceIsLive) {
+        if (!sourceWasLive) setMicLiveEpoch((epoch) => epoch + 1)
+        repairAttempts = 0
+      } else if (!handsFreeEnabled && !isRecording && !permissionRequestInFlight) {
+        if (repairAttempts < MIC_REPAIR_MAX_ATTEMPTS) {
+          repairAttempts += 1
+          void onRequestMicStream()
+        } else if (repairAttempts === MIC_REPAIR_MAX_ATTEMPTS) {
+          // Out of automatic attempts: stop touching the hardware and let the
+          // player decide, through the Reactivate button that already exists.
+          repairAttempts += 1
+          setShowRecoveryPrompt(true)
+        }
       }
 
       sourceWasLive = sourceIsLive
-      retryTimer = window.setTimeout(verifyMicSource, sourceIsLive ? 1500 : 500)
+      const nextDelay = sourceIsLive
+        ? MIC_POLL_LIVE_MS
+        : Math.min(
+            MIC_POLL_IDLE_MS,
+            MIC_REPAIR_BASE_MS * 2 ** Math.max(0, repairAttempts - 1),
+          )
+      retryTimer = window.setTimeout(verifyMicSource, nextDelay)
     }
 
-    retryTimer = window.setTimeout(verifyMicSource, sourceWasLive ? 1500 : 650)
+    retryTimer = window.setTimeout(verifyMicSource, sourceWasLive ? MIC_POLL_LIVE_MS : 650)
 
     return () => {
       cancelled = true

@@ -128,6 +128,23 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// playback releases ownership, `runDeferredHealthCheckIfNeeded()` replays
     /// the most recent deferred reason.
     private var deferredHealthCheckReason: String?
+    /*
+     * Self-heal backoff.
+     *
+     * A capture-session runtime error triggers a rebuild, and a rebuild that
+     * cannot succeed posts another runtime error — so a session that is
+     * genuinely unrecoverable (the mic held by another app, a route that keeps
+     * failing, a simulator with no capture source) span this loop as fast as
+     * the notifications arrived. Thousands of AVCaptureSession rebuilds a
+     * minute is what killed the app out from under a long tuner sitting.
+     *
+     * The first failure still recovers immediately; each consecutive one waits
+     * longer, and a session that comes back healthy clears the count. Recovery
+     * is never abandoned — it just stops being a hot loop.
+     * Touched only on `sessionQueue`.
+     */
+    private var consecutiveRecoveryAttempts = 0
+    private var lastRecoveryAttemptAt: CFTimeInterval = 0
 
     /// Diagnostic-only: logs movie audio connection state + time-since-last-
     /// tap-sample every 2s during an active recording. Two prior fixes (audio
@@ -471,10 +488,20 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                     )
                 )
             if isHealthy {
+                self.consecutiveRecoveryAttempts = 0
                 return
             }
 
-            print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
+            let now = CACurrentMediaTime()
+            let backoff = self.recoveryBackoffInterval(for: self.consecutiveRecoveryAttempts)
+            if self.consecutiveRecoveryAttempts > 0,
+               now - self.lastRecoveryAttemptAt < backoff {
+                return
+            }
+            self.consecutiveRecoveryAttempts += 1
+            self.lastRecoveryAttemptAt = now
+
+            print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery attempt \(self.consecutiveRecoveryAttempts) (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
 
             if self.isTunerMonitorActive &&
                 (self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured) {
@@ -510,6 +537,22 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             if self.isBridgePreviewActive {
                 self.enableFrameBridge()
             }
+        }
+    }
+
+    /// Delay before the next automatic recovery, given how many in a row have
+    /// already failed. First retry is immediate; the rest widen to a ceiling so
+    /// a session that cannot be repaired costs a couple of rebuilds a minute
+    /// instead of hundreds a second.
+    private func recoveryBackoffInterval(for attempts: Int) -> CFTimeInterval {
+        switch attempts {
+        case 0: return 0
+        case 1: return 0.75
+        case 2: return 1.5
+        case 3: return 3
+        case 4: return 6
+        case 5: return 12
+        default: return 30
         }
     }
 
@@ -701,7 +744,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
-    func stopBridgePreview() {
+    func stopBridgePreview(completion: (() -> Void)? = nil) {
         isBridgePreviewActive = false
         if !isRecording && !isPreviewActive {
             CameraSessionGuard.setPreviewActive(false)
@@ -715,7 +758,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         if !isRecording {
             needsAudioPipelineRebuild = true
         }
-        stopPreview()
+        stopPreview(completion: completion)
     }
 
     func startPreview(
@@ -780,7 +823,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
-    func stopPreview() {
+    func stopPreview(completion: (() -> Void)? = nil) {
         disableFrameBridge()
         isFrameBridgeExternallyRequested = false
         isBridgePreviewActive = false
@@ -796,7 +839,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         sessionQueue.async {
-            guard !self.isRecording else { return }
+            guard !self.isRecording else {
+                DispatchQueue.main.async {
+                    completion?()
+                }
+                return
+            }
             if self.session.isRunning {
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.begin")
                 self.session.stopRunning()
@@ -820,6 +868,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             self.isSessionConfigured = false
             self.session.commitConfiguration()
             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview clearConfiguration.end")
+            DispatchQueue.main.async {
+                completion?()
+            }
         }
     }
 
@@ -2145,6 +2196,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                     self.lastAudioTapSampleTime = 0
                     self.isTunerMonitorActive = true
                     self.needsFullReconfigureAfterMediaReset = false
+                    // An explicit start is fresh intent, not a retry — let the
+                    // next failure recover immediately rather than inheriting
+                    // the previous session's backoff.
+                    self.consecutiveRecoveryAttempts = 0
+                    self.lastRecoveryAttemptAt = 0
                     if !self.session.isRunning {
                         self.session.startRunning()
                     }

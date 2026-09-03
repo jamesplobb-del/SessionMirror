@@ -1569,8 +1569,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stopNativeCameraBridge(_ call: CAPPluginCall) {
-        nativeCameraEngine.stopBridgePreview()
-        call.resolve()
+        nativeCameraEngine.stopBridgePreview {
+            call.resolve()
+        }
     }
 
     @objc func startNativeCameraPreview(_ call: CAPPluginCall) {
@@ -1614,11 +1615,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func stopNativeCameraPreview(_ call: CAPPluginCall) {
-        nativeCameraEngine.stopPreview()
-        DispatchQueue.main.async {
+        nativeCameraEngine.stopPreview {
             (self.bridge?.viewController as? PortraitBridgeViewController)?.setCameraPassthrough(false)
+            call.resolve()
         }
-        call.resolve()
     }
 
     @objc func setNativeCameraPassthrough(_ call: CAPPluginCall) {

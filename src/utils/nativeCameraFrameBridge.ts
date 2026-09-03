@@ -109,9 +109,11 @@ export function createNativePreviewFramePump(
   onFrameDrawn?: () => void,
 ): {
   push: (event: NativeCameraPreviewFrameEvent) => void
+  setPaused: (paused: boolean) => void
   stop: () => void
 } {
   let cancelled = false
+  let paused = false
   let latestFrame: NativeCameraPreviewFrameEvent | null = null
   let decoding = false
   let displayedBitmap: ImageBitmap | null = null
@@ -172,7 +174,7 @@ export function createNativePreviewFramePump(
 
       try {
         const decoded = await decodeNativePreviewFrame(frame)
-        if (cancelled) {
+        if (cancelled || paused) {
           decoded.bitmap.close()
           continue
         }
@@ -199,9 +201,23 @@ export function createNativePreviewFramePump(
        * flight, but removes decode + paint + bridge round-trip latency from the
        * camera cadence. The decode loop itself remains latest-frame-only. */
       void acknowledgeNativePreviewFrame(event.frameId)
-      if (cancelled || !extractJpegBase64(event)) return
+      if (cancelled || paused || !extractJpegBase64(event)) return
       latestFrame = event
       void decodeLoop()
+    },
+    setPaused: (nextPaused: boolean) => {
+      if (paused === nextPaused) return
+      paused = nextPaused
+      if (!paused) return
+
+      latestFrame = null
+      cancelRaf()
+      displayedBitmap?.close()
+      displayedBitmap = null
+      if (pendingFrame) {
+        pendingFrame.close()
+        pendingFrame = null
+      }
     },
     stop,
   }

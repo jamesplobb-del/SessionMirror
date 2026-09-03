@@ -43,6 +43,8 @@ interface LiveCameraBackgroundProps {
   visuallySuppressed?: boolean
   /** Native iOS live preview via canvas frame bridge (opaque WebView). */
   nativeLivePreviewActive?: boolean
+  /** Hold the last painted native frame while a modal surface animates above it. */
+  pauseNativePreviewUpdates?: boolean
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
   nativeCameraBridgeEnabled?: boolean
   /** Seamless handoff: last WebKit frame shown until native bridge delivers. */
@@ -72,6 +74,7 @@ function LiveCameraBackground({
   variant = 'fullscreen',
   visuallySuppressed = false,
   nativeLivePreviewActive = false,
+  pauseNativePreviewUpdates = false,
   nativeCameraBridgeEnabled = false,
   nativeLivePreviewSeedUrl = null,
   holdPreviewForTakePlayback = false,
@@ -166,6 +169,7 @@ function LiveCameraBackground({
       })
     }
     const pump = nativeFramePumpRef.current
+    pump.setPaused(pauseNativePreviewUpdates)
 
     void (async () => {
       const subscription = await subscribeNativeCameraPreviewFrames((event) => {
@@ -195,6 +199,10 @@ function LiveCameraBackground({
       }
     }
   }, [activeNativeLivePreview])
+
+  useEffect(() => {
+    nativeFramePumpRef.current?.setPaused(pauseNativePreviewUpdates)
+  }, [pauseNativePreviewUpdates])
 
   useEffect(() => {
     nativeBridgePrimedRef.current = activeNativeLivePreview
@@ -837,6 +845,7 @@ export default memo(
     prev.variant === next.variant &&
     prev.visuallySuppressed === next.visuallySuppressed &&
     prev.nativeLivePreviewActive === next.nativeLivePreviewActive &&
+    prev.pauseNativePreviewUpdates === next.pauseNativePreviewUpdates &&
     prev.nativeCameraBridgeEnabled === next.nativeCameraBridgeEnabled &&
     prev.nativeLivePreviewSeedUrl === next.nativeLivePreviewSeedUrl &&
     prev.holdPreviewForTakePlayback === next.holdPreviewForTakePlayback &&
