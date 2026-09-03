@@ -18,6 +18,11 @@ interface HandsFreeStageProps {
   /** Audio mode paints a light backdrop; camera mode is dark behind the copy. */
   onLightBackground?: boolean
   placement?: HandsFreeStagePlacement
+  /**
+   * Opens the quiet-gap / start-level card. Only offered while listening —
+   * during recording and playback the overlay stays exactly as it was.
+   */
+  onTapForSettings?: () => void
 }
 
 const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
@@ -46,8 +51,10 @@ function HandsFreeStage({
   elapsed,
   onLightBackground = false,
   placement = 'center',
+  onTapForSettings,
 }: HandsFreeStageProps) {
   const copy = phase ? PHASE_COPY[phase] : null
+  const settingsTappable = phase === 'listening' && Boolean(onTapForSettings)
 
   return (
     <div
@@ -75,6 +82,16 @@ function HandsFreeStage({
           <span className="hands-free-stage__elapsed tabular-nums">
             {formatElapsed(elapsed)}
           </span>
+        )}
+        {settingsTappable && (
+          <button
+            type="button"
+            className="hands-free-stage__settings"
+            onClick={onTapForSettings}
+            aria-label="Hands-free settings: quiet gap and start level"
+          >
+            Tap for settings
+          </button>
         )}
       </div>
     </div>

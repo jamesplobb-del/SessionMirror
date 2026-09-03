@@ -714,7 +714,7 @@ export default function SettingsDrawer({
 
             <SettingToggle
               label="Idle Mic Tuner"
-              description="When Pitch Analysis is on, listen through the microphone and show a live tuner between takes. Turn this off to analyze only during playback."
+              description="In Audio mode and Review, listen through the microphone between takes instead of showing pitch only during playback. The Tuner tab always listens."
               checked={settings.liveMicTunerEnabled}
               onChange={(checked) => onUpdate({ liveMicTunerEnabled: checked })}
             />

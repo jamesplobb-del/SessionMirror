@@ -39,9 +39,13 @@ export function getFloatingWidgetTopCenter(
   return { x, y }
 }
 
+/**
+ * Widget positions live in localStorage so a dragged metronome or drone is
+ * still where it was left after a relaunch — the desk stays set overnight.
+ */
 export function loadWidgetPosition(id: string): WidgetPosition | null {
   try {
-    const raw = sessionStorage.getItem(`${POSITION_STORAGE_PREFIX}${id}`)
+    const raw = localStorage.getItem(`${POSITION_STORAGE_PREFIX}${id}`)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<WidgetPosition>
     if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') return null
@@ -54,7 +58,7 @@ export function loadWidgetPosition(id: string): WidgetPosition | null {
 
 export function saveWidgetPosition(id: string, x: number, y: number): void {
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       `${POSITION_STORAGE_PREFIX}${id}`,
       JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
     )

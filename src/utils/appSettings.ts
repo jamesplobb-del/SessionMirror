@@ -11,11 +11,8 @@ import {
   parseAudioEnhancerSettings,
   type AudioEnhancerSettings,
 } from './audioEnhancer'
-import {
-  parseSpeakerLoudnessPreset,
-  type SpeakerLoudnessPreset,
-} from './speakerLoudnessMastering'
 import { parseCaptureProfile, type CaptureProfile } from './audioCapture'
+import { setHapticsEnabled } from './haptics'
 
 export type MicInputPreference = 'auto' | 'headphone' | 'iphone'
 
@@ -38,26 +35,20 @@ export interface AppSettings {
   tunerInstrument: TunerInstrument
   /** Written-note display for concert and transposing instruments. */
   tunerTransposition: TunerTranspositionId
-  /** Kept for stored-settings compatibility; drone output is fixed at 100%. */
-  droneVolume: number
   /** Reference drone waveform timbre. */
   droneWaveform: DroneWaveform
   /** Show Best Take and Current Take cards on the main HUD. */
   showTakeCards: boolean
   /** Floating metronome widget on the main camera/audio HUD. */
   showMetronome: boolean
+  /** Floating drone widget on the main camera/audio HUD — a held pitch under the take. */
+  showDrone: boolean
   /** Silence metronome clicks while a take is playing; internal clock keeps running. */
   muteMetronomeDuringPlayback: boolean
-  /** Scale factor for Best Take / Current Take cards (85–125). */
-  takeCardScale: number
   /** Dolby On-style playback enhancer (EQ, compression, reverb). */
   audioEnhancerEnabled: boolean
-  /** iOS-only AVAudioSession path for native input/output routing. */
-  nativeExperimentalAudioEnabled: boolean
   /** Persisted enhancer preset and slider values. */
   audioEnhancerSettings: AudioEnhancerSettings
-  /** Speaker-only loudness mastering preset for built-in iPhone speakers. */
-  speakerLoudnessPreset: SpeakerLoudnessPreset
   /** Pause YouTube and enable mic echo cancellation while recording to reduce bleed. */
   excludeYoutubeFromRecording: boolean
   /** Native iOS mic input preference when headphones are connected. */
@@ -84,27 +75,17 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   liveMicTunerEnabled: true,
   tunerInstrument: 'voice',
   tunerTransposition: DEFAULT_TUNER_TRANSPOSITION,
-  droneVolume: 100,
   droneWaveform: 'warmSynth',
   showTakeCards: true,
   showMetronome: false,
+  showDrone: false,
   muteMetronomeDuringPlayback: true,
-  takeCardScale: 105,
   audioEnhancerEnabled: false,
-  nativeExperimentalAudioEnabled: true,
   audioEnhancerSettings: cloneAudioEnhancerSettings(DEFAULT_AUDIO_ENHANCER_SETTINGS),
-  speakerLoudnessPreset: 'phone',
   excludeYoutubeFromRecording: false,
   micInputPreference: 'iphone',
   captureProfile: 'natural',
   backUpTakesToIcloud: true,
-}
-
-/** Transient recording controls and floating widgets — forced off on each cold app start. */
-const SESSION_START_TRANSIENT_OFF: Pick<AppSettings, 'autoSoundRecording' | 'pitchTrackerEnabled' | 'showMetronome'> = {
-  autoSoundRecording: false,
-  pitchTrackerEnabled: false,
-  showMetronome: false,
 }
 
 function parseDroneWaveform(value: unknown): DroneWaveform {
@@ -142,7 +123,18 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+/**
+ * Read stored settings, and mirror the Haptic Feedback preference into the
+ * haptics module. Every screen that reads settings goes through here, so the
+ * preference cannot be missed by a caller that forgets to thread it through.
+ */
 export function loadAppSettings(): AppSettings {
+  const settings = readStoredSettings()
+  setHapticsEnabled(settings.hapticFeedback)
+  return settings
+}
+
+function readStoredSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_APP_SETTINGS }
@@ -182,7 +174,6 @@ export function loadAppSettings(): AppSettings {
           : DEFAULT_APP_SETTINGS.liveMicTunerEnabled,
       tunerInstrument: parseTunerInstrument(parsed.tunerInstrument),
       tunerTransposition: parseTunerTransposition(parsed.tunerTransposition),
-      droneVolume: 100,
       droneWaveform: parseDroneWaveform(parsed.droneWaveform),
       showTakeCards:
         parsed.showTakeCards !== undefined
@@ -192,27 +183,21 @@ export function loadAppSettings(): AppSettings {
         parsed.showMetronome !== undefined
           ? Boolean(parsed.showMetronome)
           : DEFAULT_APP_SETTINGS.showMetronome,
+      showDrone:
+        parsed.showDrone !== undefined
+          ? Boolean(parsed.showDrone)
+          : DEFAULT_APP_SETTINGS.showDrone,
       muteMetronomeDuringPlayback:
         parsed.muteMetronomeDuringPlayback !== undefined
           ? Boolean(parsed.muteMetronomeDuringPlayback)
           : DEFAULT_APP_SETTINGS.muteMetronomeDuringPlayback,
-      takeCardScale: clamp(
-        Number(parsed.takeCardScale) || DEFAULT_APP_SETTINGS.takeCardScale,
-        85,
-        125,
-      ),
       audioEnhancerEnabled:
         parsed.audioEnhancerEnabled !== undefined
           ? Boolean(parsed.audioEnhancerEnabled)
           : DEFAULT_APP_SETTINGS.audioEnhancerEnabled,
-      nativeExperimentalAudioEnabled: true,
       audioEnhancerSettings: parseAudioEnhancerSettings(
         parsed.audioEnhancerSettings ?? DEFAULT_APP_SETTINGS.audioEnhancerSettings,
       ),
-      speakerLoudnessPreset:
-        parsed.speakerLoudnessPreset === undefined || parsed.speakerLoudnessPreset === 'loud'
-          ? DEFAULT_APP_SETTINGS.speakerLoudnessPreset
-          : parseSpeakerLoudnessPreset(parsed.speakerLoudnessPreset),
       excludeYoutubeFromRecording:
         parsed.excludeYoutubeFromRecording !== undefined
           ? Boolean(parsed.excludeYoutubeFromRecording)
@@ -234,15 +219,18 @@ export function loadAppSettings(): AppSettings {
   }
 }
 
-/** Load persisted prefs but start with floating widgets hidden. */
+/**
+ * Cold start restores the desk exactly as it was left: the metronome and drone
+ * widgets, the pitch overlay and hands-free all come back in the state the
+ * player set. Nothing is forced off overnight — the only thing that should
+ * reset between sittings is a rolling recording.
+ */
 export function loadAppSettingsForSessionStart(): AppSettings {
-  const loaded = loadAppSettings()
-  const sessionStart = { ...loaded, ...SESSION_START_TRANSIENT_OFF }
-  saveAppSettings(sessionStart)
-  return sessionStart
+  return loadAppSettings()
 }
 
 export function saveAppSettings(settings: AppSettings): void {
+  setHapticsEnabled(settings.hapticFeedback)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
   } catch {

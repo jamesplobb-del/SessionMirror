@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core'
-import { logPlaybackGainAuditYoutubeStart } from '../playbackGainAudit'
 import { isHeadphoneOutputActive, subscribeHeadphoneOutput } from '../headphoneOutput'
 import { youtubeVolumeFromUiSlider } from '../playbackVolume'
 import { YOUTUBE_PROXY_ORIGIN } from '../youtubeEmbed'
@@ -209,7 +208,6 @@ function handleProxyPlaybackMessage(data: unknown): void {
   }
 
   if (payload.state === 'playing') {
-    logPlaybackGainAuditYoutubeStart()
     const now = Date.now()
     if (now - lastPlayingMaintainAt < PLAYING_MAINTAIN_COOLDOWN_MS) return
     lastPlayingMaintainAt = now
@@ -384,9 +382,6 @@ export function setYoutubeProxyVolumeFromUi(
 ): void {
   const clamped = youtubeVolumeFromUiSlider(uiVolume)
   postToYoutubeIframe(iframe, 'setVolume', [clamped])
-  void import('../playbackGainAudit').then((m) =>
-    m.maybeLogYoutubePlaybackGain(uiVolume, 'setVolume'),
-  )
 }
 
 /** @deprecated Prefer setYoutubeProxyVolumeFromUi — accepts 0–1 UI slider values. */

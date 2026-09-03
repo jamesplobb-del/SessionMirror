@@ -299,7 +299,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'visit-games',
     title: 'Practice Games',
-    body: 'Games opens Staff Jumper and Balance for pitch-driven sight-reading and long-tone practice.',
+    body: 'Games opens Staff Jumper, Balance, and Learn for sight-reading, long tones, and fingerings.',
     selector: '[data-tutorial="audio-tab-games"]',
     placement: 'bottom',
     advance: 'tap-screen',
@@ -310,12 +310,12 @@ export const COACH_MARKS: CoachMarkContent[] = [
   },
   {
     id: 'return-to-audio',
-    title: 'Return to Audio',
+    title: 'Return to Record',
     body: 'Back to recording and comparing takes.',
     selector: '[data-tutorial="audio-tab-audio"]',
     placement: 'bottom',
     advance: 'audio-tab-audio',
-    continueHint: 'Tap Audio.',
+    continueHint: 'Tap Record.',
     requiresSplitView: 'closed',
     requiresRecordingMode: 'audio',
     requiresAudioPracticeTab: 'tuner',
@@ -408,7 +408,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'multitrack',
     title: 'Multitrack',
-    body: 'Tap the four-panel Multitrack control above Record in Camera Mode to layer separate performances in one project.',
+    body: 'Open Workspace and tap Multitrack to layer separate performances into one project.',
     bullets: [
       'Record or assign a take to each performance panel',
       'Add a backing track, click, pitch guide, or sheet music when needed',
@@ -418,10 +418,11 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'practice-games',
     title: 'Practice Games',
-    body: 'Two games that listen to what you play. Nothing from the mic is saved.',
+    body: 'Three games that listen to what you play. Nothing from the mic is saved.',
     bullets: [
       'Staff Jumper is sight-reading — it listens for pitch, not rhythm',
       'Balance times how long you hold a note dead center',
+      'Learn matches the written note to the real fingering, one note at a time',
     ],
   },
   {
@@ -456,7 +457,7 @@ export const HELP_TOPICS: HelpTopic[] = [
       'Play to see pitch direction and cents in real time',
       'Tap the large note to hold it as a drone; tap again to release',
       'Open Drone to scroll pitches, change octave, or build a major/minor chord',
-      'Adjust drone volume and waveform in Settings',
+      'Choose the drone waveform in Settings',
     ],
   },
   {
@@ -487,7 +488,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Every recording saves here on its own, session by session.',
     bullets: [
       'Open Practice Home from the left end of the Camera or Audio pill, then tap Best Take Vault',
-      'Search, sort, select, favorite, trim, share, or delete takes',
+      'Search, sort, select, favorite, share, or delete takes',
       'Pin a take as Best Take or Current Take',
       'Open any recording full screen for focused review',
     ],
@@ -528,7 +529,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Expand View',
     body: 'A bigger split screen for takes, imported references, and YouTube.',
     bullets: [
-      'In Camera Mode, tap Expand View directly above Record',
+      'Open Workspace and tap Expand View',
       'Drag the middle divider to give either side more room',
       'Load YouTube or upload audio and video references while expanded',
       'Tap the collapse control to return to the normal Camera layout',

@@ -60,10 +60,26 @@ function runCapacitorImpact(style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigi
   )
 }
 
+/**
+ * Global Haptic Feedback preference, mirrored from app settings.
+ *
+ * Gating lives here rather than at the call sites: most `trigger*` helpers
+ * default `enabled` to true, and a caller that simply forgets to thread the
+ * setting through would otherwise buzz with haptics switched off. Both native
+ * entry points below funnel through here, so the preference holds everywhere.
+ */
+let hapticsEnabled = true
+
+export function setHapticsEnabled(enabled: boolean): void {
+  hapticsEnabled = enabled
+}
+
 function runImpact(
   style: 'light' | 'medium' | 'heavy' | 'soft' | 'rigid',
   intensity?: number,
 ): void {
+  if (!hapticsEnabled) return
+
   if (isIOS) {
     const options = intensity === undefined ? { style } : { style, intensity }
     void BestTakeAudioPlugin.hapticImpact(options)
@@ -81,6 +97,8 @@ function runImpact(
 }
 
 function runNotification(type: 'success' | 'warning' | 'error'): void {
+  if (!hapticsEnabled) return
+
   if (isIOS) {
     void BestTakeAudioPlugin.hapticNotification({ type }).catch(() => {}).finally(scheduleHapticReprime)
     return

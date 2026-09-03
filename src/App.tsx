@@ -30,6 +30,22 @@ import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
+import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
+import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
+import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
+import {
+  createDesk,
+  deskMatchesSnapshot,
+  loadFocusDesk,
+  loadWorkspaceDesks,
+  MAX_WORKSPACE_DESKS,
+  saveFocusDesk,
+  saveWorkspaceDesks,
+  summarizeDesk,
+  type DeskSnapshot,
+  type WorkspaceDesk,
+} from './utils/workspaceDesks'
+import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from './utils/shareTakeVideo'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
 import {
@@ -96,7 +112,7 @@ import {
 } from './utils/takeStorage'
 import { resetVideoPlayback } from './utils/videoPlayback'
 import type { ReviewContext, ReviewSlot, RecordingMode, SortMode, Take, TakeUpdate } from './types'
-import { AUDIO_TAKE_THUMBNAIL, inferMediaTypeFromMime } from './utils/mediaType'
+import { AUDIO_TAKE_THUMBNAIL, getTakeMediaType, inferMediaTypeFromMime } from './utils/mediaType'
 import { scheduleViewportSync } from './utils/viewportSync'
 import { applyDarkHudStatusBar } from './utils/nativeStatusBar'
 import { registerRecordingRouteRestoredHandler } from './utils/stereoPlaybackRoute'
@@ -107,7 +123,7 @@ import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosFade, iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
 import { getInstrumentSettings } from './utils/instrumentProfiles'
-import { ActionSheetProvider } from './context/ActionSheetContext'
+import { ActionSheetProvider, showAlertOutsideTree } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
 import {
@@ -164,7 +180,7 @@ import {
   probeAudioDurationSeconds,
 } from './utils/libraryStorage'
 import type { BenchmarkBinding } from './types/library'
-import { setTakePlaybackEnhancerState, setSpeakerLoudnessPreset } from './utils/takePlaybackSpeaker'
+import { setTakePlaybackEnhancerState } from './utils/takePlaybackSpeaker'
 import BestTakeAudioPlugin, {
   applyNativeExperimentalAudioMode,
   applyTakesBackupPreference,
@@ -295,6 +311,10 @@ interface MainAudioPitchSource {
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
 const DraggableMetronomeWidget = lazy(() => import('./components/DraggableMetronomeWidget'))
+const DraggableDroneWidget = lazy(() => import('./components/DraggableDroneWidget'))
+
+/** Where the last sitting ended. Read once so day two opens on the take, not a menu. */
+const bootSurface = loadLastSurface()
 const TakeVaultDrawer = lazy(() => import('./components/TakeVaultDrawer'))
 const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
@@ -492,7 +512,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [practiceItemStates, setPracticeItemStates] = useState<PracticeItemState[]>(
     bootSnapshot.practiceItemStates,
   )
-  const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
+  const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(false)
   const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
   const [focusedCueOpen, setFocusedCueOpen] = useState(false)
   const [focusedPostTakeId, setFocusedPostTakeId] = useState<string | null>(null)
@@ -527,9 +547,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [audioTakeReadiness, setAudioTakeReadiness] = useState<Record<string, AudioTakeReadiness>>(
     {},
   )
-  const [showPitch, setShowPitch] = useState(false)
+  // The pitch overlay comes back if it was up when the app was last closed.
+  const [showPitch, setShowPitch] = useState(() => loadAppSettingsForSessionStart().pitchTrackerEnabled)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
+  /** Saved desks — chips at the top of the Workspace tray. */
+  const [workspaceDesks, setWorkspaceDesks] = useState<WorkspaceDesk[]>(() => loadWorkspaceDesks())
+  /** The live room, kept current so a focused take can remember the desk it was played on. */
+  const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
+  const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
+  /** Cross-fade veil painted in the colour of the surface being entered. */
+  const [modeVeil, setModeVeil] = useState<RecordingMode | null>(null)
+  /** One breath of the record button after Current finishes playing back. */
+  const [againPulse, setAgainPulse] = useState(false)
   const [youtubeUrl, setYoutubeUrl] = useState<string | null>(null)
   const [showYoutubeHeadphonesTip, setShowYoutubeHeadphonesTip] = useState(false)
   const [youtubeHeadphonesTipNonce, setYoutubeHeadphonesTipNonce] = useState(0)
@@ -552,8 +582,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const {
     activeTab: audioPracticeTab,
     setActiveTab: setAudioPracticeTab,
-    resetToAudioTab,
-  } = useAudioPracticeTab()
+  } = useAudioPracticeTab(bootSurface.tab)
   const handleAudioPracticeTabChange = useCallback(
     (tab: AudioPracticeTab) => {
       if (tab === 'tuner' && audioPracticeTab !== 'tuner') {
@@ -1479,6 +1508,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (focusedAtCapture?.projectId === projectId) {
         setFocusedPostTakeId(takeId)
         setFocusedPostTakeReviewed(false)
+        // The session remembers the room it was played in; resume restores it.
+        if (liveDeskSnapshotRef.current) saveFocusDesk(projectId, liveDeskSnapshotRef.current)
       }
 
       if (mediaType === 'audio') {
@@ -1642,7 +1673,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             focusArea: focusAreaAtCapture,
             pitchSeries,
             performanceStartSeconds: autoPerformanceStartSeconds,
-            name: mediaType === 'audio' ? `Audio ${takeIndex}` : `Take ${takeIndex}`,
+            // In a Focus session the take carries the focus: "mm. 12–20 · 4", not "Audio 4".
+            name: focusAreaAtCapture
+              ? `${focusAreaAtCapture} · ${takeIndex}`
+              : mediaType === 'audio'
+                ? `Audio ${takeIndex}`
+                : `Take ${takeIndex}`,
           })
 
           if (intentionAtCapture) {
@@ -1937,7 +1973,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     secondaryPreviewRef: splitPreviewRef,
     onBeforeForegroundRestart: handleBeforeForegroundRestart,
     onAfterForegroundRestart: resumeYoutubeReference,
-    nativeExperimentalAudioEnabled: settings.nativeExperimentalAudioEnabled,
     nativeCameraRecordingEnabled: isNativeCameraPlatform,
     micInputPreference: settings.micInputPreference,
   })
@@ -2198,12 +2233,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     stopAutoPlaybackAudio()
     releaseAutoRecordSuppress(0)
   }, [recordingMode, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
-
-  useEffect(() => {
-    if (recordingMode !== 'audio') {
-      resetToAudioTab()
-    }
-  }, [recordingMode, resetToAudioTab])
 
   useEffect(() => {
     document.documentElement.classList.toggle('app-audio-mode', recordingMode === 'audio')
@@ -2616,16 +2645,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (mode: RecordingMode) => {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
-        setShowPitch(false)
-        resetToAudioTab()
+        // Same sitting, different surface: the tool tab, the pitch overlay and
+        // Take Cards are left exactly as the player had them. A short veil in
+        // the incoming surface's colour turns the swap into a cross-fade.
+        setModeVeil(mode)
         // Refresh the cached visual viewport before the audio layout mounts.
         // Otherwise iOS can paint one frame with the camera surface's stale
         // height and clip the bottom deck before its later recovery pass.
         stabilizeViewportAfterMediaInteraction()
-        if (mode === 'audio' && !showTakeCardsRef.current) {
-          showTakeCardsRef.current = true
-          updateSettings({ showTakeCards: true })
-        }
         if (import.meta.env.DEV) {
           console.log(
             mode === 'video' ? '[ModeSwitch] entering camera' : '[ModeSwitch] entering audio'
@@ -2662,10 +2689,35 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       isRecording,
       requestCameraAccess,
       requestCameraPreviewResume,
-      resetToAudioTab,
-      updateSettings,
     ]
   )
+  const handleRecordingModeChangeRef = useRef(handleRecordingModeChange)
+  handleRecordingModeChangeRef.current = handleRecordingModeChange
+
+  useEffect(() => {
+    if (!modeVeil) return
+    const timer = window.setTimeout(() => setModeVeil(null), 460)
+    return () => window.clearTimeout(timer)
+  }, [modeVeil])
+
+  /* ---- The desk stays set ------------------------------------------------
+   * Day two opens on the surface day one ended on. Camera is the hook's
+   * default, so only an Audio ending needs the switch; it runs once, after
+   * the first paint, so the camera session is not asked to change mid-boot. */
+  const bootSurfaceAppliedRef = useRef(false)
+  useEffect(() => {
+    if (bootSurfaceAppliedRef.current) return
+    bootSurfaceAppliedRef.current = true
+    if (bootSurface.mode !== 'audio') return
+    const frame = window.requestAnimationFrame(() => {
+      handleRecordingModeChangeRef.current('audio')
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
+    saveLastSurface({ mode: recordingMode, tab: audioPracticeTab })
+  }, [audioPracticeTab, recordingMode])
 
   const handleReplayOnboardingTutorial = useCallback(() => {
     setIsSettingsOpen(false)
@@ -2742,6 +2794,154 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       warmAutoRecording,
     ]
   )
+
+  /* ---- Desks: the whole room as one tap ---------------------------------- */
+  const metronomeDeskState = useSyncExternalStore(
+    sharedMetronomeEngine.subscribe,
+    () => {
+      const snapshot = sharedMetronomeEngine.getSnapshot()
+      return `${snapshot.bpm}|${snapshot.meter}|${snapshot.subdivision}`
+    },
+    () => '',
+  )
+  const droneDeskState = useSyncExternalStore(subscribeDrone, getDroneSnapshot, getDroneSnapshot)
+
+  const liveDeskSnapshot = useMemo<DeskSnapshot>(() => {
+    const metronome = sharedMetronomeEngine.getSnapshot()
+    return {
+      mode: recordingMode,
+      pitchTrackerEnabled: settings.pitchTrackerEnabled,
+      showMetronome: settings.showMetronome,
+      showDrone: settings.showDrone,
+      showTakeCards: settings.showTakeCards,
+      autoSoundRecording: settings.autoSoundRecording,
+      audioEnhancerEnabled: settings.audioEnhancerEnabled,
+      metronome: {
+        bpm: Math.round(metronome.bpm),
+        meter: metronome.meter,
+        subdivision: metronome.subdivision,
+      },
+      drone: {
+        pitchClass: droneDeskState.activeNotes[0] ?? droneDeskState.lastPitchClass,
+        octave: droneDeskState.octave,
+      },
+      soundSilenceSeconds: settings.soundSilenceSeconds,
+    }
+    // metronomeDeskState is the subscription key for the engine snapshot read above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    droneDeskState,
+    metronomeDeskState,
+    recordingMode,
+    settings.audioEnhancerEnabled,
+    settings.autoSoundRecording,
+    settings.pitchTrackerEnabled,
+    settings.showDrone,
+    settings.showMetronome,
+    settings.showTakeCards,
+    settings.soundSilenceSeconds,
+  ])
+  liveDeskSnapshotRef.current = liveDeskSnapshot
+
+  const activeDeskId = useMemo(
+    () => workspaceDesks.find((desk) => deskMatchesSnapshot(desk, liveDeskSnapshot))?.id ?? null,
+    [liveDeskSnapshot, workspaceDesks],
+  )
+  const liveDeskSummary = useMemo(
+    () => summarizeDesk(liveDeskSnapshot, settings.tunerTransposition),
+    [liveDeskSnapshot, settings.tunerTransposition],
+  )
+
+  const applyDeskSnapshot = useCallback(
+    (desk: DeskSnapshot) => {
+      updateSettings({
+        pitchTrackerEnabled: desk.pitchTrackerEnabled,
+        showMetronome: desk.showMetronome,
+        showDrone: desk.showDrone,
+        showTakeCards: desk.showTakeCards,
+        audioEnhancerEnabled: desk.audioEnhancerEnabled,
+        soundSilenceSeconds: desk.soundSilenceSeconds,
+      })
+      showTakeCardsRef.current = desk.showTakeCards
+      if (desk.autoSoundRecording !== autoSoundRecordingEnabledRef.current) {
+        handleAutoSoundRecordingChange(desk.autoSoundRecording)
+      }
+      sharedMetronomeEngine.setMeter(desk.metronome.meter)
+      sharedMetronomeEngine.setSubdivision(desk.metronome.subdivision)
+      sharedMetronomeEngine.setBpm(desk.metronome.bpm)
+      if (desk.showDrone) {
+        applyDroneFromDesk(desk.drone.pitchClass, desk.drone.octave)
+      } else {
+        applyDroneFromDesk(null, desk.drone.octave)
+      }
+      if (desk.mode !== recordingModeRef.current) {
+        handleRecordingModeChangeRef.current(desk.mode)
+      }
+    },
+    [handleAutoSoundRecordingChange, updateSettings],
+  )
+
+  const handleApplyDesk = useCallback(
+    (deskId: string) => {
+      const desk = workspaceDesks.find((item) => item.id === deskId)
+      if (!desk) return
+      triggerLightHaptic(settings.hapticFeedback)
+      applyDeskSnapshot(desk)
+    },
+    [applyDeskSnapshot, settings.hapticFeedback, workspaceDesks],
+  )
+
+  const handleSaveDesk = useCallback(
+    (name: string) => {
+      const desk = createDesk(name, liveDeskSnapshotRef.current ?? liveDeskSnapshot)
+      setWorkspaceDesks((current) => {
+        const kept = [...current].sort((a, b) => b.savedAt - a.savedAt).slice(0, MAX_WORKSPACE_DESKS - 1)
+        const next = [...kept, desk].sort((a, b) => a.savedAt - b.savedAt)
+        saveWorkspaceDesks(next)
+        return next
+      })
+    },
+    [liveDeskSnapshot],
+  )
+
+  const handleDeleteDesk = useCallback((deskId: string) => {
+    setWorkspaceDesks((current) => {
+      const next = current.filter((desk) => desk.id !== deskId)
+      saveWorkspaceDesks(next)
+      return next
+    })
+  }, [])
+
+  /** Focus picks the piece; the desk it was last played on comes with it. */
+  const restoreFocusDesk = useCallback(
+    (projectId: string) => {
+      const desk = loadFocusDesk(projectId)
+      if (desk) applyDeskSnapshot(desk)
+    },
+    [applyDeskSnapshot],
+  )
+
+  /* ---- Share from the card ---------------------------------------------- */
+  const handleShareTake = useCallback((take: Take) => {
+    if (getTakeMediaType(take) === 'video') {
+      void shareTakeVideo(take).then((result) => {
+        const message = describeSaveTakeResult(result)
+        if (message && !result.ok) showAlertOutsideTree({ message, tone: 'error' })
+      })
+      return
+    }
+    void shareTakeToSystem(take).then((result) => {
+      if (result.ok) return
+      showAlertOutsideTree({
+        message:
+          result.reason === 'missing_file'
+            ? 'That take’s audio file is missing, so it can’t be shared.'
+            : 'Sharing didn’t go through. Try again.',
+        tone: 'error',
+      })
+    })
+  }, [])
+
 
   const handleCloseSettings = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -2902,6 +3102,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setFocusedPostTakeReviewed(false)
       triggerLightHaptic(settings.hapticFeedback)
       setFocusedPractice({ projectId, focusArea })
+      restoreFocusDesk(projectId)
       dismissPracticeHub()
     },
     [
@@ -2910,6 +3111,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       prepareFocusedComparisonAnalysis,
       projects,
       resolveSessionReference,
+      restoreFocusDesk,
       settings.hapticFeedback,
       updateSettings,
     ],
@@ -2941,6 +3143,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setFocusedPostTakeId(null)
       setFocusedPostTakeReviewed(false)
       setFocusedPractice({ projectId, focusArea })
+      restoreFocusDesk(projectId)
       triggerLightHaptic(settings.hapticFeedback)
       dismissPracticeHub()
     },
@@ -2951,6 +3154,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       prepareFocusedComparisonAnalysis,
       projects,
       resolveSessionReference,
+      restoreFocusDesk,
       settings.hapticFeedback,
       updateSettings,
     ],
@@ -3295,6 +3499,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pendingPitchTrackerEnabled,
       settings.audioEnhancerEnabled,
       settings.pitchTrackerEnabled,
+      settings.showDrone,
       settings.showMetronome,
       settings.showTakeCards,
     ]
@@ -3562,11 +3767,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const metronomeHudSuspended =
     isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen || isPracticeHubOpen
 
-  const showFloatingMetronomeWidget =
-    showMetronomeWidget &&
-    (recordingMode === 'video' || (recordingMode === 'audio' && audioPracticeTab !== 'metronome'))
+  // Desk widgets live on the record surfaces. The Tools tabs are where the
+  // full tools are, so the widgets step aside there and are back on return.
+  const onRecordSurface = recordingMode === 'video' || audioPracticeTab === 'audio'
+  const showFloatingMetronomeWidget = showMetronomeWidget && onRecordSurface
 
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended
+
+  const showFloatingDroneWidget = settings.showDrone && onRecordSurface
+  const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended
 
   // Full-screen hands-free presence layer. Uses the same resolver as the control
   // deck carousel so the stage and the record button can never disagree, and
@@ -3689,10 +3898,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   ])
 
   useEffect(() => {
-    setSpeakerLoudnessPreset(settings.speakerLoudnessPreset)
-  }, [settings.speakerLoudnessPreset])
-
-  useEffect(() => {
     setActiveCaptureProfile('natural')
   }, [])
 
@@ -3782,6 +3987,51 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseMetronome = useCallback(() => {
     handleShowMetronomeSettingChange(false)
   }, [handleShowMetronomeSettingChange])
+
+  const handleShowDroneSettingChange = useCallback(
+    (show: boolean) => {
+      updateSettings({ showDrone: show })
+      if (!show) applyDroneFromDesk(null, getDroneSnapshot().octave)
+    },
+    [updateSettings],
+  )
+
+  const handleCloseDrone = useCallback(() => {
+    handleShowDroneSettingChange(false)
+  }, [handleShowDroneSettingChange])
+
+  /* ---- "Again": one breath of Record when Current finishes playing back --- */
+  const currentPlaybackActive = autoPlaybackPlaying || challengerPipPlaying
+  const currentPlaybackWasActiveRef = useRef(currentPlaybackActive)
+  useEffect(() => {
+    const wasActive = currentPlaybackWasActiveRef.current
+    currentPlaybackWasActiveRef.current = currentPlaybackActive
+    if (!wasActive || currentPlaybackActive || isRecording) return
+    setAgainPulse(true)
+    const timer = window.setTimeout(() => setAgainPulse(false), 950)
+    return () => window.clearTimeout(timer)
+  }, [currentPlaybackActive, isRecording])
+
+  /** The session name plus take count, for the line at the top of the desk. */
+  // `takes` is the active project's list; a Focus session is always the active project.
+  const focusedTakeCount =
+    focusedPractice && focusedPractice.projectId === activeProjectId ? takes.length : 0
+
+  /** What Practice Home shows under the Focus card: the desk that session restores. */
+  const focusDeskSummary = useMemo(() => {
+    if (!isPracticeHubOpen) return null
+    const projectId =
+      focusedPractice?.projectId ?? practiceItemStates[0]?.projectId ?? activeProjectId ?? null
+    if (!projectId) return null
+    const desk = loadFocusDesk(projectId)
+    return desk ? summarizeDesk(desk, settings.tunerTransposition) : null
+  }, [
+    activeProjectId,
+    focusedPractice?.projectId,
+    isPracticeHubOpen,
+    practiceItemStates,
+    settings.tunerTransposition,
+  ])
 
   useEffect(() => {
     if (!settings.showTakeCards) {
@@ -4496,7 +4746,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [challengerId, handlePinBenchmark])
 
   const pipScaleStyle = {
-    '--pip-scale': settings.takeCardScale / 100,
   } as React.CSSProperties
 
   const tutorialSignals = useMemo(
@@ -4565,6 +4814,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 bestTakeHistory={bestTakeHistory}
                 focusedPractice={focusedPractice}
                 practiceItemStates={practiceItemStates}
+                focusDeskSummary={focusDeskSummary}
                 tunerInstrument={settings.tunerInstrument}
                 tunerTransposition={settings.tunerTransposition}
                 hapticFeedback={settings.hapticFeedback}
@@ -4864,6 +5114,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 )}
               </div>
 
+              <div
+                className={`drone-display-layer${
+                  droneWidgetInteractive ? '' : ' floating-widget-layer--inert'
+                }`}
+                aria-hidden={!droneWidgetInteractive}
+              >
+                {showFloatingDroneWidget && (
+                  <Suspense fallback={null}>
+                    <AnimatePresence>
+                      <DraggableDroneWidget
+                        key={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
+                        boundaryRef={appShellRef}
+                        positionId={recordingMode === 'audio' ? 'audio-drone-widget' : 'main-drone'}
+                        droneWaveform={settings.droneWaveform}
+                        tunerTransposition={settings.tunerTransposition}
+                        hapticFeedback={settings.hapticFeedback}
+                        isTakePlaying={takePlaybackActive}
+                        muteDuringPlayback={settings.muteMetronomeDuringPlayback}
+                        onClose={handleCloseDrone}
+                      />
+                    </AnimatePresence>
+                  </Suspense>
+                )}
+              </div>
+
               {/* Sibling of the rotator, not a child: `.app-ui-rotator` is a
                   positioned z-10 element, so anything nested inside it is
                   clamped to that plane and the z-36 metronome layer would paint
@@ -4873,7 +5148,34 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 elapsed={elapsed}
                 onLightBackground={recordingMode === 'audio'}
                 placement={handsFreeStagePlacement}
+                onTapForSettings={() => setHandsFreeCardOpen(true)}
               />
+              <HandsFreeSettingsCard
+                open={handsFreeCardOpen && hudModalState === 'idle'}
+                silenceSeconds={settings.soundSilenceSeconds}
+                volumeThreshold={settings.soundVolumeThreshold}
+                hapticFeedback={settings.hapticFeedback}
+                onSilenceSecondsChange={(soundSilenceSeconds) =>
+                  updateSettings({ soundSilenceSeconds })
+                }
+                onVolumeThresholdChange={(soundVolumeThreshold) =>
+                  updateSettings({ soundVolumeThreshold })
+                }
+                onClose={() => setHandsFreeCardOpen(false)}
+              />
+              <AnimatePresence>
+                {modeVeil && (
+                  <motion.div
+                    key={`mode-veil-${modeVeil}`}
+                    className={`mode-veil mode-veil--${modeVeil}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.92, 0] }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.44, times: [0, 0.4, 1], ease: 'easeInOut' }}
+                    aria-hidden
+                  />
+                )}
+              </AnimatePresence>
 
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
                 {showMainPitchWidget && mainVideoPitchSource && (
@@ -4958,6 +5260,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       : undefined,
                   }}
                 >
+                  {focusedPractice && !isSplitView && !quickSettingsOpen && (
+                    <div className="session-line" aria-live="polite">
+                      <span className="session-line__pill">
+                        <span className="session-line__focus">{focusedPractice.focusArea}</span>
+                        <span className="session-line__take">
+                          {focusedTakeCount === 0 ? 'first take' : `take ${focusedTakeCount}`}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+
                   <AnimatePresence initial={false}>
                     {recordingMode === 'audio' &&
                       !quickSettingsOpen &&
@@ -5030,8 +5343,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onTunerInstrumentChange={(tunerInstrument) =>
                             updateSettings({ tunerInstrument })
                           }
-                          liveMicTunerEnabled={settings.liveMicTunerEnabled}
-                          droneVolume={settings.droneVolume}
                           droneWaveform={settings.droneWaveform}
                           hapticFeedback={settings.hapticFeedback}
                           micInputPreference={settings.micInputPreference}
@@ -5062,6 +5373,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onPinCurrentAsBest={handlePinCurrentAsBest}
                             onClearBenchmark={handleClearAudioBenchmark}
                             onClearChallenger={handleClearAudioChallenger}
+                            onShareBenchmark={
+                              benchmarkTake ? () => handleShareTake(benchmarkTake) : undefined
+                            }
+                            onShareChallenger={
+                              challengerTake ? () => handleShareTake(challengerTake) : undefined
+                            }
                             hapticFeedback={settings.hapticFeedback}
                           />
                         </div>
@@ -5208,6 +5525,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             onSubmitYoutube={handleSubmitYoutube}
                             onClearYoutube={handleClearYoutube}
                             onToggleSplitView={handleToggleSplitView}
+                            onShareBenchmark={
+                              benchmarkTake && !youtubeUrl && !libraryBenchmarkPlayback
+                                ? () => handleShareTake(benchmarkTake)
+                                : undefined
+                            }
+                            onShareChallenger={
+                              challengerTake ? () => handleShareTake(challengerTake) : undefined
+                            }
                             onExpandBenchmark={handleExpandBenchmark}
                             onExpandChallenger={handleExpandChallenger}
                             onDragStateChange={handlePipDragStateChange}
@@ -5280,8 +5605,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onPitchTrackerChange={handlePitchTrackerSettingChange}
                         onShowTakeCardsChange={handleShowTakeCardsSettingChange}
                         showMetronome={hudQuickSettings.showMetronome}
-                        metronomeToggleVisible={!isAudioPracticeMetronomeTab}
+                        metronomeToggleVisible={onRecordSurface}
                         onShowMetronomeChange={handleShowMetronomeSettingChange}
+                        showDrone={hudQuickSettings.showDrone}
+                        droneToggleVisible={onRecordSurface}
+                        onShowDroneChange={handleShowDroneSettingChange}
+                        desks={workspaceDesks}
+                        activeDeskId={activeDeskId}
+                        liveDeskSummary={liveDeskSummary}
+                        onApplyDesk={handleApplyDesk}
+                        onSaveDesk={handleSaveDesk}
+                        onDeleteDesk={handleDeleteDesk}
+                        againPulse={againPulse}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                         settingsLayoutMode={

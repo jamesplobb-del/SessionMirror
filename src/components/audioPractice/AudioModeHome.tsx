@@ -11,10 +11,11 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { LoaderCircle, Pause, Play, RotateCw, Star, X } from 'lucide-react'
+import { LoaderCircle, Pause, Play, RotateCw, Share, Star, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
+import type { AudioModePlaybackItem } from '../../context/AudioModePlaybackContext'
 import { useLiveRecordingWaveform } from '../../hooks/useLiveRecordingWaveform'
 import { stopEventBubble } from '../../utils/eventBubbling'
 import { triggerDragStartHaptic, triggerLightHaptic } from '../../utils/haptics'
@@ -382,6 +383,14 @@ interface AudioModeTakeCardProps {
   onOpen?: () => void
   onFavorite?: () => void
   onClear?: () => void
+  /** Share this take from the card. Absent for library references. */
+  onShare?: () => void
+  /**
+   * The other card's take. Press and hold this card's play button while the
+   * partner is playing to hear this take from the same spot; release to go
+   * back. A quick check without opening split view.
+   */
+  abPartnerItem?: AudioModePlaybackItem | null
   readiness?: { status: 'preparing' | 'ready' | 'error'; durationSeconds?: number; message?: string }
   onRetryPreparation?: () => void
   hapticFeedback?: boolean
@@ -403,6 +412,8 @@ function AudioModeTakeCard({
   onOpen,
   onFavorite,
   onClear,
+  onShare,
+  abPartnerItem = null,
   readiness,
   onRetryPreparation,
   hapticFeedback = true,
@@ -466,6 +477,54 @@ function AudioModeTakeCard({
     [audioPlayback, isCurrentItem, playable, playbackItem, waveformDurationSeconds],
   )
 
+  /* ---- Hold to A/B ----------------------------------------------------- */
+  const abRef = useRef<{ timer: number | null; active: boolean; suppressClick: boolean }>({
+    timer: null,
+    active: false,
+    suppressClick: false,
+  })
+
+  const partnerIsPlaying = useCallback(() => {
+    if (!abPartnerItem) return false
+    return audioPlayback.matchesCurrentSource(abPartnerItem) && audioPlayback.state.isPlaying
+  }, [abPartnerItem, audioPlayback])
+
+  const clearAbTimer = useCallback(() => {
+    if (abRef.current.timer !== null) {
+      window.clearTimeout(abRef.current.timer)
+      abRef.current.timer = null
+    }
+  }, [])
+
+  const handlePlayPointerDown = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      stopEventBubble(event)
+      if (!playable || !playbackItem || !abPartnerItem || !partnerIsPlaying()) return
+      clearAbTimer()
+      abRef.current.timer = window.setTimeout(() => {
+        abRef.current.timer = null
+        if (!partnerIsPlaying()) return
+        abRef.current.active = true
+        abRef.current.suppressClick = true
+        if (hapticFeedback) void triggerDragStartHaptic()
+        audioPlayback.play(playbackItem, { startTime: audioPlayback.state.currentTime })
+      }, 380)
+    },
+    [abPartnerItem, audioPlayback, clearAbTimer, hapticFeedback, partnerIsPlaying, playable, playbackItem],
+  )
+
+  const handlePlayPointerEnd = useCallback(() => {
+    clearAbTimer()
+    if (!abRef.current.active) return
+    abRef.current.active = false
+    if (abPartnerItem) {
+      triggerLightHaptic(hapticFeedback)
+      audioPlayback.play(abPartnerItem, { startTime: audioPlayback.state.currentTime })
+    }
+  }, [abPartnerItem, audioPlayback, clearAbTimer, hapticFeedback])
+
+  useEffect(() => () => clearAbTimer(), [clearAbTimer])
+
   /* Live mic energy replaces the stored body while recording, and while Current
    * is still empty — that is what makes the card read as the recorder. */
   const liveStage = stage && (isRecording || !playable)
@@ -512,6 +571,21 @@ function AudioModeTakeCard({
               <Star className="h-4 w-4 fill-current" />
             </Pressable>
           ) : null}
+          {hasMedia && playable && onShare ? (
+            <Pressable
+              type="button"
+              intensity="icon"
+              haptic="light"
+              onClick={(event) => {
+                event.stopPropagation()
+                onShare()
+              }}
+              className="audio-mode-take-card__mini-btn audio-mode-take-card__mini-btn--share"
+              aria-label={`Share ${label}`}
+            >
+              <Share className="h-4 w-4" />
+            </Pressable>
+          ) : null}
           {hasMedia ? (
             <Pressable
               type="button"
@@ -540,10 +614,17 @@ function AudioModeTakeCard({
           disabled={!playable && !preparationFailed}
           onClick={(event) => {
             event.stopPropagation()
+            if (abRef.current.suppressClick) {
+              abRef.current.suppressClick = false
+              return
+            }
             if (preparationFailed) onRetryPreparation?.()
             else if (playable) togglePlayback()
           }}
-          onPointerDown={stopEventBubble}
+          onPointerDown={handlePlayPointerDown}
+          onPointerUp={handlePlayPointerEnd}
+          onPointerCancel={handlePlayPointerEnd}
+          onPointerLeave={handlePlayPointerEnd}
           className="audio-mode-take-card__play"
           aria-label={
             isPreparing
@@ -627,6 +708,8 @@ interface AudioModeHomeProps {
   onPinCurrentAsBest?: () => void
   onClearBenchmark?: () => void
   onClearChallenger?: () => void
+  onShareBenchmark?: () => void
+  onShareChallenger?: () => void
   takeReadiness?: Record<string, { status: 'preparing' | 'ready' | 'error'; durationSeconds?: number; message?: string }>
   onRetryTakePreparation?: (takeId: string) => void
   hapticFeedback?: boolean
@@ -646,10 +729,19 @@ function AudioModeHome({
   onPinCurrentAsBest,
   onClearBenchmark,
   onClearChallenger,
+  onShareBenchmark,
+  onShareChallenger,
   takeReadiness = {},
   onRetryTakePreparation,
   hapticFeedback = true,
 }: AudioModeHomeProps) {
+  // Each card knows the other's playback item so hold-to-A/B can jump between them.
+  const bestItem = useAudioModeTakeItem({
+    tone: 'best',
+    take: benchmarkTake,
+    libraryPlayback: libraryBenchmarkPlayback,
+  }).playbackItem
+  const currentItem = useAudioModeTakeItem({ tone: 'current', take: challengerTake }).playbackItem
   return (
     <section className="audio-mode-home audio-mode-home--inplace pointer-events-auto">
       <div className="audio-mode-take-stack">
@@ -660,6 +752,8 @@ function AudioModeHome({
           libraryPlayback={libraryBenchmarkPlayback}
           onOpen={Boolean(libraryBenchmarkPlayback || benchmarkTake) ? onExpandBenchmark : undefined}
           onClear={onClearBenchmark}
+          onShare={benchmarkTake && !libraryBenchmarkPlayback ? onShareBenchmark : undefined}
+          abPartnerItem={currentItem}
           readiness={benchmarkTake ? takeReadiness[benchmarkTake.id] : undefined}
           onRetryPreparation={
             benchmarkTake ? () => onRetryTakePreparation?.(benchmarkTake.id) : undefined
@@ -674,6 +768,8 @@ function AudioModeHome({
           onOpen={onExpandChallenger}
           onFavorite={onPinCurrentAsBest}
           onClear={onClearChallenger}
+          onShare={challengerTake ? onShareChallenger : undefined}
+          abPartnerItem={bestItem}
           readiness={challengerTake ? takeReadiness[challengerTake.id] : undefined}
           onRetryPreparation={
             challengerTake ? () => onRetryTakePreparation?.(challengerTake.id) : undefined

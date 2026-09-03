@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import {
   droneGetState,
   droneRestoreState,
@@ -10,6 +10,7 @@ import {
   droneStop,
   droneToggleNote,
   isDroneNativeAvailable,
+  type DroneState,
   type DroneWaveform,
 } from '../utils/droneEngine'
 import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
@@ -26,13 +27,208 @@ export interface UseDroneResult {
   activeNotes: number[]
   octave: number
   enabled: boolean
+  /** Last pitch class held — what the desk widget reopens on. */
+  lastPitchClass: number | null
   nativeAvailable: boolean
   toggleNote: (pitchClass: number) => void
   soloNote: (pitchClass: number) => void
   glissNote: (pitchClass: number, octave: number) => void
   setNotes: (pitchClasses: number[]) => void
+  /** Silence the drone but keep its note so it can be brought straight back. */
+  silence: () => void
   incrementOctave: () => void
   decrementOctave: () => void
+}
+
+/*
+ * One drone for the whole app.
+ *
+ * The native engine is a singleton, so the state that mirrors it has to be
+ * one as well. Before this the Tuner tab and anything else that wanted a
+ * drone each held a private copy, and whichever unmounted first silenced the
+ * other. Now every subscriber reads the same store; the engine is only
+ * stopped when the last subscriber leaves. That is what lets a drone started
+ * on the Tuner tab keep sounding under the desk widget on Camera.
+ */
+
+let prefs: DronePrefs = loadDronePrefs()
+const listeners = new Set<() => void>()
+let subscriberCount = 0
+let commandSequence = 0
+let restored = false
+let recoveryListenerAttached = false
+
+function emit(): void {
+  for (const listener of listeners) listener()
+}
+
+function commit(next: DronePrefs, persist = true): void {
+  prefs = next
+  if (persist) saveDronePrefs(next)
+  emit()
+}
+
+function fromNative(state: DroneState, base: DronePrefs = prefs): DronePrefs {
+  return {
+    ...base,
+    activeNotes: state.activeNotes,
+    octave: state.octave,
+    enabled: state.enabled,
+    volume: state.volume,
+    waveform: state.waveform,
+    lastPitchClass: state.activeNotes[0] ?? base.lastPitchClass,
+  }
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+function getSnapshot(): DronePrefs {
+  return prefs
+}
+
+async function syncFromNative(): Promise<void> {
+  if (!isDroneNativeAvailable()) return
+  const state = await droneGetState()
+  commit(fromNative(state))
+}
+
+function runNative<T extends DroneState>(
+  optimistic: DronePrefs,
+  command: () => Promise<T>,
+): void {
+  const sequence = ++commandSequence
+  commit(optimistic, !isDroneNativeAvailable())
+  if (!isDroneNativeAvailable()) return
+  void command()
+    .then((state) => {
+      if (sequence !== commandSequence) return
+      commit(fromNative(state))
+    })
+    .catch(() => {
+      if (sequence === commandSequence) void syncFromNative()
+    })
+}
+
+function toggleNote(pitchClass: number, hapticFeedback: boolean): void {
+  void triggerLightHaptic(hapticFeedback)
+  const has = prefs.activeNotes.includes(pitchClass)
+  const activeNotes = has
+    ? prefs.activeNotes.filter((note) => note !== pitchClass)
+    : [...prefs.activeNotes, pitchClass].sort((a, b) => a - b)
+  runNative(
+    {
+      ...prefs,
+      activeNotes,
+      enabled: activeNotes.length > 0,
+      lastPitchClass: has ? prefs.lastPitchClass : pitchClass,
+    },
+    () => droneToggleNote(pitchClass),
+  )
+}
+
+function soloNote(pitchClass: number): void {
+  runNative(
+    { ...prefs, activeNotes: [pitchClass], enabled: true, lastPitchClass: pitchClass },
+    () => droneSoloNote(pitchClass),
+  )
+}
+
+function glissNote(pitchClass: number, octave: number): void {
+  const clampedOctave = Math.min(8, Math.max(0, Math.round(octave)))
+  runNative(
+    {
+      ...prefs,
+      activeNotes: [pitchClass],
+      octave: clampedOctave,
+      enabled: true,
+      lastPitchClass: pitchClass,
+    },
+    () => droneSoloNote(pitchClass, clampedOctave),
+  )
+}
+
+function setNotes(pitchClasses: number[], hapticFeedback: boolean): void {
+  const activeNotes = Array.from(
+    new Set(pitchClasses.filter((note) => Number.isInteger(note) && note >= 0 && note <= 11)),
+  ).sort((a, b) => a - b)
+  void triggerLightHaptic(hapticFeedback)
+  const snapshot = prefs
+  runNative(
+    {
+      ...snapshot,
+      activeNotes,
+      enabled: activeNotes.length > 0,
+      lastPitchClass: activeNotes[0] ?? snapshot.lastPitchClass,
+    },
+    () =>
+      droneRestoreState({
+        activeNotes,
+        octave: snapshot.octave,
+        volume: snapshot.volume,
+        waveform: snapshot.waveform,
+      }),
+  )
+}
+
+function silence(): void {
+  if (prefs.activeNotes.length === 0 && !prefs.enabled) return
+  runNative({ ...prefs, activeNotes: [], enabled: false }, () => droneStop())
+}
+
+function setOctave(octave: number): void {
+  const clamped = Math.min(8, Math.max(0, octave))
+  runNative({ ...prefs, octave: clamped }, () => droneSetOctave(clamped))
+}
+
+function stepOctave(delta: 1 | -1, hapticFeedback: boolean): void {
+  const next = prefs.octave + delta
+  if (next < 0 || next > 8) return
+  void triggerLightHaptic(hapticFeedback)
+  setOctave(next)
+}
+
+function attachRecoveryListener(): void {
+  if (recoveryListenerAttached || typeof window === 'undefined') return
+  recoveryListenerAttached = true
+  window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, () => {
+    if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0) return
+    void droneStart()
+      .then(() => syncFromNative())
+      .catch(() => {})
+  })
+}
+
+function restoreOnce(volume: number, waveform: DroneWaveform): void {
+  if (restored || !isDroneNativeAvailable()) return
+  restored = true
+  const saved = loadDronePrefs()
+  void droneRestoreState({
+    activeNotes: [],
+    octave: saved.octave,
+    volume,
+    waveform,
+  }).then((state) => {
+    commit(fromNative(state, { ...prefs, lastPitchClass: saved.lastPitchClass }))
+  })
+}
+
+function retain(): void {
+  subscriberCount += 1
+  attachRecoveryListener()
+}
+
+function release(): void {
+  subscriberCount = Math.max(0, subscriberCount - 1)
+  if (subscriberCount > 0 || !isDroneNativeAvailable()) return
+  // Last listener gone: nothing on screen can show the drone, so stop it.
+  void droneStop().then((state) => {
+    commit({ ...fromNative(state), activeNotes: [], enabled: false })
+  })
 }
 
 export function useDrone({
@@ -40,341 +236,73 @@ export function useDrone({
   waveform,
   hapticFeedback = true,
 }: UseDroneOptions): UseDroneResult {
-  const [prefs, setPrefs] = useState<DronePrefs>(() => loadDronePrefs())
-  const restoredRef = useRef(false)
-  const commandSequenceRef = useRef(0)
-  const prefsRef = useRef(prefs)
-  prefsRef.current = prefs
+  const state = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
   useEffect(() => {
-    if (!isDroneNativeAvailable() || restoredRef.current) return
-    restoredRef.current = true
-    const saved = loadDronePrefs()
-    void droneRestoreState({
-      activeNotes: [],
-      octave: saved.octave,
-      volume,
-      waveform,
-    }).then((state) => {
-      const next: DronePrefs = {
-        activeNotes: state.activeNotes,
-        octave: state.octave,
-        enabled: state.enabled,
-        volume: state.volume,
-        waveform: state.waveform,
-      }
-      setPrefs(next)
-      saveDronePrefs(next)
-    })
-  }, [volume, waveform])
+    retain()
+    restoreOnce(volume, waveform)
+    return release
+    // Retain/release exactly once per mount; volume and waveform have their own effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
-    if (!isDroneNativeAvailable()) return
-    void droneSetVolume(volume)
-    setPrefs((current) => {
-      const next = { ...current, volume }
-      saveDronePrefs(next)
-      return next
-    })
+    if (prefs.volume === volume) return
+    runNative({ ...prefs, volume }, () => droneSetVolume(volume))
   }, [volume])
 
   useEffect(() => {
-    if (!isDroneNativeAvailable()) return
-    void droneSetWaveform(waveform)
-    setPrefs((current) => {
-      const next = { ...current, waveform }
-      saveDronePrefs(next)
-      return next
-    })
+    if (prefs.waveform === waveform) return
+    runNative({ ...prefs, waveform }, () => droneSetWaveform(waveform))
   }, [waveform])
 
-  const syncFromNative = useCallback(async () => {
-    if (!isDroneNativeAvailable()) return
-    const state = await droneGetState()
-    setPrefs((current) => {
-      const next: DronePrefs = {
-        ...current,
-        activeNotes: state.activeNotes,
-        octave: state.octave,
-        enabled: state.enabled,
-        volume: state.volume,
-        waveform: state.waveform,
-      }
-      saveDronePrefs(next)
-      return next
-    })
-  }, [])
-
-  useEffect(() => {
-    const recoverActiveDrone = () => {
-      if (!isDroneNativeAvailable() || prefsRef.current.activeNotes.length === 0) return
-      void droneStart().then(() => syncFromNative()).catch(() => {})
-    }
-    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverActiveDrone)
-    return () => {
-      window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverActiveDrone)
-    }
-  }, [syncFromNative])
-
-  const toggleNote = useCallback(
-    (pitchClass: number) => {
-      const commandSequence = ++commandSequenceRef.current
-      void triggerLightHaptic(hapticFeedback)
-      if (!isDroneNativeAvailable()) {
-        setPrefs((current) => {
-          const has = current.activeNotes.includes(pitchClass)
-          const activeNotes = has
-            ? current.activeNotes.filter((note) => note !== pitchClass)
-            : [...current.activeNotes, pitchClass].sort((a, b) => a - b)
-          const next = { ...current, activeNotes, enabled: activeNotes.length > 0 }
-          saveDronePrefs(next)
-          return next
-        })
-        return
-      }
-
-      setPrefs((current) => {
-        const has = current.activeNotes.includes(pitchClass)
-        const activeNotes = has
-          ? current.activeNotes.filter((note) => note !== pitchClass)
-          : [...current.activeNotes, pitchClass].sort((a, b) => a - b)
-        return { ...current, activeNotes, enabled: activeNotes.length > 0 }
-      })
-
-      void droneToggleNote(pitchClass)
-        .then((result) => {
-          if (commandSequence !== commandSequenceRef.current) return
-          setPrefs((current) => {
-            const next: DronePrefs = {
-              ...current,
-              activeNotes: result.activeNotes,
-              octave: result.octave,
-              enabled: result.enabled,
-              volume: result.volume,
-              waveform: result.waveform,
-            }
-            saveDronePrefs(next)
-            return next
-          })
-        })
-        .catch(() => {
-          if (commandSequence === commandSequenceRef.current) {
-            void syncFromNative()
-          }
-        })
-    },
-    [hapticFeedback, syncFromNative],
+  const toggle = useCallback(
+    (pitchClass: number) => toggleNote(pitchClass, hapticFeedback),
+    [hapticFeedback],
   )
-
-  const soloNote = useCallback(
-    (pitchClass: number) => {
-      const commandSequence = ++commandSequenceRef.current
-      if (!isDroneNativeAvailable()) {
-        setPrefs((current) => {
-          const next = {
-            ...current,
-            activeNotes: [pitchClass],
-            enabled: true,
-          }
-          saveDronePrefs(next)
-          return next
-        })
-        return
-      }
-
-      setPrefs((current) => ({
-        ...current,
-        activeNotes: [pitchClass],
-        enabled: true,
-      }))
-
-      void droneSoloNote(pitchClass)
-        .then((result) => {
-          if (commandSequence !== commandSequenceRef.current) return
-          setPrefs((current) => {
-            const next: DronePrefs = {
-              ...current,
-              activeNotes: result.activeNotes,
-              octave: result.octave,
-              enabled: result.enabled,
-              volume: result.volume,
-              waveform: result.waveform,
-            }
-            saveDronePrefs(next)
-            return next
-          })
-        })
-        .catch(() => {
-          if (commandSequence === commandSequenceRef.current) {
-            void syncFromNative()
-          }
-        })
-    },
-    [syncFromNative],
+  const setAll = useCallback(
+    (pitchClasses: number[]) => setNotes(pitchClasses, hapticFeedback),
+    [hapticFeedback],
   )
-
-  const glissNote = useCallback(
-    (pitchClass: number, octave: number) => {
-      const clampedOctave = Math.min(8, Math.max(0, Math.round(octave)))
-      const commandSequence = ++commandSequenceRef.current
-
-      setPrefs((current) => ({
-        ...current,
-        activeNotes: [pitchClass],
-        octave: clampedOctave,
-        enabled: true,
-      }))
-
-      if (!isDroneNativeAvailable()) return
-
-      void droneSoloNote(pitchClass, clampedOctave)
-        .then((result) => {
-          if (commandSequence !== commandSequenceRef.current) return
-          setPrefs((current) => {
-            const next: DronePrefs = {
-              ...current,
-              activeNotes: result.activeNotes,
-              octave: result.octave,
-              enabled: result.enabled,
-              volume: result.volume,
-              waveform: result.waveform,
-            }
-            saveDronePrefs(next)
-            return next
-          })
-        })
-        .catch(() => {
-          if (commandSequence === commandSequenceRef.current) {
-            void syncFromNative()
-          }
-        })
-    },
-    [syncFromNative],
-  )
-
-  const setNotes = useCallback(
-    (pitchClasses: number[]) => {
-      const activeNotes = Array.from(
-        new Set(pitchClasses.filter((note) => Number.isInteger(note) && note >= 0 && note <= 11)),
-      ).sort((a, b) => a - b)
-      const commandSequence = ++commandSequenceRef.current
-      void triggerLightHaptic(hapticFeedback)
-
-      const current = prefsRef.current
-      const optimistic: DronePrefs = {
-        ...current,
-        activeNotes,
-        enabled: activeNotes.length > 0,
-      }
-      setPrefs(optimistic)
-      saveDronePrefs(optimistic)
-
-      if (!isDroneNativeAvailable()) return
-
-      void droneRestoreState({
-        activeNotes,
-        octave: current.octave,
-        volume: current.volume,
-        waveform: current.waveform,
-      })
-        .then((state) => {
-          if (commandSequence !== commandSequenceRef.current) return
-          setPrefs((latest) => {
-            const next: DronePrefs = {
-              ...latest,
-              activeNotes: state.activeNotes,
-              octave: state.octave,
-              enabled: state.enabled,
-              volume: state.volume,
-              waveform: state.waveform,
-            }
-            saveDronePrefs(next)
-            return next
-          })
-        })
-        .catch(() => {
-          if (commandSequence === commandSequenceRef.current) {
-            void syncFromNative()
-          }
-        })
-    },
-    [hapticFeedback, syncFromNative],
-  )
-
-  const setOctave = useCallback(
-    (octave: number) => {
-      const commandSequence = ++commandSequenceRef.current
-      const clamped = Math.min(8, Math.max(0, octave))
-      if (!isDroneNativeAvailable()) {
-        setPrefs((current) => {
-          const next = { ...current, octave: clamped }
-          saveDronePrefs(next)
-          return next
-        })
-        return
-      }
-
-      void droneSetOctave(clamped).then((state) => {
-        if (commandSequence !== commandSequenceRef.current) return
-        setPrefs((current) => {
-          const next: DronePrefs = {
-            ...current,
-            activeNotes: state.activeNotes,
-            octave: state.octave,
-            enabled: state.enabled,
-          }
-          saveDronePrefs(next)
-          return next
-        })
-      })
-    },
-    [],
-  )
-
-  const incrementOctave = useCallback(() => {
-    setPrefs((current) => {
-      if (current.octave >= 8) return current
-      void triggerLightHaptic(hapticFeedback)
-      void setOctave(current.octave + 1)
-      return { ...current, octave: current.octave + 1 }
-    })
-  }, [hapticFeedback, setOctave])
-
-  const decrementOctave = useCallback(() => {
-    setPrefs((current) => {
-      if (current.octave <= 0) return current
-      void triggerLightHaptic(hapticFeedback)
-      void setOctave(current.octave - 1)
-      return { ...current, octave: current.octave - 1 }
-    })
-  }, [hapticFeedback, setOctave])
-
-  useEffect(() => {
-    return () => {
-      if (!isDroneNativeAvailable()) return
-      void droneStop().then((state) => {
-        const next: DronePrefs = {
-          activeNotes: [],
-          octave: state.octave,
-          enabled: false,
-          volume: state.volume,
-          waveform: state.waveform,
-        }
-        saveDronePrefs(next)
-      })
-    }
-  }, [])
+  const incrementOctave = useCallback(() => stepOctave(1, hapticFeedback), [hapticFeedback])
+  const decrementOctave = useCallback(() => stepOctave(-1, hapticFeedback), [hapticFeedback])
 
   return {
-    activeNotes: prefs.activeNotes,
-    octave: prefs.octave,
-    enabled: prefs.enabled,
+    activeNotes: state.activeNotes,
+    octave: state.octave,
+    enabled: state.enabled,
+    lastPitchClass: state.lastPitchClass,
     nativeAvailable: isDroneNativeAvailable(),
-    toggleNote,
+    toggleNote: toggle,
     soloNote,
     glissNote,
-    setNotes,
+    setNotes: setAll,
+    silence,
     incrementOctave,
     decrementOctave,
   }
+}
+
+/** Read the live drone state outside React (desk snapshots). */
+export function readDroneState(): DronePrefs {
+  return prefs
+}
+
+/** Subscribe to the drone store outside the widget (desk chips watch it). */
+export const subscribeDrone = subscribe
+export const getDroneSnapshot = getSnapshot
+
+/**
+ * Restore a desk's drone: the note sounds when the desk had one, otherwise
+ * the drone goes quiet. Octave is applied either way so the widget reopens
+ * where the desk left it.
+ */
+export function applyDroneFromDesk(pitchClass: number | null, octave: number): void {
+  const clampedOctave = Math.min(8, Math.max(0, Math.round(octave)))
+  if (pitchClass === null) {
+    if (prefs.octave !== clampedOctave) setOctave(clampedOctave)
+    silence()
+    return
+  }
+  glissNote(pitchClass, clampedOctave)
 }

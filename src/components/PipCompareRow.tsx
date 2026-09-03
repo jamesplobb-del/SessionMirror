@@ -12,7 +12,7 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { ArrowLeftRight, Pin, RotateCcw, X } from 'lucide-react'
+import { ArrowLeftRight, Pin, RotateCcw, Share, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
 import PipWindow from './PipWindow'
@@ -58,6 +58,9 @@ export interface PipCompareRowProps {
   onSubmitYoutube: (embedUrl: string) => void
   onClearYoutube: () => void
   onToggleSplitView: () => void
+  /** Share the seated take from its own tile. Absent for YouTube/library references. */
+  onShareBenchmark?: () => void
+  onShareChallenger?: () => void
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onDragStateChange?: (state: PipDragUiState) => void
@@ -562,6 +565,42 @@ function CompactTakeClearButton({
   )
 }
 
+/**
+ * Share lives on the tile the player is looking at: the same round glass
+ * button as the pin, beside it. The keeper should leave from here, not from
+ * two screens away in Vault.
+ */
+function CompactShareButton({
+  label,
+  onShare,
+  hapticFeedback,
+}: {
+  label: string
+  onShare: () => void
+  hapticFeedback: boolean
+}) {
+  return (
+    <Pressable
+      type="button"
+      intensity="icon"
+      squish={false}
+      haptic="light"
+      hapticFeedback={hapticFeedback}
+      className="compact-take-card__share"
+      data-card-move-ignore
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation()
+        onShare()
+      }}
+      aria-label={`Share ${label}`}
+      title={`Share ${label}`}
+    >
+      <Share aria-hidden />
+    </Pressable>
+  )
+}
+
 function CompactPinCurrentButton({
   onPin,
   hapticFeedback,
@@ -727,6 +766,8 @@ export default memo(function PipCompareRow({
   onSubmitYoutube,
   onClearYoutube,
   onToggleSplitView,
+  onShareBenchmark,
+  onShareChallenger,
   onExpandBenchmark,
   onExpandChallenger,
   onDragStateChange,
@@ -998,6 +1039,13 @@ export default memo(function PipCompareRow({
               hapticFeedback={hapticFeedback}
             />
           )}
+          {compact && compactBenchmarkHasMedia && onShareBenchmark && (
+            <CompactShareButton
+              label="Best Take"
+              onShare={onShareBenchmark}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
           {compact && challengerDragging && !challengerGhost?.overDelete && (
             <span
               className={`compact-take-transfer-target compact-take-transfer-target--best ${
@@ -1096,6 +1144,13 @@ export default memo(function PipCompareRow({
             <CompactTakeClearButton
               label="Current Take"
               onClear={onUnpinChallenger}
+              hapticFeedback={hapticFeedback}
+            />
+          )}
+          {compact && compactCurrentHasMedia && onShareChallenger && (
+            <CompactShareButton
+              label="Current Take"
+              onShare={onShareChallenger}
               hapticFeedback={hapticFeedback}
             />
           )}

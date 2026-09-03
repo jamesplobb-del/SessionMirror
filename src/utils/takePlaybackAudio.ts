@@ -1,4 +1,3 @@
-import { logPlaybackGainAuditOnStart } from './playbackGainAudit'
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import {
   prepareInlineMediaElement,
@@ -206,13 +205,6 @@ function waitForFirstMediaFrame(media: HTMLMediaElement): Promise<void> {
   })
 }
 
-/** Defer one frame so routing/gain is wired after play() resolves. */
-function reportTakePlaybackStarted(media: HTMLMediaElement): void {
-  window.requestAnimationFrame(() => {
-    logPlaybackGainAuditOnStart(media)
-  })
-}
-
 /** Wire Web Audio gain after playback starts so the user gesture is not blocked. */
 function wireTakePlaybackAfterStart(
   media: HTMLMediaElement,
@@ -240,7 +232,6 @@ export function playTakeMediaFromUserGesture(
       await media.play()
       attachPlaybackRouteEndedListener(media)
       wireTakePlaybackAfterStart(media, true)
-      reportTakePlaybackStarted(media)
       callbacks.onPlaying?.()
     } catch (error: unknown) {
       console.log(error)
@@ -266,7 +257,6 @@ export function playInlineTakeBoxFromUserGesture(
         await media.play()
         attachInlineTakeBoxEndedListener(media)
         wireTakePlaybackAfterStart(media, true)
-        reportTakePlaybackStarted(media)
         callbacks.onPlaying?.()
       } catch {
         // First play() rejection was previously fatal — the button silently
@@ -280,7 +270,6 @@ export function playInlineTakeBoxFromUserGesture(
         media.volume = 1
         attachInlineTakeBoxEndedListener(media)
         wireTakePlaybackAfterStart(media, true)
-        reportTakePlaybackStarted(media)
         callbacks.onPlaying?.()
       }
     } catch (error: unknown) {
@@ -312,9 +301,6 @@ export function playTakeMediaBatchFromUserGesture(
   )
     .then(() => {
       primeTakePlayback(media, false)
-      for (const element of media) {
-        reportTakePlaybackStarted(element)
-      }
     })
     .catch(() => {
       /* onFailure already invoked per element */
@@ -329,7 +315,6 @@ export async function playTakeMedia(
   try {
     await media.play()
     wireTakePlaybackAfterStart(media, true)
-    reportTakePlaybackStarted(media)
     return true
   } catch (error: unknown) {
     console.log(error)
@@ -345,7 +330,6 @@ export async function playTakeMediaMuted(
   primeTakePlayback([media], false)
   await resumePlaybackAudioContext()
   const started = await safePlayMutedMedia(media, options)
-  if (started) reportTakePlaybackStarted(media)
   return started
 }
 
@@ -394,7 +378,6 @@ export async function playTakeMediaAudible(
     await media.play()
     if (attachEnded) attachPlaybackRouteEndedListener(media)
     wireTakePlaybackAfterStart(media, true)
-    reportTakePlaybackStarted(media)
     return true
   } catch {
     try {
@@ -404,7 +387,6 @@ export async function playTakeMediaAudible(
       media.volume = 1
       if (attachEnded) attachPlaybackRouteEndedListener(media)
       wireTakePlaybackAfterStart(media, true)
-      reportTakePlaybackStarted(media)
       return true
     } catch (error) {
       console.error('[Playback] playTakeMediaAudible failed — both play attempts rejected', {
@@ -443,7 +425,6 @@ export async function playTakeMediaBatch(media: HTMLMediaElement[]): Promise<boo
   return Promise.all(
     media.map(async (element) => {
       const started = await safePlayMutedMedia(element)
-      if (started) reportTakePlaybackStarted(element)
       return started
     }),
   )

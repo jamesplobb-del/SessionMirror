@@ -6,8 +6,8 @@ function logAudioTab(tab: AudioPracticeTab): void {
   console.log(`[AudioTabs] activeTab=${tab}`)
 }
 
-export function useAudioPracticeTab() {
-  const [activeTab, setActiveTab] = useState<AudioPracticeTab>('audio')
+export function useAudioPracticeTab(initialTab: AudioPracticeTab = 'audio') {
+  const [activeTab, setActiveTab] = useState<AudioPracticeTab>(initialTab)
 
   const setActiveTabSafe = useCallback((tab: AudioPracticeTab) => {
     logAudioTab(tab)

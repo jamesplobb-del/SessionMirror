@@ -6,6 +6,12 @@ export interface DronePrefs {
   enabled: boolean
   volume: number
   waveform: DroneWaveform
+  /**
+   * The last pitch class the player held. Sound never restores on its own
+   * across a relaunch, but the desk drone widget reopens on this note so one
+   * tap brings yesterday's drone back.
+   */
+  lastPitchClass: number | null
 }
 
 export const DEFAULT_DRONE_PREFS: DronePrefs = {
@@ -14,6 +20,7 @@ export const DEFAULT_DRONE_PREFS: DronePrefs = {
   enabled: false,
   volume: 0.75,
   waveform: 'warmSynth',
+  lastPitchClass: null,
 }
 
 const STORAGE_KEY = 'sessionmirror:drone-prefs'
@@ -25,6 +32,11 @@ function clampOctave(value: number): number {
 function parseWaveform(value: unknown): DroneWaveform {
   if (value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
   return DEFAULT_DRONE_PREFS.waveform
+}
+
+function parsePitchClass(value: unknown): number | null {
+  const pitchClass = Number(value)
+  return Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null
 }
 
 export function loadDronePrefs(): DronePrefs {
@@ -42,6 +54,7 @@ export function loadDronePrefs(): DronePrefs {
           ? DEFAULT_DRONE_PREFS.volume
           : Math.min(1, Math.max(0, Number(parsed.volume) || DEFAULT_DRONE_PREFS.volume)),
       waveform: parseWaveform(parsed.waveform),
+      lastPitchClass: parsePitchClass(parsed.lastPitchClass),
     }
   } catch {
     return { ...DEFAULT_DRONE_PREFS }
@@ -56,6 +69,7 @@ export function saveDronePrefs(prefs: DronePrefs): void {
         ...prefs,
         activeNotes: [],
         enabled: false,
+        lastPitchClass: prefs.activeNotes[0] ?? prefs.lastPitchClass,
       }),
     )
   } catch {

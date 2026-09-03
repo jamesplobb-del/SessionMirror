@@ -75,9 +75,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private let bridgeMaxAckTimeouts = 3
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     /// Preview JPEG pump — recording uses AVCaptureMovieFileOutput at full session resolution.
-    private var bridgeFramesPerSecondFull: Double { isPad ? 30 : 24 }
-    /// Keep expand-mode live preview usable during recording + YouTube play-along while still avoiding a full 60fps bridge flood.
-    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 20
+    /// Keep the admission ceiling above the camera's usual 30fps cadence. A
+    /// 30fps ceiling can reject every other 30fps frame when callback jitter
+    /// lands just below 33.3ms, making the preview look closer to 15fps. The
+    /// acknowledgement gate below remains the real load-sensitive backpressure.
+    private let bridgeFramesPerSecondFull: Double = 45
+    /// Play-along uses smaller JPEGs and a slightly lower ceiling, while still
+    /// staying above a 30fps source cadence to avoid the same aliasing.
+    private let bridgeFramesPerSecondRecordingPlayAlong: Double = 36
     // Preview-only pump sizing. The recorded movie file uses a separate
     // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
@@ -1255,9 +1260,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     /// The Capacitor notify call only confirms that a message was enqueued for
-    /// WebKit. It does not mean WebKit has received, decoded, or painted the
-    /// JPEG. Wait for the canvas consumer to acknowledge the frame before
-    /// sending another large payload so IPC can never grow without bound.
+    /// WebKit. Wait until the JS consumer has actually received the frame before
+    /// sending another large payload so IPC can never grow without bound. JS
+    /// keeps only its newest pending decode, so receipt is the correct pressure
+    /// boundary; waiting for decode + requestAnimationFrame adds visible latency.
     func acknowledgePreviewFrame(_ frameId: UInt64) {
         frameBridgeQueue.async {
             guard self.bridgeFrameAwaitingAck == frameId else { return }

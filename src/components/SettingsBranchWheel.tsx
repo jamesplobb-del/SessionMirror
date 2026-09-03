@@ -5,6 +5,7 @@ import {
   Grid2X2,
   LayoutGrid,
   MicVocal,
+  Radio,
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
@@ -15,6 +16,9 @@ import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
 import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
 import { triggerLightHaptic } from '../utils/haptics'
+import { useLongPress } from '../hooks/useLongPress'
+import { useActionSheet } from '../context/ActionSheetContext'
+import { MAX_WORKSPACE_DESKS, type WorkspaceDesk } from '../utils/workspaceDesks'
 
 interface SettingsBranchWheelProps {
   open: boolean
@@ -30,6 +34,18 @@ interface SettingsBranchWheelProps {
   handsFreeToggleVisible?: boolean
   layoutMode?: SettingsBranchLayoutMode
   metronomeToggleVisible?: boolean
+  showDrone?: boolean
+  droneToggleVisible?: boolean
+  onShowDroneChange?: (show: boolean) => void
+  /** Saved desks — up to three chips above the toggle grid. */
+  desks?: WorkspaceDesk[]
+  activeDeskId?: string | null
+  /** What "Save this desk" would capture, as one literal line. */
+  liveDeskSummary?: string
+  onApplyDesk?: (deskId: string) => void
+  onSaveDesk?: (name: string) => void
+  onDeleteDesk?: (deskId: string) => void
+  hapticFeedback?: boolean
   tunerTakePillsVisible?: boolean
   tunerTakePillsToggleVisible?: boolean
   pitchToggleVisible: boolean
@@ -54,6 +70,7 @@ interface BranchItem {
     | 'take-cards'
     | 'tuner-takes'
     | 'metronome'
+    | 'drone'
     | 'enhancer'
     | 'hands-free'
     | 'expand'
@@ -64,6 +81,46 @@ interface BranchItem {
 }
 
 const BRANCH_MOTION = nativeGlideEase
+
+/**
+ * One saved desk. Tap applies the whole room; long-press forgets it. The lit
+ * chip means the live desk still matches what was saved — drifting from it
+ * (changing the bpm, say) dims the chip rather than nagging.
+ */
+function DeskChip({
+  desk,
+  active,
+  hapticFeedback,
+  onApply,
+  onDelete,
+}: {
+  desk: WorkspaceDesk
+  active: boolean
+  hapticFeedback: boolean
+  onApply: () => void
+  onDelete: () => void
+}) {
+  const handlers = useLongPress({
+    onClick: onApply,
+    onLongPress: onDelete,
+    hapticFeedback,
+    strongHapticFeedback: true,
+  })
+  return (
+    <button
+      type="button"
+      className={`settings-branch-tray__desk ${NATIVE_SQUISH} ${
+        active ? 'settings-branch-tray__desk--active' : ''
+      }`}
+      aria-pressed={active}
+      aria-label={`${desk.name} desk${active ? ', active' : ''}. Long press to forget.`}
+      onContextMenu={(event) => event.preventDefault()}
+      {...handlers}
+    >
+      {desk.name}
+    </button>
+  )
+}
 
 export default function SettingsBranchWheel({
   open,
@@ -78,6 +135,16 @@ export default function SettingsBranchWheel({
   handsFreeToggleVisible = false,
   layoutMode = 'camera',
   metronomeToggleVisible = true,
+  showDrone = false,
+  droneToggleVisible = true,
+  onShowDroneChange,
+  desks = [],
+  activeDeskId = null,
+  liveDeskSummary = '',
+  onApplyDesk,
+  onSaveDesk,
+  onDeleteDesk,
+  hapticFeedback = true,
   tunerTakePillsVisible = false,
   tunerTakePillsToggleVisible = false,
   pitchToggleVisible,
@@ -94,6 +161,9 @@ export default function SettingsBranchWheel({
   onOpenMultitrack,
 }: SettingsBranchWheelProps) {
   const notifyTutorial = useTutorialAction()
+  const { showConfirm } = useActionSheet()
+  const [savingDesk, setSavingDesk] = useState(false)
+  const [deskNameDraft, setDeskNameDraft] = useState('')
   const [anchor, setAnchor] = useState<{
     rect: DOMRect
     viewportLeft: number
@@ -137,7 +207,31 @@ export default function SettingsBranchWheel({
 
   const handleExitComplete = () => {
     setAnchor(null)
+    setSavingDesk(false)
+    setDeskNameDraft('')
     onExitComplete?.()
+  }
+
+  const canSaveDesk = Boolean(onSaveDesk)
+  const desksVisible = canSaveDesk || desks.length > 0
+
+  const commitDeskName = () => {
+    const name = deskNameDraft.trim()
+    if (!name || !onSaveDesk) return
+    triggerLightHaptic(hapticFeedback)
+    onSaveDesk(name)
+    setSavingDesk(false)
+    setDeskNameDraft('')
+  }
+
+  const confirmDeleteDesk = (desk: WorkspaceDesk) => {
+    void showConfirm({
+      message: `Forget the “${desk.name}” desk?`,
+      destructive: true,
+      confirmLabel: 'Forget',
+    }).then((confirmed) => {
+      if (confirmed) onDeleteDesk?.(desk.id)
+    })
   }
 
   useEffect(() => {
@@ -209,6 +303,16 @@ export default function SettingsBranchWheel({
       })
     }
 
+    if (droneToggleVisible && onShowDroneChange) {
+      items.push({
+        id: 'drone',
+        label: 'Drone',
+        icon: 'drone',
+        active: showDrone,
+        onSelect: () => onShowDroneChange(!showDrone),
+      })
+    }
+
     items.push({
       id: 'audio-enhancer',
       label: 'Audio Enhancer',
@@ -255,10 +359,13 @@ export default function SettingsBranchWheel({
     return items
   }, [
     audioEnhancerEnabled,
+    droneToggleVisible,
     handsFreeEnabled,
     handsFreeToggleVisible,
     expandViewActive,
     metronomeToggleVisible,
+    onShowDroneChange,
+    showDrone,
     onAudioEnhancerChange,
     onHandsFreeChange,
     onOpenMultitrack,
@@ -345,6 +452,77 @@ export default function SettingsBranchWheel({
                 <span className="settings-branch-tray__title">Workspace</span>
               </div>
 
+              {desksVisible && !savingDesk && (
+                <div className="settings-branch-tray__desks" role="group" aria-label="Saved desks">
+                  {desks.map((desk) => (
+                    <DeskChip
+                      key={desk.id}
+                      desk={desk}
+                      active={desk.id === activeDeskId}
+                      hapticFeedback={hapticFeedback}
+                      onApply={() => onApplyDesk?.(desk.id)}
+                      onDelete={() => confirmDeleteDesk(desk)}
+                    />
+                  ))}
+                  {desks.length === 0 && (
+                    <span className="settings-branch-tray__desks-empty">
+                      Save the room you set up — click, drone, hands-free — as one tap.
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {savingDesk ? (
+                <form
+                  className="settings-branch-tray__save"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    commitDeskName()
+                  }}
+                >
+                  <label className="settings-branch-tray__save-label" htmlFor="workspace-desk-name">
+                    Save this desk
+                  </label>
+                  <input
+                    id="workspace-desk-name"
+                    className="settings-branch-tray__save-input"
+                    value={deskNameDraft}
+                    autoFocus
+                    maxLength={24}
+                    placeholder="Long tones, Excerpt run, Lesson…"
+                    aria-label="Desk name"
+                    onChange={(event) => setDeskNameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        setSavingDesk(false)
+                      }
+                    }}
+                  />
+                  <p className="settings-branch-tray__save-summary">{liveDeskSummary}</p>
+                  {desks.length >= MAX_WORKSPACE_DESKS && (
+                    <p className="settings-branch-tray__save-note">
+                      Three desks already — this replaces the oldest.
+                    </p>
+                  )}
+                  <div className="settings-branch-tray__save-actions">
+                    <button
+                      type="button"
+                      className={`settings-branch-tray__save-btn ${NATIVE_SQUISH}`}
+                      onClick={() => setSavingDesk(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className={`settings-branch-tray__save-btn settings-branch-tray__save-btn--primary ${NATIVE_SQUISH}`}
+                      disabled={!deskNameDraft.trim()}
+                    >
+                      Save
+                    </button>
+                  </div>
+                </form>
+              ) : (
               <div className="settings-branch-tray__grid">
                 {branchItems.map((item) => {
                   const tutorialTarget =
@@ -389,6 +567,8 @@ export default function SettingsBranchWheel({
                             <LayoutGrid strokeWidth={2.1} />
                           ) : item.icon === 'enhancer' ? (
                             <Sparkles strokeWidth={2.1} />
+                          ) : item.icon === 'drone' ? (
+                            <Radio strokeWidth={2.1} />
                           ) : item.icon === 'hands-free' ? (
                             <MicVocal strokeWidth={2.1} />
                           ) : item.icon === 'expand' ? (
@@ -405,6 +585,21 @@ export default function SettingsBranchWheel({
                   )
                 })}
               </div>
+              )}
+
+              {canSaveDesk && !savingDesk && (
+                <button
+                  type="button"
+                  className={`settings-branch-tray__save-trigger ${NATIVE_SQUISH}`}
+                  onClick={() => {
+                    triggerLightHaptic(hapticFeedback)
+                    setDeskNameDraft('')
+                    setSavingDesk(true)
+                  }}
+                >
+                  Save this desk…
+                </button>
+              )}
 
               <span
                 className="settings-branch-tray__arrow"

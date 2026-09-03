@@ -71,7 +71,6 @@ interface UseCameraSessionOptions {
   secondaryPreviewRef?: RefObject<HTMLVideoElement | null>
   onBeforeForegroundRestart?: () => void
   onAfterForegroundRestart?: () => void
-  nativeExperimentalAudioEnabled?: boolean
   /** iOS-only: record video via native AVFoundation (fixes WebKit MediaRecorder frame-drop freeze). */
   nativeCameraRecordingEnabled?: boolean
   micInputPreference?: MicInputPreference
@@ -276,7 +275,6 @@ export function useCameraSession({
   secondaryPreviewRef,
   onBeforeForegroundRestart,
   onAfterForegroundRestart,
-  nativeExperimentalAudioEnabled = false,
   nativeCameraRecordingEnabled = false,
   micInputPreference = 'headphone',
 }: UseCameraSessionOptions) {
@@ -305,7 +303,6 @@ export function useCameraSession({
   const onCompleteRef = useRef(onRecordingComplete)
   const onBeforeForegroundRestartRef = useRef(onBeforeForegroundRestart)
   const onAfterForegroundRestartRef = useRef(onAfterForegroundRestart)
-  const nativeExperimentalAudioEnabledRef = useRef(nativeExperimentalAudioEnabled)
   const micInputPreferenceRef = useRef<MicInputPreference>(micInputPreference)
   const queuedMicPreferenceRef = useRef<MicInputPreference | null>(micInputPreference)
   const nativeExperimentalRecordingRef = useRef(false)
@@ -343,7 +340,6 @@ export function useCameraSession({
   onCompleteRef.current = onRecordingComplete
   onBeforeForegroundRestartRef.current = onBeforeForegroundRestart
   onAfterForegroundRestartRef.current = onAfterForegroundRestart
-  nativeExperimentalAudioEnabledRef.current = nativeExperimentalAudioEnabled
   nativeCameraRecordingEnabledRef.current = nativeCameraRecordingEnabled
   micInputPreferenceRef.current = micInputPreference
   queuedMicPreferenceRef.current = micInputPreference
@@ -1239,7 +1235,6 @@ export function useCameraSession({
     acquireStream,
     cancelScheduledRelease,
     forceClearCameraState,
-    nativeExperimentalAudioEnabled,
     nativeCameraRecordingEnabled,
     normalizeReusableVideoPreview,
     recordingMode,

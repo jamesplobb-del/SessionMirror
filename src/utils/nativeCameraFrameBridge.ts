@@ -115,7 +115,7 @@ export function createNativePreviewFramePump(
   let latestFrame: NativeCameraPreviewFrameEvent | null = null
   let decoding = false
   let displayedBitmap: ImageBitmap | null = null
-  let pendingFrame: { bitmap: ImageBitmap; frameId?: number } | null = null
+  let pendingFrame: ImageBitmap | null = null
   let rafId: number | null = null
 
   const cancelRaf = () => {
@@ -132,36 +132,32 @@ export function createNativePreviewFramePump(
       if (cancelled) return
 
       const canvas = canvasRef.current
-      const frame = pendingFrame
-      if (!frame) return
+      const bitmap = pendingFrame
+      if (!bitmap) return
 
       pendingFrame = null
       if (!canvas) {
-        frame.bitmap.close()
-        void acknowledgeNativePreviewFrame(frame.frameId)
+        bitmap.close()
         return
       }
 
-      drawCoverFrameOnCanvas(canvas, frame.bitmap, frame.bitmap.width, frame.bitmap.height)
+      drawCoverFrameOnCanvas(canvas, bitmap, bitmap.width, bitmap.height)
       displayedBitmap?.close()
-      displayedBitmap = frame.bitmap
+      displayedBitmap = bitmap
       onFrameDrawn?.()
-      void acknowledgeNativePreviewFrame(frame.frameId)
     })
   }
 
   const stop = () => {
     cancelled = true
     if (latestFrame) {
-      void acknowledgeNativePreviewFrame(latestFrame.frameId)
       latestFrame = null
     }
     cancelRaf()
     displayedBitmap?.close()
     displayedBitmap = null
     if (pendingFrame) {
-      pendingFrame.bitmap.close()
-      void acknowledgeNativePreviewFrame(pendingFrame.frameId)
+      pendingFrame.close()
       pendingFrame = null
     }
   }
@@ -178,18 +174,16 @@ export function createNativePreviewFramePump(
         const decoded = await decodeNativePreviewFrame(frame)
         if (cancelled) {
           decoded.bitmap.close()
-          void acknowledgeNativePreviewFrame(frame.frameId)
           continue
         }
 
         if (pendingFrame) {
-          pendingFrame.bitmap.close()
-          void acknowledgeNativePreviewFrame(pendingFrame.frameId)
+          pendingFrame.close()
         }
-        pendingFrame = { bitmap: decoded.bitmap, frameId: frame.frameId }
+        pendingFrame = decoded.bitmap
         scheduleDraw()
       } catch {
-        void acknowledgeNativePreviewFrame(frame.frameId)
+        /* receipt was already acknowledged; skip a malformed frame */
       }
     }
 
@@ -201,10 +195,11 @@ export function createNativePreviewFramePump(
 
   return {
     push: (event: NativeCameraPreviewFrameEvent) => {
+      /* Acknowledging at receipt keeps exactly one native-to-WebKit delivery in
+       * flight, but removes decode + paint + bridge round-trip latency from the
+       * camera cadence. The decode loop itself remains latest-frame-only. */
+      void acknowledgeNativePreviewFrame(event.frameId)
       if (cancelled || !extractJpegBase64(event)) return
-      if (latestFrame) {
-        void acknowledgeNativePreviewFrame(latestFrame.frameId)
-      }
       latestFrame = event
       void decodeLoop()
     },

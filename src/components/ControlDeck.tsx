@@ -22,6 +22,7 @@ import { resolveHandsFreePhase } from '../utils/handsFreePhase'
 import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
+import type { WorkspaceDesk } from '../utils/workspaceDesks'
 import { useTutorialAction } from '../context/TutorialContext'
 
 interface ControlDeckProps {
@@ -59,6 +60,18 @@ interface ControlDeckProps {
   showTakeCards?: boolean
   showMetronome?: boolean
   metronomeToggleVisible?: boolean
+  showDrone?: boolean
+  droneToggleVisible?: boolean
+  onShowDroneChange?: (show: boolean) => void
+  /** Saved desks shown as chips at the top of the Workspace tray. */
+  desks?: WorkspaceDesk[]
+  activeDeskId?: string | null
+  liveDeskSummary?: string
+  onApplyDesk?: (deskId: string) => void
+  onSaveDesk?: (name: string) => void
+  onDeleteDesk?: (deskId: string) => void
+  /** One breath of the record button after Current finishes playing back. */
+  againPulse?: boolean
   audioEnhancerEnabled?: boolean
   pitchToggleVisible?: boolean
   onPitchTrackerChange?: (enabled: boolean) => void
@@ -131,6 +144,16 @@ function ControlDeck({
   showTakeCards = true,
   showMetronome = false,
   metronomeToggleVisible = true,
+  showDrone = false,
+  droneToggleVisible = true,
+  onShowDroneChange,
+  desks,
+  activeDeskId = null,
+  liveDeskSummary = '',
+  onApplyDesk,
+  onSaveDesk,
+  onDeleteDesk,
+  againPulse = false,
   audioEnhancerEnabled = false,
   pitchToggleVisible = true,
   onPitchTrackerChange,
@@ -279,6 +302,7 @@ function ControlDeck({
             hapticFeedback={hapticFeedback}
             onAutoSoundRecordingChange={onAutoSoundRecordingChange}
             presentation={isCameraPresentation ? 'camera' : 'audio'}
+            againPulse={againPulse}
           />
         )}
       </div>
@@ -327,6 +351,16 @@ function ControlDeck({
         onHandsFreeChange={onAutoSoundRecordingChange}
         layoutMode={settingsLayoutMode}
         metronomeToggleVisible={metronomeToggleVisible}
+        showDrone={showDrone}
+        droneToggleVisible={droneToggleVisible}
+        onShowDroneChange={(show) => onShowDroneChange?.(show)}
+        desks={desks}
+        activeDeskId={activeDeskId}
+        liveDeskSummary={liveDeskSummary}
+        onApplyDesk={onApplyDesk}
+        onSaveDesk={onSaveDesk}
+        onDeleteDesk={onDeleteDesk}
+        hapticFeedback={hapticFeedback}
         tunerTakePillsVisible={tunerTakePillsVisible}
         tunerTakePillsToggleVisible={tunerTakePillsToggleVisible}
         pitchToggleVisible={pitchToggleVisible}

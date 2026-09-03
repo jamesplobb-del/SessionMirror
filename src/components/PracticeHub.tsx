@@ -45,6 +45,8 @@ interface PracticeHubProps {
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
+  /** The desk a Focus session will restore — one literal line under its card. */
+  focusDeskSummary?: string | null
 }
 
 type HubPage = 'home' | 'focused-setup'
@@ -69,6 +71,7 @@ export default function PracticeHub({
   onOpenVault,
   onOpenTuner,
   onOpenMetronome,
+  focusDeskSummary = null,
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const [page, setPage] = useState<HubPage>('home')
@@ -354,6 +357,12 @@ export default function PracticeHub({
                         <em>
                           {takeCountLabel} · {takes.length === 0 ? 'ready to begin' : 'ready for another'}
                         </em>
+                        {launchMode === 'focus' && focusDeskSummary && (
+                          <span className="practice-menu-focus-desk">
+                            <span>Desk</span>
+                            {focusDeskSummary}
+                          </span>
+                        )}
                         <span className="practice-menu-focus-action">
                           {launchMode === 'focus' ? 'Choose a focus' : 'Start a take'}
                         </span>

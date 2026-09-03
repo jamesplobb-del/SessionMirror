@@ -234,6 +234,9 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   )
   const activeTransposition = getTunerTransposition(settings.tunerTransposition)
   const showTuner = permissionChecked && permission === 'granted'
+  // The header sat on "Live" while the stage still read "Checking microphone…",
+  // and stayed there when the mic dropped and the retry prompt appeared.
+  const micIsLive = showTuner && (!isNativeIOS || monitorReady)
   const permissionMessage = permissionCopy(permission)
 
   return (
@@ -251,9 +254,11 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
           <p>BestTake</p>
           <h1>Quick Tuner</h1>
         </div>
-        <span className="quick-tuner-live-badge">
+        <span
+          className={`quick-tuner-live-badge${micIsLive ? '' : ' quick-tuner-live-badge--idle'}`}
+        >
           <span aria-hidden />
-          Live
+          {micIsLive ? 'Live' : 'Mic idle'}
         </span>
       </header>
 

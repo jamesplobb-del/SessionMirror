@@ -26,6 +26,8 @@ interface RecordingModeCarouselProps {
   hapticFeedback?: boolean
   handsFreePhase?: HandsFreePhase
   presentation?: 'carousel' | 'camera' | 'audio'
+  /** One breath of the record button after Current finishes playing back: "your turn". */
+  againPulse?: boolean
 }
 
 type SlotPosition = 'center' | 'left' | 'right'
@@ -48,6 +50,7 @@ interface ModeSlotProps {
   handsFreePhase?: HandsFreePhase
   hapticFeedback?: boolean
   cameraPresentation?: boolean
+  againPulse?: boolean
 }
 
 function ModeSlot({
@@ -62,6 +65,7 @@ function ModeSlot({
   handsFreePhase,
   hapticFeedback = true,
   cameraPresentation = false,
+  againPulse = false,
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
@@ -122,7 +126,9 @@ function ModeSlot({
         longPressActive ? 'record-carousel-slot--hands-free' : ''
       } ${handsFreePhase ? `record-carousel-slot--hands-free-${handsFreePhase}` : ''} ${
         recordStartBlocked ? 'record-carousel-slot--not-ready' : ''
-      } ${cameraPresentation ? 'record-carousel-slot--camera' : ''}`}
+      } ${cameraPresentation ? 'record-carousel-slot--camera' : ''} ${
+        isCenter && againPulse && !isRecording ? 'record-carousel-slot--again' : ''
+      }`}
     >
       {isCenter && handsFreePhase === 'playback' ? (
         <Play className="record-carousel-slot-playback h-5 w-5" fill="currentColor" aria-hidden />
@@ -156,6 +162,7 @@ function RecordingModeCarousel({
   hapticFeedback = true,
   handsFreePhase,
   presentation = 'carousel',
+  againPulse = false,
 }: RecordingModeCarouselProps) {
   const notifyTutorial = useTutorialAction()
   const touchStartXRef = useRef(0)
@@ -258,6 +265,7 @@ function RecordingModeCarousel({
             onLongPress={handleRecordLongPress}
             longPressActive={autoSoundRecording}
             handsFreePhase={handsFreePhase}
+            againPulse={againPulse}
             hapticFeedback={hapticFeedback}
             cameraPresentation
           />
@@ -288,6 +296,7 @@ function RecordingModeCarousel({
             onLongPress={handleRecordLongPress}
             longPressActive={autoSoundRecording}
             handsFreePhase={handsFreePhase}
+            againPulse={againPulse}
             hapticFeedback={hapticFeedback}
           />
         </div>
@@ -316,6 +325,7 @@ function RecordingModeCarousel({
           onLongPress={value === 'video' ? handleRecordLongPress : undefined}
           longPressActive={value === 'video' && autoSoundRecording}
           handsFreePhase={value === 'video' ? handsFreePhase : undefined}
+          againPulse={againPulse}
           hapticFeedback={hapticFeedback}
         />
         <ModeSlot
@@ -328,6 +338,7 @@ function RecordingModeCarousel({
           onLongPress={value === 'audio' ? handleRecordLongPress : undefined}
           longPressActive={value === 'audio' && autoSoundRecording}
           handsFreePhase={value === 'audio' ? handsFreePhase : undefined}
+          againPulse={againPulse}
           hapticFeedback={hapticFeedback}
         />
       </div>

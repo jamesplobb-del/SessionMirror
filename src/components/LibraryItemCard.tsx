@@ -4,6 +4,7 @@ import Pressable from './ui/Pressable'
 import { useActionSheet } from '../context/ActionSheetContext'
 import type { HydratedLibraryItem } from '../utils/libraryBridge'
 import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
+import { formatDuration } from '../utils/videoDuration'
 
 interface LibraryItemCardProps {
   item: HydratedLibraryItem
@@ -113,7 +114,7 @@ export default function LibraryItemCard({
             )}
           </div>
           {item.duration > 0 && (
-            <p className="vault-take-row__date">{item.duration}s</p>
+            <p className="vault-take-row__date">{formatDuration(item.duration)}</p>
           )}
         </div>
 

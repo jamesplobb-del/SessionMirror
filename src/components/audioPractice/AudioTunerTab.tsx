@@ -36,8 +36,6 @@ interface AudioTunerTabProps {
   tunerTransposition: TunerTranspositionId
   onTunerTranspositionChange: (value: TunerTranspositionId) => void
   onTunerInstrumentChange: (value: TunerInstrument) => void
-  liveMicTunerEnabled: boolean
-  droneVolume: number
   droneWaveform: DroneWaveform
   hapticFeedback: boolean
   micInputPreference: MicInputPreference
@@ -73,8 +71,6 @@ export default function AudioTunerTab({
   tunerTransposition,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
-  liveMicTunerEnabled: _liveMicTunerEnabled,
-  droneVolume,
   droneWaveform,
   hapticFeedback,
   micInputPreference,
@@ -82,7 +78,7 @@ export default function AudioTunerTab({
   onRequestMicStream,
 }: AudioTunerTabProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
-  const normalizedVolume = droneVolume / 100
+
   const [micLiveEpoch, setMicLiveEpoch] = useState(0)
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('connecting')
   const [showRecoveryPrompt, setShowRecoveryPrompt] = useState(false)
@@ -91,7 +87,7 @@ export default function AudioTunerTab({
   const previousRecordingRef = useRef(isRecording)
 
   const drone = useDrone({
-    volume: normalizedVolume,
+    volume: 1,
     waveform: droneWaveform,
     hapticFeedback,
   })
