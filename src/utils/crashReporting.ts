@@ -47,11 +47,12 @@ export function initCrashReporting(): void {
       tracesSampleRate: 0,
 
       // --- Privacy ---------------------------------------------------------
-      // BestTake records video and audio of the user. Session Replay captures
-      // the screen, which here means the live camera preview — it stays off
-      // permanently, not merely sampled at zero.
-      replaysSessionSampleRate: 0,
-      replaysOnErrorSampleRate: 0,
+      // BestTake records video and audio of the user, so Session Replay — which
+      // captures the screen, and here that means the live camera preview — must
+      // never run. The Capacitor SDK does not ship Replay at all (its options
+      // type omits the sample rates, and no replay integration is among its
+      // defaults), so the guarantee is structural: it can only start if someone
+      // adds replayIntegration() below. Do not.
       sendDefaultPii: false,
 
       beforeSend(event) {
