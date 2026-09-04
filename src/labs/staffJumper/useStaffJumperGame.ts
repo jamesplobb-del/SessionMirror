@@ -9,12 +9,20 @@ import {
   isReadoutCorrectPitch,
   isReadoutWrongPitch,
   loadBestScore,
+  pitchClassesMatch,
   saveBestScore,
   type StaffJumperConfig,
+  type StaffJumperDifficulty,
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
-import { judgeTiming, METERS, secondsPerPulse } from './staffJumperRhythm'
+import {
+  isSustainedNote,
+  judgeTiming,
+  METERS,
+  noteDurationMs,
+  secondsPerPulse,
+} from './staffJumperRhythm'
 import {
   startClickTrack,
   startDrone,
@@ -37,6 +45,29 @@ const DIFFICULTY_TIMING = {
  * a row; every other case clears the release gate as soon as the pitch moves.
  */
 const REPEATED_NOTE_HOLD_MS = 170
+
+/**
+ * Share of a note's written length the player has to keep sounding for the
+ * note to count as held for its full value.
+ *
+ * Short of 1 on purpose: the detector needs a moment to latch on at the start,
+ * and a note that is released cleanly on the last count still stops registering
+ * slightly early. Asking for the whole length would fail honest playing.
+ */
+const SUSTAIN_CREDIT_FRACTION = 0.7
+
+/**
+ * Whether the first mistake on a note costs a nudge instead of a heart.
+ *
+ * A single wrong guess while reading a note is part of learning to read, and
+ * losing a third of the run for it made the game feel punishing rather than
+ * hard. Hard mode keeps the old rule, where every mistake counts.
+ */
+const FORGIVES_FIRST_MISS: Record<StaffJumperDifficulty, boolean> = {
+  easy: true,
+  medium: true,
+  hard: false,
+}
 
 /**
  * One bar of clicks before the first note.
@@ -64,7 +95,16 @@ function createRunSeed(): number {
 
 type Action =
   | { type: 'START'; config: StaffJumperConfig }
-  | { type: 'SUCCESS'; quality: 'perfect' | 'good'; timing: StaffJumperTiming; timingErrorMs: number }
+  /** The note under the player was heard — the hold starts, nothing moves yet. */
+  | {
+      type: 'LAND'
+      quality: 'perfect' | 'good'
+      timing: StaffJumperTiming
+      timingErrorMs: number
+      holdDurationMs: number
+    }
+  /** The written length has elapsed — this is the hop to the next note. */
+  | { type: 'ADVANCE'; sustained: boolean }
   | { type: 'MISS'; reason: 'wrong' | 'timeout' }
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
@@ -90,6 +130,12 @@ function createInitialState(): StaffJumperState {
     missToken: 0,
     feedback: null,
     feedbackToken: 0,
+    noteStage: 'reading',
+    holdDurationMs: 0,
+    holdToken: 0,
+    sustainedCount: 0,
+    missesOnStep: 0,
+    lastMissForgiven: false,
     isFalling: false,
     startedAtMs: null,
     endedAtMs: null,
@@ -121,18 +167,19 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     case 'COUNT_IN_COMPLETE':
       return state.isCountingIn ? { ...state, isCountingIn: false } : state
 
-    case 'SUCCESS': {
-      if (state.phase !== 'playing' || !state.config) return state
-      const nextStep = state.sequenceStep + 1
-      const target = getTargetNoteAtStep(state.config, nextStep)
+    /**
+     * The note was heard. Scoring happens here, movement does not: the player
+     * now owes the note the rest of its written length, and the character
+     * stays put until that time is up.
+     */
+    case 'LAND': {
+      if (state.phase !== 'playing' || !state.config || state.noteStage !== 'reading') return state
       const streak = state.streak + 1
       // Landing on the beat is worth an extra point — timing is a bonus, never
-      // a penalty, so a late note still advances and still scores.
+      // a penalty, so a late note still counts and still scores.
       const onTime = action.timing === 'on'
       return {
         ...state,
-        sequenceStep: nextStep,
-        targetPitchClass: target.pitchClass,
         score: state.score + (onTime ? 2 : 1),
         streak,
         bestStreak: Math.max(state.bestStreak, streak),
@@ -140,15 +187,41 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         onTimeCount: state.onTimeCount + (onTime ? 1 : 0),
         timing: action.timing,
         timingErrorMs: action.timingErrorMs,
-        advanceToken: state.advanceToken + 1,
+        noteStage: 'holding',
+        holdDurationMs: action.holdDurationMs,
+        holdToken: state.holdToken + 1,
         feedback: action.quality,
         feedbackToken: state.feedbackToken + 1,
       }
     }
 
+    /** The written length has run out — this is the hop, and only now. */
+    case 'ADVANCE': {
+      if (state.phase !== 'playing' || !state.config || state.noteStage !== 'holding') return state
+      const nextStep = state.sequenceStep + 1
+      const target = getTargetNoteAtStep(state.config, nextStep)
+      return {
+        ...state,
+        sequenceStep: nextStep,
+        targetPitchClass: target.pitchClass,
+        // Holding a long note for its full value is the skill this teaches,
+        // so it earns a point rather than merely avoiding a penalty.
+        score: state.score + (action.sustained ? 1 : 0),
+        sustainedCount: state.sustainedCount + (action.sustained ? 1 : 0),
+        noteStage: 'reading',
+        holdDurationMs: 0,
+        missesOnStep: 0,
+        lastMissForgiven: false,
+        advanceToken: state.advanceToken + 1,
+      }
+    }
+
     case 'MISS': {
       if (state.phase !== 'playing' || !state.config) return state
-      const hearts = Math.max(0, state.hearts - 1)
+      const missesOnStep = state.missesOnStep + 1
+      // The first slip on a note is a nudge, not a life — see FORGIVES_FIRST_MISS.
+      const forgiven = missesOnStep === 1 && FORGIVES_FIRST_MISS[state.config.difficulty]
+      const hearts = forgiven ? state.hearts : Math.max(0, state.hearts - 1)
       const feedback = action.reason === 'timeout' ? 'timeout' : 'wrong'
       if (hearts <= 0) {
         const bestScore = saveBestScore(state.score)
@@ -158,6 +231,8 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
           streak: 0,
           missCount: state.missCount + 1,
           missToken: state.missToken + 1,
+          missesOnStep,
+          lastMissForgiven: false,
           phase: 'playing',
           isFalling: true,
           bestScore,
@@ -172,6 +247,8 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         streak: 0,
         missCount: state.missCount + 1,
         missToken: state.missToken + 1,
+        missesOnStep,
+        lastMissForgiven: forgiven,
         feedback,
         feedbackToken: state.feedbackToken + 1,
       }
@@ -190,7 +267,7 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
     case 'RESUME': {
       if (state.phase !== 'paused') return state
       const resumedAt = Date.now()
-      return {
+      const resumed: StaffJumperState = {
         ...state,
         phase: 'playing',
         pausedAtMs: null,
@@ -201,6 +278,12 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
           state.pausedDurationMs +
           (state.pausedAtMs == null ? 0 : Math.max(0, resumedAt - state.pausedAtMs)),
       }
+      // A hold cannot survive a pause — the beat clock restarts with the
+      // count-in — so the note being held is finished and the player hops on
+      // rather than being asked to play it again.
+      return resumed.noteStage === 'holding'
+        ? reducer(resumed, { type: 'ADVANCE', sustained: false })
+        : resumed
     }
 
     case 'RESTART':
@@ -238,15 +321,22 @@ export function useStaffJumperGame(
   /**
    * Pitch class the player is still releasing.
    *
-   * Detection is deliberately fast, so the moment a note is accepted the game
-   * moves to the next target while the previous note is still ringing. Without
-   * this gate that decay reads as a wrong answer against the new target — the
-   * player had to clip every note short to avoid losing hearts. It also stops a
-   * single held wrong note from burning all three hearts in a row.
+   * Set when the character hops: a note held to the end of its value is still
+   * ringing as the next one comes into play, and without this gate that decay
+   * reads as a wrong answer against the new target. It also stops a single
+   * sustained wrong note from burning all three hearts in a row.
    */
   const releasingPitchClassRef = useRef<number | null>(null)
   const noteDeadlineAtRef = useRef<number | null>(null)
   const noteRemainingMsRef = useRef(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
+  /**
+   * When the note under the player has been held for its written length.
+   *
+   * Measured from the moment the pitch was accepted rather than snapped to the
+   * click: a note that started slightly late is still a whole note, and cutting
+   * it short to catch up would punish the very reading the game is teaching.
+   */
+  const holdEndsAtRef = useRef<number | null>(null)
 
   const clickRef = useRef<ClickTrackHandle | null>(null)
   const droneRef = useRef<DroneHandle | null>(null)
@@ -351,6 +441,7 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    holdEndsAtRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
     // Never inherit the setup preview's seed or a previous run's seed.
     const seeded = { ...config, sessionSeed: createRunSeed() }
@@ -362,6 +453,7 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    holdEndsAtRef.current = null
     const config = stateRef.current.config
     resetNoteClock(
       config
@@ -379,6 +471,7 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    holdEndsAtRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
     stopAudio()
     dispatch({ type: 'BACK_TO_SETUP' })
@@ -400,6 +493,8 @@ export function useStaffJumperGame(
     actionLockUntilRef.current = performance.now() + 650
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
+    // RESUME finishes any hold in progress, so its clock goes with it.
+    holdEndsAtRef.current = null
     const config = stateRef.current.config
     dispatch({ type: 'RESUME' })
     // A fresh count-in re-establishes the tempo, and restarting the transport
@@ -452,14 +547,81 @@ export function useStaffJumperGame(
     }
   }, [hapticFeedback, state.feedback, state.feedbackToken])
 
+  /**
+   * The gameplay loop, in two stages.
+   *
+   * `reading` is the old loop: watch the pitch, accept the note, or take a miss
+   * when the clock runs out. `holding` is the stage the game used to skip — the
+   * note is already right, so nothing is judged and nothing can be lost; the
+   * only question is when its written length is up and the character hops.
+   */
   useEffect(() => {
     if (!enabled || state.phase !== 'playing' || state.isFalling) return
+    const config = state.config
+    if (!config) return
+
+    const meter = METERS[config.meter]
+    const timing = DIFFICULTY_TIMING[config.difficulty]
+    const noteTimeoutMs = DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000
 
     let rafId = 0
     let lastTs = performance.now()
+
+    // ── Holding: stay on the note for exactly as long as it is written for ──
+    if (state.noteStage === 'holding') {
+      const rhythm = getRhythmForStep(config, state.sequenceStep)
+      const holdDurationMs = state.holdDurationMs
+      const holdEndsAt = holdEndsAtRef.current ?? lastTs + holdDurationMs
+      holdEndsAtRef.current = holdEndsAt
+      // The clock for the *next* note does not start until the character lands
+      // on it: reading time and holding time are different things.
+      noteDeadlineAtRef.current = null
+      noteRemainingMsRef.current = noteTimeoutMs
+      let sustainedMs = 0
+
+      const holdTick = (now: number) => {
+        const current = stateRef.current
+        if (
+          current.phase !== 'playing' ||
+          current.noteStage !== 'holding' ||
+          current.isFalling ||
+          holdEndsAtRef.current !== holdEndsAt
+        ) return
+
+        const dt = Math.min(now - lastTs, 50)
+        lastTs = now
+        if (isReadoutCorrectPitch(readoutRef.current, current.targetPitchClass, config)) {
+          sustainedMs += dt
+        }
+
+        if (now >= holdEndsAt) {
+          const sustained =
+            isSustainedNote(rhythm.durationUnits, meter) &&
+            sustainedMs >= holdDurationMs * SUSTAIN_CREDIT_FRACTION
+          // Gate only the note that was just held. Its tail is what would
+          // otherwise be read as an answer to the next note — but a player who
+          // has already moved on to a different pitch should be heard at once.
+          const stillSounding = getDetectedPitchClass(readoutRef.current, config)
+          releasingPitchClassRef.current =
+            stillSounding != null && pitchClassesMatch(stillSounding, current.targetPitchClass)
+              ? stillSounding
+              : null
+          actionLockUntilRef.current = now + timing.cooldownMs
+          holdEndsAtRef.current = null
+          dispatch({ type: 'ADVANCE', sustained })
+          return
+        }
+
+        rafId = requestAnimationFrame(holdTick)
+      }
+
+      rafId = requestAnimationFrame(holdTick)
+      return () => cancelAnimationFrame(rafId)
+    }
+
+    // ── Reading: work out the note under the player and play it ──
     let correctStableMs = 0
     let wrongStableMs = 0
-    const noteTimeoutMs = DIFFICULTY_TIMEOUT_SECONDS[state.config!.difficulty] * 1000
     const initialRemainingMs = Math.max(0, Math.min(noteTimeoutMs, noteRemainingMsRef.current))
     let targetDeadlineAt = performance.now() + initialRemainingMs
     noteDeadlineAtRef.current = targetDeadlineAt
@@ -475,6 +637,7 @@ export function useStaffJumperGame(
       if (
         current.phase !== 'playing' ||
         !current.config ||
+        current.noteStage !== 'reading' ||
         current.isFalling ||
         noteDeadlineAtRef.current !== targetDeadlineAt
       ) return
@@ -522,7 +685,6 @@ export function useStaffJumperGame(
 
       const readoutNow = readoutRef.current
       const target = current.targetPitchClass
-      const timing = DIFFICULTY_TIMING[current.config.difficulty]
       const detectedPc = getDetectedPitchClass(readoutNow, current.config)
 
       // The previous note has stopped ringing once the pitch moves or drops out.
@@ -531,23 +693,23 @@ export function useStaffJumperGame(
       }
       const isReleasingPreviousNote = releasingPitchClassRef.current != null
 
-      const startNextNote = (quality: 'perfect' | 'good') => {
+      const landOnNote = (quality: 'perfect' | 'good') => {
         correctStableMs = 0
         wrongStableMs = 0
-        resetTargetDeadline(now)
-        actionLockUntilRef.current = now + timing.cooldownMs
         wrongPitchClassRef.current = null
-        releasingPitchClassRef.current = detectedPc
+        // The reading clock stops here. What follows is the hold, which is
+        // measured in note values rather than in seconds of thinking time.
+        noteDeadlineAtRef.current = null
+        noteRemainingMsRef.current = noteTimeoutMs
 
         // Score the landing against the beat it was written on, then re-anchor
         // the expectation to where the player actually is.
         let placement: StaffJumperTiming = null
         let errorMs = 0
+        const rhythm = getRhythmForStep(current.config!, current.sequenceStep)
         if (clickRef.current?.isRunning()) {
           // Both duration and pulse length are exact sixteenth-note units.
-          const pulseUnits = METERS[current.config!.meter].pulseUnits
-          const heldPulses =
-            getRhythmForStep(current.config!, current.sequenceStep).durationUnits / pulseUnits
+          const heldPulses = rhythm.durationUnits / meter.pulseUnits
           const verdict = judgeTiming(
             clickRef.current.pulsesElapsed(),
             expectedPulseRef.current,
@@ -559,11 +721,19 @@ export function useStaffJumperGame(
           expectedPulseRef.current = verdict.nextExpectedPulse
         }
 
+        const holdDurationMs = noteDurationMs(
+          rhythm.durationUnits,
+          meter,
+          current.config!.tempoBpm,
+        )
+        holdEndsAtRef.current = now + holdDurationMs
+
         dispatch({
-          type: 'SUCCESS',
+          type: 'LAND',
           quality,
           timing: placement,
           timingErrorMs: Math.round(errorMs),
+          holdDurationMs,
         })
       }
 
@@ -575,7 +745,8 @@ export function useStaffJumperGame(
         // needs a longer hold before it counts — there was no fresh attack.
         const requiredMs = isReleasingPreviousNote ? REPEATED_NOTE_HOLD_MS : timing.correctMs
         if (correctStableMs >= requiredMs) {
-          startNextNote(Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good')
+          landOnNote(Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good')
+          return
         }
       } else if (
         !isReleasingPreviousNote &&
@@ -630,7 +801,16 @@ export function useStaffJumperGame(
         noteDeadlineAtRef.current = null
       }
     }
-  }, [enabled, state.phase, state.sequenceStep, state.isFalling])
+  }, [
+    enabled,
+    state.config,
+    state.phase,
+    state.sequenceStep,
+    state.noteStage,
+    state.holdToken,
+    state.holdDurationMs,
+    state.isFalling,
+  ])
 
   const configuredTimeoutMs = state.config
     ? DIFFICULTY_TIMEOUT_SECONDS[state.config.difficulty] * 1000

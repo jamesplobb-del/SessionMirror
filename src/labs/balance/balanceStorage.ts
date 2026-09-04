@@ -1,5 +1,5 @@
 import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
-import { isBalanceCharacterId } from './balanceCharacters'
+import { isBalanceCharacterId, type BalanceCharacterId } from './balanceCharacters'
 import type {
   BalanceCustomRoutine,
   BalanceNoteResult,
@@ -12,13 +12,17 @@ import type {
 export const BALANCE_STORAGE_KEY = 'besttake:balance'
 const MAX_ROUTINE_SUMMARIES = 30
 
-export function createDefaultBalanceSettings(instrumentId: string): BalanceSettings {
+export function createDefaultBalanceSettings(
+  instrumentId: string,
+  /** The character chosen on the Games menu, when the player has picked one. */
+  characterId: BalanceCharacterId = 'balancer',
+): BalanceSettings {
   const instrument = getBalanceInstrument(instrumentId)
   const defaultMidi = clampWrittenMidi(72, instrument)
   return {
     routineType: 'single',
     instrumentId: instrument.id,
-    characterId: 'balancer',
+    characterId,
     single: { writtenMidi: defaultMidi, repetitions: 3 },
     scale: {
       rootWrittenMidi: defaultMidi,
@@ -43,10 +47,10 @@ export function createDefaultBalanceSettings(instrumentId: string): BalanceSetti
   }
 }
 
-function createEmptyData(instrumentId: string): BalanceStoredDataV1 {
+function createEmptyData(instrumentId: string, characterId?: BalanceCharacterId): BalanceStoredDataV1 {
   return {
     version: 1,
-    settings: createDefaultBalanceSettings(instrumentId),
+    settings: createDefaultBalanceSettings(instrumentId, characterId),
     customRoutines: [],
     personalBests: {},
     routineSummaries: [],
@@ -57,8 +61,12 @@ function finiteNumber(value: unknown, fallback: number): number {
   return Number.isFinite(Number(value)) ? Number(value) : fallback
 }
 
-function normalizeSettings(value: unknown, instrumentId: string): BalanceSettings {
-  const defaults = createDefaultBalanceSettings(instrumentId)
+function normalizeSettings(
+  value: unknown,
+  instrumentId: string,
+  characterId?: BalanceCharacterId,
+): BalanceSettings {
+  const defaults = createDefaultBalanceSettings(instrumentId, characterId)
   if (!value || typeof value !== 'object') return defaults
   const source = value as Partial<BalanceSettings>
   const instrument = getBalanceInstrument(
@@ -179,8 +187,11 @@ function normalizePersonalBests(value: unknown): Record<string, BalanceStoredPer
   }, {})
 }
 
-export function loadBalanceData(instrumentId: string): BalanceStoredDataV1 {
-  const fallback = createEmptyData(instrumentId)
+export function loadBalanceData(
+  instrumentId: string,
+  characterId?: BalanceCharacterId,
+): BalanceStoredDataV1 {
+  const fallback = createEmptyData(instrumentId, characterId)
   if (typeof localStorage === 'undefined') return fallback
   try {
     const raw = localStorage.getItem(BALANCE_STORAGE_KEY)
@@ -189,7 +200,7 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV1 {
     if (parsed.version !== 1) return fallback
     return {
       version: 1,
-      settings: normalizeSettings(parsed.settings, instrumentId),
+      settings: normalizeSettings(parsed.settings, instrumentId, characterId),
       customRoutines: Array.isArray(parsed.customRoutines)
         ? parsed.customRoutines.map(normalizeCustomRoutine).filter((item): item is BalanceCustomRoutine => item !== null)
         : [],
@@ -207,6 +218,30 @@ export function saveBalanceData(data: BalanceStoredDataV1): void {
   if (typeof localStorage === 'undefined') return
   try {
     localStorage.setItem(BALANCE_STORAGE_KEY, JSON.stringify({ ...data, version: 1 }))
+  } catch {
+    /* Private browsing and quota errors must never block play. */
+  }
+}
+
+/**
+ * Follow the character chosen on the Games menu.
+ *
+ * Only rewrites settings that already exist: writing a fresh blob here would
+ * also stamp in a default instrument, and Balance's instrument comes from the
+ * tuner rather than from this file. With no saved settings there is nothing to
+ * correct anyway — the menu's character is passed in as the default instead.
+ */
+export function applyBalanceCharacter(characterId: BalanceCharacterId): void {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const raw = localStorage.getItem(BALANCE_STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as Partial<BalanceStoredDataV1>
+    if (parsed.version !== 1 || !parsed.settings) return
+    localStorage.setItem(
+      BALANCE_STORAGE_KEY,
+      JSON.stringify({ ...parsed, settings: { ...parsed.settings, characterId } }),
+    )
   } catch {
     /* Private browsing and quota errors must never block play. */
   }

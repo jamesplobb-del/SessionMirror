@@ -23,6 +23,7 @@ import {
   movementSpeedForCents,
   type BalanceScoreAccumulator,
 } from './balanceScoring'
+import type { BalanceCharacterId } from './balanceCharacters'
 import {
   getBalanceBestMs,
   loadBalanceData,
@@ -81,6 +82,8 @@ function createRoutineResult(
 
 interface UseBalanceGameOptions {
   initialInstrumentId: string
+  /** Character chosen on the Games menu — the default for a first run. */
+  initialCharacterId: BalanceCharacterId
   hapticFeedback: boolean
   onInstrumentChange: (settings: Pick<BalanceSettings, 'instrumentId'>) => void
 }
@@ -111,10 +114,11 @@ export interface UseBalanceGameResult {
 
 export function useBalanceGame({
   initialInstrumentId,
+  initialCharacterId,
   hapticFeedback,
   onInstrumentChange,
 }: UseBalanceGameOptions): UseBalanceGameResult {
-  const [data, setData] = useState(() => loadBalanceData(initialInstrumentId))
+  const [data, setData] = useState(() => loadBalanceData(initialInstrumentId, initialCharacterId))
   const dataRef = useRef(data)
   dataRef.current = data
   const [state, dispatch] = useReducer(

@@ -288,6 +288,15 @@
   margin-bottom: 0.55rem;
 }
 
+/* A setting that is shown rather than chosen here. */
+.sj-field__value {
+  margin: 0;
+  color: var(--sj-ink);
+  font-size: 0.8rem;
+  font-weight: 550;
+  line-height: 1.4;
+}
+
 .sj-field__note {
   margin: 0.5rem 0 0;
   color: var(--sj-muted);
@@ -418,37 +427,6 @@
 
 .sj-switch--on::after {
   transform: translateX(1.05rem);
-}
-
-/* ── Character picker ── */
-.sj-characters__grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.35rem;
-}
-
-.sj-character {
-  display: grid;
-  min-width: 0;
-  aspect-ratio: 1;
-  place-items: center;
-  padding: 0.2rem;
-  border: 1px solid transparent;
-  border-radius: 0.55rem;
-  background: #f6f5f2;
-}
-
-.sj-character img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.sj-character--on {
-  border-color: var(--sj-ink);
-  background: #fff;
 }
 
 /* ── Start ── */
@@ -907,6 +885,52 @@
   animation: sj-note-glow 1.4s ease-in-out infinite;
 }
 
+/* Held note: the player is standing on it for its full written value. */
+.sj-note--holding .sj-note__head {
+  box-shadow:
+    0 0 0 3px rgba(22, 185, 129, 0.3),
+    0 0 22px rgba(22, 185, 129, 0.4);
+  animation: none;
+}
+
+.sj-note--holding .sj-note__head--hollow {
+  border-color: #0f9a6d;
+}
+
+.sj-note--holding .sj-note__label {
+  color: #0f9a6d;
+}
+
+/*
+ * Sustain bar — the written length of the held note, drawn along the staff
+ * from its notehead to where the next note starts and filled in real time.
+ * World-space px, so it scales with the staff.
+ */
+.sj-hold-bar {
+  position: absolute;
+  z-index: 2;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: rgba(22, 185, 129, 0.16);
+}
+
+.sj-hold-bar span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #16b981, #34d399);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: sj-hold-fill var(--sj-hold-duration, 1s) linear forwards;
+}
+
+@keyframes sj-hold-fill {
+  to { transform: scaleX(1); }
+}
+
 /* Wrong note: shake */
 .sj-note--shake {
   animation: sj-note-shake 0.40s ease;
@@ -965,6 +989,14 @@
 
 .sj-player--hop {
   animation: sj-player-hop 110ms cubic-bezier(0.25, 0.9, 0.35, 1);
+}
+
+/*
+ * Holding: the character stays on the note it is playing. The bob is the only
+ * movement — hopping away is what the hold exists to stop.
+ */
+.sj-player--holding {
+  animation: sj-player-hold 1.05s ease-in-out infinite;
 }
 
 .sj-player--stumble {
@@ -1090,6 +1122,11 @@
   0%   { transform: translateX(-50%) translateY(0) scale(var(--sj-player-scale, 1)); }
   45%  { transform: translateX(-50%) translateY(-14px) scale(var(--sj-player-scale, 1)); }
   100% { transform: translateX(-50%) translateY(0) scale(var(--sj-player-scale, 1)); }
+}
+
+@keyframes sj-player-hold {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(var(--sj-player-scale, 1)); }
+  50%      { transform: translateX(-50%) translateY(-3px) scale(var(--sj-player-scale, 1)); }
 }
 
 @keyframes sj-player-stumble {
@@ -1384,6 +1421,69 @@
   color: #129361;
 }
 
+/* What the note is worth, and how long it has to be held for. */
+.sj-note-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.24rem 0 0;
+  color: #8a94a6;
+  font-size: 0.58rem;
+  font-weight: 650;
+}
+
+.sj-note-value strong {
+  color: #27364f;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.sj-note-value--holding strong {
+  color: #0f9a6d;
+}
+
+/*
+ * Hold meter — the note's written length, divided into the clicks the player
+ * hears. It replaces the turn countdown while a note is held: the hold is not
+ * a race, so a draining timer would say the wrong thing.
+ */
+.sj-hold-meter {
+  position: relative;
+  height: 0.4rem;
+  margin-top: 0.42rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(22, 185, 129, 0.14);
+}
+
+.sj-hold-meter__fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #16b981, #34d399);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: sj-hold-fill var(--sj-hold-duration, 1s) linear forwards;
+}
+
+.sj-hold-meter__counts {
+  position: absolute;
+  display: flex;
+  inset: 0;
+}
+
+/* One segment per click, so the fill can be counted rather than estimated. */
+.sj-hold-meter__counts i {
+  flex: 1 1 0;
+  border-right: 2px solid rgba(255, 255, 255, 0.82);
+}
+
+.sj-hold-meter__counts i:last-child {
+  border-right: 0;
+}
+
 .sj-turn-timer {
   height: 0.18rem;
   margin-top: 0.42rem;
@@ -1454,11 +1554,22 @@
     animation: none;
   }
 
+
   .sj-feedback-toast {
     animation: sj-feedback-reduced 0.9s step-end forwards;
   }
 
   .sj-turn-timer span {
     animation: sj-turn-countdown var(--sj-turn-remaining, 12s) steps(12, end) forwards;
+  }
+
+  .sj-player--holding {
+    animation: none;
+  }
+
+  /* The bar still has to fill — it is the count — but it can step. */
+  .sj-hold-meter__fill,
+  .sj-hold-bar span {
+    animation: sj-hold-fill var(--sj-hold-duration, 1s) steps(8, end) forwards;
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
+import type { PracticeGameCharacterId } from '../practiceGameCharacters'
 import { useLivePitchTracker, type PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import Pressable from '../../components/ui/Pressable'
 import BalanceResults from './BalanceResults'
@@ -21,6 +22,8 @@ interface BalanceScreenProps {
   streamGeneration: number
   tunerInstrument: TunerInstrument
   tunerTransposition: TunerTranspositionId
+  /** Character chosen on the Games menu; Balance's own picker can override it. */
+  characterId: PracticeGameCharacterId
   hapticFeedback: boolean
   micPermissionBlocked: boolean
   micPermissionPending: boolean
@@ -37,6 +40,7 @@ export default function BalanceScreen({
   streamGeneration,
   tunerInstrument,
   tunerTransposition,
+  characterId,
   hapticFeedback,
   micPermissionBlocked,
   micPermissionPending,
@@ -53,6 +57,7 @@ export default function BalanceScreen({
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('idle')
   const game = useBalanceGame({
     initialInstrumentId: initialInstrument.id,
+    initialCharacterId: characterId,
     hapticFeedback,
     onInstrumentChange: ({ instrumentId }) =>
       onTunerSettingsChange(balanceInstrumentSettings(instrumentId)),

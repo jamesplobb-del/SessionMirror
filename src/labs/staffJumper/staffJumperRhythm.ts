@@ -370,6 +370,73 @@ export function secondsPerPulse(bpm: number): number {
   return 60 / Math.max(1, bpm)
 }
 
+/**
+ * How long a note actually lasts, in milliseconds.
+ *
+ * This is the number the player feels: it is how long the character stays on
+ * the note before hopping to the next one, so a whole note occupies four beats
+ * of the run rather than being over the instant the pitch is recognised.
+ */
+export function noteDurationMs(durationUnits: number, meter: MeterSpec, bpm: number): number {
+  return (durationUnits / meter.pulseUnits) * secondsPerPulse(bpm) * 1000
+}
+
+/**
+ * A note's length counted in metronome clicks.
+ *
+ * Clicks rather than beats because the click is what the player hears: 4/4
+ * ticks quarters, so a half note is 2; 6/8 ticks eighths, so a dotted quarter
+ * is 3 — which is exactly how a player counts a bar of 6/8 out loud.
+ */
+export function noteCountsFor(durationUnits: number, meter: MeterSpec): number {
+  return durationUnits / meter.tickUnits
+}
+
+/**
+ * Pips to draw for a held note, or 0 when counting them would not help.
+ *
+ * Only whole clicks get pips. Anything shorter than two of them is over before
+ * a count would register, and fractional values (a dotted quarter in 4/4) are
+ * better shown as a filling bar than as a row of pips that cannot be counted.
+ */
+export function holdPipCount(durationUnits: number, meter: MeterSpec): number {
+  const counts = noteCountsFor(durationUnits, meter)
+  return Number.isInteger(counts) && counts >= 2 && counts <= 8 ? counts : 0
+}
+
+/** Long enough to be worth counting through — the notes that need a hold. */
+export function isSustainedNote(durationUnits: number, meter: MeterSpec): boolean {
+  return noteCountsFor(durationUnits, meter) >= 2
+}
+
+const NOTE_VALUE_NAMES: Record<NoteValue, string> = {
+  whole: 'Whole',
+  half: 'Half',
+  quarter: 'Quarter',
+  eighth: 'Eighth',
+  sixteenth: 'Sixteenth',
+}
+
+export function noteValueLabel(value: NoteValue, dotted: boolean): string {
+  const name = NOTE_VALUE_NAMES[value]
+  return dotted ? `Dotted ${name.toLowerCase()} note` : `${name} note`
+}
+
+const COUNT_FRACTIONS: Record<string, string> = {
+  '0.25': '¼',
+  '0.5': '½',
+  '0.75': '¾',
+}
+
+/** "2 counts", "1½ counts", "½ count" — how long to stay on the note. */
+export function noteCountsLabel(durationUnits: number, meter: MeterSpec): string {
+  const counts = noteCountsFor(durationUnits, meter)
+  const whole = Math.floor(counts)
+  const fraction = COUNT_FRACTIONS[String(Number((counts - whole).toFixed(2)))] ?? ''
+  const text = whole > 0 ? `${whole}${fraction}` : fraction || String(counts)
+  return `${text} ${counts === 1 ? 'count' : 'counts'}`
+}
+
 export const STAFF_JUMPER_TEMPO_MIN = 40
 export const STAFF_JUMPER_TEMPO_MAX = 200
 export const STAFF_JUMPER_TEMPO_DEFAULT = 80
@@ -377,10 +444,15 @@ export const STAFF_JUMPER_TEMPO_DEFAULT = 80
 /**
  * Half-width of the "on the beat" window as a fraction of a pulse, clamped so
  * it stays humane at fast tempos and does not become a free pass at slow ones.
+ *
+ * Widened from a fifth of a beat: an attack is timed from when the detector
+ * settles on a pitch, not from the instant the note starts speaking, and on a
+ * brass or reed attack those are far enough apart that honestly-placed notes
+ * were being called late.
  */
-const ON_BEAT_WINDOW_FRACTION = 0.18
-const ON_BEAT_WINDOW_MIN_MS = 90
-const ON_BEAT_WINDOW_MAX_MS = 220
+const ON_BEAT_WINDOW_FRACTION = 0.28
+const ON_BEAT_WINDOW_MIN_MS = 130
+const ON_BEAT_WINDOW_MAX_MS = 320
 
 export function onBeatWindowMs(bpm: number): number {
   const pulseMs = secondsPerPulse(bpm) * 1000

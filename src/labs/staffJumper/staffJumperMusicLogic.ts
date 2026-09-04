@@ -143,6 +143,16 @@ export interface StaffJumperConfig {
 /** How a landed note sat against the beat it was written on. */
 export type StaffJumperTiming = 'early' | 'on' | 'late' | null
 
+/**
+ * What the player is doing on the note under their feet.
+ *
+ * `reading` is the half of the game that was always there: work out the note
+ * and play it. `holding` is the other half the game used to skip — the note is
+ * correct and is now being held for as long as it is written for, which is why
+ * the character stays on it instead of hopping away the instant it is heard.
+ */
+export type StaffJumperNoteStage = 'reading' | 'holding'
+
 export interface StaffJumperState {
   phase: StaffJumperPhase
   config: StaffJumperConfig | null
@@ -159,6 +169,18 @@ export interface StaffJumperState {
   missToken: number
   feedback: StaffJumperFeedback
   feedbackToken: number
+  /** Reading the note under the player, or holding it for its written value. */
+  noteStage: StaffJumperNoteStage
+  /** Written length of the note being held, in ms at the run's tempo. */
+  holdDurationMs: number
+  /** Bumped when a hold starts, so the view can restart its countdown. */
+  holdToken: number
+  /** Notes held for (near enough) their full written length. */
+  sustainedCount: number
+  /** Misses on the note under the player — the first can be forgiven. */
+  missesOnStep: number
+  /** True when the last miss cost a nudge rather than a heart. */
+  lastMissForgiven: boolean
   isFalling: boolean
   startedAtMs: number | null
   endedAtMs: number | null

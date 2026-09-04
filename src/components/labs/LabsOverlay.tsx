@@ -1,12 +1,25 @@
 import { lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { useEffect, useRef, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
+import {
+  loadPracticeGameCharacter,
+  savePracticeGameCharacter,
+  type PracticeGameCharacterId,
+} from '../../labs/practiceGameCharacters'
+import {
+  getPracticeGameInstrument,
+  loadPracticeGameInstrumentId,
+  practiceGameInstrumentSettings,
+  resolvePracticeGameInstrument,
+  savePracticeGameInstrumentId,
+} from '../../labs/practiceGameInstruments'
+import { applyBalanceCharacter } from '../../labs/balance/balanceStorage'
 import LabsMenu from './LabsMenu'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
@@ -47,6 +60,37 @@ export default function LabsOverlay({
   onRequestMicStream,
   onTunerSettingsChange,
 }: LabsOverlayProps) {
+  /**
+   * Instrument and character are chosen once on the menu and shared by every
+   * game, so the overlay owns them: the games read them as props instead of
+   * each keeping a private copy that could drift.
+   */
+  const [storedInstrumentId, setStoredInstrumentId] = useState(loadPracticeGameInstrumentId)
+  const [characterId, setCharacterId] = useState<PracticeGameCharacterId>(loadPracticeGameCharacter)
+  const instrument = useMemo(
+    () => resolvePracticeGameInstrument(storedInstrumentId, tunerTransposition, tunerInstrument),
+    [storedInstrumentId, tunerInstrument, tunerTransposition],
+  )
+
+  const handleInstrumentChange = useCallback(
+    (instrumentId: string) => {
+      const next = getPracticeGameInstrument(instrumentId)
+      setStoredInstrumentId(next.id)
+      savePracticeGameInstrumentId(next.id)
+      // The tuner is what actually listens, so the pick has to reach it too.
+      onTunerSettingsChange(practiceGameInstrumentSettings(next))
+    },
+    [onTunerSettingsChange],
+  )
+
+  const handleCharacterChange = useCallback((nextCharacterId: PracticeGameCharacterId) => {
+    setCharacterId(nextCharacterId)
+    savePracticeGameCharacter(nextCharacterId)
+    // Balance keeps its own saved settings, so the shared pick has to reach
+    // them or the menu would promise a character that game does not use.
+    applyBalanceCharacter(nextCharacterId)
+  }, [])
+
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const routeRef = useRef(route)
   const onCloseRef = useRef(onClose)
@@ -169,6 +213,10 @@ export default function LabsOverlay({
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}
+              instrument={instrument}
+              characterId={characterId}
+              onInstrumentChange={handleInstrumentChange}
+              onCharacterChange={handleCharacterChange}
               onOpenStaffJumper={() => onNavigate('staff-jumper')}
               onOpenBalance={() => onNavigate('balance')}
               onBack={onClose}
@@ -178,6 +226,8 @@ export default function LabsOverlay({
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               tunerInstrument={tunerInstrument}
+              instrument={instrument}
+              characterId={characterId}
               hapticFeedback={hapticFeedback}
               onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
@@ -189,6 +239,7 @@ export default function LabsOverlay({
                 streamGeneration={streamGeneration}
                 tunerInstrument={tunerInstrument}
                 tunerTransposition={tunerTransposition}
+                characterId={characterId}
                 hapticFeedback={hapticFeedback}
                 micPermissionBlocked={micPermissionBlocked}
                 micPermissionPending={micPermissionPending}

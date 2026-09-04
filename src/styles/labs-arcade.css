@@ -100,11 +100,6 @@
   stroke-width: 2.25;
 }
 
-.arcade-menu__hero {
-  margin: clamp(0.9rem, 3.4vh, 2.4rem) 0 clamp(0.7rem, 1.8vh, 1rem);
-}
-
-.arcade-kicker,
 .arcade-state-eyebrow {
   margin: 0;
   color: #d87c06;
@@ -114,22 +109,235 @@
   text-transform: uppercase;
 }
 
-.arcade-menu__hero h1 {
-  max-width: 35rem;
-  margin: 0;
-  color: var(--arcade-ink);
-  font-size: clamp(1.5rem, 6.4vw, 2.35rem);
-  font-weight: 740;
-  letter-spacing: -0.045em;
-  line-height: 1.04;
+/* ─────────────────────────────────────────────
+   Player setup — the instrument is the headline of this screen, and the
+   character stands on top of it. Both are shared by every game, so they are
+   settled here once instead of inside each game's own setup sheet.
+───────────────────────────────────────────── */
+.arcade-setup {
+  margin: clamp(0.7rem, 2.4vh, 1.35rem) 0 clamp(0.85rem, 2.2vh, 1.25rem);
 }
 
-.arcade-menu__hero p:last-child {
-  max-width: 32rem;
-  margin: clamp(0.45rem, 1.3vh, 0.9rem) 0 0;
+.arcade-setup__stage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: clamp(4rem, 12vh, 5.6rem);
+  /* Feet land on the panel's top edge rather than floating above it. */
+  margin-bottom: -0.1rem;
+}
+
+.arcade-setup__avatar {
+  position: relative;
+  z-index: 2;
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  transform: scale(var(--arcade-avatar-scale, 1));
+  transform-origin: bottom center;
+  filter: drop-shadow(0 9px 14px rgba(23, 26, 34, 0.18));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.arcade-setup__avatar-shadow {
+  position: absolute;
+  z-index: 1;
+  bottom: 0.15rem;
+  width: 3.6rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(23, 26, 34, 0.24), rgba(23, 26, 34, 0));
+}
+
+.arcade-setup__panel {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.96);
+  border-radius: 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 40px rgba(30, 41, 59, 0.09), inset 0 0 0 1px rgba(15, 23, 42, 0.02);
+}
+
+.arcade-instrument {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(0.6rem, 3vw, 0.95rem);
+  padding: clamp(0.75rem, 2vh, 1rem) clamp(0.8rem, 3.4vw, 1.05rem);
+  border: 0;
+  text-align: left;
+  background: transparent;
+}
+
+/* The written key is the part that actually changes the notes on the page. */
+.arcade-instrument__key {
+  display: grid;
+  width: clamp(3rem, 14vw, 3.5rem);
+  height: clamp(3rem, 14vw, 3.5rem);
+  place-items: center;
+  border-radius: 1.1rem;
+  color: #fff;
+  font-size: clamp(1.25rem, 5.6vw, 1.5rem);
+  font-weight: 820;
+  letter-spacing: -0.03em;
+  background: linear-gradient(150deg, #38b6f5, #1f7fd0);
+  box-shadow: 0 10px 22px rgba(31, 127, 208, 0.26), inset 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.arcade-instrument__copy {
+  display: block;
+  min-width: 0;
+}
+
+.arcade-instrument__copy small {
+  display: block;
+  color: #98a2b3;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.arcade-instrument__copy strong {
+  display: block;
+  margin-top: 0.08rem;
+  overflow: hidden;
+  color: var(--arcade-ink);
+  font-size: clamp(1.3rem, 6vw, 1.75rem);
+  font-weight: 780;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arcade-instrument__copy > span {
+  display: block;
+  margin-top: 0.15rem;
   color: var(--arcade-muted);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.arcade-instrument__chevron {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: #98a2b3;
+  transition: transform 160ms ease;
+}
+
+.arcade-instrument--open .arcade-instrument__chevron {
+  transform: rotate(180deg);
+}
+
+.arcade-instrument-picker {
+  display: grid;
+  gap: 0.65rem;
+  max-height: min(46vh, 22rem);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 clamp(0.8rem, 3.4vw, 1.05rem) 0.65rem;
+}
+
+.arcade-instrument-picker__label {
+  margin: 0 0 0.3rem;
+  color: #98a2b3;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.arcade-instrument-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.35rem;
+}
+
+.arcade-instrument-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  color: var(--arcade-ink);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.arcade-instrument-option em {
+  margin-left: auto;
+  color: var(--arcade-muted);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 780;
+}
+
+.arcade-instrument-option svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  stroke-width: 3;
+}
+
+.arcade-instrument-option--on {
+  border-color: rgba(31, 127, 208, 0.35);
+  color: #10598f;
+  background: #eaf5ff;
+}
+
+.arcade-instrument-option--on em {
+  color: #2f88cf;
+}
+
+.arcade-character-strip {
+  padding: 0.65rem clamp(0.8rem, 3.4vw, 1.05rem) 0.8rem;
+  border-top: 1px solid var(--arcade-line);
+}
+
+.arcade-character-strip__label {
+  margin: 0 0 0.4rem;
+  color: #98a2b3;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.arcade-character-strip__chips {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.arcade-character-chip {
+  display: grid;
+  min-width: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0.22rem;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.arcade-character-chip img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.arcade-character-chip--on {
+  border-color: rgba(237, 139, 9, 0.45);
+  background: #fff;
+  box-shadow: 0 6px 14px rgba(237, 139, 9, 0.18);
 }
 
 .arcade-menu__section-head {
@@ -1222,12 +1430,12 @@
 }
 
 @media (max-height: 720px) {
-  .arcade-menu__hero h1 {
-    font-size: clamp(1.4rem, 5.8vw, 1.8rem);
+  .arcade-setup__stage {
+    height: clamp(3.2rem, 9vh, 4.4rem);
   }
 
-  .arcade-menu__hero p:last-child {
-    font-size: 0.82rem;
+  .arcade-instrument__copy > span {
+    font-size: 0.64rem;
   }
 
   .arcade-game-card__art {

@@ -20,7 +20,6 @@ import {
   type StaffJumperRange,
   type StaffJumperScaleMode,
 } from './staffJumperMusicLogic'
-import type { StaffJumperTransposition } from './staffJumperInstrumentRanges'
 import {
   METERS,
   STAFF_JUMPER_METERS,
@@ -29,12 +28,12 @@ import {
   STAFF_JUMPER_TEMPO_MIN,
   type StaffJumperMeter,
 } from './staffJumperRhythm'
+import { type PracticeGameCharacterId } from '../practiceGameCharacters'
 import {
-  loadPracticeGameCharacter,
-  PRACTICE_GAME_CHARACTERS,
-  savePracticeGameCharacter,
-  type PracticeGameCharacterId,
-} from '../practiceGameCharacters'
+  PRACTICE_GAME_FAMILY_LABELS,
+  staffJumperTranspositionFor,
+  type PracticeGameInstrument,
+} from '../practiceGameInstruments'
 import {
   CLEF_LABELS,
   STAFF_JUMPER_CLEFS,
@@ -50,31 +49,16 @@ interface StaffJumperScreenProps {
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
+  /** Chosen on the Games menu and shared by every game. */
+  instrument: PracticeGameInstrument
+  characterId: PracticeGameCharacterId
   hapticFeedback: boolean
   onRequestMicStream: () => void
   onBack: () => void
 }
 
-/**
- * The transposition picker reads as an instrument choice, because that is the
- * decision the player is actually making. A bare "Written pitch" dropdown of
- * key names made everyone guess.
- */
-const WRITTEN_PITCH_CHOICES: {
-  id: StaffJumperTransposition
-  name: string
-  instruments: string
-}[] = [
-  { id: 'concert', name: 'Concert C', instruments: 'Flute · Violin · Voice · Piano' },
-  { id: 'bb', name: 'B♭', instruments: 'Trumpet · Clarinet · Tenor sax' },
-  { id: 'eb', name: 'E♭', instruments: 'Alto sax · Bari sax' },
-  { id: 'f', name: 'F', instruments: 'French horn' },
-  { id: 'a', name: 'A', instruments: 'Clarinet in A' },
-  { id: 'g', name: 'G', instruments: 'Alto flute' },
-]
-
 /** Only one settings group is open at a time, so the screen stays scannable. */
-type SetupSection = 'exercise' | 'instrument' | 'tempo'
+type SetupSection = 'exercise' | 'reading' | 'tempo'
 
 function formatRunTime(seconds: number): string {
   const rounded = Math.max(0, Math.round(seconds))
@@ -86,6 +70,8 @@ export default function StaffJumperScreen({
   streamRef,
   streamGeneration,
   tunerInstrument,
+  instrument,
+  characterId,
   hapticFeedback,
   onRequestMicStream,
   onBack,
@@ -96,11 +82,19 @@ export default function StaffJumperScreen({
   const [draftKey, setDraftKey] = useState<StaffJumperKey>('C')
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
-  const [draftClef, setDraftClef] = useState<StaffJumperClef>('treble')
-  const [draftTransposition, setDraftTransposition] = useState<StaffJumperTransposition>('concert')
-  const [draftPlayerModel, setDraftPlayerModel] = useState<PracticeGameCharacterId>(
-    loadPracticeGameCharacter,
-  )
+  /**
+   * The instrument brings its usual clef with it, but the clef stays editable:
+   * plenty of players read a part in the other one, and switching should not
+   * mean pretending to play a different instrument.
+   */
+  const [draftClef, setDraftClef] = useState<StaffJumperClef>(instrument.clef)
+  const instrumentIdRef = useRef(instrument.id)
+  useEffect(() => {
+    if (instrumentIdRef.current === instrument.id) return
+    instrumentIdRef.current = instrument.id
+    setDraftClef(instrument.clef)
+  }, [instrument.clef, instrument.id])
+  const draftTransposition = staffJumperTranspositionFor(instrument)
   const [draftMeter, setDraftMeter] = useState<StaffJumperMeter>('simple')
   const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
   const [draftMetronome, setDraftMetronome] = useState(true)
@@ -162,7 +156,7 @@ export default function StaffJumperScreen({
       clef: draftClef,
       tunerInstrument,
       transposition: draftTransposition,
-      playerModel: draftPlayerModel,
+      playerModel: characterId,
       meter: draftMeter,
       tempoBpm: draftTempo,
       metronome: draftMetronome,
@@ -174,7 +168,7 @@ export default function StaffJumperScreen({
       draftDrone,
       draftKey,
       draftMetronome,
-      draftPlayerModel,
+      characterId,
       draftRange,
       draftMeter,
       draftScaleMode,
@@ -197,10 +191,6 @@ export default function StaffJumperScreen({
     Boolean(readout.noteName && readout.noteName !== '—')
 
   if (state.phase === 'setup') {
-    const selectedInstrument =
-      WRITTEN_PITCH_CHOICES.find((item) => item.id === draftTransposition) ??
-      WRITTEN_PITCH_CHOICES[0]!
-
     /** Inline text options — the choice is just the word, underlined when on. */
     const Options = <T extends string>({
       value,
@@ -314,7 +304,8 @@ export default function StaffJumperScreen({
           <StaffPreview config={previewConfig} />
 
           <p className="sj-hero__note">
-            Every run is a different exercise — this is one example.
+            Every run is a different exercise — this is one example. Your player stays on each
+            note for its written value, then hops on the beat.
           </p>
         </section>
 
@@ -400,20 +391,21 @@ export default function StaffJumperScreen({
         </Section>
 
         <Section
-          id="instrument"
-          title="Instrument"
-          summary={`${selectedInstrument.name} · ${CLEF_LABELS[draftClef]} clef`}
+          id="reading"
+          title="Reading"
+          summary={`${instrument.name} · ${CLEF_LABELS[draftClef]} clef · ${rangePreview.signatureLabel}`}
         >
+          {/* Instrument and character are set once on the Games menu — this is
+              the same setting, shown here so the part on screen is never a
+              surprise. */}
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
-              Written pitch <span>{selectedInstrument.instruments}</span>
+              Instrument <span>Change it on the Games menu</span>
             </p>
-            <Options
-              label="Written pitch"
-              value={draftTransposition}
-              onChange={setDraftTransposition}
-              options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
-            />
+            <p className="sj-field__value">
+              {instrument.name} · {PRACTICE_GAME_FAMILY_LABELS[instrument.family]} · parts written in{' '}
+              {instrument.keyLabel}
+            </p>
           </div>
 
           <div className="sj-field">
@@ -424,29 +416,6 @@ export default function StaffJumperScreen({
               onChange={setDraftClef}
               options={STAFF_JUMPER_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
             />
-          </div>
-
-          <div className="sj-field sj-field--stack" role="group" aria-label="Character">
-            <p className="sj-field__label">Character</p>
-            <div className="sj-characters__grid">
-              {PRACTICE_GAME_CHARACTERS.map((model) => (
-                <Pressable
-                  key={model.id}
-                  type="button"
-                  intensity="soft"
-                  hapticFeedback={hapticFeedback}
-                  onClick={() => {
-                    setDraftPlayerModel(model.id)
-                    savePracticeGameCharacter(model.id)
-                  }}
-                  className={`sj-character ${draftPlayerModel === model.id ? 'sj-character--on' : ''}`}
-                  aria-pressed={draftPlayerModel === model.id}
-                  aria-label={`Choose ${model.name}`}
-                >
-                  <img src={model.asset} alt="" draggable={false} />
-                </Pressable>
-              ))}
-            </div>
           </div>
         </Section>
 
@@ -594,7 +563,11 @@ export default function StaffJumperScreen({
             <div><dt>Time</dt><dd>{formatRunTime(durationSeconds)}</dd></div>
           </dl>
           <p className="sj-state-summary">
-            {state.missCount} {state.missCount === 1 ? 'miss' : 'misses'} · Best {state.bestScore}
+            {state.missCount} {state.missCount === 1 ? 'miss' : 'misses'}
+            {state.sustainedCount > 0 && ` · ${state.sustainedCount} long ${
+              state.sustainedCount === 1 ? 'note' : 'notes'
+            } held full value`}{' '}
+            · Best {state.bestScore}
           </p>
           <div className="sj-state-actions">
             <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="arcade-primary-button">

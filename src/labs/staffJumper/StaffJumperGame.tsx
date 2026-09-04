@@ -49,7 +49,13 @@ import {
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { layoutRhythm } from './staffJumperNotationLayout'
-import { isHollowNotehead, METERS } from './staffJumperRhythm'
+import {
+  holdPipCount,
+  isHollowNotehead,
+  METERS,
+  noteCountsLabel,
+  noteValueLabel,
+} from './staffJumperRhythm'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -146,8 +152,22 @@ export default function StaffJumperGame({
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
   const cents = Math.round(readout.cents)
   const targetDisplay = config.difficulty === 'easy' ? target.noteLabel : 'See staff'
-  const responseHint =
-    detectedPc == null
+  const meterSpec = METERS[config.meter]
+  /**
+   * The note under the player is either being read or being held for its
+   * written length. Everything below that treats the two differently is doing
+   * it so a whole note reads as four counts of standing still rather than as a
+   * jump that happened too early.
+   */
+  const isHolding = state.noteStage === 'holding'
+  const noteValueText = noteValueLabel(target.rhythm.value, target.rhythm.dotted)
+  const countsText = noteCountsLabel(target.rhythm.durationUnits, meterSpec)
+  const pipCount = holdPipCount(target.rhythm.durationUnits, meterSpec)
+  const responseHint = isHolding
+    ? isPlayableMatch
+      ? `Hold it — ${countsText}`
+      : 'Let it ring for the whole note'
+    : detectedPc == null
       ? config.difficulty === 'easy'
         ? `Play ${target.noteLabel}`
         : 'Play the note under the player'
@@ -192,7 +212,6 @@ export default function StaffJumperGame({
     [config.clef, config.difficulty, config.key, config.scaleMode],
   )
 
-  const meterSpec = METERS[config.meter]
   const glyphMetrics = useMusicGlyphMetrics()
 
   /**
@@ -287,12 +306,14 @@ export default function StaffJumperGame({
           : state.feedback === 'wrong'
             ? `Wrong note. ${state.hearts} hearts left.`
             : ''
-  const targetAnnouncement =
-    config.difficulty === 'easy'
-      ? `Target ${target.noteLabel}.`
+  const targetAnnouncement = isHolding
+    ? `Holding ${target.noteLabel} for ${countsText}.`
+    : config.difficulty === 'easy'
+      ? `Target ${target.noteLabel}, ${noteValueText.toLowerCase()}, ${countsText}.`
       : `Read the next note for jump ${state.sequenceStep + 1}.`
   const turnFraction = Math.max(0, Math.min(1, turnRemainingMs / Math.max(1, turnDurationMs)))
 
+  const isMissFeedback = state.feedback === 'wrong' || state.feedback === 'timeout'
   const timingLabel =
     state.timing === 'on'
       ? 'On the beat'
@@ -311,6 +332,22 @@ export default function StaffJumperGame({
   const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
   const playerScreenX = targetWorldX * scale + scrollX
   const playerModel = getPracticeGameCharacter(config.playerModel)
+
+  /**
+   * The sustain bar: how far along the staff the held note reaches.
+   *
+   * Drawn from the notehead to where the next note begins, and filled over the
+   * note's written length, so "this lasts four counts" is something you can see
+   * on the page rather than something you have to infer from a number.
+   */
+  const targetSlotIndex = displayedPlatforms.findIndex((slot) => slot.role === 'target')
+  const nextSlotX =
+    targetSlotIndex >= 0 ? displayedPlatforms[targetSlotIndex + 1]?.xPx : undefined
+  const holdBarStartX = targetWorldX + NOTEHEAD_W / 2 + 8
+  const holdBarWidth = Math.max(
+    NOTEHEAD_W / 2,
+    (nextSlotX ?? targetWorldX + NOTE_SPACING_PX) - NOTEHEAD_W / 2 - 8 - holdBarStartX,
+  )
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
@@ -463,6 +500,7 @@ export default function StaffJumperGame({
                       'sj-note',
                       `sj-note--${slot.note.kind}`,
                       slot.role === 'target' ? 'sj-note--target' : '',
+                      isHolding && slot.role === 'target' ? 'sj-note--holding' : '',
                       slot.role === 'future' ? 'sj-note--future' : '',
                       slot.role === 'landed' ? 'sj-note--landed' : '',
                       shake ? 'sj-note--shake' : '',
@@ -527,6 +565,24 @@ export default function StaffJumperGame({
                 )
               })}
             </div>
+
+            {isHolding && (
+              <div
+                key={`sj-hold-bar-${state.holdToken}`}
+                className="sj-hold-bar"
+                style={
+                  {
+                    left: `${holdBarStartX}px`,
+                    top: `${standNote.yPx}px`,
+                    width: `${holdBarWidth}px`,
+                    '--sj-hold-duration': `${state.holdDurationMs}ms`,
+                  } as CSSProperties
+                }
+                aria-hidden
+              >
+                <span />
+              </div>
+            )}
           </div>
 
           {/* The score opening shares the world's scroll transform and appears once. */}
@@ -605,6 +661,7 @@ export default function StaffJumperGame({
             className={[
               'sj-player',
               jumpActive ? 'sj-player--hop' : '',
+              isHolding ? 'sj-player--holding' : '',
               missActive && !state.isFalling ? 'sj-player--stumble' : '',
             ]
               .filter(Boolean)
@@ -671,7 +728,12 @@ export default function StaffJumperGame({
                   : state.feedback === 'timeout'
                     ? 'Time’s up'
                     : 'Wrong note'}
-              {timingLabel && <em className={`sj-feedback-toast__timing sj-timing--${state.timing}`}>{timingLabel}</em>}
+              {isMissFeedback && state.lastMissForgiven && (
+                <em className="sj-feedback-toast__timing">Free retry</em>
+              )}
+              {!isMissFeedback && timingLabel && (
+                <em className={`sj-feedback-toast__timing sj-timing--${state.timing}`}>{timingLabel}</em>
+              )}
             </div>
           )}
 
@@ -694,19 +756,46 @@ export default function StaffJumperGame({
               <p className={`sj-target-dock__hint ${isPlayableMatch ? 'sj-target-dock__hint--match' : ''}`}>
                 {responseHint}
               </p>
-              <div
-                className="sj-turn-timer"
-                key={`sj-turn-${state.sequenceStep}-${state.missToken}`}
-                style={
-                  {
-                    '--sj-turn-remaining': `${turnRemainingMs}ms`,
-                    '--sj-turn-fraction': turnFraction,
-                  } as CSSProperties
-                }
-                aria-hidden
-              >
-                <span />
-              </div>
+
+              {/* How long this note lasts, before it is played and while it is
+                  being held. The value was previously nowhere on screen, which
+                  is what made whole notes feel arbitrary. */}
+              <p className={`sj-note-value ${isHolding ? 'sj-note-value--holding' : ''}`}>
+                <span>{noteValueText}</span>
+                <strong>{isHolding ? `Hold ${countsText}` : countsText}</strong>
+              </p>
+
+              {isHolding ? (
+                <div
+                  className="sj-hold-meter"
+                  key={`sj-hold-meter-${state.holdToken}`}
+                  style={{ '--sj-hold-duration': `${state.holdDurationMs}ms` } as CSSProperties}
+                  aria-hidden
+                >
+                  <span className="sj-hold-meter__fill" />
+                  {pipCount > 0 && (
+                    <span className="sj-hold-meter__counts">
+                      {Array.from({ length: pipCount }, (_, index) => (
+                        <i key={index} />
+                      ))}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="sj-turn-timer"
+                  key={`sj-turn-${state.sequenceStep}-${state.missToken}`}
+                  style={
+                    {
+                      '--sj-turn-remaining': `${turnRemainingMs}ms`,
+                      '--sj-turn-fraction': turnFraction,
+                    } as CSSProperties
+                  }
+                  aria-hidden
+                >
+                  <span />
+                </div>
+              )}
             </div>
           )}
         </div>
