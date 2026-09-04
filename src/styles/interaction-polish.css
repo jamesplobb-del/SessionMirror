@@ -18,19 +18,26 @@ button,
 [role='menuitemcheckbox'],
 select,
 label[for] {
-  transition-property: color, background-color, border-color, box-shadow, opacity, filter,
-    transform;
-  transition-duration: var(--sm-motion-standard);
+  transition-property: color, background-color, border-color, box-shadow, opacity, filter;
+  transition-duration: var(--sm-motion-fast);
   transition-timing-function: var(--sm-motion-ease);
+}
+
+button.ui-pressable,
+[role='button'].ui-pressable,
+[role='tab'].ui-pressable,
+[role='menuitem'].ui-pressable,
+[role='menuitemcheckbox'].ui-pressable {
+  transition-property: color, background-color, border-color, box-shadow, opacity, filter;
 }
 
 button:not(:disabled):not(.tutorial-sheet-backdrop):not(.native-sheet-backdrop):not(
     .action-sheet-backdrop
-  ):active,
-[role='button']:not([aria-disabled='true']):active,
-[role='tab']:not([aria-disabled='true']):active,
-[role='menuitem']:not([aria-disabled='true']):active,
-[role='menuitemcheckbox']:not([aria-disabled='true']):active {
+  ):not(.ui-pressable):not(.settings-branch-backdrop):active,
+[role='button']:not([aria-disabled='true']):not(.ui-pressable):active,
+[role='tab']:not([aria-disabled='true']):not(.ui-pressable):active,
+[role='menuitem']:not([aria-disabled='true']):not(.ui-pressable):active,
+[role='menuitemcheckbox']:not([aria-disabled='true']):not(.ui-pressable):active {
   filter: brightness(0.97);
 }
 

@@ -796,7 +796,7 @@ function LiveCameraBackground({
       <div
         className={`${overlayClass} camera-background-overlay--audio-hero flex flex-col items-center justify-center ${
           isEmbedded ? 'camera-background-overlay--audio-hero-embedded' : ''
-        } transition-all duration-500 ease-out ${
+        } ${
           showAudioIdle
             ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
             : 'opacity-0 translate-y-4 scale-95 pointer-events-none'

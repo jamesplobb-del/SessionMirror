@@ -79,7 +79,6 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
     var(--tuner-ui-hue) var(--tuner-ui-strength),
     var(--audio-bg-base, #f7f8fa)
   ) !important;
-  transition: background-color 90ms linear;
 }
 
 html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
@@ -98,9 +97,7 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
     inset 0 0 0 2px color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-strength), transparent),
     inset 0 0 var(--tuner-rim-spread)
       color-mix(in srgb, var(--tuner-ui-hue) var(--tuner-rim-glow-strength), transparent);
-  transition:
-    background-color 90ms linear,
-    box-shadow 90ms linear;
+  transition: box-shadow 90ms linear;
 }
 
 /* —— The tuner's colour lives on exactly one plane ——
@@ -2162,7 +2159,6 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
   box-shadow:
     0 0.65rem 1.7rem rgba(29, 61, 84, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  animation: audio-control-pill-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
   -webkit-backdrop-filter: blur(22px) saturate(1.18);
   backdrop-filter: blur(22px) saturate(1.18);
 }
@@ -2637,18 +2633,6 @@ html.app-dark-mode
     inset 0 1px 0 rgba(255, 255, 255, 0.11);
 }
 
-@keyframes audio-control-pill-enter {
-  from {
-    opacity: 0;
-    transform: translateY(0.3rem) scale(0.965);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 @media (max-width: 350px) {
   .app-ui-overlay--audio-mode .audio-control-pill {
     width: calc(100vw - 1.25rem);
@@ -2682,12 +2666,6 @@ html.app-dark-mode
     height: 3.95rem;
   }
 
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-ui-overlay--audio-mode .audio-control-pill {
-    animation: none;
-  }
 }
 
 /* Keep the reference-style Audio take cards compact after late tablet/global rules. */

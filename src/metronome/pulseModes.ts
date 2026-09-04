@@ -151,11 +151,22 @@ export const METER_PULSE_MODES: Record<MetronomeMeter, PulseModeDefinition[]> = 
     ],
     defaultFeelId: '4+3', defaultAccentLevels: accentsFromGrouping([4, 3]),
   }],
-  '3/8': [{
-    id: 'default', label: 'Eighth', bpmSymbol: '♪', pulseCount: 3, pulseUnit: 'eighth', pulseName: 'Eighth',
-    compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,
-    defaultAccentLevels: ['strong', 'weak', 'weak'],
-  }],
+  '3/8': [
+    {
+      id: 'default', label: 'Eighth', bpmSymbol: '♪', pulseCount: 3, pulseUnit: 'eighth', pulseName: 'Eighth',
+      compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,
+      defaultAccentLevels: ['strong', 'weak', 'weak'],
+    },
+    {
+      // 3/8 in one. The bar is three eighths — a single dotted quarter — which
+      // is how fast 3/8 is actually conducted, and it was the one compound
+      // meter with no dotted-quarter beat available.
+      id: 'compound', label: 'Dotted quarter', bpmSymbol: '♩·', pulseCount: 1,
+      pulseUnit: 'dotted-quarter', pulseName: 'Dotted Quarter', compound: true,
+      defaultSubdivision: '8ths', availableSubdivisions: C_SUB,
+      defaultAccentLevels: ['strong'],
+    },
+  ],
   '4/8': [{
     id: 'default', label: 'Eighth', bpmSymbol: '♪', pulseCount: 4, pulseUnit: 'eighth', pulseName: 'Eighth',
     compound: false, defaultSubdivision: 'off', availableSubdivisions: E_SUB,

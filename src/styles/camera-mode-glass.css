@@ -1996,7 +1996,7 @@ button.compact-take-caption:active {
 
 .camera-vault-button,
 .camera-pill-action {
-  transition: opacity 180ms ease, background-color 180ms ease;
+  transition: opacity 80ms var(--sm-motion-ease, cubic-bezier(0.32, 0.72, 0, 1));
 }
 
 .camera-vault-button:active,

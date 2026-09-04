@@ -2030,14 +2030,7 @@ body.settings-branch-open * {
 .control-deck__settings-btn {
   min-width: 44px;
   min-height: 44px;
-  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1.18), background 180ms ease,
-    box-shadow 180ms ease, color 180ms ease;
-  will-change: transform;
-}
-
-.control-deck__vault-btn:active,
-.control-deck__settings-btn:active {
-  transform: scale(0.92);
+  transition: background 180ms ease, box-shadow 180ms ease, color 180ms ease;
 }
 
 .control-deck__settings-btn[aria-expanded='true'] {
@@ -2857,7 +2850,6 @@ video.camera-preview {
   object-position: center center !important;
   z-index: 0 !important;
   pointer-events: none !important;
-  transition: opacity 0.38s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 video.camera-preview.camera-preview--live {
@@ -2876,7 +2868,9 @@ video.camera-preview.camera-preview--take-playback {
   object-position: center center !important;
 }
 
-video.camera-preview.camera-preview--hidden {
+video.camera-preview.camera-preview--hidden,
+html.app-audio-mode video.camera-preview,
+.app-shell--audio-mode video.camera-preview {
   opacity: 0 !important;
   pointer-events: none !important;
 }
@@ -5985,7 +5979,11 @@ html.app-dark-mode .pitch-spectrogram--glass {
 .settings-branch-backdrop {
   padding: 0;
   border: 0;
-  background: transparent;
+  background: rgba(8, 13, 21, 0.36);
+}
+
+html.app-audio-mode .settings-branch-backdrop {
+  background: rgba(15, 23, 42, 0.26);
 }
 
 .settings-branch-tray {

@@ -223,8 +223,9 @@ function ControlDeck({
   }, [branchOpen, settingsBranchDisabled])
 
   const settingsButton = (
-    <button
+    <Pressable
       type="button"
+      intensity="icon"
       data-tutorial="settings-button"
       className={`control-deck__settings-btn ${
         isCameraPresentation
@@ -232,6 +233,8 @@ function ControlDeck({
           : 'audio-control-deck__settings-btn'
       } flex h-11 w-11 items-center justify-center rounded-full ${HUD_SOLID_BTN} bg-black/40 text-white hover:bg-black/55`}
       aria-label="Open settings"
+      haptic="light"
+      hapticFeedback={hapticFeedback}
       onContextMenu={(event) => event.preventDefault()}
       onClick={() => {
         if (!settingsBranchDisabled) onOpenSettings()
@@ -242,7 +245,7 @@ function ControlDeck({
           <Settings className="h-5 w-5" strokeWidth={1.9} />
         </span>
       </span>
-    </button>
+    </Pressable>
   )
 
   const recordStage = (

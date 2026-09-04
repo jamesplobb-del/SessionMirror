@@ -339,6 +339,25 @@ function BestTakeBox({
     onPlaybackChange?.(isPlaying)
   }, [isPlaying, onPlaybackChange])
 
+  /*
+   * Report "stopped" if this box is torn down while it is still playing.
+   *
+   * The effect above only fires on a change, so unmounting mid-playback left
+   * the owner believing a take was still running — and that flag is what mutes
+   * the metronome during playback. Leaving Camera before a take finished
+   * silenced the click for the rest of the session. Refs keep this to a true
+   * unmount, so it never fights the normal play/pause reporting.
+   */
+  const playbackReportRef = useRef({ playing: isPlaying, notify: onPlaybackChange })
+  playbackReportRef.current = { playing: isPlaying, notify: onPlaybackChange }
+  useEffect(
+    () => () => {
+      const { playing, notify } = playbackReportRef.current
+      if (playing) notify?.(false)
+    },
+    [],
+  )
+
   useEffect(() => {
     if (!suspendPlayback || !hasTake) return
     if (useNativeTakePlayback) {

@@ -8,9 +8,7 @@ import {
   iosSheetPremium,
   iosSpringSheet,
   motionGpuLayer,
-  nativeGlideEase,
 } from '../../utils/motionPresets'
-import { nativeGlideIn, nativeGlideShown } from '../../utils/interactiveUx'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
 
 interface AnimatedBottomSheetProps {
@@ -84,7 +82,7 @@ export default function AnimatedBottomSheet({
       return
     }
     setBackdropArmed(false)
-    const timer = window.setTimeout(() => setBackdropArmed(true), 320)
+    const timer = window.setTimeout(() => setBackdropArmed(true), 90)
     return () => window.clearTimeout(timer)
   }, [isOpen])
 
@@ -178,12 +176,7 @@ export default function AnimatedBottomSheet({
             onAnimationComplete={handleSheetAnimationComplete}
             {...sheetDragProps}
           >
-            <motion.div
-              className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden"
-              initial={nativeGlideIn}
-              animate={nativeGlideShown}
-              transition={nativeGlideEase}
-            >
+            <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
               <div
                 {...dragHandleProps}
                 className={`${dragHandleProps.className} native-sheet-handle min-h-11 justify-center pb-1 pt-2.5`}
@@ -191,7 +184,7 @@ export default function AnimatedBottomSheet({
                 <div className="h-1 w-10 rounded-full bg-stone-300/90" />
               </div>
               {children}
-            </motion.div>
+            </div>
           </motion.div>
         </>
       )}

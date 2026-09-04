@@ -1,6 +1,6 @@
 /** Shared tactile press styling for native-feeling controls. */
 export const NATIVE_SQUISH =
-  'select-none transition-all duration-200 ease-out active:scale-95 [-webkit-tap-highlight-color:transparent]'
+  'ui-pressable select-none [-webkit-tap-highlight-color:transparent] active:opacity-80'
 
 /** Record HUD chrome — opaque glass without backdrop-filter (GPU-friendly over live camera). */
 export const HUD_SOLID_BTN =

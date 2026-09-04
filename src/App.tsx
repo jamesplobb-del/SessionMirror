@@ -120,7 +120,7 @@ import { lockPortraitOrientation, syncAppOrientationLock } from './utils/lockPor
 import { PHYSICAL_UI_ROOT_ID } from './utils/physicalUiPortal'
 import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
-import { iosFade, iosHudDim, motionGpuLayer } from './utils/motionPresets'
+import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
 import { getInstrumentSettings } from './utils/instrumentProfiles'
 import { ActionSheetProvider, showAlertOutsideTree } from './context/ActionSheetContext'
@@ -2260,7 +2260,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     releaseAutoRecordSuppress(0)
   }, [recordingMode, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle('app-audio-mode', recordingMode === 'audio')
     return () => {
       document.documentElement.classList.remove('app-audio-mode')
@@ -2602,20 +2602,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     } else if (wasOpen && !isSettingsOpen) {
       timers.push(
         window.setTimeout(() => {
-          recoverCameraAfterSurfaceDismiss('settings-close')
-        }, 350)
-      )
-      timers.push(
-        window.setTimeout(() => {
           sharedMetronomeEngine.reconcileAfterSurfaceTransition(recordingModeRef.current)
-        }, 560)
+        }, 280)
       )
     }
 
     return () => {
       for (const timer of timers) window.clearTimeout(timer)
     }
-  }, [isSettingsOpen, recoverCameraAfterSurfaceDismiss])
+  }, [isSettingsOpen])
 
   const wasReviewOpenRef = useRef(false)
   useEffect(() => {
@@ -2661,7 +2656,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleOpenSettings = useCallback(() => {
     if (!canOpenOverlaySheet() || isExperimentalOpen || settingsOpenInFlightRef.current) return
-    triggerLightHaptic(settings.hapticFeedback)
     const openSettings = () => {
       settingsOpenInFlightRef.current = false
       if (!canOpenOverlaySheet() || isExperimentalOpen) return
@@ -2684,13 +2678,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     disarmAutoRecording,
     isAutoPreRollCaptureActive,
     isExperimentalOpen,
-    settings.hapticFeedback,
   ])
 
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
+        if (isRecording) return
+        // Tokens for Tools (`--audio-bg-base`) live on `html.app-audio-mode`.
+        // Apply them before React paints the new overlay so the first frame is
+        // already cream, not a black hole that then lerps.
+        document.documentElement.classList.toggle('app-audio-mode', mode === 'audio')
         // Same sitting, different surface: the tool tab, the pitch overlay and
         // Take Cards are left exactly as the player had them.
         //
@@ -3028,7 +3026,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleOpenPracticeHome = useCallback(() => {
     if (isRecording || isStopping) return
     if (!canOpenOverlaySheet() || isExperimentalOpen) return
-    triggerLightHaptic(settings.hapticFeedback)
     setShowPitch(false)
     setQuickSettingsOpen(false)
     setIsVaultOpen(false)
@@ -3041,7 +3038,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isExperimentalOpen,
     isRecording,
     isStopping,
-    settings.hapticFeedback,
   ])
 
   /**
@@ -5111,7 +5107,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
-                pauseNativePreviewUpdates={hudModalState !== 'idle' || quickSettingsOpen}
+                pauseNativePreviewUpdates={hudModalState === 'review' || isVaultOpen}
                 nativeCameraBridgeEnabled={isNativeCameraPlatform}
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
@@ -5320,9 +5316,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }`}
                   aria-hidden={hudModalState === 'review'}
                   animate={{
-                    opacity: hudModalState === 'review' ? 0 : hudModalState === 'sheet' ? 0.78 : 1,
-                    scale:
-                      hudModalState === 'review' ? 0.94 : hudModalState === 'sheet' ? 0.985 : 1,
+                    opacity: hudModalState === 'review' ? 0 : 1,
+                    scale: hudModalState === 'review' ? 0.94 : 1,
                   }}
                   transition={iosHudDim}
                   style={{
@@ -5347,33 +5342,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     </div>
                   )}
 
-                  <AnimatePresence initial={false}>
-                    {recordingMode === 'audio' &&
-                      !quickSettingsOpen &&
-                      !practiceSessionActive &&
-                      !isSplitView && (
-                        <motion.div
-                          key="audio-mode-top-tabs"
-                          data-tutorial="audio-mode-tabs"
-                          /* No entry fade: the cream ground flips in the same
-                             frame the mode does, so fading the tabs in after it
-                             showed an empty surface first and read as a stall.
-                             The exit fade stays — leaving can be gradual. */
-                          initial={false}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={iosFade}
-                          style={motionGpuLayer}
-                        >
-                          <AudioPracticeTopTabs
-                            activeTab={audioPracticeTab}
-                            onTabChange={handleAudioPracticeTabChange}
-                          />
-                        </motion.div>
-                      )}
-                  </AnimatePresence>
+                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && (
+                    <div data-tutorial="audio-mode-tabs">
+                      <AudioPracticeTopTabs
+                        activeTab={audioPracticeTab}
+                        onTabChange={handleAudioPracticeTabChange}
+                      />
+                    </div>
+                  )}
 
-                  {recordingMode === 'audio' && !quickSettingsOpen && !isSplitView && (
+                  {recordingMode === 'audio' && !isSplitView && (
                     <div className="relative flex min-h-0 flex-1">
                       <AnimatedTabPanel
                         panelKey="audio-practice-metronome-layer"
@@ -5466,8 +5444,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     </div>
                   )}
 
-                  {!quickSettingsOpen &&
-                    settings.showTakeCards &&
+                  {settings.showTakeCards &&
                     isSplitView &&
                     isAudioPracticeMainTab && (
                       <div
@@ -5532,8 +5509,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       (isAudioPracticeTimelineTab &&
                         practiceSessionActive &&
                         practiceRecordingControlsExpanded &&
-                        settings.showTakeCards)) &&
-                      !quickSettingsOpen && (
+                        settings.showTakeCards)) && (
                         <motion.div
                           key={
                             isAudioPracticeTimelineTab && practiceSessionActive
@@ -5569,8 +5545,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         </motion.div>
                       )}
 
-                    {!quickSettingsOpen &&
-                      settings.showTakeCards &&
+                    {settings.showTakeCards &&
                       !isSplitView &&
                       recordingMode !== 'audio' && (
                         <motion.div
@@ -5579,7 +5554,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             cameraTakeCardsExpanded ? '' : 'app-pip-row-wrap--compact'
                           }`}
                           data-tutorial="review-mode-button"
-                          initial={{ opacity: 0, y: 14 }}
+                          initial={false}
                           animate={{ opacity: 1, y: 0 }}
                           transition={iosHudDim}
                           style={{ ...motionGpuLayer, ...pipScaleStyle }}

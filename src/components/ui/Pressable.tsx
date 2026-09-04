@@ -70,15 +70,27 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
     whileTap,
     className = '',
     onClick,
+    onPointerDown,
     type = 'button',
     children,
     ...props
   },
   ref,
 ) {
+  const handlePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (haptic && !event.currentTarget.disabled) {
+        runPressableHaptic(haptic, hapticFeedback)
+      }
+      onPointerDown?.(event)
+    },
+    [haptic, hapticFeedback, onPointerDown],
+  )
+
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
-      if (haptic) {
+      // Keyboard / accessibility activation has detail 0 and never saw pointerdown.
+      if (haptic && event.detail === 0) {
         runPressableHaptic(haptic, hapticFeedback)
       }
       onClick?.(event)
@@ -88,7 +100,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
 
   const squishClass = squish
     ? NATIVE_SQUISH
-    : 'select-none [-webkit-tap-highlight-color:transparent]'
+    : 'ui-pressable select-none [-webkit-tap-highlight-color:transparent]'
   const tapMotion = squish ? whileTap ?? defaultWhileTap(intensity) : whileTap
 
   return (
@@ -98,6 +110,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
       className={`${squishClass} ${className}`.trim()}
       whileTap={tapMotion}
       transition={transition ?? iosPressTransition}
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       {...props}
     >

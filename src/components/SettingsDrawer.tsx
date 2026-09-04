@@ -23,12 +23,10 @@ import { DRONE_WAVEFORM_OPTIONS, type DroneWaveform } from '../utils/droneEngine
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
 import AudioEnhancer from './AudioEnhancer'
-import { SettingsDrawerSkeleton } from './ui/DrawerSkeletons'
 import IOSSegmentedControl from './ui/IOSSegmentedControl'
 import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
-import { useDeferredDrawerContent } from '../hooks/useDeferredDrawerContent'
 import HelpSheet from './HelpSheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
@@ -558,7 +556,6 @@ export default function SettingsDrawer({
   onOpenQuickMetronome,
 }: SettingsDrawerProps) {
   const notifyTutorial = useTutorialAction()
-  const { contentReady, markContentReady } = useDeferredDrawerContent(isOpen)
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
   const [activeQuickFunctionSetup, setActiveQuickFunctionSetup] =
     useState<QuickFunctionSetup | null>(null)
@@ -658,10 +655,6 @@ export default function SettingsDrawer({
     track.scrollLeft = Math.max(0, Math.min(target, track.scrollWidth - track.clientWidth))
   }, [activeSettingsSection, isOpen])
 
-  const handleSheetEnterComplete = useCallback(() => {
-    markContentReady()
-  }, [markContentReady])
-
   const handleCloseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
@@ -715,7 +708,6 @@ export default function SettingsDrawer({
         motionPreset="premium"
         elevated
         elevatedLight
-        onEnterComplete={handleSheetEnterComplete}
       >
       <div className="settings-sheet settings-sheet-host flex min-h-0 flex-1 flex-col">
       <div className="native-sheet-header sticky top-0 z-20 flex shrink-0 items-center justify-between gap-3 px-5 pb-4 pt-3">
@@ -728,7 +720,7 @@ export default function SettingsDrawer({
           data-tutorial="settings-close"
           intensity="icon"
           onClick={handleCloseClick}
-          haptic="light"
+          haptic={false}
           className="native-sheet-close relative z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 text-stone-500 shadow-sm ring-1 ring-stone-200/70 hover:bg-white hover:text-stone-800"
           aria-label="Close settings"
         >
@@ -741,9 +733,6 @@ export default function SettingsDrawer({
         onScroll={handleSettingsScroll}
         className="settings-drawer-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-3"
       >
-        {!contentReady ? (
-          <SettingsDrawerSkeleton />
-        ) : (
         <div className="set-page pb-2">
           <nav className="set-nav" aria-label="Settings sections">
             <div className="set-nav__track">
@@ -1027,7 +1016,6 @@ export default function SettingsDrawer({
             </SettingsGroup>
           </SettingsSection>
         </div>
-        )}
       </div>
       </div>
       </AnimatedBottomSheet>
