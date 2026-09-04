@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Check, ChevronRight, Music4, Play, Trophy, Wind } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronRight } from 'lucide-react'
 import balanceShot from '../../assets/games/balance.jpg'
 import learnInstrumentShot from '../../assets/games/learn-instrument.jpg'
 import staffJumperShot from '../../assets/games/staff-jumper.jpg'
@@ -40,6 +40,7 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 
 type PlazaPage = 'plaza' | 'instrument' | 'character'
+type GameWorld = 'staff' | 'balance' | 'learn'
 
 interface LabsMenuProps {
   hapticFeedback: boolean
@@ -52,6 +53,24 @@ interface LabsMenuProps {
 }
 
 const LEARN_INSTRUMENT_COUNT = LEARN_INSTRUMENTS.length
+const WORLD_ORDER: GameWorld[] = ['staff', 'balance', 'learn']
+const PLAYER_LEFT: Record<GameWorld, string> = {
+  staff: '16.666%',
+  balance: '50%',
+  learn: '83.333%',
+}
+const HOP_MS = 440
+const STEP_IN_MS = 280
+
+function worldForGame(id: PracticeGameId): GameWorld {
+  if (id === 'staff-jumper') return 'staff'
+  if (id === 'learn-instrument') return 'learn'
+  return 'balance'
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 function openGame(
   id: PracticeGameId,
@@ -92,11 +111,19 @@ export default function LabsMenu({
   const streak = balanceCurrentStreak(balanceData.daily, dayKey)
   const dailyDone = balanceDailyIsComplete(balanceData.daily, dayKey)
   const lastGame = loadLastPracticeGame() ?? 'balance'
+  const [atWorld, setAtWorld] = useState<GameWorld>(() => worldForGame(lastGame))
+  const [facing, setFacing] = useState<'left' | 'right'>('right')
+  const [walking, setWalking] = useState(false)
+  const [steppingIn, setSteppingIn] = useState(false)
+  const [hopKey, setHopKey] = useState(0)
+  const pendingOpenRef = useRef<PracticeGameId | null>(null)
+  const walkTimerRef = useRef(0)
   const openers = {
     'staff-jumper': onOpenStaffJumper,
     balance: onOpenBalance,
     'learn-instrument': onOpenLearnInstrument,
   } as const
+  const range = `${midiToBalanceNoteName(instrument.minWrittenMidi)}–${midiToBalanceNoteName(instrument.maxWrittenMidi)}`
 
   const selectCharacter = (id: PracticeGameCharacterId) => {
     setCharacterId(id)
@@ -109,6 +136,62 @@ export default function LabsMenu({
     setInstrumentId(next.id)
     savePracticeGameInstrumentId(next.id)
     setPage('plaza')
+  }
+
+  useEffect(() => () => window.clearTimeout(walkTimerRef.current), [])
+
+  const finishEnter = () => {
+    window.clearTimeout(walkTimerRef.current)
+    setWalking(false)
+    setSteppingIn(false)
+    const id = pendingOpenRef.current
+    pendingOpenRef.current = null
+    if (id) openGame(id, openers)
+  }
+
+  const beginStepIn = () => {
+    window.clearTimeout(walkTimerRef.current)
+    setWalking(false)
+    setSteppingIn(true)
+    walkTimerRef.current = window.setTimeout(finishEnter, STEP_IN_MS)
+  }
+
+  const hopToward = (path: GameWorld[]) => {
+    const next = path[0]
+    if (!next) {
+      beginStepIn()
+      return
+    }
+    setAtWorld(next)
+    setHopKey((key) => key + 1)
+    window.clearTimeout(walkTimerRef.current)
+    walkTimerRef.current = window.setTimeout(() => hopToward(path.slice(1)), HOP_MS)
+  }
+
+  const walkInto = (id: PracticeGameId) => {
+    if (prefersReducedMotion()) {
+      openGame(id, openers)
+      return
+    }
+    if (steppingIn) return
+    const world = worldForGame(id)
+    pendingOpenRef.current = id
+    if (world === atWorld && !walking) {
+      beginStepIn()
+      return
+    }
+    const from = WORLD_ORDER.indexOf(atWorld)
+    const to = WORLD_ORDER.indexOf(world)
+    const step = to > from ? 1 : -1
+    const path: GameWorld[] = []
+    for (let index = from; index !== to; index += step) {
+      path.push(WORLD_ORDER[index + step]!)
+    }
+    setFacing(step > 0 ? 'right' : 'left')
+    setSteppingIn(false)
+    setWalking(true)
+    window.clearTimeout(walkTimerRef.current)
+    hopToward(path)
   }
 
   if (page === 'instrument') {
@@ -172,7 +255,7 @@ export default function LabsMenu({
     id: PracticeGameId
     title: string
     line: string
-    world: 'staff' | 'balance' | 'learn'
+    world: GameWorld
     description: string
     image: string
   }> = [
@@ -213,82 +296,89 @@ export default function LabsMenu({
       onBack={onBack}
       backLabel="Close Games"
       stat={streak > 0 ? { label: 'Streak', value: `${streak} day` } : null}
-      className="balance-arcade--plaza balance-arcade--games"
+      className="balance-arcade--plaza balance-arcade--hall"
     >
       <h1 className="sr-only">Practice Games</h1>
 
       <Pressable
         intensity="soft"
         hapticFeedback={hapticFeedback}
-        className="balance-instrument-pill balance-instrument-pill--quiet"
+        className="balance-instrument-board"
         onClick={() => setPage('instrument')}
         aria-label={`Instrument ${instrument.name}. Change instrument`}
       >
         <span>
-          <small>Instrument</small>
+          <small>Playing on</small>
           <strong>{instrument.name}</strong>
+          <b>Written {range}</b>
         </span>
-        <b>
-          {midiToBalanceNoteName(instrument.minWrittenMidi)}–
-          {midiToBalanceNoteName(instrument.maxWrittenMidi)}
-        </b>
+        <em>Change</em>
         <ChevronRight aria-hidden />
       </Pressable>
 
-      <ul className="arcade-game-list balance-game-list" aria-label="Games">
-        {doors.map((door) => {
-          const current = lastGame === door.id
-          const accentClass = door.world === 'learn' ? 'wind' : door.world
-          return (
-            <li key={door.id}>
+      <div className="balance-hall">
+        <div className="balance-hall__doors" role="list" aria-label="Games">
+          {doors.map((door) => {
+            const current = lastGame === door.id
+            return (
               <Pressable
+                key={door.id}
                 type="button"
                 intensity="normal"
                 squish={false}
                 haptic="medium"
                 hapticFeedback={hapticFeedback}
-                className={`arcade-game-card arcade-game-card--${accentClass} ${current ? 'is-current' : ''}`}
+                className={`balance-door ${atWorld === door.world ? 'is-open' : ''}`}
                 aria-current={current ? 'true' : undefined}
                 aria-label={`${current ? 'Continue' : 'Play'} ${door.title}. ${door.description}`}
-                onClick={() => openGame(door.id, openers)}
+                onClick={() => walkInto(door.id)}
               >
-                <span className="arcade-game-card__copy">
-                  <span className="arcade-game-card__badge">
-                    {door.world === 'staff' ? <Music4 aria-hidden /> : door.world === 'learn' ? <Wind aria-hidden /> : null}
-                    {current ? 'Continue' : door.line}
-                  </span>
-                  <h3>{door.title}</h3>
-                  <p>{door.description}</p>
-                  <span className="arcade-game-card__meta">
-                    <span>
-                      {door.line.startsWith('Best ') ? <Trophy aria-hidden /> : null}
-                      {door.line}
-                    </span>
-                  </span>
+                <span className={`balance-door__world balance-door__world--${door.world}`} aria-hidden>
+                  <img className="balance-door__preview" src={door.image} alt="" decoding="async" />
                 </span>
-                <span className={`arcade-game-card__art arcade-game-card__art--${accentClass}`} aria-hidden>
-                  <img className="arcade-game-card__shot" src={door.image} alt="" decoding="async" />
-                  <span className="arcade-game-card__go"><Play aria-hidden /></span>
+                <span className="balance-door__plaque">
+                  {current ? <em>Continue</em> : null}
+                  <strong>{door.title}</strong>
+                  <small>{door.line}</small>
                 </span>
               </Pressable>
-            </li>
-          )
-        })}
-      </ul>
+            )
+          })}
+        </div>
 
-      <Pressable
-        intensity="soft"
-        hapticFeedback={hapticFeedback}
-        className="balance-games__character"
-        onClick={() => setPage('character')}
-        aria-label={`Character ${character.name}. Change player`}
-      >
-        <span aria-hidden>
-          <img src={character.asset} alt="" draggable={false} />
-        </span>
-        <span><small>Player</small><strong>{character.name}</strong></span>
-        <ChevronRight aria-hidden />
-      </Pressable>
+        <div className="balance-hall__threshold">
+          <div className="balance-hall__floor" aria-hidden />
+          <div
+            className={`balance-hall__player is-${atWorld} ${
+              steppingIn ? 'is-stepping-in' : walking ? 'is-walking' : 'is-idle'
+            } is-face-${facing}`}
+            style={{ left: PLAYER_LEFT[atWorld] }}
+          >
+            <Pressable
+              intensity="soft"
+              squish={false}
+              hapticFeedback={hapticFeedback}
+              className="balance-hall__player-hit"
+              aria-label={`Character ${character.name}. Change player`}
+              onClick={() => {
+                if (walking || steppingIn) return
+                setPage('character')
+              }}
+            >
+              <span className="balance-hall__player-face" aria-hidden>
+                <span key={hopKey} className={`balance-hall__player-art${walking ? ' is-hopping' : ''}`}>
+                  <img
+                    src={character.asset}
+                    alt=""
+                    draggable={false}
+                    style={{ transform: `scale(${character.scale})` }}
+                  />
+                </span>
+              </span>
+            </Pressable>
+          </div>
+        </div>
+      </div>
     </BalanceArcadeShell>
   )
 }

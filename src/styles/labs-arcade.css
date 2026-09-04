@@ -10,6 +10,53 @@
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 }
 
+/* Load into the games world. Pointer events stay on so a door still opens
+   the same game immediately — this is paint, not a loading gate. */
+.labs-overlay--enter-world {
+  overflow: hidden;
+}
+
+.labs-overlay--enter-world::before,
+.labs-overlay--enter-world::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.labs-overlay--enter-world::before {
+  background:
+    radial-gradient(ellipse 80% 40% at 20% 30%, rgba(255, 255, 255, 0.95), transparent 62%),
+    radial-gradient(ellipse 70% 36% at 80% 20%, rgba(255, 255, 255, 0.88), transparent 64%),
+    radial-gradient(ellipse 90% 50% at 50% 100%, rgba(255, 255, 255, 0.92), transparent 58%);
+  animation: labs-world-fog 820ms ease-out both;
+}
+
+.labs-overlay--enter-world::after {
+  background: #cbeefe;
+  animation: labs-world-flash 640ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .labs-overlay--enter-world::before,
+  .labs-overlay--enter-world::after {
+    content: none;
+    animation: none;
+  }
+}
+
+@keyframes labs-world-fog {
+  0% { opacity: 1; transform: scale(1.12) translateY(8%); }
+  55% { opacity: 0.7; }
+  100% { opacity: 0; transform: scale(1.4) translateY(-12%); }
+}
+
+@keyframes labs-world-flash {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+
 /*
  * The menu is a full-screen sheet on a phone, so it is sized to fit rather
  * than to scroll: the vertical rhythm is vh-based and the safe areas are part

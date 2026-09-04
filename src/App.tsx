@@ -33,6 +33,7 @@ import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
 import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
+import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
 import {
   createDesk,
   deskMatchesSnapshot,
@@ -5120,7 +5121,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
               />
 
-              {cameraNeedsPermission && (
+              {cameraNeedsPermission && !SKIP_MEDIA_PERMISSION_GATE && (
                 <CameraPermissionPrompt
                   recordingMode={recordingMode}
                   requesting={cameraPermissionRequestInFlight}

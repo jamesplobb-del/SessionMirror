@@ -716,7 +716,70 @@
   max-width: 32rem;
   overflow: hidden;
   padding-bottom: max(0.45rem, env(safe-area-inset-bottom, 0px));
-  gap: 0.5rem;
+  gap: 0.55rem;
+}
+
+.balance-instrument-board {
+  display: grid;
+  width: 100%;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.85rem 0.75rem;
+  border-radius: 1.2rem;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 0 0 0.14rem var(--gold),
+    0 var(--edge-2) 0 var(--gold-edge),
+    0 0.4rem 0.85rem rgba(150, 100, 12, 0.16);
+}
+
+.balance-instrument-board > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.balance-instrument-board small {
+  color: var(--ink-faint);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.balance-instrument-board strong {
+  overflow: hidden;
+  font-family: var(--display-font);
+  font-size: 1.28rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balance-instrument-board b {
+  color: var(--gold-edge);
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance-instrument-board em {
+  color: var(--ink);
+  font-family: var(--display-font);
+  font-size: 0.88rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.balance-instrument-board svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  color: var(--ink-faint);
+  stroke-width: 2.6;
 }
 
 .balance-instrument-pill--quiet {
@@ -808,6 +871,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .balance-door__plaque {
@@ -864,7 +929,7 @@
   z-index: 2;
   height: 6.6rem;
   flex: 0 0 auto;
-  margin: 0 -0.35rem -0.15rem;
+  margin: -1.15rem -0.35rem -0.15rem;
 }
 
 .balance-hall__floor {
@@ -883,17 +948,55 @@
   width: 5.8rem;
   height: 6.4rem;
   place-items: end center;
+  margin: 0 0 0 -2.9rem;
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  transition:
+    left 440ms cubic-bezier(0.22, 0.78, 0.28, 1),
+    transform 280ms cubic-bezier(0.45, 0.02, 0.2, 1),
+    opacity 280ms ease;
+}
+
+.balance-hall__player-hit {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: end center;
   padding: 0;
   border: 0;
   background: transparent;
-  transform: translateX(-50%);
-  transition: left 280ms ease;
   cursor: pointer;
 }
 
-.balance-hall__player.is-staff { left: 16.666%; }
-.balance-hall__player.is-balance { left: 50%; }
-.balance-hall__player.is-learn { left: 83.333%; }
+.balance-hall__player.is-walking,
+.balance-hall__player.is-stepping-in {
+  pointer-events: none;
+}
+
+.balance-hall__player.is-stepping-in {
+  z-index: 4;
+  transform: translateY(-3.4rem) scale(0.52);
+  opacity: 0.2;
+}
+
+.balance-hall__player-face {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  transform-origin: center bottom;
+}
+
+.balance-hall__player.is-face-left .balance-hall__player-face {
+  transform: scaleX(-1);
+}
+
+.balance-hall__player-art {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: end center;
+  transform-origin: center bottom;
+}
 
 .balance-hall__player img {
   width: 100%;
@@ -905,22 +1008,110 @@
   -webkit-user-drag: none;
 }
 
-.balance-hall__player-art {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: end center;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-  .balance-hall__player-art {
-    animation: balance-hall-bob 2.4s ease-in-out infinite alternate;
+  .balance-hall__player.is-idle .balance-hall__player-art {
+    animation: balance-hall-idle-step 0.64s ease-in-out infinite;
+  }
+
+  .balance-hall__player.is-walking .balance-hall__player-art.is-hopping {
+    animation: balance-hall-hop 440ms cubic-bezier(0.2, 0.85, 0.32, 1) both;
+  }
+
+  .balance-hall__player.is-stepping-in .balance-hall__player-art {
+    animation: balance-hall-hop 280ms cubic-bezier(0.2, 0.85, 0.32, 1) both;
   }
 }
 
-@keyframes balance-hall-bob {
-  from { transform: translateY(0); }
-  to { transform: translateY(-0.28rem); }
+@media (prefers-reduced-motion: reduce) {
+  .balance-hall__player {
+    transition: none;
+  }
+}
+
+@keyframes balance-hall-idle-step {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-0.22rem) rotate(2deg); }
+}
+
+@keyframes balance-hall-hop {
+  0% { transform: translateY(0) scale(1, 1); }
+  16% { transform: translateY(0.14rem) scale(1.12, 0.82); }
+  46% { transform: translateY(-1.45rem) scale(0.9, 1.14); }
+  78% { transform: translateY(-0.08rem) scale(1.08, 0.88); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .labs-overlay--enter-world .balance-arcade {
+    animation: games-world-arrive 720ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-arcade__sky {
+    animation: games-sky-rush 760ms ease-out both;
+  }
+
+  .labs-overlay--enter-world .balance-arcade__bar {
+    animation: games-bar-drop 480ms 80ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-instrument-board {
+    animation: games-board-drop 520ms 120ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-door:nth-child(1) {
+    animation: games-door-pop 560ms 140ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-door:nth-child(2) {
+    animation: games-door-pop 560ms 200ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-door:nth-child(3) {
+    animation: games-door-pop 560ms 260ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+
+  .labs-overlay--enter-world .balance-door.is-open {
+    animation-name: games-door-pop-open;
+  }
+
+  .labs-overlay--enter-world .balance-hall__player-art {
+    animation: balance-hall-hop 440ms 180ms cubic-bezier(0.2, 0.85, 0.32, 1) both;
+  }
+}
+
+@keyframes games-world-arrive {
+  from { transform: scale(1.08); }
+  to { transform: scale(1); }
+}
+
+@keyframes games-sky-rush {
+  from { transform: scale(1.22) translateY(6%); }
+  to { transform: scale(1) translateY(0); }
+}
+
+@keyframes games-bar-drop {
+  from { opacity: 0; transform: translateY(-0.7rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes games-board-drop {
+  from { opacity: 0; transform: translateY(-0.85rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes games-door-pop {
+  from { opacity: 0; transform: translateY(1.1rem) scale(0.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes games-door-pop-open {
+  from { opacity: 0; transform: translateY(1.1rem) scale(0.92); }
+  to { opacity: 1; transform: translateY(-0.28rem) scale(1); }
+}
+
+@keyframes games-player-run-in {
+  from { opacity: 0; transform: translateX(-42vw); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .balance-hall__hint {

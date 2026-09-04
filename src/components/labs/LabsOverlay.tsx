@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { GameMicRequest } from '../../labs/useGameMicRecovery'
 import { createPortal } from 'react-dom'
 import { useEffect, useRef, type RefObject } from 'react'
@@ -146,12 +146,27 @@ export default function LabsOverlay({
     return () => window.cancelAnimationFrame(focusFrame)
   }, [isOpen, route])
 
+  const [enteringWorld, setEnteringWorld] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setEnteringWorld(false)
+      return
+    }
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return
+    }
+    setEnteringWorld(true)
+    const timer = window.setTimeout(() => setEnteringWorld(false), 880)
+    return () => window.clearTimeout(timer)
+  }, [isOpen])
+
   if (typeof document === 'undefined' || !isOpen) return null
 
   return createPortal(
         <div
           ref={dialogRef}
-          className="labs-overlay fixed inset-0 z-[135] flex flex-col"
+          className={`labs-overlay fixed inset-0 z-[135] flex flex-col${enteringWorld && route === 'menu' ? ' labs-overlay--enter-world' : ''}`}
           tabIndex={-1}
           role="dialog"
           aria-modal="true"
