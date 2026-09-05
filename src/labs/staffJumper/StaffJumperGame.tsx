@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { Pause } from 'lucide-react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import { getPracticeGameCharacter } from '../practiceGameCharacters'
@@ -25,7 +33,6 @@ import {
   dotYForNote,
   LEDGER_LINE_THICKNESS,
   LEDGER_LINE_W,
-  noteheadHalfHeight,
   NOTEHEAD_RING_THICKNESS,
   NOTEHEAD_W,
   NOTEHEAD_H,
@@ -53,6 +60,18 @@ import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
 import { layoutRhythm } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
 import { describeWrittenRhythm, formatBeats } from './staffJumperRhythmReading'
+import {
+  clamp01,
+  FREE_PLAY_LIGHT_PROGRESS,
+  groundLaneScreenY,
+  nextLightProgress,
+  PLANK_HEIGHT_PX,
+  PLAYER_HEIGHT_SPACES,
+  readingCue,
+  travelX,
+  walkwayPlank,
+  type ReadingCue,
+} from './staffJumperTravel'
 import Pressable from '../../components/ui/Pressable'
 
 interface StaffJumperGameProps {
@@ -65,10 +84,10 @@ interface StaffJumperGameProps {
   turnDurationMs: number
   /** Rhythm mode: the pulse of the bar the click is on, 0-based. */
   beatInBar: number | null
+  /** 0 at the current notehead, 1 at the next. Driven by the game clock. */
+  getTravelProgress: () => number
 }
 
-/** Visible feet sit above the transparent bottom padding in the source PNG. */
-const PLAYER_FEET_OFFSET_PX = 45
 /**
  * Notes kept in the DOM ahead of the player. Eighth notes are narrow, so a
  * screen's worth of them needs more slots than a screen of quarters.
@@ -91,6 +110,50 @@ const STAFF_HEIGHT_FRACTION = 0.28
 
 /** Screen-space margin that keeps the complete score opening inside the viewport. */
 const SCORE_OPENING_MARGIN_PX = 14
+
+interface ReadingHintInput {
+  cue: ReadingCue
+  easy: boolean
+  rhythmMode: boolean
+  holding: boolean
+  currentIsRest: boolean
+  currentLabel: string
+  nextLabel: string
+  holdBeats: string
+  /** Rhythm mode only: how the written value is counted aloud. */
+  count: string | null
+  detectedPc: number | null
+  isMatch: boolean
+  isPlayableMatch: boolean
+  cents: number
+}
+
+/**
+ * What to tell the player, in the order they need to hear it.
+ *
+ * Steps rather than one nested conditional, because the play cue moves ahead
+ * of the note being held: "what to play next" and "what to hold now" are two
+ * different answers, and which one is wanted depends only on where in the
+ * note the run is.
+ */
+function readingHint(input: ReadingHintInput): string {
+  // Silence is counted, not played — until the pickup for the next note.
+  if (input.currentIsRest && !input.cue.leading) {
+    return input.rhythmMode ? `Rest — count ${input.holdBeats}` : 'Rest — count it through'
+  }
+  // The glow has moved on: name the note it moved to, never the one underfoot.
+  if (input.cue.leading) {
+    return input.easy ? `Play ${input.nextLabel}` : 'Play the lit note'
+  }
+  if (input.holding) return `Hold it — ${input.holdBeats}`
+  if (input.detectedPc == null) {
+    const what = input.easy ? `Play ${input.currentLabel}` : 'Play the lit note'
+    return input.count ? `${what} ${input.count}` : what
+  }
+  if (input.isPlayableMatch) return Math.abs(input.cents) <= 8 ? 'Centered' : 'Hold steady'
+  if (input.isMatch) return `${input.cents > 0 ? '+' : ''}${input.cents}¢ from center`
+  return 'Try again'
+}
 
 function glyphNameForAccidental(accidental: '#' | 'b') {
   return accidental === '#' ? ('sharp' as const) : ('flat' as const)
@@ -167,6 +230,7 @@ export default function StaffJumperGame({
   turnRemainingMs,
   turnDurationMs,
   beatInBar,
+  getTravelProgress,
 }: StaffJumperGameProps) {
   const config = state.config!
   const rhythmMode = isRhythmMode(config)
@@ -184,33 +248,69 @@ export default function StaffJumperGame({
       ? target.noteLabel
       : 'See staff'
   const meterSpec = METERS[config.meter]
+  const nextNote = getTargetNoteAtStep(config, state.sequenceStep + 1)
+
+  /**
+   * How far into this note's walk the next head takes the glow.
+   *
+   * With the click running the travel is the written length, so the cue can be
+   * placed in beats. Free play's travel is the dwell after an accepted note,
+   * which is short and has nothing to do with the written value — half of it
+   * is all the warning there is to give.
+   */
+  const lightProgress = rhythmMode
+    ? nextLightProgress(target.rhythm.durationUnits, meterSpec.pulseUnits)
+    : FREE_PLAY_LIGHT_PROGRESS
+
+  /**
+   * Only the reading cue is state.
+   *
+   * The walk itself — the scroll, the character, the trail behind it — is
+   * written straight to the DOM a frame at a time in `applyFrame`, because
+   * re-rendering a screenful of engraved notation sixty times a second to move
+   * one transform is how a phone drops frames. The cue changes twice a note.
+   */
+  const [cue, setCue] = useState<ReadingCue>({ litStep: 0, leading: false, walking: false })
+  const cueRef = useRef(cue)
+
   /** Rhythm mode: the written value under the player, in words. */
   const writtenRhythm = rhythmMode ? describeWrittenRhythm(target.rhythm, meterSpec) : null
   const holdBeats = formatBeats(target.rhythm.durationUnits, meterSpec)
+  /** Past the attack: the answer is now the note's length, not its name. */
+  const holding = cue.walking || state.isSustaining
+  const playDisplay = cue.leading
+    ? config.difficulty === 'easy'
+      ? nextNote.noteLabel
+      : 'See staff'
+    : targetDisplay
 
-  const responseHint = target.isRest
-    ? rhythmMode
-      ? `Rest — count ${holdBeats}`
-      : 'Rest — count it through'
-    : rhythmMode && state.isSustaining
-      ? `Hold it — ${holdBeats}`
-      : detectedPc == null
-        ? config.difficulty === 'easy'
-          ? rhythmMode
-            ? `Play ${target.noteLabel} ${writtenRhythm!.count}`
-            : `Play ${target.noteLabel}`
-          : rhythmMode
-            ? `Play the note under the player ${writtenRhythm!.count}`
-            : 'Play the note under the player'
-        : isPlayableMatch
-          ? Math.abs(cents) <= 8
-            ? 'Centered'
-            : 'Hold steady'
-          : isMatch
-            ? `${cents > 0 ? '+' : ''}${cents}¢ from center`
-            : 'Try again'
+  const responseHint = readingHint({
+    cue,
+    easy: config.difficulty === 'easy',
+    rhythmMode,
+    holding,
+    currentIsRest: target.isRest,
+    currentLabel: target.noteLabel,
+    nextLabel: nextNote.noteLabel,
+    holdBeats,
+    count: writtenRhythm?.count ?? null,
+    detectedPc,
+    isMatch,
+    isPlayableMatch,
+    cents,
+  })
 
   const playfieldRef = useRef<HTMLDivElement>(null)
+  const dockRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * Top of the target dock, in playfield coordinates.
+   *
+   * The walkway hangs above it, and the dock's height moves with its contents
+   * — a beat strip in rhythm mode, a countdown in free play, a hint that wraps
+   * to two lines on a narrow phone — so it is measured rather than guessed.
+   */
+  const [dockTopPx, setDockTopPx] = useState<number | null>(null)
 
   /**
    * layout.scale: world-px → screen-px multiplier.
@@ -232,6 +332,23 @@ export default function StaffJumperGame({
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
+
+  useLayoutEffect(() => {
+    const dock = dockRef.current
+    const field = playfieldRef.current
+    if (!dock || !field) {
+      setDockTopPx(null)
+      return
+    }
+    const measure = () => {
+      setDockTopPx(dock.getBoundingClientRect().top - field.getBoundingClientRect().top)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(dock)
+    observer.observe(field)
+    return () => observer.disconnect()
+  }, [state.isFalling])
 
   const platforms = useMemo(
     () => getVisiblePlatforms(config, state.sequenceStep, VISIBLE_NOTE_COUNT),
@@ -302,30 +419,138 @@ export default function StaffJumperGame({
     (NOTE_SPACING_PX * MIN_LOOKAHEAD_NOTES + NOTEHEAD_W)
   const scale = Math.max(0.5, Math.min(1.15, Math.min(heightScale, widthScale)))
   const baseY = viewport.height * 0.47 - STAFF_MIDDLE_Y * scale
-  const focusWorldX = target.xPx + notationLeadInOffset
+  const playerModel = getPracticeGameCharacter(config.playerModel)
 
   /**
-   * The first target must leave world X=0 on screen or the clef and key
-   * signature are clipped. After the first successful note, return to the
-   * normal reading point and let the score opening scroll away naturally.
+   * Player position — feet on the walkway, a lane under the whole staff.
+   *
+   * The character no longer rides the noteheads: pitch is what the page is
+   * for, and a sprite standing on a head covers the head, its stem and
+   * whatever is written above it. Its X is the reading line, so the column it
+   * stands in is still the note being read.
+   *
+   * Its box scales with the staff so the same clearance holds at every zoom;
+   * the per-character optical scale rides on top of that as a transform, and
+   * has to be counted when asking how tall the thing on screen actually is.
    */
-  const openingAnchorX = focusWorldX * scale + SCORE_OPENING_MARGIN_PX
-  const playerAnchorX =
-    state.sequenceStep === 0
-      ? Math.max(PLAYER_ANCHOR_X_PX, openingAnchorX)
-      : PLAYER_ANCHOR_X_PX
+  const playerBoxPx = STAFF_SPACE_PX * PLAYER_HEIGHT_SPACES * scale
+  const groundScreenY = groundLaneScreenY({
+    baseY,
+    scale,
+    playerHeightPx: playerBoxPx * playerModel.scale,
+    dockTopPx: dockTopPx ?? viewport.height * 0.78,
+  })
+  const groundWorldY = (groundScreenY - baseY) / Math.max(scale, 0.1)
+  /** The world canvas has to reach the walkway or the SVG clips the planks. */
+  const worldCanvasHeight = Math.max(STAFF_CANVAS_HEIGHT, groundWorldY + PLANK_HEIGHT_PX + 4)
+  const targetPlatform = displayedPlatforms.find((p) => p.step === state.sequenceStep)
+  const nextPlatform = displayedPlatforms.find((p) => p.step === state.sequenceStep + 1)
+  const fromWorldX = targetPlatform?.xPx ?? target.xPx + notationLeadInOffset
+  const toWorldX = nextPlatform?.xPx ?? nextNote.xPx + notationLeadInOffset
 
-  // Follow every accepted pitch immediately so fast passages never queue visual movement.
-  const scrollX = playerAnchorX - focusWorldX * scale
+  /**
+   * The first note has to leave world X=0 on screen or the clef and key
+   * signature are clipped, so the opening pins the score at its left margin
+   * and lets the character walk in from it. Easing the anchor back to the
+   * reading point across that first walk is what stops the score jumping a
+   * screen's width sideways the moment the first note is done.
+   */
+  const openingAnchorX = Math.max(
+    PLAYER_ANCHOR_X_PX,
+    fromWorldX * scale + SCORE_OPENING_MARGIN_PX,
+  )
 
   const visibleWorldWidth = viewport.width / Math.max(scale, 0.1)
   const lastVisibleX =
-    displayedPlatforms.length > 0 ? displayedPlatforms[displayedPlatforms.length - 1]!.xPx : focusWorldX
+    displayedPlatforms.length > 0 ? displayedPlatforms[displayedPlatforms.length - 1]!.xPx : toWorldX
   const staffWorldWidth = Math.max(
     1200,
-    focusWorldX + visibleWorldWidth + NOTE_SPACING_PX * 3,
+    toWorldX + visibleWorldWidth + NOTE_SPACING_PX * 3,
     lastVisibleX + NOTE_SPACING_PX * 3,
   )
+
+  /** The ground the character covers on this note; the trail fills it as it walks. */
+  const currentPlank = walkwayPlank(state.sequenceStep, fromWorldX, toWorldX)
+
+  const worldRef = useRef<HTMLDivElement>(null)
+  const headRef = useRef<HTMLDivElement>(null)
+  const playerRef = useRef<HTMLDivElement>(null)
+  const trailRef = useRef<SVGRectElement>(null)
+  const lastAnchorRef = useRef<number | null>(null)
+  /** Everything a frame needs, handed to the loop without re-subscribing it. */
+  const frame = {
+    scale,
+    baseY,
+    fromWorldX,
+    toWorldX,
+    openingAnchorX,
+    opening: state.sequenceStep === 0,
+    step: state.sequenceStep,
+    currentIsRest: target.isRest,
+    nextIsRest: nextNote.isRest,
+    lightProgress,
+    plankWidth: currentPlank?.width ?? 0,
+  }
+  const frameRef = useRef(frame)
+  frameRef.current = frame
+
+  /**
+   * One frame of the walk.
+   *
+   * The score scrolls so the character stays on the reading line, which is why
+   * a long note scrolls through its own length instead of parking a head on
+   * screen with empty staff to the right of it.
+   */
+  const applyFrame = useCallback(() => {
+    const view = frameRef.current
+    const progress = clamp01(getTravelProgress())
+    const worldX = travelX(view.fromWorldX, view.toWorldX, progress)
+    const anchorX = view.opening
+      ? view.openingAnchorX + (PLAYER_ANCHOR_X_PX - view.openingAnchorX) * progress
+      : PLAYER_ANCHOR_X_PX
+    const scrollX = anchorX - worldX * view.scale
+    const transform = `translate3d(${scrollX}px, ${view.baseY}px, 0) scale(${view.scale})`
+    if (worldRef.current) worldRef.current.style.transform = transform
+    if (headRef.current) headRef.current.style.transform = transform
+    if (playerRef.current && lastAnchorRef.current !== anchorX) {
+      lastAnchorRef.current = anchorX
+      playerRef.current.style.left = `${anchorX}px`
+    }
+    if (trailRef.current) {
+      trailRef.current.setAttribute('width', `${Math.max(0, view.plankWidth * progress)}`)
+    }
+
+    // Re-render only when the cue itself turns over — twice a note, not sixty
+    // times a second. Compared against a ref rather than left to React's
+    // bail-out so the frame loop cannot schedule work it does not need.
+    const next = readingCue(
+      view.step,
+      view.currentIsRest,
+      view.nextIsRest,
+      progress,
+      view.lightProgress,
+    )
+    const shown = cueRef.current
+    if (
+      shown.litStep !== next.litStep ||
+      shown.leading !== next.leading ||
+      shown.walking !== next.walking
+    ) {
+      cueRef.current = next
+      setCue(next)
+    }
+  }, [getTravelProgress])
+
+  // Before paint, so a re-render never shows the previous frame's scroll.
+  useLayoutEffect(applyFrame)
+
+  useEffect(() => {
+    let raf = requestAnimationFrame(function step() {
+      applyFrame()
+      raf = requestAnimationFrame(step)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [applyFrame])
 
   const feedbackAnnouncement =
     state.feedback === 'perfect'
@@ -375,16 +600,6 @@ export default function StaffJumperGame({
         .filter(Boolean)
         .join(' · ')
     : ''
-
-  // Player position — visible feet meet the top edge of the current target notehead.
-  const targetPlatform = displayedPlatforms.find((p) => p.role === 'target')
-  const standNote = targetPlatform?.note ?? target
-  const targetWorldX = targetPlatform?.xPx ?? target.xPx
-  const headTopWorld = standNote.yPx - noteheadHalfHeight()
-  const playerFeetScreen = baseY + headTopWorld * scale
-  const playerScreenY = playerFeetScreen - PLAYER_FEET_OFFSET_PX
-  const playerScreenX = targetWorldX * scale + scrollX
-  const playerModel = getPracticeGameCharacter(config.playerModel)
 
   const prevAdvanceRef = useRef(state.advanceToken)
   const prevMissRef = useRef(state.missToken)
@@ -442,21 +657,24 @@ export default function StaffJumperGame({
             </div>
           </div>
 
+          {/*
+            The transform is set by `applyFrame`, never here: it changes every
+            frame while everything else on this layer changes twice a note.
+
+            Transform order (applied right-to-left in screen space):
+            1. scale around origin (0,0)
+            2. translateY by baseY
+            3. translateX by scrollX
+
+            Result: screen_x = world_x * scale + scrollX
+                    screen_y = world_y * scale + baseY
+          */}
           <div
             className="sj-staff-world"
+            ref={worldRef}
             style={{
-              /**
-               * Transform order (applied right-to-left in screen space):
-               * 1. scale around origin (0,0)
-               * 2. translateY by baseY
-               * 3. translateX by scrollX
-               *
-               * Result: screen_x = world_x * scale + scrollX
-               *         screen_y = world_y * scale + baseY
-               */
-              transform: `translateX(${scrollX}px) translateY(${baseY}px) scale(${scale})`,
               transformOrigin: '0 0',
-              height: `${STAFF_CANVAS_HEIGHT}px`,
+              height: `${worldCanvasHeight}px`,
               width: `${staffWorldWidth}px`,
             }}
           >
@@ -468,8 +686,8 @@ export default function StaffJumperGame({
             <svg
               className="sj-rhythm-layer"
               width={staffWorldWidth}
-              height={STAFF_CANVAS_HEIGHT}
-              viewBox={`0 0 ${staffWorldWidth} ${STAFF_CANVAS_HEIGHT}`}
+              height={worldCanvasHeight}
+              viewBox={`0 0 ${staffWorldWidth} ${worldCanvasHeight}`}
               aria-hidden
               focusable="false"
             >
@@ -483,6 +701,56 @@ export default function StaffJumperGame({
                   height={staffHeight}
                 />
               ))}
+
+              {/*
+                The walkway, in its own lane below the lowest note the game can
+                write. Scenery, deliberately kept clear of the staff: a rule
+                drawn near a notehead reads as a ledger line, and this one is
+                not part of the music.
+              */}
+              {displayedPlatforms.map((slot) => {
+                const following = displayedPlatforms.find((item) => item.step === slot.step + 1)
+                const nextX =
+                  following?.xPx ??
+                  getTargetNoteAtStep(config, slot.step + 1).xPx + notationLeadInOffset
+                const plank = walkwayPlank(slot.step, slot.xPx, nextX)
+                if (!plank) return null
+                // Ground already behind the character keeps the trail's colour,
+                // so the fill reads as a path walked rather than a bar resetting.
+                const walked = slot.step < state.sequenceStep
+                return (
+                  <rect
+                    key={plank.key}
+                    className={[
+                      'sj-walkway',
+                      slot.note.isRest ? 'sj-walkway--rest' : '',
+                      walked ? 'sj-walkway--walked' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    x={plank.x}
+                    y={groundWorldY}
+                    width={plank.width}
+                    height={PLANK_HEIGHT_PX}
+                    rx={PLANK_HEIGHT_PX / 2}
+                    opacity={slot.opacity}
+                  />
+                )
+              })}
+
+              {/* Ground already covered on this note — the width is set per frame. */}
+              {currentPlank && (
+                <rect
+                  key={`trail-${state.sequenceStep}`}
+                  ref={trailRef}
+                  className="sj-walkway__trail"
+                  x={currentPlank.x}
+                  y={groundWorldY}
+                  width={0}
+                  height={PLANK_HEIGHT_PX}
+                  rx={PLANK_HEIGHT_PX / 2}
+                />
+              )}
 
               {rhythmLayout.stems.map((stem) => (
                 <rect
@@ -523,8 +791,11 @@ export default function StaffJumperGame({
             {/* Noteheads */}
             <div className="sj-noteheads">
               {displayedPlatforms.map((slot) => {
-                const shake = missActive && !state.isFalling && slot.role === 'target'
-                const crack = state.isFalling && slot.role === 'target'
+                const isPlayLit = cue.litStep === slot.step
+                const isHolding = slot.step === state.sequenceStep && cue.walking && !isPlayLit
+                const inkOpacity = isPlayLit || isHolding ? 1 : slot.opacity
+                const shake = missActive && !state.isFalling && slot.step === state.sequenceStep
+                const crack = state.isFalling && slot.step === state.sequenceStep
 
                 return (
                   /**
@@ -537,8 +808,9 @@ export default function StaffJumperGame({
                       'sj-note',
                       `sj-note--${slot.note.kind}`,
                       slot.note.isRest ? 'sj-note--rest' : '',
-                      slot.role === 'target' ? 'sj-note--target' : '',
-                      slot.role === 'future' ? 'sj-note--future' : '',
+                      isPlayLit ? 'sj-note--target' : '',
+                      isHolding ? 'sj-note--holding' : '',
+                      slot.role === 'future' && !isPlayLit ? 'sj-note--future' : '',
                       slot.role === 'landed' ? 'sj-note--landed' : '',
                       shake ? 'sj-note--shake' : '',
                       crack ? 'sj-note--crack' : '',
@@ -549,7 +821,7 @@ export default function StaffJumperGame({
                   >
                     {/* A rest replaces the whole note: no head, ledgers or label. */}
                     {slot.note.isRest && (
-                      <StaffRest value={slot.note.rhythm.value} opacity={slot.opacity} />
+                      <StaffRest value={slot.note.rhythm.value} opacity={inkOpacity} />
                     )}
 
                     {/* Draw every ledger rule required between the staff and this note. */}
@@ -577,7 +849,7 @@ export default function StaffJumperGame({
                         style={{
                           width: `${NOTEHEAD_W}px`,
                           height: `${NOTEHEAD_H}px`,
-                          opacity: slot.opacity,
+                          opacity: inkOpacity,
                           borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
                         }}
                         aria-hidden
@@ -593,7 +865,7 @@ export default function StaffJumperGame({
                           top: `${dotYForNote(slot.note.yPx, slot.note.kind) - slot.note.yPx}px`,
                           width: `${DOT_RADIUS * 2}px`,
                           height: `${DOT_RADIUS * 2}px`,
-                          opacity: slot.opacity,
+                          opacity: inkOpacity,
                         }}
                         aria-hidden
                       />
@@ -601,7 +873,7 @@ export default function StaffJumperGame({
 
                     {/* Note name label (easy mode) */}
                     {slot.note.showLabel && (
-                      <span className="sj-note__label" style={{ opacity: slot.opacity }}>
+                      <span className="sj-note__label" style={{ opacity: inkOpacity }}>
                         {slot.note.noteLabel}
                       </span>
                     )}
@@ -614,8 +886,8 @@ export default function StaffJumperGame({
           {/* The score opening shares the world's scroll transform and appears once. */}
           <div
             className="sj-staff-head"
+            ref={headRef}
             style={{
-              transform: `translateX(${scrollX}px) translateY(${baseY}px) scale(${scale})`,
               transformOrigin: '0 0',
               width: `${staffHead.width}px`,
               height: `${STAFF_CANVAS_HEIGHT}px`,
@@ -674,10 +946,11 @@ export default function StaffJumperGame({
           </div>
         </div>
 
-        {/* ── Player anchor follows pitch immediately; sprite animation restarts per note. ── */}
+        {/* ── Player anchor walks the lane; sprite animation restarts per hop. ── */}
         <div
+          ref={playerRef}
           className={`sj-player-anchor ${state.isFalling ? 'sj-player-anchor--fall' : ''}`}
-          style={{ left: `${playerScreenX}px`, top: `${playerScreenY}px` }}
+          style={{ top: `${groundScreenY}px`, '--sj-player-box': `${playerBoxPx}px` } as CSSProperties}
           aria-hidden
         >
           <img
@@ -763,16 +1036,16 @@ export default function StaffJumperGame({
           )}
 
           {!state.isFalling && (
-            <div className="sj-target-dock">
+            <div className="sj-target-dock" ref={dockRef}>
               <div className="sj-target-dock__meta">
                 <span>{target.patternName}</span>
                 <span>{DIFFICULTY_LABELS[config.difficulty]}</span>
               </div>
               <div className="sj-target-dock__notes">
                 <div className="sj-target-note">
-                  <small>Target</small>
-                  <strong>{targetDisplay}</strong>
-                  {writtenRhythm && (
+                  <small>{cue.leading ? 'Next' : holding ? 'Holding' : 'Target'}</small>
+                  <strong>{playDisplay}</strong>
+                  {writtenRhythm && !cue.leading && (
                     <span className="sj-target-note__rhythm">
                       {writtenRhythm.name} · {writtenRhythm.beats}
                     </span>

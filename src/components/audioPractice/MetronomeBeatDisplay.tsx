@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { useMetronome } from '../../hooks/useMetronome'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { subTicksPerPulse, type MetronomeAccentLevel } from '../../utils/metronomeConfig'
-import { triggerLightHaptic } from '../../utils/haptics'
+import MetronomeBeatMarkers from './MetronomeBeatMarkers'
 import {
   useMetronomeVisualStyle,
   type MetronomeVisualStyle,
@@ -116,7 +116,7 @@ export default function MetronomeBeatDisplay({ interactive = true }: MetronomeBe
             />
           </div>
 
-          <BeatMarkers
+          <MetronomeBeatMarkers
             interactive={interactive}
             playing={playing}
             beatIndex={beatIndex}
@@ -442,92 +442,6 @@ function PulseRibbon({
           <circle ref={travelCoreRef} className="metronome-ribbon__travel-core" cx="0" cy="0" r="5.2" />
         </g>
       </svg>
-    </div>
-  )
-}
-
-function BeatMarkers({
-  interactive,
-  playing,
-  beatIndex,
-  subTickIndex,
-  beatPulseId,
-  beatsPerBar,
-  accentLevels,
-  subNotchCount,
-  toggleBeatAccent,
-}: {
-  interactive: boolean
-  playing: boolean
-  beatIndex: number
-  subTickIndex: number
-  beatPulseId: number
-  beatsPerBar: number
-  accentLevels: readonly MetronomeAccentLevel[]
-  subNotchCount: number
-  toggleBeatAccent: (index: number) => void
-}) {
-  return (
-    <div
-      className={`metronome-beat-markers ${beatsPerBar > 8 ? 'metronome-beat-markers--compact' : ''} ${playing ? 'metronome-beat-markers--playing' : ''}`}
-      role="group"
-      aria-label="Beat accents"
-    >
-      {Array.from({ length: beatsPerBar }, (_, index) => {
-        const level = accentLevels[index] ?? 'weak'
-        const active = playing && beatIndex === index
-        const mainTick = active && subTickIndex === 0
-        const subTick = active && subTickIndex > 0
-        const accented = level === 'strong' || level === 'medium'
-        const classes = [
-          'metronome-beat-marker',
-          index === 0 ? 'metronome-beat-marker--downbeat' : '',
-          accented ? 'metronome-beat-marker--accented' : '',
-          level === 'silent' ? 'metronome-beat-marker--silent' : '',
-          mainTick ? 'metronome-beat-marker--active' : '',
-          subTick ? 'metronome-beat-marker--sub-active' : '',
-        ]
-          .filter(Boolean)
-          .join(' ')
-        const content = (
-          <>
-            <span className="metronome-beat-marker__halo" aria-hidden />
-            <span className="metronome-beat-marker__number" aria-hidden>{index + 1}</span>
-          </>
-        )
-
-        return (
-          <div key={`${index}-${mainTick ? beatPulseId : 'idle'}`} className="metronome-beat-marker__cell">
-            {interactive ? (
-              <button
-                type="button"
-                className={`${classes} pointer-events-auto`}
-                aria-label={`Beat ${index + 1}, ${level}. Tap to change accent.`}
-                aria-pressed={accented}
-                onPointerUp={(event) => {
-                  if (event.button !== 0) return
-                  triggerLightHaptic()
-                  toggleBeatAccent(index)
-                }}
-              >
-                {content}
-              </button>
-            ) : (
-              <div className={classes}>{content}</div>
-            )}
-            {subNotchCount > 0 ? (
-              <div className="metronome-beat-marker__sub-notches" aria-hidden>
-                {Array.from({ length: subNotchCount }, (_, notchIndex) => (
-                  <span
-                    key={notchIndex}
-                    className={`metronome-beat-marker__sub-notch ${active && subTickIndex === notchIndex + 1 ? 'metronome-beat-marker__sub-notch--active' : ''}`}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )
-      })}
     </div>
   )
 }

@@ -801,14 +801,14 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  /* Above the character, below the HUD. */
+  z-index: 2;
 }
 
 .sj-staff-world {
   position: absolute;
   top: 0;
   left: 0;
-  /* Smooth horizontal scroll — CSS transition only on translateX */
-  transition: transform 90ms linear;
   will-change: transform;
 }
 
@@ -827,7 +827,6 @@
   top: 0;
   left: 0;
   color: #1c1917;
-  transition: transform 90ms linear;
   will-change: transform;
   pointer-events: none;
 }
@@ -963,6 +962,31 @@
   opacity: 0.55;
 }
 
+/* ── Walkway ─────────────────────────────────
+   Scenery in its own lane below the staff, never notation. Kept quiet enough
+   that the eye stays on the noteheads, and amber where the run is now, which
+   is what amber means everywhere else in the app.
+───────────────────────────────────────────── */
+.sj-walkway {
+  fill: #64748b;
+  opacity: 0.3;
+}
+
+/* Silence is still ground to cross, just fainter. */
+.sj-walkway--rest {
+  opacity: 0.12;
+}
+
+.sj-walkway--walked {
+  fill: #d97706;
+  opacity: 0.34;
+}
+
+.sj-walkway__trail {
+  fill: #d97706;
+  opacity: 0.5;
+}
+
 /* ── Count-in + timing feedback ─────────────*/
 .sj-count-in {
   position: absolute;
@@ -1087,6 +1111,15 @@
   border-color: #1c1917;
 }
 
+.sj-note--holding .sj-note__head {
+  background: #1c1917;
+}
+
+.sj-note--holding .sj-note__head--hollow {
+  background: transparent;
+  border-color: #1c1917;
+}
+
 /* Target: golden glow */
 .sj-note--target .sj-note__head {
   box-shadow:
@@ -1127,21 +1160,31 @@
 ───────────────────────────────────────────── */
 .sj-player-anchor {
   position: absolute;
-  z-index: 6;
+  /*
+    Under the staff layer, not over it. The character walks its own lane, so
+    they rarely meet — but on the deepest ledger notes the notation has to be
+    the thing that survives the overlap.
+  */
+  z-index: 1;
   width: 0;
   height: 0;
   transform: translateX(-50%);
-  transition: left 85ms linear, top 85ms linear;
   pointer-events: none;
 }
 
 .sj-player {
   position: absolute;
-  top: 0;
+  /* Feet on the anchor: the anchor point is the walkway, not the sprite's top. */
+  bottom: 0;
   left: 0;
-  width: 2.8rem;
+  /*
+    Sized from the staff, not from the root font: the character has to keep the
+    same clearance under the lowest note at every zoom, and the box that
+    guarantees it is measured in JS (see PLAYER_HEIGHT_SPACES).
+  */
+  height: var(--sj-player-box, 3rem);
+  width: calc(var(--sj-player-box, 3rem) * 0.85);
   max-width: none;
-  height: 3.3rem;
   object-fit: contain;
   object-position: bottom center;
   transform: translateX(-50%) scale(var(--sj-player-scale, 1));

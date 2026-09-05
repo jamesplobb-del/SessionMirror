@@ -1544,61 +1544,6 @@ button.pitch-living-readout__note--catch:focus-visible {
   font-size: 14px;
 }
 
-.pitch-widget-besttake {
-  display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 7px;
-  padding: 11px 12px 8px;
-}
-
-.pitch-widget-besttake > header {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.pitch-widget-besttake > header > div {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.pitch-widget-besttake > header strong {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.pitch-widget-besttake > header span,
-.pitch-widget-besttake .pitch-status-label {
-  color: rgba(255, 255, 255, 0.48);
-  font-size: 9px;
-}
-
-.pitch-widget-besttake__deviation {
-  align-items: flex-end;
-}
-
-.pitch-widget-besttake__deviation strong {
-  font-size: 17px !important;
-}
-
-.pitch-widget-besttake__chart {
-  position: relative;
-  min-height: 50px;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.pitch-widget-besttake__chart .pitch-chart-shell,
-.pitch-widget-besttake__chart canvas {
-  min-height: 50px !important;
-}
-
 /* Camera Mode mirrors the dedicated tuner's living readout in a compact,
  * draggable frame. The pitch trace remains the backdrop while the status,
  * note, cents, and frequency use the same hierarchy as the full tuner. */

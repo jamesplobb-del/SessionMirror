@@ -71,7 +71,7 @@ function parseDesk(value: unknown): WorkspaceDesk | null {
     },
     drone: {
       pitchClass:
-        Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null,
+        drone.pitchClass !== null && drone.pitchClass !== undefined && Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null,
       octave: Number.isFinite(Number(drone.octave)) ? Number(drone.octave) : 4,
     },
     soundSilenceSeconds: Number.isFinite(Number(raw.soundSilenceSeconds))
@@ -111,6 +111,22 @@ export function createDesk(name: string, snapshot: DeskSnapshot): WorkspaceDesk 
     name: name.trim().slice(0, 24) || 'Desk',
     savedAt: Date.now(),
   }
+}
+
+/** Reusing a name updates that desk and keeps its identity. */
+export function upsertWorkspaceDesk(
+  current: WorkspaceDesk[],
+  name: string,
+  snapshot: DeskSnapshot,
+): WorkspaceDesk[] {
+  const desk = createDesk(name, snapshot)
+  const existing = current.find(item => item.name.toLocaleLowerCase() === desk.name.toLocaleLowerCase())
+  if (existing) desk.id = existing.id
+  const kept = current
+    .filter(item => item.id !== desk.id)
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, MAX_WORKSPACE_DESKS - 1)
+  return [...kept, desk].sort((a, b) => a.savedAt - b.savedAt)
 }
 
 /** True when the live desk still matches what was saved — the chip stays lit. */

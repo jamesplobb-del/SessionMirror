@@ -234,12 +234,7 @@ export default function LabsMenu({
                 onClick={() => selectCharacter(option.id)}
               >
                 <span className="balance-plaza__character-art" aria-hidden>
-                  <img
-                    src={option.asset}
-                    alt=""
-                    draggable={false}
-                    style={{ transform: `scale(${option.scale})` }}
-                  />
+                  <img src={option.asset} alt="" draggable={false} />
                   {selected ? <Check /> : null}
                 </span>
                 <strong>{option.name}</strong>
@@ -334,10 +329,10 @@ export default function LabsMenu({
                 onClick={() => walkInto(door.id)}
               >
                 <span className={`balance-door__world balance-door__world--${door.world}`} aria-hidden>
+                  {current ? <em className="balance-door__continue">Continue</em> : null}
                   <img className="balance-door__preview" src={door.image} alt="" decoding="async" />
                 </span>
-                <span className="balance-door__plaque">
-                  {current ? <em>Continue</em> : null}
+                <span className="balance-door__name">
                   <strong>{door.title}</strong>
                   <small>{door.line}</small>
                 </span>
@@ -367,16 +362,36 @@ export default function LabsMenu({
             >
               <span className="balance-hall__player-face" aria-hidden>
                 <span key={hopKey} className={`balance-hall__player-art${walking ? ' is-hopping' : ''}`}>
-                  <img
-                    src={character.asset}
-                    alt=""
-                    draggable={false}
-                    style={{ transform: `scale(${character.scale})` }}
-                  />
+                  <img src={character.asset} alt="" draggable={false} />
                 </span>
               </span>
             </Pressable>
           </div>
+        </div>
+
+        <div className="balance-hall__roster" role="radiogroup" aria-label="Game character">
+          {PRACTICE_GAME_CHARACTERS.map((option) => {
+            const selected = option.id === characterId
+            return (
+              <Pressable
+                key={option.id}
+                type="button"
+                intensity="soft"
+                hapticFeedback={hapticFeedback}
+                className={`balance-hall__roster-pick ${selected ? 'is-selected' : ''}`}
+                role="radio"
+                aria-checked={selected}
+                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
+                onClick={() => selectCharacter(option.id)}
+              >
+                <span aria-hidden>
+                  <img src={option.asset} alt="" draggable={false} />
+                  {selected ? <Check /> : null}
+                </span>
+                <strong>{option.name}</strong>
+              </Pressable>
+            )
+          })}
         </div>
       </div>
     </BalanceArcadeShell>

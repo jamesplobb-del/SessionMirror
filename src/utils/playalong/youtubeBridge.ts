@@ -125,10 +125,10 @@ function cancelScheduledLoudnessWork(): void {
 }
 
 /** Reset audio state when swapping or clearing a YouTube reference. */
-export function prepareNewYoutubeReference(): void {
+export function prepareNewYoutubeReference(options: { autoplay?: boolean } = {}): void {
   cancelScheduledLoudnessWork()
   releaseYoutubeReferenceRoute()
-  pendingYoutubeWake = true
+  pendingYoutubeWake = options.autoplay !== false
   activeYoutubeIframe = null
   lastPlayingMaintainAt = 0
 }

@@ -55,8 +55,6 @@ interface LivePitchTunerProps {
   hapticsEnabled?: boolean
   /** Widget-only: analyze live mic instead of media element. */
   pitchSource?: 'media' | 'microphone'
-  /** Widget-only: use the centered living-tuner presentation. */
-  widgetPresentation?: 'compact' | 'living'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
   /** Audio tuner only: reports whether live PCM is actually arriving. */
@@ -452,56 +450,53 @@ function LiveAudioTunerPane({
   )
 }
 
-function CompactPitchWidgetPane({
-  readout,
-  canvasRef,
-  isPlaying,
-}: {
-  readout: PitchReadout
-  canvasRef: RefObject<HTMLCanvasElement | null>
-  isPlaying: boolean
-}) {
-  const active = readout.noteName !== '—'
-  const cents = active ? readout.cents : 0
-  const accent = active ? getIntonationColor(cents) : 'rgba(255,255,255,0.55)'
-  const inTune = active && isInTune(cents)
-  const zone = active ? getIntonationZone(cents) : null
-
-  return (
-    <div className="pitch-widget-besttake">
-      <header>
-        <div>
-          <strong style={{ color: accent }}>{readout.noteName}</strong>
-          <span>{formatFrequencyHz(readout.frequencyHz)}</span>
-        </div>
-        <div className="pitch-widget-besttake__deviation">
-          <strong style={{ color: accent }}>{active ? formatDisplayCents(cents) : '—'}</strong>
-          <StatusLabel active={active} inTune={inTune} zone={zone} isPlaying={isPlaying} />
-        </div>
-      </header>
-      <CentsNeedle cents={cents} active={active} compact />
-      <div className="pitch-widget-besttake__chart">
-        <PitchChartCanvas canvasRef={canvasRef} glass fill />
-      </div>
-    </div>
-  )
-}
-
+/**
+ * The Tuner tab's stage, sized for the floating widget: the same living trace,
+ * the same gauge, and the same tint easing along the line color. Only the tool
+ * rail is left behind — the drone and transposition live in the tab.
+ */
 function LivingPitchWidgetPane({
   readout,
   canvasRef,
+  inTuneGlow = 0,
+  coachEnabled = false,
+  tunerTransposition,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
+  inTuneGlow?: number
+  coachEnabled?: boolean
+  tunerTransposition: TunerTranspositionId
 }) {
+  const stageRef = useRef<HTMLDivElement>(null)
   const active = readout.noteName !== '—'
   const zone = active ? getIntonationZone(readout.cents) : 'idle'
+  const concertMidi = active
+    ? Math.round(readout.midi) - getTunerTransposition(tunerTransposition).writtenOffsetSemitones
+    : null
+  const coach = useLivePitchCoach({
+    enabled: coachEnabled,
+    concertMidi,
+    writtenNoteName: readout.noteName,
+    transpositionId: tunerTransposition,
+    suppressed: false,
+  })
+
+  useTunerWash(stageRef, active ? readout.cents : null, inTuneGlow, true)
 
   return (
-    <div className={`pitch-widget-living pitch-audio-stage--${zone}`}>
+    <div
+      ref={stageRef}
+      className={`pitch-widget-living pitch-audio-stage--${zone}`}
+    >
       <div className="pitch-living-canvas pitch-widget-living__canvas">
         <PitchChartCanvas canvasRef={canvasRef} glass fill living />
-        <TuningGauge readout={readout} />
+        <TuningGauge readout={readout} coach={coach} />
+
+        <div className="pitch-living-canvas__direction" aria-hidden>
+          <span>Sharp</span>
+          <span>Flat</span>
+        </div>
       </div>
     </div>
   )
@@ -752,7 +747,6 @@ export default function LivePitchTuner({
   onTunerInstrumentChange,
   hapticsEnabled,
   pitchSource = 'media',
-  widgetPresentation = 'compact',
   liveMicOnly = false,
   drone,
   onLiveSourceHealthChange,
@@ -823,15 +817,13 @@ export default function LivePitchTuner({
     return (
       <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col">
         <div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden">
-          {widgetPresentation === 'living' ? (
-            <LivingPitchWidgetPane readout={displayReadout} canvasRef={canvasRef} />
-          ) : (
-            <CompactPitchWidgetPane
-              readout={displayReadout}
-              canvasRef={canvasRef}
-              isPlaying={trackerPlaying}
-            />
-          )}
+          <LivingPitchWidgetPane
+            readout={displayReadout}
+            canvasRef={canvasRef}
+            inTuneGlow={tracker.inTuneGlow}
+            coachEnabled={liveMicWidget}
+            tunerTransposition={tunerTransposition}
+          />
           {!widgetContinuousScroll && !isPlaying && !liveMicWidget && (
             <p className="pitch-widget-hint pointer-events-none shrink-0 px-3 pb-2 text-center">
               Pitch trace during playback

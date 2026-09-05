@@ -18,6 +18,7 @@ import {
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
 import { durationMs, judgeTiming, lingerMs, METERS, secondsPerPulse } from './staffJumperRhythm'
+import { clamp01 } from './staffJumperTravel'
 import {
   attackWindowClosed,
   classifyHold,
@@ -54,6 +55,29 @@ const DIFFICULTY_TIMING = {
  * a row; every other case clears the release gate as soon as the pitch moves.
  */
 const REPEATED_NOTE_HOLD_MS = 170
+
+/**
+ * The player has moved on: the next written pitch is sounding, steadily, and
+ * it is not the note they were just holding.
+ *
+ * Free play is paced by the player, so waiting out a dwell they have already
+ * left is the run getting in their way. A repeated pitch is excluded because
+ * there is no way to tell a fresh attack from the note still ringing.
+ */
+function nextNoteIsBeingPlayed(
+  readout: PitchReadout,
+  nextPitchClass: number,
+  currentPitchClass: number,
+  config: StaffJumperConfig,
+  now: number,
+  correctMs: number,
+  onset: { pitchClass: number | null; startedAt: number },
+): boolean {
+  if (pitchClassesMatch(nextPitchClass, currentPitchClass)) return false
+  if (!isReadoutCorrectPitch(readout, nextPitchClass, config)) return false
+  if (onset.pitchClass == null || !pitchClassesMatch(onset.pitchClass, nextPitchClass)) return false
+  return now - onset.startedAt >= correctMs
+}
 
 /**
  * One bar of clicks before the first note.
@@ -420,6 +444,11 @@ export function useStaffJumperGame(
   /** Pulse within the bar the click is on, for the HUD's beat strip. Null with no clock. */
   const [beatInBar, setBeatInBar] = useState<number | null>(null)
   /**
+   * 0 on the current notehead, 1 at the next. The renderer walks the character
+   * along this; the loop is the clock, so the view only reads it.
+   */
+  const travelProgressRef = useRef(0)
+  /**
    * Wall-clock backstop for the count-in.
    *
    * The click handle only exists once the audio context has resumed, and on a
@@ -448,6 +477,7 @@ export function useStaffJumperGame(
     if (drone) void drone.stop()
     beatInBarRef.current = null
     setBeatInBar(null)
+    travelProgressRef.current = 0
   }, [])
 
   const startAudio = useCallback((config: StaffJumperConfig) => {
@@ -653,7 +683,7 @@ export function useStaffJumperGame(
      *
      * Each slot has an onset and an end on the click's grid. The step advances
      * when the grid reaches the slot's end, whatever the player did, so the
-     * character stands on a whole note for four beats and a rest for its full
+     * character walks a whole note for four beats and a rest for its full
      * length. The note itself must be attacked inside a window around its
      * onset (see staffJumperRhythmReading for how wide, and why), and after
      * the attack the pitch is followed only to report how long it was held.
@@ -714,6 +744,30 @@ export function useStaffJumperGame(
      * the next beat. Rhythm mode never reads this; it hops on the grid.
      */
     let lingerUntilMs: number | null = null
+    let lingerDurationMs = 0
+    travelProgressRef.current = 0
+
+    /**
+     * The walk, published for the renderer.
+     *
+     * `handOver` has to zero it in the same breath as the advance dispatch,
+     * not on the next pass of this effect: the view re-renders on the new step
+     * before this loop is rebuilt, and a stale 1.0 read against the new step's
+     * endpoints puts the character a whole note ahead for a frame. The loop
+     * also keeps ticking until the teardown lands, so writes after the hand
+     * over are ignored rather than resurrecting the note just finished.
+     */
+    let handedOver = false
+
+    const setTravelProgress = (value: number) => {
+      if (handedOver) return
+      travelProgressRef.current = clamp01(value)
+    }
+
+    const handOver = () => {
+      handedOver = true
+      travelProgressRef.current = 0
+    }
 
     const initialRemainingMs = Math.max(0, Math.min(noteTimeoutMs, noteRemainingMsRef.current))
     let targetDeadlineAt = performance.now() + initialRemainingMs
@@ -757,6 +811,7 @@ export function useStaffJumperGame(
         if (rhythmMode) publishBeat(gridNowMs(now))
         if (Math.min(audioRemainingMs, wallRemainingMs) > 0) {
           resetTargetDeadline(now)
+          setTravelProgress(0)
           rafId = requestAnimationFrame(tick)
           return
         }
@@ -777,6 +832,7 @@ export function useStaffJumperGame(
         publishBeat(gridMs)
         const slotOnsetMs = (stepRhythm.unitPosition - gridOriginRef.current.units) * perUnitMs
         const slotEndMs = slotOnsetMs + writtenMs
+        const gridProgress = writtenMs > 0 ? (gridMs - slotOnsetMs) / writtenMs : 1
         const timing = DIFFICULTY_TIMING[current.config.difficulty]
         const readoutNow = readoutRef.current
         const target = current.targetPitchClass
@@ -784,8 +840,10 @@ export function useStaffJumperGame(
         if (stepRhythm.isRest) {
           // Silence is read, not played: whatever sounds during a rest is
           // neither right nor wrong, and the run waits out the written length.
+          setTravelProgress(gridProgress)
           if (!advanced && gridMs >= slotEndMs) {
             advanced = true
+            handOver()
             releasingPitchClassRef.current = null
             wrongPitchClassRef.current = null
             dispatch({ type: 'REST_COMPLETE' })
@@ -894,9 +952,17 @@ export function useStaffJumperGame(
           }
         }
 
+        // The click is the conductor, so the character walks with it whether or
+        // not the note was played: where it stands is where the beat is. An
+        // attack ahead of the beat is already credited from the window's edge
+        // (see the attack branch above), so playing early moves the reader on
+        // — it never moves the grid.
+        setTravelProgress(gridProgress)
+
         // The click has reached the next written onset: hop, played or not.
         if (!advanced && gridMs >= slotEndMs) {
           advanced = true
+          handOver()
           let holdQuality: HoldQuality | null = null
           if (attackAccepted && holdIsReported(stepRhythm, stepMeter)) {
             const soundedMs = (releasedAtWallMs ?? now) - attackWallMs
@@ -914,9 +980,30 @@ export function useStaffJumperGame(
       // clock is held full so the dwell cannot expire into a miss.
       if (current.isSustaining) {
         resetTargetDeadline(now)
+        const lingerProgress =
+          lingerUntilMs == null || lingerDurationMs <= 0
+            ? 1
+            : 1 - (lingerUntilMs - now) / lingerDurationMs
+        setTravelProgress(lingerProgress)
+        const nextNote = getTargetNoteAtStep(current.config, current.sequenceStep + 1)
+        // No window on this: the dwell exists to let a note breathe, and the
+        // player starting the next one is the only signal that it has.
+        const canTakeNext =
+          lingerUntilMs != null &&
+          !nextNote.isRest &&
+          nextNoteIsBeingPlayed(
+            readoutRef.current,
+            nextNote.pitchClass,
+            current.targetPitchClass,
+            current.config,
+            now,
+            DIFFICULTY_TIMING[current.config.difficulty].correctMs,
+            pitchOnsetRef.current,
+          )
         // A null deadline means the loop was torn down and rebuilt mid-dwell;
         // there is nothing left to wait for, so hop rather than strand the run.
-        if (lingerUntilMs == null || now >= lingerUntilMs) {
+        if (lingerUntilMs == null || now >= lingerUntilMs || canTakeNext) {
+          handOver()
           lingerUntilMs = null
           correctStableMs = 0
           wrongStableMs = 0
@@ -933,8 +1020,11 @@ export function useStaffJumperGame(
         // never expire into a missed note.
         resetTargetDeadline(now)
         if (restEndsAt == null) restEndsAt = now + restMs
+        const restProgress = restMs <= 0 ? 1 : 1 - (restEndsAt - now) / restMs
+        setTravelProgress(restProgress)
         if (!restResolved && now >= restEndsAt) {
           restResolved = true
+          handOver()
           actionLockUntilRef.current =
             now + DIFFICULTY_TIMING[current.config.difficulty].cooldownMs
           // Silence guarantees the next note is a fresh attack, so nothing is
@@ -1007,6 +1097,7 @@ export function useStaffJumperGame(
         // longer than an eighth without stalling the run for four beats.
         lingerUntilMs =
           now + lingerMs(stepRhythm.durationUnits, stepMeter, current.config!.tempoBpm)
+        lingerDurationMs = lingerUntilMs - now
 
         dispatch({
           type: 'NOTE_ACCEPTED',
@@ -1085,6 +1176,8 @@ export function useStaffJumperGame(
     ? DIFFICULTY_TIMEOUT_SECONDS[state.config.difficulty] * 1000
     : DIFFICULTY_TIMEOUT_SECONDS.medium * 1000
 
+  const getTravelProgress = useCallback(() => travelProgressRef.current, [])
+
   return {
     state,
     start,
@@ -1097,5 +1190,6 @@ export function useStaffJumperGame(
     noteTimeoutMs: configuredTimeoutMs,
     /** Rhythm mode: the pulse of the bar the click is on, 0-based; null without a running run. */
     beatInBar,
+    getTravelProgress,
   }
 }

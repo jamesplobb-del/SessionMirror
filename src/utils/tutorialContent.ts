@@ -1,4 +1,4 @@
-export type OnboardingCardId = 'welcome' | 'instrument' | 'closing'
+export type OnboardingCardId = 'welcome' | 'instrument' | 'routine' | 'closing'
 
 export type CoachMarkId =
   | 'record-camera-take'
@@ -130,6 +130,12 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
     title: 'What do you play?',
     body: 'So the tuner shows your written notes, not concert pitch.',
     cta: 'Continue',
+  },
+  {
+    id: 'routine',
+    title: 'Lay out your daily routine',
+    body: 'A short checklist. Each step opens the right tool, set the way you want it.',
+    cta: 'Skip for now',
   },
   {
     id: 'closing',

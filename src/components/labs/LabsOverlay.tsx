@@ -147,19 +147,27 @@ export default function LabsOverlay({
   }, [isOpen, route])
 
   const [enteringWorld, setEnteringWorld] = useState(false)
+  const wasOpenRef = useRef(false)
+
+  // Apply the enter class in the same render that opens the overlay. Waiting
+  // until an effect runs paints one settled frame, then replays the same motion.
+  if (isOpen !== wasOpenRef.current) {
+    wasOpenRef.current = isOpen
+    if (isOpen) {
+      const reduceMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (!reduceMotion) setEnteringWorld(true)
+    } else if (enteringWorld) {
+      setEnteringWorld(false)
+    }
+  }
 
   useEffect(() => {
-    if (!isOpen) {
-      setEnteringWorld(false)
-      return
-    }
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return
-    }
-    setEnteringWorld(true)
+    if (!enteringWorld) return
     const timer = window.setTimeout(() => setEnteringWorld(false), 880)
     return () => window.clearTimeout(timer)
-  }, [isOpen])
+  }, [enteringWorld])
 
   if (typeof document === 'undefined' || !isOpen) return null
 

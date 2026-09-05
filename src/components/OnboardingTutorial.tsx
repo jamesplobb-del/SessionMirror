@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, ChevronDown } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, ListChecks, Sparkles } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
+import type { RoutineBuilderMode } from './RoutineBuilder'
 import {
   INSTRUMENT_FAMILIES,
   getInstrumentProfile,
@@ -20,6 +21,8 @@ interface OnboardingTutorialProps {
   onSkip: () => void
   /** Applies the tuner and hands-free settings implied by the chosen instrument. */
   onSelectInstrument: (instrumentId: string) => void
+  /** Ends the cards and opens the routine builder in the hub. */
+  onChooseRoutine: (mode: RoutineBuilderMode) => void
   hapticFeedback?: boolean
 }
 
@@ -27,6 +30,7 @@ export default function OnboardingTutorial({
   onComplete,
   onSkip,
   onSelectInstrument,
+  onChooseRoutine,
   hapticFeedback = true,
 }: OnboardingTutorialProps) {
   const [index, setIndex] = useState(0)
@@ -34,6 +38,8 @@ export default function OnboardingTutorial({
   const card = ONBOARDING_CARDS[index] ?? ONBOARDING_CARDS[0]
   const isLast = index >= ONBOARDING_CARDS.length - 1
   const isInstrumentStep = card.id === 'instrument'
+  const isRoutineStep = card.id === 'routine'
+  const isChoiceStep = isInstrumentStep || isRoutineStep
 
   useEffect(() => {
     document.body.classList.add('tutorial-active')
@@ -63,18 +69,27 @@ export default function OnboardingTutorial({
 
   /** The card body advances on tap, but only where there is nothing to choose. */
   const handleCardTap = useCallback(() => {
-    if (isInstrumentStep) return
+    if (isChoiceStep) return
     handleNext()
-  }, [handleNext, isInstrumentStep])
+  }, [handleNext, isChoiceStep])
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isInstrumentStep) return
+      if (isChoiceStep) return
       if (event.key !== 'Enter' && event.key !== ' ') return
       event.preventDefault()
       handleNext()
     },
-    [handleNext, isInstrumentStep],
+    [handleNext, isChoiceStep],
+  )
+
+  const handleChooseRoutine = useCallback(
+    (mode: RoutineBuilderMode) => {
+      void triggerLightHaptic(hapticFeedback)
+      markOnboardingComplete()
+      onChooseRoutine(mode)
+    },
+    [hapticFeedback, onChooseRoutine],
   )
 
   const handleSelectInstrument = useCallback(
@@ -188,6 +203,49 @@ export default function OnboardingTutorial({
               </p>
             ) : null}
 
+            {isRoutineStep ? (
+              <div className="onboarding-lite__routine-choices">
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  haptic="light"
+                  hapticFeedback={hapticFeedback}
+                  className="onboarding-lite__routine-choice is-primary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleChooseRoutine('build')
+                  }}
+                >
+                  <ListChecks aria-hidden />
+                  <span>
+                    <strong>Build my routine</strong>
+                    <small>Add the things you actually do, in order.</small>
+                  </span>
+                  <ArrowRight aria-hidden />
+                </Pressable>
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  haptic="light"
+                  hapticFeedback={hapticFeedback}
+                  className="onboarding-lite__routine-choice"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleChooseRoutine('presets')
+                  }}
+                >
+                  <Sparkles aria-hidden />
+                  <span>
+                    <strong>Start from a preset</strong>
+                    <small>
+                      {selectedProfile ? `A common ${selectedProfile.label.toLowerCase()} routine to edit.` : 'A common routine you can edit.'}
+                    </small>
+                  </span>
+                  <ArrowRight aria-hidden />
+                </Pressable>
+              </div>
+            ) : null}
+
             {card.highlights?.length ? (
               <div className="onboarding-lite__highlights" aria-label="Highlights">
                 {card.highlights.map((highlight) => (
@@ -215,7 +273,7 @@ export default function OnboardingTutorial({
           >
             Skip tour
           </Pressable>
-          {isInstrumentStep ? (
+          {isChoiceStep ? (
             <Pressable
               type="button"
               intensity="soft"
@@ -225,7 +283,7 @@ export default function OnboardingTutorial({
                 event.stopPropagation()
                 handleNext()
               }}
-              className="onboarding-lite__tap-hint"
+              className={`onboarding-lite__tap-hint ${isRoutineStep ? 'onboarding-lite__tap-hint--quiet' : ''}`}
             >
               {card.cta}
               <ArrowRight className="h-4 w-4" />

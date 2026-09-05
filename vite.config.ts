@@ -20,12 +20,13 @@ export default defineConfig(({ command, mode }) => {
   const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN ?? fileEnv.SENTRY_AUTH_TOKEN
   const sentryOrg = process.env.SENTRY_ORG ?? fileEnv.SENTRY_ORG
   const sentryProject = process.env.SENTRY_PROJECT ?? fileEnv.SENTRY_PROJECT ?? 'besttake'
+  const useHttps = fileEnv.VITE_HTTPS === 'true'
 
   return {
     plugins: [
       react(),
       tailwindcss(),
-      basicSsl(),
+      ...(useHttps ? [basicSsl()] : []),
       ...(command === 'build' && sentryAuthToken
         ? [
             sentryVitePlugin({

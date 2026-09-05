@@ -106,7 +106,7 @@ export default function FocusedPracticeCue({
               <header>
                 <div>
                   <span>Focused Practice</span>
-                  <h2 id="focused-cue-title">What should change next?</h2>
+                  <h2 id="focused-cue-title">One small adjustment.</h2>
                 </div>
                 <button type="button" onClick={close} aria-label="Close">
                   <X aria-hidden />
@@ -160,7 +160,7 @@ export default function FocusedPracticeCue({
                   onClick={close}
                 >
                   {value ? <Check aria-hidden /> : <PencilLine aria-hidden />}
-                  {value ? 'Done' : 'Skip'}
+                  {value ? 'Save adjustment' : 'Skip for now'}
                 </Pressable>
               </div>
             </motion.section>

@@ -2,11 +2,13 @@ import { useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeYoutubeEmbedUrl } from '../utils/youtubeEmbed'
 import {
+  pauseYoutubeProxy,
   scheduleYoutubeReferenceWake,
   wakeYoutubeReference,
 } from '../utils/playalong/youtubeBridge'
 
 interface YoutubeBenchmarkPlayerProps {
+  autoPlayOnLoad?: boolean
   embedUrl: string
   hostEl: HTMLElement | null
   iframeRef: RefObject<HTMLIFrameElement | null>
@@ -15,6 +17,7 @@ interface YoutubeBenchmarkPlayerProps {
 /** Single persistent YouTube iframe — portaled into the active Best Take host so it survives split/pip toggles. */
 export default function YoutubeBenchmarkPlayer({
   embedUrl,
+  autoPlayOnLoad = true,
   hostEl,
   iframeRef,
 }: YoutubeBenchmarkPlayerProps) {
@@ -36,6 +39,10 @@ export default function YoutubeBenchmarkPlayer({
       title="YouTube reference"
       onLoad={() => {
         const el = iframeRef.current
+        if (!autoPlayOnLoad) {
+          pauseYoutubeProxy(el)
+          return
+        }
         wakeYoutubeReference(el)
         scheduleYoutubeReferenceWake(el)
       }}

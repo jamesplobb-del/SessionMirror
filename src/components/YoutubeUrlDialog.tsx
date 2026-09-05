@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { App } from '@capacitor/app'
@@ -13,6 +13,11 @@ import {
   applyViewportCssVarsOnResume,
   requestCameraPreviewLayoutRecovery,
 } from '../utils/viewportSync'
+
+import PracticeReferenceBrowser from './PracticeReferenceBrowser'
+import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
+import { savePracticeReference } from '../utils/practiceReferences'
+import { parseYoutubeVideoId } from '../utils/youtubeEmbed'
 
 interface YoutubeUrlDialogProps {
   open: boolean
@@ -29,17 +34,31 @@ function readDialogViewport(): { height: number; top: number } {
 }
 
 export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrlDialogProps) {
+  const { projectId } = useContext(PracticeReferenceContext)
+  const [referenceName, setReferenceName] = useState('')
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [clipboardReady, setClipboardReady] = useState(false)
   const [viewportHeight, setViewportHeight] = useState<number | null>(null)
   const [viewportTop, setViewportTop] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const recoveryTimerRef = useRef<number | null>(null)
   const openRef = useRef(open)
 
   useEffect(() => {
     openRef.current = open
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const previous = document.activeElement as HTMLElement | null
+    const frame = requestAnimationFrame(() => dialogRef.current?.focus())
+    return () => {
+      cancelAnimationFrame(frame)
+      setYoutubeDialogOpen(false)
+      previous?.focus({ preventScroll: true })
+    }
   }, [open])
 
   const releaseInputFocus = useCallback(() => {
@@ -103,6 +122,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     }
 
     setValue('')
+    setReferenceName('')
     setError(null)
     setClipboardReady(false)
     applyViewportCssVarsOnResume()
@@ -178,12 +198,18 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       setError('Paste a valid YouTube link or video ID.')
       return
     }
+    try {
+      savePracticeReference({ videoId: parseYoutubeVideoId(embedUrl)!, title: referenceName.trim() || `YouTube · ${parseYoutubeVideoId(embedUrl)}`, channel: '' }, projectId)
+    } catch {
+      setError('Could not save this reference. Please free up device storage and try again.')
+      return
+    }
     releaseInputFocus()
     setYoutubeDialogOpen(false)
     onSubmit(embedUrl)
     onClose()
     requestCameraPreviewLayoutRecovery('youtube-submit')
-  }, [onClose, onSubmit, releaseInputFocus, value])
+  }, [onClose, onSubmit, projectId, referenceName, releaseInputFocus, value])
 
   const handleClose = useCallback(() => {
     releaseInputFocus()
@@ -240,10 +266,22 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             transition={nativeGlideEase}
           />
           <motion.div
-            className="relative w-full max-w-sm rounded-2xl border border-[rgba(23,26,34,0.06)] bg-[#f7f8fa] p-4 shadow-[0_-18px_48px_rgba(23,26,34,0.1),0_-4px_14px_rgba(23,26,34,0.05)]"
+            className="relative w-full max-w-lg rounded-2xl border border-[rgba(23,26,34,0.06)] bg-[#f7f8fa] p-4 shadow-[0_-18px_48px_rgba(23,26,34,0.1),0_-4px_14px_rgba(23,26,34,0.05)]"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
+            ref={dialogRef}
+            tabIndex={-1}
             role="dialog"
+            aria-modal="true"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') { event.stopPropagation(); handleClose() }
+              if (event.key !== 'Tab') return
+              const targets = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input, summary') ?? []).filter(node => node.getClientRects().length > 0)
+              const first = targets[0], last = targets.at(-1)
+              if (!first || !last) return
+              if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus() }
+              if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+            }}
             aria-labelledby="youtube-url-title"
             initial={nativeGlideIn}
             animate={nativeGlideShown}
@@ -275,9 +313,17 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
               </button>
             </div>
 
+            <PracticeReferenceBrowser key={projectId ?? 'library'} onSelect={(url) => {
+              releaseInputFocus()
+              setYoutubeDialogOpen(false)
+              onSubmit(url)
+              onClose()
+              requestCameraPreviewLayoutRecovery('youtube-submit')
+            }} />
+            <details className="focus-link-entry" open={clipboardReady || undefined}>
+              <summary>Have a YouTube link?</summary>
             <p className="mb-2 text-[11px] leading-snug text-[#6c7077]">
-              Copy a link in YouTube, then return here — we&apos;ll pick it up automatically, or tap
-              Paste.
+              Paste a link to add it to your saved references.
             </p>
 
             <div className="flex gap-2">
@@ -291,6 +337,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
                 spellCheck={false}
                 enterKeyHint="done"
                 placeholder="YouTube URL or video ID"
+                aria-label="YouTube URL or video ID"
                 value={value}
                 onPointerDown={(event) => event.stopPropagation()}
                 onTouchStart={(event) => event.stopPropagation()}
@@ -317,6 +364,9 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
               </button>
             </div>
 
+            <input className="focus-reference-name" value={referenceName} maxLength={120}
+              onChange={event => setReferenceName(event.target.value)}
+              placeholder="Name this reference (optional)" aria-label="Reference name" />
             {clipboardReady && !error && (
               <p className="mt-2 text-xs text-emerald-600">Link ready — tap Load.</p>
             )}
@@ -342,9 +392,10 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
                 }}
                 className={`rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-500 ${NATIVE_SQUISH}`}
               >
-                Load
+                Save & load
               </button>
             </div>
+            </details>
           </motion.div>
         </motion.div>
       )}

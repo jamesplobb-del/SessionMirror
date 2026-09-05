@@ -10,7 +10,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private var audioRouteObserver: NSObjectProtocol?
     private var audioInterruptionObserver: NSObjectProtocol?
 
-    /// Keep the Swift plugin class linked so Capacitor packageClassList can resolve it.
+    /// Keep the Swift plugin class linked so Capacit asr packageClassList can resolve it.
     private let bestTakeAudioPluginClass = BestTakeAudioPlugin.self
     private let dronePluginClass = DronePlugin.self
     private let metronomePluginClass = MetronomePlugin.self

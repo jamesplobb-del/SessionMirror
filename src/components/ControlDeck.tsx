@@ -1,7 +1,9 @@
 import {
+  Bookmark,
   Camera,
   Check,
   ChevronDown,
+  History,
   House,
   Layers3,
   MessageSquareText,
@@ -9,8 +11,8 @@ import {
   RotateCcw,
   ScanSearch,
   Settings,
+  SlidersHorizontal,
   Trash2,
-  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -38,6 +40,11 @@ interface ControlDeckProps {
   expandViewActive?: boolean
   onToggleExpandView?: () => void
   onOpenMultitrack?: () => void
+  focusedPracticeName?: string
+  routineStepActive?: boolean
+  focusedAttemptCount?: number
+  onOpenFocusReferences?: () => void
+  onOpenFocusHistory?: () => void
   focusedPostTakeActive?: boolean
   focusedPostTakeReviewed?: boolean
   focusedPostTakeHasNote?: boolean
@@ -122,6 +129,11 @@ function ControlDeck({
   expandViewActive = false,
   onToggleExpandView,
   onOpenMultitrack,
+  focusedPracticeName,
+  routineStepActive = false,
+  focusedAttemptCount = 0,
+  onOpenFocusReferences,
+  onOpenFocusHistory,
   focusedPostTakeActive = false,
   focusedPostTakeReviewed = false,
   focusedPostTakeHasNote = false,
@@ -379,6 +391,76 @@ function ControlDeck({
         onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
+      {focusedPracticeName && !routineStepActive && !focusedPostTakeActive && !isRecording && !isStopping && (
+        <section className="focus-session-strip" aria-label="Current practice focus">
+          <header>
+            <span className="focus-strip-id">
+              <strong>{focusedPracticeName}</strong>
+            </span>
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              className="focus-strip-finish"
+              onClick={onFocusedPostTakeDismiss}
+            >
+              Finish
+            </Pressable>
+          </header>
+
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            className={`focus-strip-intention ${focusedRecordingGoal.trim() ? 'is-set' : ''}`}
+            onClick={onFocusedPostTakeNote}
+          >
+            <MessageSquareText aria-hidden />
+            <span>
+              {focusedRecordingGoal.trim() || 'One adjustment for the next take'}
+            </span>
+          </Pressable>
+
+          <div className="focus-strip-actions">
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              className="is-primary"
+              onClick={onOpenFocusHistory}
+            >
+              <History aria-hidden />
+              <span>Progress</span>
+              {focusedAttemptCount > 0 && (
+                <em className="focus-strip-count">{focusedAttemptCount}</em>
+              )}
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              onClick={onOpenFocusReferences}
+            >
+              <Bookmark aria-hidden />
+              <span>Reference</span>
+            </Pressable>
+            <Pressable
+              type="button"
+              intensity="soft"
+              haptic="light"
+              hapticFeedback={hapticFeedback}
+              onClick={() => (branchActive ? closeBranch() : openBranch())}
+            >
+              <SlidersHorizontal aria-hidden />
+              <span>Desk</span>
+            </Pressable>
+          </div>
+        </section>
+      )}
       {isRecording && focusedRecordingGoal.trim() && (
         <div className="focused-recording-goal" role="status">
           <MessageSquareText aria-hidden />
@@ -391,7 +473,7 @@ function ControlDeck({
         <section className="focused-post-take-dock" aria-label="Focused practice next steps">
           <header>
             <div>
-              <span>Focused Practice</span>
+              <span>{focusedPracticeName}</span>
               <strong>Take saved</strong>
             </div>
             <Pressable
@@ -400,25 +482,18 @@ function ControlDeck({
               haptic="light"
               hapticFeedback={hapticFeedback}
               onClick={onFocusedPostTakeDismiss}
-              aria-label="Done for now"
+              aria-label={routineStepActive ? 'Finish this item and continue' : 'Done for now'}
             >
-              <X aria-hidden />
+              {routineStepActive ? 'Done & next' : 'Finish'}
             </Pressable>
           </header>
-          <div className="focused-post-take-rating">
-            <StarRating
-              rating={focusedPostTakeRating}
-              onChange={(value) => onFocusedPostTakeRate?.(value)}
-              size="md"
-            />
-          </div>
           <div className="focused-post-take-actions">
             <Pressable
               type="button"
               intensity="soft"
               haptic="light"
               hapticFeedback={hapticFeedback}
-              className={focusedPostTakeReviewed ? 'is-complete' : 'is-recommended'}
+              className={focusedPostTakeReviewed ? 'is-complete' : ''}
               onClick={onFocusedPostTakeReview}
             >
               {focusedPostTakeReviewed ? <Check aria-hidden /> : <ScanSearch aria-hidden />}
@@ -433,7 +508,7 @@ function ControlDeck({
               onClick={onFocusedPostTakeNote}
             >
               {focusedPostTakeHasNote ? <Check aria-hidden /> : <MessageSquareText aria-hidden />}
-              <span>Note</span>
+              <span>{focusedPostTakeHasNote ? 'Edit adjustment' : 'One adjustment'}</span>
             </Pressable>
             <Pressable
               type="button"
@@ -447,6 +522,10 @@ function ControlDeck({
               <span>Try again</span>
             </Pressable>
           </div>
+          <details className="focus-optional-rating">
+            <summary>Rate this take · optional</summary>
+            <StarRating rating={focusedPostTakeRating} onChange={(value) => onFocusedPostTakeRate?.(value)} size="md" />
+          </details>
         </section>
       ) : isCameraPresentation ? (
         <div className="camera-control-deck__main-row">

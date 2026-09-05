@@ -6,7 +6,7 @@
  * on, the click is the conductor. Every written note has a place on its grid
  * — an onset, in beats from the first note, and a length — and the player is
  * asked to put the attack on that onset and stay on the note for its length.
- * The character does the same: it stands on a whole note for all four beats
+ * The character does the same: it walks a whole note for all four beats
  * and only hops when the next note is due.
  *
  * How rhythm is defined here follows what the research on timing says:

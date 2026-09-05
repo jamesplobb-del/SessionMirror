@@ -12,9 +12,9 @@ interface AnimatedTabPanelProps {
 /**
  * Mutually-exclusive tab panel.
  *
- * This intentionally swaps immediately. Keeping the outgoing camera, tuner,
- * game, or waveform tree mounted for a crossfade made two media-heavy screens
- * compete for a WebKit frame and produced a visible flash on iPhone.
+ * Incoming content plays a short settle (same idea as the Games world enter).
+ * The outgoing tree is not kept mounted — crossfading two media-heavy screens
+ * made them compete for a WebKit frame and flashed on iPhone.
  */
 export default function AnimatedTabPanel({
   panelKey,
@@ -28,7 +28,7 @@ export default function AnimatedTabPanel({
   return (
     <div
       key={panelKey}
-      className={className}
+      className={`audio-tab-arrive ${className ?? ''}`.trim()}
       data-tutorial={dataTutorial}
       style={{ position: 'absolute', inset: 0 }}
     >

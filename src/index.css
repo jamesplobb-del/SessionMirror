@@ -542,9 +542,14 @@ body.settings-branch-open * {
   pointer-events: none !important;
 }
 
+/* Same allowance the drone layer makes: the layer itself is inert, but the
+   widget's own controls — including the pickers, whose markup is the tab's —
+   have to take taps. */
 .metronome-display-layer .metronome-widget-draggable,
 .metronome-display-layer .pointer-events-auto,
 .metronome-display-layer .pitch-widget-close,
+.metronome-display-layer button,
+.metronome-display-layer .metronome-audio-select__menu,
 .metronome-display-layer .metronome-widget-audio--stage .pointer-events-auto {
   pointer-events: auto !important;
 }
@@ -604,7 +609,7 @@ body.settings-branch-open * {
 .metronome-widget {
   container-type: size;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 0.375rem;
   height: 100%;
   padding: 0.625rem 0.75rem 0.5rem;
@@ -616,18 +621,41 @@ body.settings-branch-open * {
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/*
+ * The click, felt through the panel. Keyed on the beat in JS so the fade
+ * restarts with the sound, and tinted with the tab's own pulse color — gold
+ * on the downbeat, blue on the rest — instead of a colorless white flash.
+ */
 .metronome-widget__accent {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.14), transparent 58%);
-  transition: opacity 0.08s ease-out;
+  background: radial-gradient(
+    circle at 50% 34%,
+    color-mix(in srgb, var(--metronome-pulse-color, #ffffff) 34%, transparent),
+    transparent 62%
+  );
 }
 
 .metronome-widget__accent--pulse {
-  opacity: 1;
+  animation: metronome-widget-accent-pulse 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes metronome-widget-accent-pulse {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metronome-widget__accent--pulse {
+    animation: none;
+  }
 }
 
 .metronome-widget__drag-handle {
@@ -716,8 +744,20 @@ body.settings-branch-open * {
   touch-action: none;
 }
 
+.metronome-widget__bpm-note {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.metronome-widget__bpm-equals {
+  align-self: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .metronome-widget__bpm-value {
-  font-size: clamp(1rem, 38cqh, 1.75rem);
+  font-size: clamp(1rem, 30cqh, 1.6rem);
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -744,44 +784,205 @@ body.settings-branch-open * {
   padding: 0.25rem 0.35rem;
 }
 
-.metronome-widget__meter-group {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.metronome-widget__meter-btn {
-  min-width: 0;
-  flex: 1 1 auto;
-  height: clamp(1.25rem, 18cqh, 1.55rem);
-  padding: 0 0.25rem;
-  font-size: clamp(0.5rem, 12cqh, 0.625rem);
+.metronome-widget__tap {
+  flex-shrink: 0;
+  height: 1.85rem;
+  padding: 0 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.metronome-widget__row--subdivisions {
-  flex-wrap: nowrap;
-  gap: 0.2rem;
+/*
+ * The bar, drawn with the Metronome tab's own beat markers. Same component,
+ * same accent language; only the scale changes so a four-bar row fits a panel
+ * that also has to hold a transport and two pickers.
+ */
+.metronome-widget__beats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
-.metronome-widget__subdivision-btn {
-  min-width: 0;
-  flex: 1 1 auto;
-  height: clamp(1.2rem, 16cqh, 1.45rem);
-  padding: 0 0.2rem;
-  font-size: clamp(0.48rem, 11cqh, 0.58rem);
-  font-weight: 700;
-  letter-spacing: 0.01em;
+.metronome-widget__beats .metronome-beat-markers {
+  width: 100%;
+  margin: 0;
 }
 
-.metronome-widget__meter-divider {
-  width: 1px;
-  align-self: stretch;
-  margin-inline: 0.1rem;
-  background: rgba(255, 255, 255, 0.12);
+.metronome-widget__beats .metronome-beat-marker {
+  width: clamp(1.4rem, 14cqw, 2rem);
+  height: clamp(1.35rem, 22cqh, 1.9rem);
+  /* The tab's markers are drawn for its light surface; on camera glass the
+     idle beats need a light ink. Accents keep the shared gold and blue. */
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.metronome-widget__beats .metronome-beat-marker--accented {
+  color: var(--audio-blue, #1598ff);
+}
+
+.metronome-widget__beats .metronome-beat-marker--downbeat {
+  color: var(--audio-gold, #f7a600);
+}
+
+.metronome-widget__beats .metronome-beat-marker--active {
+  color: #fff;
+}
+
+.metronome-widget__beats .metronome-beat-marker__sub-notch {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.metronome-widget__beats .metronome-beat-marker__sub-notch--active {
+  background: var(--audio-blue, #1598ff);
+}
+
+.metronome-widget__beats .metronome-beat-marker__halo {
+  width: clamp(1.05rem, 11cqw, 1.5rem);
+  height: clamp(1.05rem, 11cqw, 1.5rem);
+}
+
+.metronome-widget__beats .metronome-beat-marker--downbeat .metronome-beat-marker__halo {
+  width: clamp(1.2rem, 12.5cqw, 1.7rem);
+  height: clamp(1.2rem, 12.5cqw, 1.7rem);
+}
+
+.metronome-widget__beats .metronome-beat-marker__number {
+  font-size: clamp(0.5rem, 9cqh, 0.65rem);
+}
+
+.metronome-widget__beats .metronome-beat-marker--downbeat .metronome-beat-marker__number {
+  font-size: clamp(0.55rem, 10cqh, 0.72rem);
+}
+
+.metronome-widget__beats .metronome-beat-marker__sub-notches {
+  margin-top: 0.15rem;
+}
+
+.metronome-widget__row--selects {
+  gap: 0.4rem;
+}
+
+.metronome-widget__row--selects .metronome-audio-select {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metronome-widget__row--selects .metronome-audio-select__label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.metronome-widget__row--selects .metronome-audio-select__field {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.metronome-widget__row--selects .metronome-audio-select__control {
+  display: flex;
+  width: 100%;
+  height: 1.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.metronome-widget__row--selects .metronome-audio-select--open .metronome-audio-select__control {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(125, 211, 252, 0.42);
+}
+
+.metronome-widget__row--selects .metronome-audio-select__selection {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.metronome-widget__row--selects .metronome-audio-select__chevron {
+  width: 0.7rem;
+  height: 0.7rem;
+  opacity: 0.55;
+}
+
+/* Opens downward like the Metronome tab's pickers: the widget's own home is
+   the top of the frame, so the room is below it. */
+.metronome-widget__row--selects .metronome-audio-select__menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 50%;
+  z-index: 40;
+  width: max(100%, 8.5rem);
+  max-height: 11rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transform: translateX(-50%);
+  border-radius: 0.85rem;
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 20, 26, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  padding: 0.25rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+}
+
+.metronome-widget__row--selects .metronome-audio-select__option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 0.6rem;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.metronome-widget__row--selects .metronome-audio-select__option--selected {
+  background: rgba(56, 189, 248, 0.2);
+  color: rgb(224, 242, 254);
+}
+
+.metronome-widget__row--selects .metronome-audio-select__option-body {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.metronome-widget__row--selects .metronome-audio-select__option-hint {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.46);
+}
+
+/*
+ * The panel clips its children so the glass corners stay clean, which would
+ * also swallow an open picker. Only while one is open does it stop clipping.
+ */
+.metronome-widget:has(.metronome-audio-select--open) {
+  overflow: visible;
 }
 
 .app-hud-bottom {
@@ -956,6 +1157,23 @@ body.settings-branch-open * {
 .audio-practice-tab-panel {
   position: relative;
   z-index: 2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .audio-tab-arrive {
+    animation: audio-tab-arrive 460ms cubic-bezier(0.22, 1, 0.32, 1) both;
+  }
+}
+
+@keyframes audio-tab-arrive {
+  from {
+    opacity: 0.18;
+    transform: scale(1.04) translateY(0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .audio-practice-placeholder {
@@ -9692,12 +9910,63 @@ html.app-dark-mode .hands-free-card__stepper {
 }
 
 .app-shell--audio-mode .metronome-widget__bpm-label,
+.app-shell--audio-mode .metronome-widget__bpm-equals,
 .app-shell--audio-mode .metronome-widget__sync-lock {
   color: var(--audio-text-secondary, #6c7077);
 }
 
-.app-shell--audio-mode .metronome-widget__meter-divider {
-  background: rgba(23, 26, 34, 0.12);
+.app-shell--audio-mode .metronome-widget__bpm-note {
+  color: var(--audio-text-primary, #171a22);
+}
+
+/* Audio mode puts the same widget on a white card, so the beats and the
+   pickers take the tab's ink instead of the camera's light-on-glass. */
+.app-shell--audio-mode .metronome-widget__beats .metronome-beat-marker {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.app-shell--audio-mode .metronome-widget__beats .metronome-beat-marker__sub-notch {
+  background: rgba(23, 26, 34, 0.25);
+}
+
+.app-shell--audio-mode .metronome-widget__row--selects .metronome-audio-select__label {
+  color: var(--audio-text-secondary, #6c7077);
+}
+
+.app-shell--audio-mode .metronome-widget__row--selects .metronome-audio-select__control {
+  border-color: rgba(23, 26, 34, 0.1);
+  background: rgba(23, 26, 34, 0.05);
+  color: var(--audio-text-primary, #171a22);
+}
+
+.app-shell--audio-mode
+  .metronome-widget__row--selects
+  .metronome-audio-select--open
+  .metronome-audio-select__control {
+  border-color: transparent;
+  background: var(--sm-blue, #27a9f4);
+  color: #fff;
+}
+
+.app-shell--audio-mode .metronome-widget__row--selects .metronome-audio-select__menu {
+  border-color: rgba(23, 26, 34, 0.08);
+  background: var(--audio-surface, #ffffff);
+  box-shadow: 0 18px 40px rgba(23, 26, 34, 0.16);
+}
+
+.app-shell--audio-mode .metronome-widget__row--selects .metronome-audio-select__option {
+  color: var(--audio-text-primary, #171a22);
+}
+
+.app-shell--audio-mode
+  .metronome-widget__row--selects
+  .metronome-audio-select__option--selected {
+  background: rgba(39, 169, 244, 0.14);
+  color: var(--audio-text-primary, #171a22);
+}
+
+.app-shell--audio-mode .metronome-widget__row--selects .metronome-audio-select__option-hint {
+  color: var(--audio-text-secondary, #6c7077);
 }
 
 .app-shell--audio-mode .metronome-widget .pitch-widget-close {

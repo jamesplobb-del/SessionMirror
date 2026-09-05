@@ -1,0 +1,943 @@
+/**
+ * Focused Practice surfaces.
+ *
+ * Everything here is built from the app's own tokens — `--sm-*` for accent and
+ * type (src/styles/audio-mode-tokens.css) and `--practice-menu-*` for the hub
+ * card. This file previously carried 24 hard-coded hex values, none of which
+ * were app colours, 146 px values with no rem, and two dark-mode rules where
+ * comparable sheets carry 19–87. That is why the feature read as a plugin.
+ *
+ * Two rules hold the whole thing together:
+ *
+ * 1. Anything floating over the camera uses ONE material — the dock recipe
+ *    below. The session strip and the post-take dock occupy the same spot
+ *    seconds apart; they must be the same object changing its contents.
+ * 2. Gold is the live position, blue is what is selected or done. Same as the
+ *    metronome, the tuner and the take pills.
+ */
+
+.focus-reference-browser,
+.focus-history-card,
+.practice-bench {
+  --focus-text: var(--audio-text-primary, #171a22);
+  --focus-secondary: var(--audio-text-secondary, #6c7077);
+  --focus-surface: var(--audio-surface, #fff);
+  --focus-field: var(--audio-surface, #fff);
+  --focus-divider: var(--audio-divider, rgba(23, 26, 34, 0.08));
+  --focus-edge: rgba(23, 26, 34, 0.14);
+  --focus-danger: #b3261e;
+}
+
+html.app-dark-mode .focus-reference-browser,
+html.app-dark-mode .focus-history-card,
+html.app-dark-mode .practice-bench {
+  --focus-text: #f8fafc;
+  --focus-secondary: #bdc7d5;
+  --focus-surface: rgba(31, 45, 65, 0.94);
+  --focus-field: rgba(38, 53, 75, 0.94);
+  --focus-divider: rgba(226, 232, 240, 0.17);
+  --focus-edge: rgba(226, 232, 240, 0.22);
+  --focus-danger: #ff9d95;
+}
+
+/* ── Reference browser ─────────────────────────────────────────────────── */
+
+.focus-reference-browser {
+  color: var(--focus-text);
+  text-align: left;
+}
+
+.focus-segments {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--focus-text) 7%, transparent);
+}
+
+.focus-segments button {
+  display: flex;
+  flex: 1;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  border-radius: 0.62rem;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-segments button[aria-pressed='true'] {
+  color: var(--sm-blue, #1598ff);
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+  box-shadow: inset 0 0 0 1px var(--sm-blue-border, rgba(21, 152, 255, 0.54));
+}
+
+.focus-segments svg,
+.focus-icon-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.focus-reference-browser label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-search-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.focus-search-row input,
+.focus-reference-name {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  padding: 0.7rem;
+  border: 1px solid var(--focus-edge);
+  border-radius: 0.62rem;
+  color: var(--focus-text);
+  background: var(--focus-field);
+  /* 16px floor: anything smaller and iOS zooms the whole page on focus. */
+  font-size: 1rem;
+}
+
+.focus-search-row button,
+.focus-history-empty button {
+  min-height: 2.75rem;
+  padding: 0.62rem 0.85rem;
+  border-radius: 0.62rem;
+  color: #fff;
+  background: var(--sm-blue, #1598ff);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-help {
+  margin: 0.5rem 0 0.75rem;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+  line-height: 1.5;
+}
+
+.focus-error {
+  margin: 0.62rem 0;
+  color: var(--focus-danger);
+  font-size: var(--sm-text-label, 0.76rem);
+}
+
+.focus-reference-results {
+  max-height: 32dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.focus-reference-results article {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--focus-divider);
+}
+
+.focus-reference-result {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.42rem;
+  padding: 0.75rem 0.25rem;
+  color: var(--focus-text);
+  text-align: left;
+}
+
+.focus-reference-result strong {
+  display: block;
+  font-size: var(--sm-text-label, 0.76rem);
+  font-weight: var(--sm-weight-medium, 600);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.focus-reference-result small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.focus-reference-use {
+  color: var(--sm-blue, #1598ff);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-strong, 700);
+}
+
+.focus-icon-button {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--focus-edge);
+  border-radius: 50%;
+  color: var(--focus-secondary);
+  background: color-mix(in srgb, var(--focus-text) 5%, transparent);
+}
+
+.focus-link-entry {
+  margin-top: 0.75rem;
+  padding-top: 0.62rem;
+  border-top: 1px solid var(--focus-divider);
+}
+
+.focus-link-entry summary {
+  min-height: 2.75rem;
+  align-content: center;
+  color: var(--focus-text);
+  cursor: pointer;
+  font-size: var(--sm-text-label, 0.76rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-reference-name {
+  margin-top: 0.5rem;
+}
+
+.focus-reference-browser button:disabled {
+  opacity: 0.45;
+}
+
+/* ── Session strip ─────────────────────────────────────────────────────────
+ *
+ * The dock recipe, verbatim from `.focused-post-take-dock`. The width and
+ * `margin-inline: auto` are load-bearing: they are what makes this line up
+ * with the tab bar underneath it. */
+
+.focus-session-strip {
+  pointer-events: auto;
+  width: min(92vw, 24rem);
+  margin: 0 auto 0.5rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1.2rem;
+  color: rgba(255, 255, 255, 0.96);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 21, 0.9);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px) saturate(1.16);
+  -webkit-backdrop-filter: blur(24px) saturate(1.16);
+}
+
+.focus-session-strip > header {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0 0.12rem 0.42rem 0.24rem;
+}
+
+.focus-strip-id {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.42rem;
+}
+
+/* The gold rule is the "this is live" mark, matching the tuner and metronome. */
+.focus-strip-id::before {
+  content: '';
+  width: 3px;
+  height: 0.82rem;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--sm-gold, #f7a600);
+}
+
+.focus-strip-id strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-medium, 600);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-strip-finish {
+  flex: 0 0 auto;
+  min-height: 1.9rem;
+  padding: 0.28rem 0.62rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(235, 242, 250, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-strip-intention {
+  display: flex;
+  width: 100%;
+  min-height: 2.1rem;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.42rem 0.5rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: rgba(235, 242, 250, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: var(--sm-text-caption, 0.7rem);
+  text-align: left;
+}
+
+.focus-strip-intention svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: 0 0 auto;
+}
+
+.focus-strip-intention span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A note that is actually set is live work, so it takes the gold. */
+.focus-strip-intention.is-set {
+  border-left-color: var(--sm-gold, #f7a600);
+  color: rgba(255, 255, 255, 0.92);
+  background: var(--sm-gold-soft, rgba(247, 166, 0, 0.14));
+}
+
+.focus-strip-intention.is-set svg {
+  color: var(--sm-gold, #f7a600);
+}
+
+.focus-strip-actions {
+  display: flex;
+  gap: 0.3rem;
+  margin-top: 0.42rem;
+}
+
+.focus-strip-actions button {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.62rem;
+  color: rgba(235, 242, 250, 0.88);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-strip-actions button svg {
+  width: 0.88rem;
+  height: 0.88rem;
+  flex: 0 0 auto;
+}
+
+/* Exactly one primary: the journal is the only one opened mid-run. */
+.focus-strip-actions button.is-primary {
+  border-color: var(--sm-blue-border, rgba(21, 152, 255, 0.54));
+  color: #cbe6ff;
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+}
+
+.focus-strip-count {
+  display: inline-grid;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.2rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #23180a;
+  background: var(--sm-gold, #f7a600);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: var(--sm-weight-strong, 700);
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-session-strip button:disabled {
+  opacity: 0.45;
+}
+
+/* ── Practice journal ──────────────────────────────────────────────────── */
+
+.focus-history-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 125;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  background: rgba(8, 13, 21, 0.52);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.focus-history-card {
+  width: 100%;
+  max-width: 35rem;
+  max-height: 100%;
+  padding: 1.35rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--focus-edge);
+  border-radius: 1.5rem;
+  color: var(--focus-text);
+  background: var(--audio-bg-base, #f7f8fa);
+  box-shadow: 0 1.25rem 5rem rgba(20, 35, 48, 0.19);
+}
+
+html.app-dark-mode .focus-history-card {
+  border-color: rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.02)),
+    rgba(8, 13, 21, 0.94);
+  box-shadow:
+    0 1.4rem 3.75rem rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(30px) saturate(1.16);
+  -webkit-backdrop-filter: blur(30px) saturate(1.16);
+}
+
+.focus-history-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.62rem;
+}
+
+.focus-history-card h2 {
+  font-size: 1.3rem;
+  font-weight: var(--sm-weight-strong, 700);
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.focus-eyebrow {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--sm-gold, #f7a600);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.focus-history-summary {
+  margin: 0.55rem 0 0;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.focus-history-summary b {
+  color: var(--sm-gold, #f7a600);
+  font-weight: var(--sm-weight-medium, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The spine. Day and sitting are the structure; the rule makes the gaps
+ * between sittings visible, which is the whole point of a journal. */
+.focus-spine {
+  margin: 1rem 0 0;
+  padding: 0 0 0 1.05rem;
+  border-left: 1px solid var(--focus-divider);
+  list-style: none;
+}
+
+.focus-spine ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.focus-sitting + .focus-sitting {
+  margin-top: 1.1rem;
+}
+
+.focus-day {
+  margin: 0 0 0.45rem;
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-strong, 700);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.focus-node {
+  position: relative;
+  margin-bottom: 0.55rem;
+  padding: 0.68rem 0.72rem;
+  border: 1px solid var(--focus-divider);
+  border-radius: 0.85rem;
+  background: var(--focus-surface);
+}
+
+.focus-node-marker {
+  position: absolute;
+  left: -1.72rem;
+  top: 0.72rem;
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.focus-node-marker::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--focus-text) 28%, transparent);
+  box-shadow: 0 0 0 3px var(--audio-bg-base, #f7f8fa);
+}
+
+html.app-dark-mode .focus-node-marker::before {
+  box-shadow: 0 0 0 3px rgba(8, 13, 21, 0.94);
+}
+
+.focus-node--latest {
+  border-color: var(--sm-gold-border, rgba(247, 166, 0, 0.54));
+  background:
+    linear-gradient(160deg, var(--sm-gold-soft, rgba(247, 166, 0, 0.14)), transparent 70%),
+    var(--focus-surface);
+}
+
+.focus-node--latest .focus-node-marker::before {
+  background: var(--sm-gold, #f7a600);
+}
+
+.focus-node--baseline {
+  border-color: var(--sm-blue-border, rgba(21, 152, 255, 0.54));
+  background:
+    linear-gradient(160deg, var(--sm-blue-soft, rgba(21, 152, 255, 0.14)), transparent 70%),
+    var(--focus-surface);
+}
+
+.focus-node--baseline .focus-node-marker::before {
+  background: var(--sm-blue, #1598ff);
+}
+
+.focus-node-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.62rem;
+}
+
+.focus-node-heading strong {
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-node-heading time {
+  color: var(--focus-secondary);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-node-chip {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  color: var(--sm-blue, #1598ff);
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+  font-size: 0.62rem;
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.focus-node p {
+  margin: 0.42rem 0 0;
+  font-size: var(--sm-text-label, 0.76rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.focus-node p span {
+  display: block;
+  color: var(--focus-secondary);
+  font-size: 0.62rem;
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
+.focus-node-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.62rem;
+  margin-top: 0.55rem;
+}
+
+/* A five-segment meter, not a number: a personal note, never a score. */
+.focus-meter {
+  display: flex;
+  gap: 2px;
+}
+
+.focus-meter i {
+  width: 0.62rem;
+  height: 0.25rem;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--focus-text) 16%, transparent);
+}
+
+.focus-meter i.is-on {
+  background: var(--sm-gold, #f7a600);
+}
+
+.focus-node-actions {
+  display: flex;
+  gap: 0.38rem;
+}
+
+.focus-node-actions button {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.68rem;
+  border: 1px solid var(--focus-edge);
+  border-radius: 999px;
+  color: var(--focus-text);
+  background: color-mix(in srgb, var(--focus-text) 5%, transparent);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-node-actions button + button {
+  border-color: var(--sm-blue-border, rgba(21, 152, 255, 0.54));
+  color: var(--sm-blue, #1598ff);
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+}
+
+.focus-node--ghost {
+  border-style: dashed;
+  border-color: var(--focus-edge);
+  background: none;
+}
+
+.focus-node--ghost .focus-node-heading strong,
+.focus-node--ghost p {
+  color: var(--focus-secondary);
+}
+
+.focus-history-empty {
+  padding: 0.5rem 0 0;
+  font-size: var(--sm-text-label, 0.76rem);
+  line-height: 1.6;
+}
+
+.focus-history-empty > strong {
+  display: block;
+  margin-top: 1.1rem;
+  font-size: var(--sm-text-title, 0.95rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.focus-history-empty > p {
+  margin: 0.5rem 0 1.1rem;
+  color: var(--focus-secondary);
+}
+
+.focus-reference-browser button:focus-visible,
+.focus-session-strip button:focus-visible,
+.focus-history-card button:focus-visible,
+.practice-bench button:focus-visible,
+.practice-home-row:focus-visible {
+  outline: 2px solid var(--sm-gold, #f7a600);
+  outline-offset: 2px;
+}
+
+/* ── Practice home ─────────────────────────────────────────────────────── */
+
+.practice-home-intro {
+  padding: 0.25rem 0.12rem 0.75rem;
+}
+
+.practice-home-intro h3 {
+  max-width: 19ch;
+  margin-top: 0.5rem;
+  font-size: clamp(1.5rem, 6vw, 1.9rem);
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+/* The bench: what is in flight, most recent first. The last card must peek at
+ * the right edge — that peek is the only thing saying the rail scrolls. */
+.practice-bench {
+  display: flex;
+  gap: 0.5rem;
+  padding-bottom: 0.3rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.practice-bench::-webkit-scrollbar {
+  display: none;
+}
+
+.practice-bench-card {
+  display: grid;
+  flex: 0 0 9.4rem;
+  align-content: start;
+  gap: 0.18rem;
+  padding: 0.62rem 0.65rem 0.68rem;
+  border: 1px solid var(--practice-menu-divider, rgba(23, 26, 34, 0.09));
+  border-radius: 0.85rem;
+  color: var(--practice-menu-text, #171a22);
+  background: var(--practice-menu-group, rgba(255, 255, 255, 0.78));
+  text-align: left;
+}
+
+.practice-bench-card em {
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.practice-bench-card strong {
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-medium, 600);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.practice-bench-card q {
+  display: -webkit-box;
+  margin-top: 0.15rem;
+  overflow: hidden;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: var(--sm-text-caption, 0.7rem);
+  line-height: 1.35;
+  quotes: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.practice-bench-card.is-live {
+  border-color: var(--sm-gold-border, rgba(247, 166, 0, 0.54));
+  background:
+    linear-gradient(160deg, var(--sm-gold-soft, rgba(247, 166, 0, 0.14)), transparent 62%),
+    var(--practice-menu-group, rgba(255, 255, 255, 0.78));
+}
+
+.practice-bench-card.is-live em {
+  color: var(--sm-gold, #f7a600);
+}
+
+.practice-bench-new {
+  display: grid;
+  flex: 0 0 5.4rem;
+  gap: 0.25rem;
+  padding: 0.5rem 0.3rem;
+  place-content: center;
+  justify-items: center;
+  border: 1px dashed var(--practice-menu-divider, rgba(23, 26, 34, 0.09));
+  border-radius: 0.85rem;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+  text-align: center;
+}
+
+.practice-bench-new svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.practice-bench-desk {
+  padding: 0.5rem 0.15rem 0;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.practice-resume-card {
+  padding: 1.1rem;
+  border: 1px solid var(--practice-menu-divider, rgba(23, 26, 34, 0.09));
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(120% 130% at 0% 0%, var(--sm-gold-soft, rgba(247, 166, 0, 0.14)), transparent 58%),
+    var(--practice-menu-group, rgba(255, 255, 255, 0.78));
+}
+
+.practice-resume-card h3 {
+  margin: 0.5rem 0;
+  font-size: 1.2rem;
+  font-weight: var(--sm-weight-medium, 600);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.practice-resume-card p {
+  margin: 0.38rem 0;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: var(--sm-text-label, 0.76rem);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.practice-resume-card .practice-menu-primary {
+  margin-top: 0.85rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.practice-home-row {
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0.2rem;
+  border-bottom: 1px solid var(--practice-menu-divider, rgba(23, 26, 34, 0.09));
+  text-align: left;
+}
+
+.practice-home-row:last-of-type {
+  border-bottom: 0;
+}
+
+.practice-home-row-icon {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--practice-menu-divider, rgba(23, 26, 34, 0.09));
+  border-radius: 0.55rem;
+  color: var(--practice-menu-secondary, #6c7077);
+  background: var(--practice-menu-control, rgba(255, 255, 255, 0.72));
+}
+
+.practice-home-row-icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.practice-home-row > span:not(.practice-home-row-icon) {
+  flex: 1;
+  min-width: 0;
+}
+
+.practice-home-row strong {
+  display: block;
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.practice-home-row small {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.practice-home-row-chevron {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  color: var(--practice-menu-secondary, #6c7077);
+}
+
+/* ── Post-take dock ────────────────────────────────────────────────────── */
+
+.focused-post-take-dock > header div {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.focused-post-take-dock > header span {
+  max-width: 15rem;
+  overflow: hidden;
+  font-size: var(--sm-text-caption, 0.7rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focused-post-take-dock > header strong {
+  font-size: var(--sm-text-value, 0.82rem);
+}
+
+.focused-post-take-dock > header button {
+  width: auto;
+  height: 2.75rem;
+  min-width: 3.4rem;
+  padding: 0 0.62rem;
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.focused-post-take-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.focused-post-take-actions button {
+  min-height: 2.75rem;
+  flex-direction: row;
+  gap: 0.42rem;
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.focused-post-take-actions button.is-primary {
+  grid-column: 1 / -1;
+  min-height: 3rem;
+  font-size: var(--sm-text-value, 0.82rem);
+}
+
+.focus-optional-rating {
+  margin: 0.38rem 0.25rem 0;
+  font-size: var(--sm-text-caption, 0.7rem);
+}
+
+.focus-optional-rating summary {
+  min-height: 2.25rem;
+  align-content: center;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.focus-optional-rating > div {
+  padding: 0.25rem 0 0.62rem;
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .focused-post-take-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .focused-post-take-actions button.is-primary {
+    grid-column: auto;
+  }
+}

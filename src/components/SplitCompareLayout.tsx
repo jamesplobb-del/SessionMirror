@@ -113,7 +113,7 @@ export default function SplitCompareLayout({
   const challengerDropRef = useRef<HTMLDivElement>(null)
   const bottomHeight = 100 - splitRatio
   const cameraPanelHeight = (ratio: number) =>
-    recordingMode === 'video' ? `calc(${ratio}% - 0.875rem)` : `${ratio}%`
+    recordingMode === 'video' ? `calc(${ratio}% - 0.4375rem)` : `${ratio}%`
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
   const benchmarkAcceptsTakeTransfer = !libraryBenchmarkPlayback && !youtubeEmbedUrl
   const benchmarkTransferLabel =
@@ -174,11 +174,21 @@ export default function SplitCompareLayout({
     hapticFeedback,
   })
 
+  const edgeChrome = recordingMode === 'video'
+  const bestPanelLabel = edgeChrome ? 'Best' : 'Best Take'
   const currentPanelLabel = isRecording
-    ? 'Recording…'
-    : recordingMode === 'audio'
-      ? 'Audio Recording'
-      : 'Current Camera'
+    ? edgeChrome
+      ? 'Live'
+      : 'Recording…'
+    : showCurrentTake
+      ? edgeChrome
+        ? 'Current'
+        : 'Current Take'
+      : recordingMode === 'audio'
+        ? 'Audio Recording'
+        : edgeChrome
+          ? 'Live'
+          : 'Current Camera'
 
   const benchmarkIsAudio =
     libraryBenchmarkPlayback != null ||
@@ -191,7 +201,12 @@ export default function SplitCompareLayout({
 
   return (
     <>
-      <div ref={layoutRef} className="split-compare-layout flex h-full w-full min-h-0 flex-col">
+      <div
+        ref={layoutRef}
+        className={`split-compare-layout flex h-full w-full min-h-0 flex-col${
+          edgeChrome ? ' split-compare-layout--edge' : ''
+        }`}
+      >
         <div
           className="split-compare-layout__top relative min-h-0 w-full shrink-0"
           style={{ height: cameraPanelHeight(splitRatio) }}
@@ -203,7 +218,7 @@ export default function SplitCompareLayout({
             }`}
           >
             <span className="split-compare-panel__label split-compare-panel__label--best">
-              Best Take
+              {bestPanelLabel}
             </span>
             <BestTakeBox
               layout="fill"
@@ -245,9 +260,9 @@ export default function SplitCompareLayout({
           {showCurrentTake && challengerTake ? (
             <div ref={challengerDropRef} className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${
               challengerIsAudio ? ' split-compare-panel--media-audio' : ''
-            }`}>
+            }${isRecording ? ' split-compare-panel--recording' : ''}`}>
               <span className="split-compare-panel__label split-compare-panel__label--current">
-                Current Take
+                {currentPanelLabel}
               </span>
               <PipWindow
                 layout="fill"
@@ -290,7 +305,7 @@ export default function SplitCompareLayout({
               ref={challengerDropRef}
               className={`split-compare-panel split-compare-panel--current h-full w-full min-h-0${
                 benchmarkGhost?.overPin ? ' pip-drop-target--active' : ''
-              }`}
+              }${isRecording ? ' split-compare-panel--recording' : ''}`}
             >
               <span className="split-compare-panel__label split-compare-panel__label--current">
                 {currentPanelLabel}

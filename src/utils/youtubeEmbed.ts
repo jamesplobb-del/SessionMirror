@@ -42,7 +42,7 @@ export function parseYoutubeVideoId(input: string): string | null {
       return id && /^[\w-]{11}$/.test(id) ? id : null
     }
 
-    if (host.includes('youtube.com') || host.includes('youtube-nocookie.com')) {
+    if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com')) {
       const fromQuery = url.searchParams.get('v')
       if (fromQuery && /^[\w-]{11}$/.test(fromQuery)) return fromQuery
 

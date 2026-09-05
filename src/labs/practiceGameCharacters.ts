@@ -23,11 +23,11 @@ export interface PracticeGameCharacter {
 
 export const PRACTICE_GAME_CHARACTERS: readonly PracticeGameCharacter[] = [
   { id: 'trumpeter', name: 'Trumpeter', asset: trumpeterAsset, scale: 1 },
-  { id: 'cat', name: 'Cat', asset: catAsset, scale: 0.96 },
-  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 0.96 },
-  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 0.96 },
-  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 0.96 },
-  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 0.96 },
+  { id: 'cat', name: 'Cat', asset: catAsset, scale: 1.18 },
+  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 1.18 },
+  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 1.18 },
+  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 1.18 },
+  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 1.18 },
 ] as const
 
 const CHARACTER_STORAGE_KEY = 'besttake.practiceGames.character'

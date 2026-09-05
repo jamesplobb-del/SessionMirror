@@ -8,20 +8,36 @@ import {
   useRef,
   useState,
   useEffect,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react'
 import { useMetronome } from '../hooks/useMetronome'
-import { triggerLightHaptic, triggerMetronomeToggleHaptic } from '../utils/haptics'
+import { useTapTempo } from '../hooks/useTapTempo'
+import {
+  triggerLightHaptic,
+  triggerMetronomeTapHaptic,
+  triggerMetronomeToggleHaptic,
+} from '../utils/haptics'
 import { iosDragRelease } from '../utils/motionPresets'
 import { usePinchResize } from '../hooks/usePinchResize'
 import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
+import MetronomeAudioSelect from './audioPractice/MetronomeAudioSelect'
+import MetronomeBeatMarkers from './audioPractice/MetronomeBeatMarkers'
+import RhythmCellGlyph from './audioPractice/RhythmCellGlyph'
 import {
-  COMPOUND_METERS,
+  getPracticeRhythmOptions,
+  PRACTICE_ALL_METERS,
+} from './audioPractice/audioPracticeMetronome'
+import {
+  getPulseNotation,
+  getRhythmCellNotation,
+  rhythmCellHint,
+} from '../metronome/metronomeNotation'
+import {
   MAX_BPM,
-  METRONOME_SUBDIVISIONS,
   MIN_BPM,
-  SIMPLE_METERS,
+  subTicksPerPulse,
   type MetronomeMeter,
   type MetronomeSubdivision,
 } from '../utils/metronomeConfig'
@@ -38,8 +54,8 @@ interface DraggableMetronomeWidgetProps {
   onClose?: () => void
 }
 
-const DEFAULT_WIDGET_SIZE = { width: 268, height: 128 }
-const MIN_WIDGET_SIZE = { width: 200, height: 120 }
+const DEFAULT_WIDGET_SIZE = { width: 288, height: 176 }
+const MIN_WIDGET_SIZE = { width: 216, height: 150 }
 const BPM_DRAG_SENSITIVITY = 0.35
 const DOUBLE_TAP_MS = 320
 
@@ -92,11 +108,30 @@ export default function DraggableMetronomeWidget({
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
-  const { bpm, meter, subdivision, playing, beatIndex, setBpm, setMeter, setSubdivision, togglePlay, stop } =
-    useMetronome({
+  const {
+    bpm,
+    meter,
+    subdivision,
+    pulseModeId,
+    pulseCount,
+    pulseName,
+    playing,
+    beatIndex,
+    subTickIndex,
+    beatPulseId,
+    accentLevels,
+    setBpm,
+    setMeter,
+    setSubdivision,
+    toggleBeatAccent,
+    togglePlay,
+    stop,
+  } = useMetronome({
     isTakePlaying,
     muteDuringPlayback,
   })
+
+  const { registerTap } = useTapTempo(setBpm)
 
   const [maxSize, setMaxSize] = useState(() => ({
     width: Math.min(320, window.innerWidth - 24),
@@ -107,7 +142,16 @@ export default function DraggableMetronomeWidget({
   const bpmDragRef = useRef<{ startY: number; startBpm: number; moved: boolean } | null>(null)
   const lastTapAtRef = useRef(0)
 
-  const savedSize = useMemo(() => loadWidgetSize(positionId), [positionId])
+  // A size saved before the panel grew a beat row would clip it, so an old
+  // pinch is honoured only down to the layout's own floor.
+  const savedSize = useMemo(() => {
+    const stored = loadWidgetSize(positionId)
+    if (!stored) return null
+    return {
+      width: Math.max(stored.width, MIN_WIDGET_SIZE.width),
+      height: Math.max(stored.height, MIN_WIDGET_SIZE.height),
+    }
+  }, [positionId])
   const initialSize = savedSize ?? DEFAULT_WIDGET_SIZE
 
   const pinchLimits = useMemo(
@@ -139,8 +183,8 @@ export default function DraggableMetronomeWidget({
   useLayoutEffect(() => {
     const measureMax = () => {
       setMaxSize({
-        width: Math.min(320, window.innerWidth - 24),
-        height: Math.min(140, Math.floor(window.innerHeight * 0.22)),
+        width: Math.min(340, window.innerWidth - 24),
+        height: Math.min(232, Math.floor(window.innerHeight * 0.32)),
       })
     }
 
@@ -256,6 +300,10 @@ export default function DraggableMetronomeWidget({
       onPinchPointerUp(event)
       if (pinching || editingBpm || playing) return
       if (event.button !== 0) return
+      // Double-tap resets the size, so it can only count taps on the panel
+      // itself — opening a picker and choosing from it is two taps too.
+      const target = event.target as HTMLElement
+      if (target.closest('button, input, [data-no-drag], .metronome-audio-select')) return
 
       const now = performance.now()
       if (now - lastTapAtRef.current <= DOUBLE_TAP_MS) {
@@ -347,29 +395,44 @@ export default function DraggableMetronomeWidget({
     }
   }, [])
 
-  const renderMeterButton = (value: MetronomeMeter) => (
-    <MetronomeControlButton
-      key={value}
-      label={`${value} meter`}
-      active={meter === value}
-      onPress={() => setMeter(value)}
-      className="metronome-widget__meter-btn"
-    >
-      {value}
-    </MetronomeControlButton>
+  // The same option sets the Metronome tab builds, so a rhythm is named for
+  // what it actually plays under the current pulse — "8ths" in 6/8 is not the
+  // same note value as "8ths" in 4/4.
+  const rhythmOptions = useMemo(
+    () => getPracticeRhythmOptions(meter, pulseModeId),
+    [meter, pulseModeId],
+  )
+  const pulseNotation = useMemo(
+    () => getPulseNotation(meter, pulseCount),
+    [meter, pulseCount],
+  )
+  const subNotchCount = subTicksPerPulse(meter, subdivision, pulseCount)
+  const activeAccent = accentLevels[beatIndex] ?? 'weak'
+  const accentTone =
+    beatIndex === 0
+      ? 'gold'
+      : activeAccent === 'strong' || activeAccent === 'medium'
+        ? 'blue-strong'
+        : 'blue'
+
+  const handleMeterChange = useCallback(
+    (value: MetronomeMeter) => {
+      if (value !== meter) setMeter(value)
+    },
+    [meter, setMeter],
   )
 
-  const renderSubdivisionButton = (value: MetronomeSubdivision, label: string) => (
-    <MetronomeControlButton
-      key={value}
-      label={`${label} subdivisions`}
-      active={subdivision === value}
-      onPress={() => setSubdivision(value)}
-      className="metronome-widget__subdivision-btn"
-    >
-      {label}
-    </MetronomeControlButton>
+  const handleSubdivisionChange = useCallback(
+    (value: MetronomeSubdivision) => {
+      if (value !== subdivision) setSubdivision(value)
+    },
+    [setSubdivision, subdivision],
   )
+
+  const handleTapTempo = useCallback(() => {
+    triggerMetronomeTapHaptic()
+    registerTap()
+  }, [registerTap])
 
   const canShellDrag = !pinching && !editingBpm
   const shellDragListener = false
@@ -414,7 +477,7 @@ export default function DraggableMetronomeWidget({
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
       onDragEnd={persistPosition}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] min-h-[104px] min-w-[200px] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -443,10 +506,15 @@ export default function DraggableMetronomeWidget({
           }}
         />
 
-        <div
-          className={`metronome-widget__accent ${beatIndex === 0 && playing ? 'metronome-widget__accent--pulse' : ''}`}
-          aria-hidden
-        />
+        {/* Gold on the downbeat, blue elsewhere — the tab's beat language,
+            re-keyed on the pulse so the flash restarts with the click. */}
+        {playing ? (
+          <span
+            key={beatPulseId}
+            className={`metronome-widget__accent metronome-widget__accent--pulse metronome-pulse-tone--${accentTone}`}
+            aria-hidden
+          />
+        ) : null}
 
         {onClose && (
           <button
@@ -471,6 +539,27 @@ export default function DraggableMetronomeWidget({
         {controlsLocked ? <span className="metronome-widget__sync-lock">Recording sync</span> : null}
 
         <fieldset disabled={controlsLocked} className="metronome-widget__locked-controls">
+        <div
+          className="metronome-widget__beats"
+          style={
+            {
+              '--beat-columns': pulseCount > 8 ? Math.ceil(pulseCount / 2) : pulseCount,
+            } as CSSProperties
+          }
+        >
+          <MetronomeBeatMarkers
+            interactive={!controlsLocked}
+            playing={playing}
+            beatIndex={beatIndex}
+            subTickIndex={subTickIndex}
+            beatPulseId={beatPulseId}
+            beatsPerBar={pulseCount}
+            accentLevels={accentLevels}
+            subNotchCount={subNotchCount}
+            toggleBeatAccent={toggleBeatAccent}
+          />
+        </div>
+
         <div className="metronome-widget__row metronome-widget__row--main pointer-events-auto">
           <MetronomeControlButton
             label={playing ? 'Pause metronome' : 'Start metronome'}
@@ -512,31 +601,62 @@ export default function DraggableMetronomeWidget({
               <button
                 type="button"
                 className="metronome-widget__bpm pointer-events-auto"
-                aria-label={`${bpm} beats per minute. ${playing ? 'Tap to edit.' : 'Drag vertically to adjust, or tap to edit.'}`}
+                aria-label={`${bpm} beats per minute, counted in ${pulseName}. ${playing ? 'Tap to edit.' : 'Drag vertically to adjust, or tap to edit.'}`}
                 onPointerDown={onBpmPointerDown}
                 onPointerMove={onBpmPointerMove}
                 onPointerUp={onBpmPointerUp}
                 onPointerCancel={endBpmDrag}
               >
+                {/* Which note BPM counts, so 6/8 at 120 can't be read as
+                    eighths when it is dotted quarters. Same glyph the tab
+                    prints above its tempo. */}
+                <RhythmCellGlyph
+                  notation={pulseNotation}
+                  height={13}
+                  className="metronome-widget__bpm-note"
+                />
+                <span className="metronome-widget__bpm-equals" aria-hidden>
+                  =
+                </span>
                 <span className="metronome-widget__bpm-value">{bpm}</span>
                 <span className="metronome-widget__bpm-label">BPM</span>
               </button>
             )}
           </div>
+
+          <MetronomeControlButton
+            label="Tap tempo"
+            haptic={false}
+            onPress={handleTapTempo}
+            className="metronome-widget__tap"
+          >
+            Tap
+          </MetronomeControlButton>
         </div>
 
-        <div className="metronome-widget__row metronome-widget__row--meters pointer-events-auto">
-          <div className="metronome-widget__meter-group">
-            {SIMPLE_METERS.map(renderMeterButton)}
-          </div>
-          <span className="metronome-widget__meter-divider" aria-hidden />
-          <div className="metronome-widget__meter-group">
-            {COMPOUND_METERS.map(renderMeterButton)}
-          </div>
-        </div>
-
-        <div className="metronome-widget__row metronome-widget__row--subdivisions pointer-events-auto">
-          {METRONOME_SUBDIVISIONS.map(({ value, label }) => renderSubdivisionButton(value, label))}
+        <div className="metronome-widget__row metronome-widget__row--selects pointer-events-auto">
+          <MetronomeAudioSelect
+            label="Time"
+            ariaLabel="Time signature"
+            value={meter}
+            options={PRACTICE_ALL_METERS.map((value) => ({ value, label: value }))}
+            onChange={handleMeterChange}
+          />
+          <MetronomeAudioSelect
+            label="Rhythm"
+            ariaLabel="Rhythm subdivision"
+            value={subdivision}
+            options={rhythmOptions.map((option) => {
+              const notation = getRhythmCellNotation(meter, option.value, pulseCount)
+              return {
+                value: option.value,
+                label: option.name,
+                hint: rhythmCellHint(notation),
+                glyph: <RhythmCellGlyph notation={notation} height={16} />,
+              }
+            })}
+            onChange={handleSubdivisionChange}
+          />
         </div>
         </fieldset>
       </div>

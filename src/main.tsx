@@ -6,6 +6,7 @@ import './styles/drone-keyboard.css'
 import './styles/drone-sound-wheel.css'
 import './styles/practice-system.css'
 import './styles/practice-hub.css'
+import './styles/practice-routines.css'
 import './styles/quick-tuner.css'
 import './styles/pitch-insights.css'
 // Keep adaptive iPad overrides last so feature-specific styles cannot restore
@@ -21,8 +22,12 @@ import { registerAppForegroundLifecycle } from './utils/appForeground'
 import { initializeQuickTunerLaunch } from './utils/quickTunerLaunch'
 import { initCrashReporting } from './utils/crashReporting'
 import { initializeRoutineFileOpen } from './practiceTimeline/storage/routineFileOpen'
+import { installFakeMediaDevices } from './utils/fakeMediaDevices'
 
 async function bootstrap() {
+  // Before anything can touch mediaDevices. No-op unless VITE_FAKE_MEDIA=1.
+  installFakeMediaDevices()
+
   // First thing, before any other init — anything that throws during boot
   // (filesystem, SQLite, quick-tuner launch) should still get reported.
   initCrashReporting()

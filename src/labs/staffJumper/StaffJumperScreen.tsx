@@ -364,6 +364,7 @@ export default function StaffJumperScreen({
     noteRemainingMs,
     noteTimeoutMs,
     beatInBar,
+    getTravelProgress,
   } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
 
   targetMidiRef.current =
@@ -892,6 +893,7 @@ export default function StaffJumperScreen({
       turnRemainingMs={noteRemainingMs}
       turnDurationMs={noteTimeoutMs}
       beatInBar={beatInBar}
+      getTravelProgress={getTravelProgress}
     />
   )
 

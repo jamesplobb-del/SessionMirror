@@ -485,6 +485,7 @@ export default function SettingsBranchWheel({
                   </label>
                   <input
                     id="workspace-desk-name"
+                    list="workspace-desk-names"
                     className="settings-branch-tray__save-input"
                     value={deskNameDraft}
                     autoFocus
@@ -499,8 +500,10 @@ export default function SettingsBranchWheel({
                       }
                     }}
                   />
+                  <datalist id="workspace-desk-names">{desks.map(desk => <option key={desk.id} value={desk.name} />)}</datalist>
+                  <p className="settings-branch-tray__save-note">Use an existing name to update that desk.</p>
                   <p className="settings-branch-tray__save-summary">{liveDeskSummary}</p>
-                  {desks.length >= MAX_WORKSPACE_DESKS && (
+                  {desks.length >= MAX_WORKSPACE_DESKS && !desks.some(desk => desk.name.toLocaleLowerCase() === deskNameDraft.trim().toLocaleLowerCase()) && (
                     <p className="settings-branch-tray__save-note">
                       Three desks already — this replaces the oldest.
                     </p>
@@ -518,7 +521,7 @@ export default function SettingsBranchWheel({
                       className={`settings-branch-tray__save-btn settings-branch-tray__save-btn--primary ${NATIVE_SQUISH}`}
                       disabled={!deskNameDraft.trim()}
                     >
-                      Save
+                      {desks.some(desk => desk.name.toLocaleLowerCase() === deskNameDraft.trim().toLocaleLowerCase()) ? 'Update desk' : 'Save'}
                     </button>
                   </div>
                 </form>
