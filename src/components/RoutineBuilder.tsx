@@ -653,7 +653,7 @@ function StepEditor({
       </section>
 
       <section className="practice-menu-section">
-        <span className="practice-menu-eyebrow">Opens</span>
+        <span className="practice-menu-eyebrow">Main tab</span>
         <div className="routine-kind-grid" role="radiogroup" aria-label="What this step opens">
           {KINDS.map((kind) => (
             <Pressable
@@ -736,7 +736,7 @@ function StepEditor({
 
       {kindNeedsDesk(step.kind) && (
         <section className="practice-menu-section">
-          <span className="practice-menu-eyebrow">Tools</span>
+          <span className="practice-menu-eyebrow">Tools / on-screen widgets</span>
           <div className="practice-menu-form routine-tools">
             <div className="routine-tool">
               <Pressable

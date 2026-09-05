@@ -1,8 +1,8 @@
 /**
- * Instrument presets for the onboarding picker.
+ * Instrument presets for Practice Home and onboarding.
  *
- * Picking an instrument here is shorthand for three settings a player would
- * otherwise have to find individually:
+ * The Home title is the chooser: picking an instrument is shorthand for the
+ * settings a player would otherwise have to find individually:
  *
  *   - `tunerInstrument`  — the pitch detection profile (voice / strings / winds).
  *   - `tunerTransposition` — the note the player reads off the page, so a
@@ -10,8 +10,9 @@
  *   - `soundVolumeThreshold` — hands-free auto-record needs a higher gate for a
  *     trumpet than for a nylon-string guitar.
  *
- * Nothing else is derived from the instrument. Capture profile, enhancer, and
- * drone timbre stay where they are: those are taste, not instrument facts.
+ * Capture profile, enhancer, and drone timbre stay where they are: those are
+ * taste, not instrument facts. Switching horns does not reset today’s routine
+ * checks or rewrite desks the player already built.
  */
 import type { TunerInstrument } from './pitchConfig'
 import type { TunerTranspositionId } from './tunerTransposition'
@@ -284,4 +285,18 @@ export function getInstrumentSettings(id: string): InstrumentSettingsPatch | nul
     tunerTransposition: profile.tunerTransposition,
     soundVolumeThreshold: profile.soundVolumeThreshold,
   }
+}
+
+/** Short enough to be the Practice Home title. "Trumpet / cornet" → "Trumpet". */
+export function instrumentHeading(id: string | null): string {
+  if (!id) return 'Choose your instrument'
+  const profile = PROFILE_BY_ID.get(id)
+  if (!profile) return 'Choose your instrument'
+  return profile.label.split(' / ')[0] ?? profile.label
+}
+
+export function describeHandsFreeGate(threshold: number): string {
+  if (threshold >= LOUD_GATE) return 'Loud gate'
+  if (threshold >= MEDIUM_GATE) return 'Medium gate'
+  return 'Quiet gate'
 }

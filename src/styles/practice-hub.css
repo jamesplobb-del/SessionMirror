@@ -73,6 +73,21 @@
   transform-origin: center;
 }
 
+/* The scroll area is clipped by the card, so a long page ended flush against
+ * the bottom edge and read as broken rather than scrollable. This fades the
+ * cut instead of hiding it. */
+.practice-menu-card::after {
+  content: '';
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  height: 1.75rem;
+  border-radius: 0 0 2rem 2rem;
+  background: linear-gradient(to top, var(--practice-menu-fade, rgba(244, 246, 248, 0.96)), transparent);
+  pointer-events: none;
+}
+
 .practice-menu-header {
   display: grid;
   min-height: 5.45rem;
@@ -157,6 +172,51 @@
   font-weight: 680;
   letter-spacing: -0.018em;
   line-height: 1.15;
+}
+
+.practice-menu-instrument-title {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 0;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+
+.practice-menu-instrument-title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-menu-instrument-title svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  color: var(--practice-menu-secondary);
+}
+
+.practice-menu-card--home .practice-menu-instrument-title {
+  display: inline-flex;
+  /* 44px floor: this is the only way to change instrument. */
+  min-height: 2.75rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.65rem;
+  border-left: 3px solid var(--sm-gold, #f7a600);
+  border-radius: 0.55rem;
+  background: var(--sm-gold-soft, rgba(247, 166, 0, 0.16));
+}
+
+.practice-menu-card--home .practice-menu-instrument-title svg {
+  color: color-mix(in srgb, var(--sm-gold, #f7a600) 70%, black 30%);
 }
 
 .practice-menu-title-block p {
@@ -606,7 +666,7 @@
 
 .practice-menu-focus-flow {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.42rem;
 }
 
 .practice-menu-mode-switch {
@@ -754,19 +814,34 @@
 
 .practice-menu-focus-tools {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 0.35rem;
-  overflow: hidden;
+  /* One row, four across: as a 2x2 these pushed the whole grid below the fold
+   * on a phone, which is what made home feel like a scrolling page. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.practice-menu-focus-tools .practice-menu-shortcut {
+  min-height: 3.9rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.3rem 0.55rem;
   border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 1.1rem;
+  border-radius: 1rem;
   background: var(--practice-menu-group);
   box-shadow:
     0 0.5rem 1.5rem rgba(23, 26, 34, 0.055),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  text-align: center;
 }
 
-.practice-menu-focus-tools .practice-menu-shortcut {
-  min-height: 4.75rem;
+.practice-menu-focus-tools .practice-menu-shortcut:last-child {
+  border-right: 0;
 }
 
 .practice-menu-field {
@@ -932,7 +1007,7 @@ html.app-dark-mode .practice-menu-card--home {
 }
 
 html.app-dark-mode .practice-menu-card--home .practice-menu-icon-button,
-html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools {
+html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools .practice-menu-shortcut {
   border-color: rgba(255, 255, 255, 0.8);
   background: var(--practice-menu-group);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
@@ -955,10 +1030,22 @@ html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools {
     -webkit-backdrop-filter: blur(11px) saturate(0.92);
   }
 
+  /* This is a sheet floating over BestTake, not a page that replaces it. The
+   * generous top and bottom gaps keep the take cards and the control deck
+   * visible around it — at `100dvh - 2rem` the card covered both and the hub
+   * read as a full-screen takeover. */
+  .practice-menu-layer {
+    padding:
+      max(2.5rem, calc(env(safe-area-inset-top) + 1.25rem))
+      max(0.9rem, env(safe-area-inset-right))
+      max(5.75rem, calc(env(safe-area-inset-bottom) + 4.9rem))
+      max(0.9rem, env(safe-area-inset-left));
+  }
+
   .practice-menu-card {
     width: min(calc(100vw - 1.8rem), 28rem);
     height: auto;
-    max-height: calc(100dvh - 2rem);
+    max-height: 100%;
     border: 1px solid rgba(255, 255, 255, 0.84);
     border-radius: 2rem;
     box-shadow:
@@ -972,7 +1059,7 @@ html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools {
   }
 
   .practice-menu-scroll {
-    padding: 1.05rem 1.15rem 1.2rem;
+    padding: 0.8rem 1.15rem 0.8rem;
   }
 
   html.app-dark-mode .practice-menu-backdrop {

@@ -150,6 +150,7 @@ html.app-dark-mode .practice-menu-card--home {
   --practice-menu-text: #f8fafc;
   --practice-menu-secondary: #bdc7d5;
   --practice-menu-divider: rgba(226, 232, 240, 0.17);
+  --practice-menu-fade: #101927;
   border-color: rgba(226, 232, 240, 0.18);
   color: var(--practice-menu-text);
   background: var(--practice-menu-surface);
@@ -177,7 +178,7 @@ html.app-dark-mode .practice-menu-card--home .practice-menu-focus-card {
 }
 
 html.app-dark-mode .practice-menu-card--home .practice-menu-icon-button,
-html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools {
+html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools .practice-menu-shortcut {
   border-color: rgba(226, 232, 240, 0.16);
   background: var(--practice-menu-group);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);

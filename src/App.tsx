@@ -781,14 +781,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsPracticeHubOpen(true)
   }, [])
 
-  /** Onboarding instrument pick — sets the tuner profile, written pitch, and auto-record gate. */
-  const handleSelectOnboardingInstrument = useCallback(
+  /**
+   * Home title and onboarding share this: the horn writes tuner, written pitch,
+   * and the auto-record gate. Today's checks and the desks already on the
+   * routine stay put — only the instrument id on the routine changes, so
+   * suggestions retune next time the builder opens.
+   */
+  const handleSelectInstrument = useCallback(
     (instrumentId: string) => {
       const instrumentSettings = getInstrumentSettings(instrumentId)
       if (!instrumentSettings) return
       updateSettings(instrumentSettings)
       savePreferredInstrumentId(instrumentId)
       setPreferredInstrumentId(instrumentId)
+      setRoutine((current) =>
+        current && current.instrumentId !== instrumentId
+          ? { ...current, instrumentId, updatedAt: Date.now() }
+          : current,
+      )
     },
     [updateSettings],
   )
@@ -4928,6 +4938,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }
       }
       setRoutine(next)
+      if (next.instrumentId) {
+        const instrumentSettings = getInstrumentSettings(next.instrumentId)
+        if (instrumentSettings) {
+          updateSettings(instrumentSettings)
+          savePreferredInstrumentId(next.instrumentId)
+          setPreferredInstrumentId(next.instrumentId)
+        }
+      }
       setRoutineDay((current) => {
         const base =
           current && current.date === todayKey() && current.routineId === next.id
@@ -4937,7 +4955,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       })
       setRoutineBuilderRequest(null)
     },
-    [settings.hapticFeedback],
+    [settings.hapticFeedback, updateSettings],
   )
 
   const handleDeleteRoutine = useCallback(() => {
@@ -5340,7 +5358,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 focusedPractice={focusedPractice}
                 practiceItemStates={practiceItemStates}
                 focusDeskSummary={focusDeskSummary}
-                tunerInstrument={settings.tunerInstrument}
                 tunerTransposition={settings.tunerTransposition}
                 hapticFeedback={settings.hapticFeedback}
                 onClose={handleClosePracticeHub}
@@ -5358,6 +5375,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 routineFocusRequest={routineFocusRequest}
                 instrumentId={preferredInstrumentId}
                 liveDeskSnapshot={liveDeskSnapshot}
+                onSelectInstrument={handleSelectInstrument}
                 onStartRoutineStep={handleStartRoutineStep}
                 onToggleRoutineStep={handleToggleRoutineStep}
                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
@@ -6393,7 +6411,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         key="onboarding-tutorial"
                         onComplete={handleCompleteOnboardingTutorial}
                         onSkip={handleSkipOnboardingTutorial}
-                        onSelectInstrument={handleSelectOnboardingInstrument}
+                        onSelectInstrument={handleSelectInstrument}
                         onChooseRoutine={handleOnboardingRoutineChoice}
                         hapticFeedback={settings.hapticFeedback}
                       />

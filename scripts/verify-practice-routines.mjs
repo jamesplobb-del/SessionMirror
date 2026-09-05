@@ -21,6 +21,11 @@ globalThis.localStorage = {
   removeItem: (key) => storage.delete(key),
 }
 
+const instruments = await load('src/utils/instrumentProfiles.ts')
+assert.equal(instruments.instrumentHeading('trumpet'), 'Trumpet')
+assert.equal(instruments.describeHandsFreeGate(34), 'Loud gate')
+assert.equal(instruments.describeHandsFreeGate(16), 'Quiet gate')
+
 const routines = await load('src/utils/practiceRoutines.ts')
 const presets = await load('src/utils/routinePresets.ts')
 
@@ -62,6 +67,11 @@ const allDone = {
 }
 assert.equal(routines.reconcileDay(allDone, reloaded).completedAt !== null, true)
 assert.equal(routines.routineProgress(reloaded, routines.reconcileDay(allDone, reloaded)).complete, true)
+
+const retuned = { ...reloaded, instrumentId: 'trombone', updatedAt: Date.now() }
+const stillDone = routines.reconcileDay(allDone, retuned)
+assert.equal(retuned.instrumentId, 'trombone')
+assert.deepEqual(stillDone.doneStepIds, allDone.doneStepIds, 'Changing instrument must not wipe today’s checks')
 
 const suggestions = presets.getStepSuggestions('trumpet', 'long-tones')
 assert.ok(suggestions.some((text) => /Stamp/i.test(text)), 'Trumpet long tones suggest Stamp')
