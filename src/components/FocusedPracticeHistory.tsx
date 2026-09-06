@@ -9,8 +9,9 @@ import {
 } from '../utils/practiceJournal'
 import '../styles/focus-practice.css'
 
-export default function FocusedPracticeHistory({ name, takes, onClose, onListen, onCompare }: {
+export default function FocusedPracticeHistory({ name, takes, notice, onClose, onListen, onCompare }: {
   name: string
+  notice?: string
   takes: Take[]
   onClose: () => void
   onListen: (take: Take) => void
@@ -57,6 +58,7 @@ export default function FocusedPracticeHistory({ name, takes, onClose, onListen,
         <button type="button" className="focus-icon-button" onClick={onClose} aria-label="Close practice journal"><X aria-hidden /></button>
       </header>
 
+      {notice && <p className="focus-history-summary" role="status">{notice}</p>}
       {attempts.length > 0 && (
         <p className="focus-history-summary">
           <b>{attempts.length}</b> {attempts.length === 1 ? 'attempt' : 'attempts'}

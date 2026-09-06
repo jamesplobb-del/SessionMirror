@@ -47,6 +47,25 @@ html.app-dark-mode .practice-bench {
   text-align: left;
 }
 
+/* Search results, a pasted link and the saved library now share one scrolling
+ * surface instead of competing tabs, so each needs a quiet section label. */
+.focus-reference-group {
+  margin-top: 1rem;
+}
+
+.focus-reference-group h4 {
+  margin: 0 0 0.45rem;
+  color: var(--focus-secondary);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.focus-reference-group .focus-reference-name {
+  margin-top: 0.5rem;
+}
+
 .focus-segments {
   display: flex;
   gap: 0.25rem;
@@ -941,3 +960,115 @@ html.app-dark-mode .focus-node-marker::before {
     grid-column: auto;
   }
 }
+
+.practice-compare-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+.practice-compare-choice select {
+  min-width: 0;
+  max-width: 68%;
+  padding: 8px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.routine-bar__remember {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  opacity: .7;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+}
+.routine-session-summary { margin-top: 16px; font-size: 12px; line-height: 1.6; }
+.routine-session-summary summary { cursor: pointer; padding: 8px 0; }
+.routine-session-summary ul { padding-left: 16px; }
+
+.practice-compare-choice option { background: Canvas; color: CanvasText; }
+
+/* Session surfaces share the app's blue accent and inherited light/dark text. */
+.practice-compare-choice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  margin: 10px 0;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+.practice-compare-choice button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+}
+.practice-compare-choice button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--sm-blue, #1598ff);
+  box-shadow: 0 3px 12px #1598ff25;
+}
+.practice-compare-choice button:disabled { opacity: .38; }
+.reference-passage {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  border-radius: 16px;
+  color: inherit;
+  background: color-mix(in srgb, var(--sm-blue, #1598ff) 8%, transparent);
+  font-size: 12px;
+}
+.reference-passage summary { display: flex; flex-wrap: wrap; gap: 4px 12px; cursor: pointer; min-height: 30px; align-items: center; }
+.reference-passage summary span { font-weight: 650; }
+.reference-passage summary small { opacity: .7; }
+.reference-passage__fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; }
+.reference-passage__fields label { display: grid; gap: 5px; }
+.reference-passage input { min-width: 0; width: 100%; padding: 9px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 10px; background: transparent; color: inherit; font: inherit; font-variant-numeric: tabular-nums; }
+.reference-passage button { min-height: 36px; padding: 6px 10px; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 10px; background: transparent; color: inherit; font: inherit; }
+.reference-passage button:disabled { opacity: .4; }
+.reference-passage__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.reference-passage__actions button { display: inline-flex; align-items: center; gap: 5px; }
+.reference-passage__actions button[aria-pressed='true'] { background: var(--sm-blue, #1598ff); color: white; border-color: transparent; }
+.reference-passage svg { width: 14px; height: 14px; }
+.reference-passage p { margin: 8px 0 0; opacity: .75; }
+.routine-program-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; font-size: 12px; }
+.routine-program-controls > span { display: grid; flex: 1; min-width: 0; }
+.routine-program-controls small { font-size: 8px; letter-spacing: .12em; opacity: .6; }
+.routine-program-controls strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routine-program-controls button { display: grid; place-items: center; min-width: 38px; min-height: 38px; border-radius: 50%; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); background: transparent; color: inherit; }
+.routine-program-controls svg { width: 16px; height: 16px; }
+.routine-program-controls p { width: 100%; }
+.routine-program-setup { margin: 12px 0; }
+.routine-program-setup small { font-size: 11px; opacity: .7; }
+.routine-recap-items { list-style: none; padding: 0 !important; }
+.routine-recap-items li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
+.routine-recap-items li > span { display: grid; }
+.routine-recap-items small { opacity: .7; }
+.routine-recap-items button, .routine-recap-history-links button { min-height: 38px; padding: 6px 10px; border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 10px; background: transparent; color: inherit; font: inherit; }
+.routine-recap-history-links { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 10px; }
+.routine-item-context { display: flex; align-items: center; gap: 8px; padding: 5px 12px 8px; font-size: 11px; opacity: .8; }
+.routine-item-context span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.routine-item-context button { display: grid; place-items: center; min-width: 28px; min-height: 28px; background: none; border: 0; color: inherit; }
+.routine-item-context svg { width: 13px; height: 13px; }
+.routine-reference-shortcut { padding: 0 10px 6px; }
+.routine-reference-shortcut button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--sm-blue, #1598ff) 30%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--sm-blue, #1598ff) 9%, transparent); color: inherit; font: inherit; font-size: 11px; }
+.routine-reference-shortcut span { flex: 1; text-align: left; }
+.routine-reference-shortcut svg { width: 15px; height: 15px; }
+.routine-bar__more { padding: 0 12px 8px; font-size: 11px; }
+.routine-bar__more summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; opacity: .7; }
+.routine-bar__more .routine-bar__resources { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.routine-bar__more button { min-height: 38px; text-align: left; }
+.routine-bar__actions button { flex-direction: row; gap: 7px; min-height: 44px; font-size: 12px; }
+.routine-bar__actions button.is-primary { flex: 2; }

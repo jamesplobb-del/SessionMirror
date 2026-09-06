@@ -123,6 +123,11 @@ export async function migrateVaultSchema(db: SQLiteDBConnection): Promise<void> 
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     )
   `)
+  const sessionColumns = await db.query('PRAGMA table_info(practice_sessions)')
+  const sessionExisting = new Set((sessionColumns.values ?? []).map(row => String(row.name)))
+  for (const name of ['routine_id', 'routine_step_id']) {
+    if (!sessionExisting.has(name)) await db.execute(`ALTER TABLE practice_sessions ADD COLUMN ${name} TEXT`)
+  }
   await db.execute(
     'CREATE INDEX IF NOT EXISTS idx_practice_sessions_project ON practice_sessions(project_id, started_at DESC)',
   )

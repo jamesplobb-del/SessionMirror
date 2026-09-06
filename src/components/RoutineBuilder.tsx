@@ -11,6 +11,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import RoutineReferenceSetup from './RoutineReferenceSetup'
+import RoutineProgramSetup from './RoutineProgramSetup'
 import { iosFade } from '../utils/motionPresets'
 import {
   INSTRUMENT_FAMILIES,
@@ -57,7 +59,7 @@ export interface RoutineFocusRequest {
   title: string
 }
 
-interface RoutineBuilderProps {
+export interface RoutineBuilderProps {
   mode: RoutineBuilderMode
   routine: Routine | null
   instrumentId: string | null
@@ -579,9 +581,10 @@ interface StepEditorProps {
   onChange: (patch: Partial<RoutineStep>) => void
   onRemove: () => void
   onDone: () => void
+  showDone?: boolean
 }
 
-function StepEditor({
+export function StepEditor({
   step,
   instrumentId,
   projects,
@@ -590,6 +593,7 @@ function StepEditor({
   onChange,
   onRemove,
   onDone,
+  showDone = true,
 }: StepEditorProps) {
   const desk = step.desk ?? blankDesk('audio')
   const suggestions = getStepSuggestions(instrumentId, step.topic)
@@ -603,6 +607,7 @@ function StepEditor({
     if (kindNeedsDesk(kind) && !step.desk) patch.desk = blankDesk('audio')
     if (kind === 'tune' || kind === 'metro') patch.desk = { ...(patch.desk ?? desk), mode: 'audio' }
     if (kind === 'metro') patch.desk = { ...(patch.desk ?? desk), showMetronome: true }
+    if (kind === 'game' || kind === 'free') patch.programId = null
     if (kind === 'game' && !step.gameRoute) patch.gameRoute = 'menu'
     onChange(patch)
   }
@@ -652,8 +657,15 @@ function StepEditor({
         </div>
       </section>
 
-      <section className="practice-menu-section">
-        <span className="practice-menu-eyebrow">Main tab</span>
+      {kindNeedsDesk(step.kind) && <RoutineReferenceSetup instrumentId={instrumentId} title={step.title}
+        value={step.referenceQuery} onChange={referenceQuery => onChange({ referenceQuery })}
+        videoId={step.referenceVideoId} onVideoIdChange={referenceVideoId => onChange({ referenceVideoId })} />}
+
+      <section className="practice-menu-section routine-tools-lead">
+        <span className="practice-menu-eyebrow">Opens with this item</span>
+        <p className="routine-tools-lead__intro">
+          Starting this item takes you straight here, with everything below already set.
+        </p>
         <div className="routine-kind-grid" role="radiogroup" aria-label="What this step opens">
           {KINDS.map((kind) => (
             <Pressable
@@ -700,43 +712,13 @@ function StepEditor({
         </section>
       )}
 
-      {kindNeedsDesk(step.kind) && (
-        <section className="practice-menu-section">
-          <span className="practice-menu-eyebrow">Practice history & reference</span>
-          <div className="practice-menu-form">
-            <label className="practice-menu-field">
-              <span>Practice item</span>
-              <select
-                value={step.projectId ?? ''}
-                onChange={(event) => onChange({ projectId: event.target.value || null })}
-              >
-                <option value="">Keep takes under this exercise’s name</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="practice-menu-field">
-              <span>Reference to find, if none is pinned</span>
-              <input
-                value={step.referenceQuery}
-                maxLength={80}
-                onChange={(event) => onChange({ referenceQuery: event.target.value })}
-                placeholder="Haydn trumpet concerto 2nd movement"
-              />
-            </label>
-          </div>
-          <p className="practice-menu-note">
-            Choose a reference once. It will be ready whenever you return to this item.
-          </p>
-        </section>
-      )}
 
       {kindNeedsDesk(step.kind) && (
         <section className="practice-menu-section">
-          <span className="practice-menu-eyebrow">Tools / on-screen widgets</span>
+          <span className="practice-menu-eyebrow">Tools ready when it opens</span>
+          <p className="routine-tools-lead__intro">
+            Anything you switch on here is running the moment the item starts — you just play.
+          </p>
           <div className="practice-menu-form routine-tools">
             <div className="routine-tool">
               <Pressable
@@ -752,6 +734,7 @@ function StepEditor({
                 <strong>Metronome</strong>
                 <i />
               </Pressable>
+              <small className="routine-tool__hint">A steady click, already at this tempo when the item opens.</small>
               {desk.showMetronome && (
                 <div className="routine-stepper routine-stepper--wide" role="group" aria-label="Tempo">
                   <Pressable
@@ -823,6 +806,7 @@ function StepEditor({
                 <strong>Drone</strong>
                 <i />
               </Pressable>
+              <small className="routine-tool__hint">Holds one pitch under you, to tune your sound against.</small>
               {desk.showDrone && (
                 <div className="routine-pitch-row" role="radiogroup" aria-label="Drone note">
                   {Array.from({ length: 12 }, (_, pitchClass) => (
@@ -857,6 +841,7 @@ function StepEditor({
               <strong>Pitch graph</strong>
               <i />
             </Pressable>
+            <small className="routine-tool__hint">Traces your pitch as you play, so you can see where it drifts.</small>
 
             {(step.kind === 'record' || step.kind === 'focus') && (
               <>
@@ -873,6 +858,7 @@ function StepEditor({
                   <strong>Hands-free recording</strong>
                   <i />
                 </Pressable>
+                <small className="routine-tool__hint">Starts when you play and stops when you stop, so you never touch the phone between attempts.</small>
                 <div className="practice-menu-field routine-field-row">
                   <span>Surface</span>
                   <div className="routine-segment" role="radiogroup" aria-label="Surface">
@@ -896,8 +882,36 @@ function StepEditor({
         </section>
       )}
 
+      {kindNeedsDesk(step.kind) && <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />}
+
+      {kindNeedsDesk(step.kind) && (
+        <details className="routine-step-customize">
+          <summary>Practice history</summary>
+          <div className="practice-menu-form">
+            <label className="practice-menu-field">
+              <span>Practice item</span>
+              <select
+                value={step.projectId ?? ''}
+                onChange={(event) => onChange({ projectId: event.target.value || null })}
+              >
+                <option value="">Keep takes under this exercise’s name</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <small className="routine-tool__hint">
+              Every take from this item is filed together, so you can compare today against last week.
+            </small>
+          </div>
+        </details>
+      )}
+
+      <details className="routine-step-customize">
+        <summary>Books & exercises</summary>
       <section className="practice-menu-section">
-        <span className="practice-menu-eyebrow">Common choices · optional</span>
         <div className="practice-menu-form">
           <label className="practice-menu-field">
             <span>This step is mostly</span>
@@ -916,7 +930,7 @@ function StepEditor({
         {suggestions.length > 0 ? (
           <ul className="routine-suggestions">
             {suggestions.map((text) => (
-              <li key={text}>{text}</li>
+              <li key={text}><button type="button" onClick={() => onChange({ title: text.slice(0, MAX_STEP_TITLE) })}>{text}<Plus aria-hidden /></button></li>
             ))}
           </ul>
         ) : null}
@@ -924,8 +938,9 @@ function StepEditor({
           Use your own book, or what your teacher assigned. The step counts either way.
         </p>
       </section>
+      </details>
 
-      <Pressable
+      {showDone && <Pressable
         type="button"
         intensity="soft"
         haptic="light"
@@ -934,7 +949,7 @@ function StepEditor({
         onClick={onDone}
       >
         Done
-      </Pressable>
+      </Pressable>}
       <Pressable
         type="button"
         intensity="soft"

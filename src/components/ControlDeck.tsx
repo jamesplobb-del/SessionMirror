@@ -14,12 +14,13 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject, memo } from 'react'
+import { useEffect, useRef, useState, type RefObject, type ReactNode, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
 import StarRating from './StarRating'
 import type { RecordingMode } from '../types'
+import type { PracticeComparisonMode } from '../db/types'
 import { resolveHandsFreePhase } from '../utils/handsFreePhase'
 import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
@@ -45,6 +46,14 @@ interface ControlDeckProps {
   focusedAttemptCount?: number
   onOpenFocusReferences?: () => void
   onOpenFocusHistory?: () => void
+  focusedComparison?: PracticeComparisonMode
+  onFocusedComparisonChange?: (mode: PracticeComparisonMode) => void
+  focusedHasReference?: boolean
+  focusedHasBest?: boolean
+  focusedHasPrevious?: boolean
+  referenceControls?: ReactNode
+  focusedTakeSaving?: boolean
+  practiceTransitionBusy?: boolean
   focusedPostTakeActive?: boolean
   focusedPostTakeReviewed?: boolean
   focusedPostTakeHasNote?: boolean
@@ -134,6 +143,14 @@ function ControlDeck({
   focusedAttemptCount = 0,
   onOpenFocusReferences,
   onOpenFocusHistory,
+  focusedComparison = 'current-best',
+  onFocusedComparisonChange,
+  focusedHasReference = false,
+  focusedHasBest = false,
+  focusedHasPrevious = false,
+  referenceControls,
+  focusedTakeSaving = false,
+  practiceTransitionBusy = false,
   focusedPostTakeActive = false,
   focusedPostTakeReviewed = false,
   focusedPostTakeHasNote = false,
@@ -403,6 +420,7 @@ function ControlDeck({
               haptic="light"
               hapticFeedback={hapticFeedback}
               className="focus-strip-finish"
+              disabled={practiceTransitionBusy}
               onClick={onFocusedPostTakeDismiss}
             >
               Finish
@@ -469,24 +487,34 @@ function ControlDeck({
         </div>
       )}
 
+      {referenceControls}
       {focusedPostTakeActive && !isRecording && !isStopping ? (
         <section className="focused-post-take-dock" aria-label="Focused practice next steps">
           <header>
             <div>
               <span>{focusedPracticeName}</span>
-              <strong>Take saved</strong>
+              <strong role="status">{focusedTakeSaving ? 'Saving take…' : 'Take saved'}</strong>
             </div>
             <Pressable
               type="button"
               intensity="icon"
               haptic="light"
               hapticFeedback={hapticFeedback}
+              disabled={practiceTransitionBusy}
               onClick={onFocusedPostTakeDismiss}
               aria-label={routineStepActive ? 'Finish this item and continue' : 'Done for now'}
             >
               {routineStepActive ? 'Done & next' : 'Finish'}
             </Pressable>
           </header>
+          {onFocusedComparisonChange && <div className="practice-compare-choice" role="group" aria-label="Compare this take with">
+            {(['current-best', 'previous-take', 'reference-track'] as const).map(mode => <button type="button" key={mode}
+              disabled={practiceTransitionBusy || (mode === 'previous-take' && !focusedHasPrevious)}
+              aria-pressed={focusedComparison === mode || (focusedComparison === 'yesterday' && mode === 'current-best')}
+              onClick={() => onFocusedComparisonChange(mode)}>
+              {mode === 'current-best' ? focusedHasBest ? 'My best' : 'This take' : mode === 'previous-take' ? 'Previous' : 'Reference'}
+            </button>)}
+          </div>}
           <div className="focused-post-take-actions">
             <Pressable
               type="button"
@@ -494,10 +522,11 @@ function ControlDeck({
               haptic="light"
               hapticFeedback={hapticFeedback}
               className={focusedPostTakeReviewed ? 'is-complete' : ''}
+              disabled={practiceTransitionBusy}
               onClick={onFocusedPostTakeReview}
             >
               {focusedPostTakeReviewed ? <Check aria-hidden /> : <ScanSearch aria-hidden />}
-              <span>Compare</span>
+              <span>{focusedComparison === 'reference-track' && !focusedHasReference ? 'Find reference' : focusedComparison === 'current-best' && !focusedHasBest ? 'Listen' : 'Compare'}</span>
             </Pressable>
             <Pressable
               type="button"
@@ -516,6 +545,7 @@ function ControlDeck({
               haptic="light"
               hapticFeedback={hapticFeedback}
               className="is-primary"
+              disabled={practiceTransitionBusy}
               onClick={onFocusedPostTakeRetry}
             >
               <RotateCcw aria-hidden />

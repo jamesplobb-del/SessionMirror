@@ -3,10 +3,9 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { ClipboardPaste, X, Youtube } from 'lucide-react'
-import { parseYoutubeEmbedUrl, readYoutubeUrlFromClipboard } from '../utils/youtubeEmbed'
+import { X, Youtube } from 'lucide-react'
 import { setYoutubeDialogOpen } from '../utils/youtubeDialogState'
-import { triggerLightHaptic, triggerMediumHaptic } from '../utils/haptics'
+import { triggerLightHaptic } from '../utils/haptics'
 import { nativeGlideEase, motionGpuLayer } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
 import {
@@ -16,8 +15,6 @@ import {
 
 import PracticeReferenceBrowser from './PracticeReferenceBrowser'
 import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
-import { savePracticeReference } from '../utils/practiceReferences'
-import { parseYoutubeVideoId } from '../utils/youtubeEmbed'
 
 interface YoutubeUrlDialogProps {
   open: boolean
@@ -35,10 +32,6 @@ function readDialogViewport(): { height: number; top: number } {
 
 export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrlDialogProps) {
   const { projectId } = useContext(PracticeReferenceContext)
-  const [referenceName, setReferenceName] = useState('')
-  const [value, setValue] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [clipboardReady, setClipboardReady] = useState(false)
   const [viewportHeight, setViewportHeight] = useState<number | null>(null)
   const [viewportTop, setViewportTop] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,18 +64,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     setViewportTop(top)
   }, [])
 
-  const tryFillFromClipboard = useCallback(async (source: 'return' | 'paste-button') => {
-    const text = await readYoutubeUrlFromClipboard()
-    if (!text || !openRef.current) return false
-    setValue(text)
-    setError(null)
-    setClipboardReady(true)
-    if (source === 'paste-button') {
-      inputRef.current?.focus()
-    }
-    return true
-  }, [])
-
   /** Layout settle after returning from YouTube — skip camera recovery until the sheet closes. */
   const recoverDialogOnReturn = useCallback(() => {
     if (!openRef.current) return
@@ -98,8 +79,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       syncDialogViewport()
     }, 280)
 
-    void tryFillFromClipboard('return')
-  }, [syncDialogViewport, tryFillFromClipboard])
+  }, [syncDialogViewport])
 
   const scheduleDialogRecovery = useCallback(() => {
     if (recoveryTimerRef.current !== null) {
@@ -117,14 +97,9 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
       releaseInputFocus()
       setViewportHeight(null)
       setViewportTop(0)
-      setClipboardReady(false)
       return
     }
 
-    setValue('')
-    setReferenceName('')
-    setError(null)
-    setClipboardReady(false)
     applyViewportCssVarsOnResume()
     syncDialogViewport()
   }, [open, releaseInputFocus, syncDialogViewport])
@@ -192,49 +167,12 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     }
   }, [open, releaseInputFocus, scheduleDialogRecovery])
 
-  const handleSubmit = useCallback(() => {
-    const embedUrl = parseYoutubeEmbedUrl(value)
-    if (!embedUrl) {
-      setError('Paste a valid YouTube link or video ID.')
-      return
-    }
-    try {
-      savePracticeReference({ videoId: parseYoutubeVideoId(embedUrl)!, title: referenceName.trim() || `YouTube · ${parseYoutubeVideoId(embedUrl)}`, channel: '' }, projectId)
-    } catch {
-      setError('Could not save this reference. Please free up device storage and try again.')
-      return
-    }
-    releaseInputFocus()
-    setYoutubeDialogOpen(false)
-    onSubmit(embedUrl)
-    onClose()
-    requestCameraPreviewLayoutRecovery('youtube-submit')
-  }, [onClose, onSubmit, projectId, referenceName, releaseInputFocus, value])
-
   const handleClose = useCallback(() => {
     releaseInputFocus()
     setYoutubeDialogOpen(false)
     onClose()
     requestCameraPreviewLayoutRecovery('youtube-close')
   }, [onClose, releaseInputFocus])
-
-  const handlePasteFromClipboard = useCallback(() => {
-    triggerLightHaptic()
-    void (async () => {
-      const filled = await tryFillFromClipboard('paste-button')
-      if (!filled) {
-        setError('No YouTube link on the clipboard — copy a URL in YouTube first.')
-      }
-    })()
-  }, [tryFillFromClipboard])
-
-  const handleInputPaste = useCallback((event: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = event.clipboardData.getData('text').trim()
-    if (!text) return
-    setValue(text)
-    setError(null)
-    setClipboardReady(parseYoutubeEmbedUrl(text) !== null)
-  }, [])
 
   if (typeof document === 'undefined') return null
 
@@ -320,82 +258,6 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
               onClose()
               requestCameraPreviewLayoutRecovery('youtube-submit')
             }} />
-            <details className="focus-link-entry" open={clipboardReady || undefined}>
-              <summary>Have a YouTube link?</summary>
-            <p className="mb-2 text-[11px] leading-snug text-[#6c7077]">
-              Paste a link to add it to your saved references.
-            </p>
-
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                inputMode="url"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                enterKeyHint="done"
-                placeholder="YouTube URL or video ID"
-                aria-label="YouTube URL or video ID"
-                value={value}
-                onPointerDown={(event) => event.stopPropagation()}
-                onTouchStart={(event) => event.stopPropagation()}
-                onChange={(event) => {
-                  setValue(event.target.value)
-                  setError(null)
-                  setClipboardReady(false)
-                }}
-                onPaste={handleInputPaste}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') handleSubmit()
-                  if (event.key === 'Escape') handleClose()
-                }}
-                className="min-w-0 flex-1 touch-manipulation rounded-lg border border-[rgba(23,26,34,0.08)] bg-white px-3 py-3 text-base text-[#171a22] placeholder:text-[#6c7077]/70 focus:border-red-500/60 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={handlePasteFromClipboard}
-                className={`flex shrink-0 items-center gap-1 rounded-lg border border-[rgba(23,26,34,0.08)] bg-white px-3 py-2 text-xs font-medium text-[#171a22] ${NATIVE_SQUISH}`}
-                aria-label="Paste from clipboard"
-              >
-                <ClipboardPaste className="h-3.5 w-3.5" />
-                Paste
-              </button>
-            </div>
-
-            <input className="focus-reference-name" value={referenceName} maxLength={120}
-              onChange={event => setReferenceName(event.target.value)}
-              placeholder="Name this reference (optional)" aria-label="Reference name" />
-            {clipboardReady && !error && (
-              <p className="mt-2 text-xs text-emerald-600">Link ready — tap Load.</p>
-            )}
-
-            {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  triggerLightHaptic()
-                  handleClose()
-                }}
-                className={`rounded-lg px-3 py-2 text-xs font-medium text-[#6c7077] ${NATIVE_SQUISH}`}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  triggerMediumHaptic()
-                  handleSubmit()
-                }}
-                className={`rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-500 ${NATIVE_SQUISH}`}
-              >
-                Save & load
-              </button>
-            </div>
-            </details>
           </motion.div>
         </motion.div>
       )}

@@ -1,3 +1,4 @@
+import { loadPracticePassage, savePracticePassage } from '../utils/practicePassages'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -212,6 +213,8 @@ interface ReviewModeOverlayProps {
   onDeleteTake?: (id: string) => void
   onFavoriteTake?: (id: string) => void
   onPlaybackActiveChange?: (playing: boolean) => void
+  practiceProjectId?: string
+  benchmarkLibraryId?: string
   focusedPractice?: boolean
   initialLoopStartSeconds?: number | null
   initialLoopEndSeconds?: number | null
@@ -252,6 +255,8 @@ export default function ReviewModeOverlay({
   onFavoriteTake,
   onPlaybackActiveChange,
   focusedPractice = false,
+  practiceProjectId,
+  benchmarkLibraryId,
   initialLoopStartSeconds = null,
   initialLoopEndSeconds = null,
   onLoopRangeChange,
@@ -318,6 +323,10 @@ export default function ReviewModeOverlay({
     : activeSlot === 'benchmark'
       ? benchmarkTake
       : challengerTake
+  const passageSource = activeTake?.id ? `take:${activeTake.id}`
+    : activeSlot === 'benchmark' && benchmarkLibraryId ? `library:${benchmarkLibraryId}` : null
+  const storedPassage = useMemo(() => practiceProjectId && passageSource
+    ? loadPracticePassage(practiceProjectId, passageSource) : null, [practiceProjectId, passageSource])
   const benchmarkBlindLabel = blindSwapped ? 'B' : 'A'
   const challengerBlindLabel = blindSwapped ? 'A' : 'B'
   const activeBlindLabel =
@@ -427,6 +436,29 @@ export default function ReviewModeOverlay({
     ? audioPlayback.state.isPlaying
     : isPlaying
   const alignedCurrentTime = Math.max(0, displayCurrentTime - activeOffsetSeconds)
+  const rememberReviewPosition = useCallback((position = alignedCurrentTime) => {
+    if (!practiceProjectId || !passageSource) return
+    try {
+      const prior = loadPracticePassage(practiceProjectId, passageSource)
+      savePracticePassage(practiceProjectId, passageSource, { ...prior, positionSeconds: Math.max(0, position) })
+    } catch { void showAlert({ message: 'Could not remember your playback position.' }) }
+  }, [alignedCurrentTime, passageSource, practiceProjectId, showAlert])
+
+  const persistReviewLoop = useCallback((start: number | null, end: number | null) => {
+    if (practiceProjectId && passageSource) {
+      try {
+        const prior = loadPracticePassage(practiceProjectId, passageSource)
+        savePracticePassage(practiceProjectId, passageSource, { ...prior, startSeconds: start, endSeconds: end, loop: end !== null })
+      } catch { void showAlert({ message: 'Could not save this recording’s loop.' }) }
+    } else onLoopRangeChange?.(start, end)
+  }, [onLoopRangeChange, passageSource, practiceProjectId, showAlert])
+  const rememberPositionRef = useRef(rememberReviewPosition)
+  rememberPositionRef.current = rememberReviewPosition
+  useEffect(() => {
+    if (!practiceProjectId || !passageSource || !isOpen) return
+    const timer = window.setInterval(() => rememberPositionRef.current(), 5000)
+    return () => { window.clearInterval(timer) }
+  }, [isOpen, passageSource, practiceProjectId])
   const trimAvailable = Boolean(activeTake?.filePath) && displayDuration >= 0.1
   const safeTrimStart = Math.max(0, Math.min(trimRange.start, displayDuration || trimRange.start))
   const safeTrimEnd = Math.max(safeTrimStart, Math.min(trimRange.end, displayDuration || trimRange.end))
@@ -477,6 +509,7 @@ export default function ReviewModeOverlay({
       if (isVault || nextSlot === activeSlot) return
       const media = getActiveVideo()
       const rawTime = media?.currentTime ?? displayCurrentTime
+      rememberReviewPosition(Math.max(0, rawTime - activeOffsetSeconds))
       pendingComparisonTimeRef.current = Math.max(0, rawTime - activeOffsetSeconds)
       if (activeAudioPlaybackItem) {
         audioPlayback.pause()
@@ -492,6 +525,7 @@ export default function ReviewModeOverlay({
       displayCurrentTime,
       getActiveVideo,
       isVault,
+      rememberReviewPosition,
       onSlotChange,
     ],
   )
@@ -514,20 +548,20 @@ export default function ReviewModeOverlay({
       const start = alignedCurrentTime
       setLoopStartSeconds(start)
       setLoopEndSeconds(null)
-      onLoopRangeChange?.(start, null)
+      persistReviewLoop(start, null)
       return
     }
     if (loopEndSeconds === null) {
-      const minimumEnd = loopStartSeconds + 0.25
+      const minimumEnd = loopStartSeconds + 0.5
       const end = Math.max(minimumEnd, alignedCurrentTime)
       setLoopEndSeconds(end)
-      onLoopRangeChange?.(loopStartSeconds, end)
+      persistReviewLoop(loopStartSeconds, end)
       return
     }
     setLoopStartSeconds(null)
     setLoopEndSeconds(null)
-    onLoopRangeChange?.(null, null)
-  }, [alignedCurrentTime, loopEndSeconds, loopStartSeconds, onLoopRangeChange])
+    persistReviewLoop(null, null)
+  }, [alignedCurrentTime, loopEndSeconds, loopStartSeconds, persistReviewLoop])
 
   const scheduleHideOverlay = useCallback(() => {
     if (hideOverlayTimerRef.current !== null) {
@@ -707,6 +741,7 @@ export default function ReviewModeOverlay({
     (event?: React.MouseEvent<HTMLButtonElement>) => {
       event?.stopPropagation()
       event?.preventDefault()
+      rememberReviewPosition()
       reviewAutoplayEnabledRef.current = false
       stopProgressLoop()
       if (activeAudioPlaybackItem) {
@@ -724,7 +759,7 @@ export default function ReviewModeOverlay({
       pauseAllReviewVideosSafe()
       onClose()
     },
-    [activeAudioPlaybackItem, audioPlayback, onClose, pauseAllReviewVideosSafe, stopProgressLoop],
+    [activeAudioPlaybackItem, audioPlayback, onClose, pauseAllReviewVideosSafe, rememberReviewPosition, stopProgressLoop],
   )
 
   const togglePlayPause = useCallback(() => {
@@ -910,9 +945,9 @@ export default function ReviewModeOverlay({
   }, [isOpen])
 
   useEffect(() => {
-    setLoopStartSeconds(initialLoopStartSeconds)
-    setLoopEndSeconds(initialLoopEndSeconds)
-  }, [initialLoopEndSeconds, initialLoopStartSeconds, isOpen])
+    setLoopStartSeconds(storedPassage ? storedPassage.startSeconds : initialLoopStartSeconds)
+    setLoopEndSeconds(storedPassage ? storedPassage.endSeconds : initialLoopEndSeconds)
+  }, [storedPassage, initialLoopEndSeconds, initialLoopStartSeconds, isOpen])
 
   useEffect(() => {
     setActionMenuOpen(false)
@@ -962,7 +997,7 @@ export default function ReviewModeOverlay({
     if (activeAudioPlaybackItem) {
       audioPlayback.openFullscreen(activeAudioPlaybackItem)
       setShowPlayOverlay(true)
-      const alignedTime = pendingComparisonTimeRef.current ?? 0
+      const alignedTime = pendingComparisonTimeRef.current ?? storedPassage?.positionSeconds ?? 0
       pendingComparisonTimeRef.current = null
       const rawTime = alignedTime + activeOffsetSeconds
       window.requestAnimationFrame(() => audioPlayback.seek(rawTime))
@@ -980,7 +1015,7 @@ export default function ReviewModeOverlay({
     const video = getActiveVideo()
     if (!video) return
 
-    const alignedTime = pendingComparisonTimeRef.current ?? 0
+    const alignedTime = pendingComparisonTimeRef.current ?? storedPassage?.positionSeconds ?? 0
     pendingComparisonTimeRef.current = null
     const rawTime = alignedTime + activeOffsetSeconds
     setCurrentTime(rawTime)

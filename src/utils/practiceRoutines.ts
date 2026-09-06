@@ -55,6 +55,14 @@ export interface RoutineStep {
   projectId: string | null
   /** What to suggest when no reference has been selected yet. */
   referenceQuery: string
+  /**
+   * A recording pinned in the builder, as a YouTube video ID. When set it
+   * loads on start instead of opening the search - `referenceQuery` stays the
+   * fallback for items where you would rather choose in the moment.
+   */
+  referenceVideoId: string | null
+  /** Existing metronome timeline ID. Recording remains owned by the normal camera/audio controls. */
+  programId: string | null
   /** For `game` steps. */
   gameRoute: LabsRoute | null
 }
@@ -80,10 +88,19 @@ export interface RoutineDay {
   activeStepStartedAt: number | null
   startedAt: number | null
   completedAt: number | null
+  /** Paused items stay resumable without counting time away. */
+  pausedStepId: string | null
+  itemsByStep: Record<string, { title: string; projectId: string | null }>
+  elapsedMsByStep: Record<string, number>
+  sessionIdsByStep: Record<string, string[]>
+  /** Temporary desk changes belong to this day, not the routine preset. */
+  desksByStep: Record<string, DeskSnapshot>
+  updatedAt: number
 }
 
 const ROUTINE_KEY = 'besttake:practice-routine:v1'
 const DAY_KEY = 'besttake:practice-routine-day:v1'
+const HISTORY_KEY = 'besttake:routine-history:v1:'
 const INSTRUMENT_KEY = 'besttake:instrument-id:v1'
 
 const KINDS: readonly RoutineStepKind[] = ['tune', 'metro', 'record', 'focus', 'game', 'free']
@@ -165,6 +182,8 @@ export function createStep(partial: Partial<RoutineStep> & { title: string }): R
     desk: partial.desk ?? null,
     projectId: partial.projectId ?? null,
     referenceQuery: (partial.referenceQuery ?? '').trim().slice(0, 80),
+    referenceVideoId: /^[\w-]{11}$/.test(partial.referenceVideoId ?? '') ? partial.referenceVideoId! : null,
+    programId: partial.programId ?? null,
     gameRoute: partial.gameRoute ?? null,
   }
 }
@@ -228,7 +247,7 @@ function parseDesk(value: unknown): DeskSnapshot | null {
   }
 }
 
-function parseStep(value: unknown): RoutineStep | null {
+export function parseStep(value: unknown): RoutineStep | null {
   if (!value || typeof value !== 'object') return null
   const raw = value as Record<string, unknown>
   if (typeof raw.id !== 'string' || typeof raw.title !== 'string') return null
@@ -241,11 +260,13 @@ function parseStep(value: unknown): RoutineStep | null {
     desk: parseDesk(raw.desk),
     projectId: typeof raw.projectId === 'string' ? raw.projectId : null,
     referenceQuery: typeof raw.referenceQuery === 'string' ? raw.referenceQuery : '',
+    referenceVideoId: typeof raw.referenceVideoId === 'string' ? raw.referenceVideoId : null,
+    programId: typeof raw.programId === 'string' && raw.programId.trim() ? raw.programId : null,
     gameRoute: GAME_ROUTES.includes(raw.gameRoute as LabsRoute) ? (raw.gameRoute as LabsRoute) : null,
   })
 }
 
-function parseRoutine(value: unknown): Routine | null {
+export function parseRoutine(value: unknown): Routine | null {
   if (!value || typeof value !== 'object') return null
   const raw = value as Record<string, unknown>
   if (typeof raw.id !== 'string' || typeof raw.name !== 'string' || !Array.isArray(raw.steps)) return null
@@ -315,6 +336,12 @@ export function freshRoutineDay(routineId: string): RoutineDay {
     activeStepStartedAt: null,
     startedAt: null,
     completedAt: null,
+    pausedStepId: null,
+    itemsByStep: {},
+    elapsedMsByStep: {},
+    sessionIdsByStep: {},
+    desksByStep: {},
+    updatedAt: Date.now(),
   }
 }
 
@@ -334,33 +361,114 @@ function parseDay(value: unknown): RoutineDay | null {
     activeStepStartedAt: num(raw.activeStepStartedAt),
     startedAt: num(raw.startedAt),
     completedAt: num(raw.completedAt),
+    pausedStepId: typeof raw.pausedStepId === 'string' ? raw.pausedStepId : null,
+    itemsByStep: Object.fromEntries(Object.entries(objectMap(raw.itemsByStep)).flatMap(([id, value]) => {
+      const item = objectMap(value)
+      return typeof item.title === 'string' ? [[id, { title: item.title.slice(0, MAX_STEP_TITLE), projectId: typeof item.projectId === 'string' ? item.projectId : null }]] : []
+    })),
+    elapsedMsByStep: Object.fromEntries(Object.entries(objectMap(raw.elapsedMsByStep))
+      .filter(([, v]) => typeof v === 'number' && Number.isFinite(v) && v >= 0)) as Record<string, number>,
+    sessionIdsByStep: Object.fromEntries(Object.entries(objectMap(raw.sessionIdsByStep)).map(([id, v]) => [id, ids(v)])),
+    desksByStep: Object.fromEntries(Object.entries(objectMap(raw.desksByStep))
+      .flatMap(([id, v]) => { const desk = parseDesk(v); return desk ? [[id, desk]] : [] })),
+    updatedAt: num(raw.updatedAt) ?? num(raw.activeStepStartedAt) ?? 0,
   }
 }
 
-/**
- * Today's progress for this routine. Yesterday's card is thrown away, and so
- * is progress against a routine that no longer exists.
- */
+function objectMap(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+/** History is retained per routine, so switching plans or rolling midnight loses no checks. */
+export function loadRoutineHistory(routineId: string): RoutineDay[] {
+  try {
+    const rows: unknown = JSON.parse(localStorage.getItem(HISTORY_KEY + encodeURIComponent(routineId)) ?? '[]')
+    return Array.isArray(rows) ? rows.map(parseDay).filter((row): row is RoutineDay => Boolean(row && row.routineId === routineId))
+      .sort((a, b) => b.date.localeCompare(a.date)) : []
+  } catch { return [] }
+}
+
 export function loadRoutineDay(routine: Routine): RoutineDay {
   try {
     const raw = localStorage.getItem(DAY_KEY)
-    const parsed = raw ? parseDay(JSON.parse(raw)) : null
-    if (parsed && parsed.date === todayKey() && parsed.routineId === routine.id) {
-      return reconcileDay(parsed, routine)
-    }
-  } catch {
-    /* fall through */
-  }
+    const legacy = raw ? parseDay(JSON.parse(raw)) : null
+    if (legacy && !loadRoutineHistory(legacy.routineId).some(row => row.date === legacy.date)) saveRoutineDay(pauseRoutineDay(legacy, legacy.updatedAt))
+    const saved = loadRoutineHistory(routine.id).find(row => row.date === todayKey())
+    const candidate = legacy?.routineId === routine.id && legacy.date === todayKey() ? legacy : null
+    const parsed = saved && (!candidate || saved.updatedAt > candidate.updatedAt) ? saved : candidate
+    // After a cold launch, resume is deliberate. Never count time the app was closed.
+    if (parsed) return reconcileDay(pauseRoutineDay(parsed, parsed.updatedAt), routine)
+  } catch { /* fall through */ }
   return freshRoutineDay(routine.id)
 }
 
+/** Throws on storage failure so the caller can report that progress is not durable. */
 export function saveRoutineDay(day: RoutineDay | null): void {
-  try {
-    if (day) localStorage.setItem(DAY_KEY, JSON.stringify(day))
-    else localStorage.removeItem(DAY_KEY)
-  } catch {
-    /* private mode / quota */
+  if (!day) { localStorage.removeItem(DAY_KEY); return }
+  const rows = loadRoutineHistory(day.routineId)
+  localStorage.setItem(HISTORY_KEY + encodeURIComponent(day.routineId), JSON.stringify([
+    day, ...rows.filter(row => row.date !== day.date),
+  ]))
+  localStorage.setItem(DAY_KEY, JSON.stringify(day))
+}
+
+/** Accrue only the active interval; checkpointing is safe to repeat. */
+export function checkpointRoutineDay(day: RoutineDay, now = Date.now(), desk?: DeskSnapshot | null): RoutineDay {
+  const id = day.activeStepId
+  if (!id) return day
+  const delta = day.activeStepStartedAt === null ? 0 : Math.max(0, now - day.activeStepStartedAt)
+  return {
+    ...day, updatedAt: now, activeStepStartedAt: now,
+    elapsedMsByStep: { ...day.elapsedMsByStep, [id]: (day.elapsedMsByStep[id] ?? 0) + delta },
+    desksByStep: desk ? { ...day.desksByStep, [id]: desk } : day.desksByStep,
   }
+}
+
+export function pauseRoutineDay(day: RoutineDay, now = Date.now(), desk?: DeskSnapshot | null): RoutineDay {
+  const next = checkpointRoutineDay(day, now, desk)
+  return { ...next, activeStepId: null, activeStepStartedAt: null,
+    pausedStepId: day.activeStepId ?? day.pausedStepId, updatedAt: now }
+}
+
+/**
+ * Opening Home is a peek, not a stop. Bank the time so far and stop the clock,
+ * but keep the item current so coming back needs no second decision. Idle time
+ * still never counts as practice.
+ */
+export function holdRoutineDay(day: RoutineDay, now = Date.now(), desk?: DeskSnapshot | null): RoutineDay {
+  if (!day.activeStepId) return day
+  return { ...checkpointRoutineDay(day, now, desk), activeStepStartedAt: null, updatedAt: now }
+}
+
+/** Restart the clock on a held item. A genuine pause has no activeStepId. */
+export function resumeRoutineDay(day: RoutineDay, now = Date.now()): RoutineDay {
+  if (!day.activeStepId || day.activeStepStartedAt !== null) return day
+  return { ...day, activeStepStartedAt: now, updatedAt: now }
+}
+
+export function startRoutineDayStep(day: RoutineDay, stepId: string, sessionId: string | null, now = Date.now(), item?: { title: string; projectId: string | null }): RoutineDay {
+  const next = checkpointRoutineDay(day, now)
+  return {
+    ...next, itemsByStep: item ? { ...day.itemsByStep, [stepId]: day.itemsByStep[stepId] ?? item } : day.itemsByStep,
+    activeStepId: stepId, activeStepStartedAt: now, pausedStepId: null,
+    startedAt: day.startedAt ?? now, completedAt: null, updatedAt: now,
+    doneStepIds: day.doneStepIds.filter(id => id !== stepId),
+    skippedStepIds: day.skippedStepIds.filter(id => id !== stepId),
+    sessionIdsByStep: sessionId ? { ...day.sessionIdsByStep,
+      [stepId]: [...new Set([...(day.sessionIdsByStep[stepId] ?? []), sessionId])] } : day.sessionIdsByStep,
+  }
+}
+
+export function settleRoutineDayStep(day: RoutineDay, routine: Routine, stepId: string, outcome: 'done' | 'skipped', now = Date.now()): RoutineDay {
+  const next = day.activeStepId === stepId ? pauseRoutineDay(day, now) : day
+  const item = routine.steps.find(step => step.id === stepId)
+  return reconcileDay({ ...next, updatedAt: now,
+    itemsByStep: item ? { ...next.itemsByStep, [stepId]: next.itemsByStep[stepId] ?? { title: item.title, projectId: item.projectId } } : next.itemsByStep,
+    pausedStepId: next.pausedStepId === stepId ? null : next.pausedStepId,
+    doneStepIds: [...next.doneStepIds.filter(id => id !== stepId), ...(outcome === 'done' ? [stepId] : [])],
+    skippedStepIds: [...next.skippedStepIds.filter(id => id !== stepId), ...(outcome === 'skipped' ? [stepId] : [])],
+    startedAt: next.startedAt ?? now,
+  }, routine)
 }
 
 /** Drops progress against steps that were edited away. */
@@ -375,6 +483,7 @@ export function reconcileDay(day: RoutineDay, routine: Routine): RoutineDay {
     routineId: routine.id,
     doneStepIds: done,
     skippedStepIds: skipped,
+    pausedStepId: day.pausedStepId && ids.has(day.pausedStepId) && !done.includes(day.pausedStepId) && !skipped.includes(day.pausedStepId) ? day.pausedStepId : null,
     activeStepId: active,
     activeStepStartedAt: active ? day.activeStepStartedAt : null,
     completedAt: allSettled ? day.completedAt ?? Date.now() : null,

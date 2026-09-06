@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Check,
   ChevronDown,
@@ -39,18 +39,13 @@ import {
   type Routine,
   type RoutineDay,
 } from '../utils/practiceRoutines'
-import RoutineBuilder, {
+import {
   type BuilderView,
   type RoutineBuilderMode,
   type RoutineFocusRequest,
 } from './RoutineBuilder'
-import {
-  buildPresetRoutine,
-  getRoutinePresets,
-  getStepTemplates,
-  presetMinutes,
-  type RoutinePreset,
-} from '../utils/routinePresets'
+import GuidedRoutineBuilder from './GuidedRoutineBuilder'
+import RoutineProgressSummary from './RoutineProgressSummary'
 
 /** A session is the specific thing being worked on — an excerpt, solo, or
  * technique. It's just a Project: its name IS the focus, and it accumulates
@@ -118,6 +113,7 @@ interface PracticeHubProps {
   instrumentId: string | null
   liveDeskSnapshot: DeskSnapshot
   onSelectInstrument: (instrumentId: string) => void
+  onOpenItemHistory?: (projectId: string, title: string) => void
   onStartRoutineStep: (stepId: string) => void | Promise<void>
   onToggleRoutineStep: (stepId: string) => void
   onOpenRoutineBuilder: (mode: RoutineBuilderMode) => void
@@ -163,6 +159,7 @@ export default function PracticeHub({
   instrumentId,
   liveDeskSnapshot,
   onSelectInstrument,
+  onOpenItemHistory,
   onStartRoutineStep,
   onToggleRoutineStep,
   onOpenRoutineBuilder,
@@ -173,6 +170,7 @@ export default function PracticeHub({
   onCancelRoutineFocus,
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
+  const reducedMotion = useReducedMotion()
   const [page, setPage] = useState<HubPage>('home')
   const pageRef = useRef<HubPage>(page)
   pageRef.current = page
@@ -247,6 +245,18 @@ export default function PracticeHub({
 
     document.body.style.overflow = 'hidden'
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && dialogRef.current) {
+        const controls = Array.from(dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, a[href], [tabindex="0"]'))
+          .filter(element => element.getClientRects().length > 0)
+        const first = controls[0]
+        const last = controls[controls.length - 1]
+        if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement as HTMLElement))) {
+          event.preventDefault(); last?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first?.focus()
+        }
+        return
+      }
       if (event.key !== 'Escape') return
       event.preventDefault()
       if (pageRef.current === 'instrument') {
@@ -277,14 +287,6 @@ export default function PracticeHub({
   const homeSubtitle = instrumentProfile
     ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(instrumentProfile.soundVolumeThreshold)}`
     : 'Sets the tuner, written pitch, and gate'
-  const homePresets = useMemo(() => getRoutinePresets(instrumentId), [instrumentId])
-  const homePresetTemplates = useMemo(() => getStepTemplates(instrumentId), [instrumentId])
-
-  const applyHomePreset = (preset: RoutinePreset) => {
-    const built = buildPresetRoutine(preset, instrumentId)
-    onSaveRoutine({ ...built, name: 'Daily routine' })
-  }
-
   /**
    * The bench: every practice item that has actually been opened, most recent
    * first. `lastOpenedAt` is the only honest ordering — a project's createdAt
@@ -365,7 +367,7 @@ export default function PracticeHub({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div className="practice-menu-layer">
+        <div className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : ''}`}>
           <motion.button
             type="button"
             className="practice-menu-backdrop"
@@ -379,14 +381,15 @@ export default function PracticeHub({
 
           <motion.section
             ref={dialogRef}
-            className={`practice-menu-card ${page === 'home' ? 'practice-menu-card--home' : ''}`}
+            className={`practice-menu-card ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="practice-menu-title"
+            aria-labelledby={activePage === 'routine' ? undefined : 'practice-menu-title'}
+            aria-label={activePage === 'routine' ? 'Build your routine' : undefined}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
+            initial={{ opacity: 0, scale: activePage === 'routine' || reducedMotion ? 1 : 0.96, y: activePage === 'routine' || reducedMotion ? 0 : 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
+            exit={{ opacity: 0, scale: activePage === 'routine' || reducedMotion ? 1 : 0.97, y: activePage === 'routine' || reducedMotion ? 0 : 8 }}
             transition={iosSpringSnappy}
             style={motionGpuLayer}
           >
@@ -483,12 +486,12 @@ export default function PracticeHub({
                   <motion.div
                     key="routine-builder"
                     className="practice-menu-page"
-                    initial={{ opacity: 0, x: 12 }}
+                    initial={{ opacity: 0, x: reducedMotion ? 0 : 12 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8 }}
+                    exit={{ opacity: 0, x: reducedMotion ? 0 : 8 }}
                     transition={iosFade}
                   >
-                    <RoutineBuilder
+                    <GuidedRoutineBuilder
                       mode={routineBuilderRequest}
                       routine={routine}
                       instrumentId={instrumentId}
@@ -608,6 +611,7 @@ export default function PracticeHub({
                           tunerTransposition={tunerTransposition}
                           hapticFeedback={hapticFeedback}
                           startingStepId={startingRoutineStepId}
+                          onOpenItemHistory={onOpenItemHistory}
                           onStartStep={(stepId) => void startRoutineStep(stepId)}
                           onToggleStep={onToggleRoutineStep}
                           onEdit={() => onOpenRoutineBuilder('edit')}
@@ -624,43 +628,12 @@ export default function PracticeHub({
                             className="practice-menu-primary"
                             onClick={() => onOpenRoutineBuilder('build')}
                           >
-                            Plan my practice
+                            Build routine
                           </Pressable>
-                          {homePresets.length > 0 && (
-                            <div className="routine-home-presets">
-                              <span className="practice-menu-eyebrow">Or start from a preset</span>
-                              {homePresets.map((preset) => {
-                                const titles = preset.templateIds
-                                  .map((id) => homePresetTemplates.find((template) => template.id === id)?.title)
-                                  .filter((title): title is string => Boolean(title))
-                                return (
-                                  <Pressable
-                                    key={preset.id}
-                                    type="button"
-                                    intensity="soft"
-                                    haptic="light"
-                                    hapticFeedback={hapticFeedback}
-                                    className="routine-home-preset"
-                                    onClick={() => applyHomePreset(preset)}
-                                  >
-                                    <span className="routine-home-preset__head">
-                                      <strong>{preset.name}</strong>
-                                      <em>
-                                        {formatMinutes(presetMinutes(preset, instrumentId))}
-                                        {' · '}
-                                        {titles.length} steps
-                                      </em>
-                                    </span>
-                                    <ol>
-                                      {titles.slice(0, 5).map((title) => (
-                                        <li key={title}>{title}</li>
-                                      ))}
-                                    </ol>
-                                  </Pressable>
-                                )
-                              })}
-                            </div>
-                          )}
+                          <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
+                            className="routine-link" onClick={() => onOpenRoutineBuilder('presets')}>
+                            Browse routines
+                          </Pressable>
                         </section>
                       )}
 
@@ -786,7 +759,7 @@ export default function PracticeHub({
                             <path d="M12 14v7" />
                           </svg>
                           <strong>Tuner</strong>
-                          <small>{instrumentProfile?.label ?? tunerKey.label}</small>
+                          <small>{instrumentId ? instrumentHeading(instrumentId) : tunerKey.shortLabel}</small>
                         </Pressable>
                       </div>
                     </section>
@@ -874,6 +847,7 @@ interface TodayBoardProps {
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   startingStepId: string | null
+  onOpenItemHistory?: (projectId: string, title: string) => void
   onStartStep: (stepId: string) => void
   onToggleStep: (stepId: string) => void
   onEdit: () => void
@@ -885,28 +859,29 @@ function TodayBoard({
   tunerTransposition,
   hapticFeedback,
   startingStepId,
+  onOpenItemHistory,
   onStartStep,
   onToggleStep,
   onEdit,
 }: TodayBoardProps) {
   const progress = routineProgress(routine, day)
-  const activeStep = day?.activeStepId
-    ? routine.steps.find((step) => step.id === day.activeStepId) ?? null
+  const resumableId = day?.activeStepId ?? day?.pausedStepId
+  const activeStep = resumableId
+    ? routine.steps.find((step) => step.id === resumableId) ?? null
     : null
   const next = activeStep ?? nextOpenStep(routine, day)
   const finished = !next && progress.total > 0
   const started = Boolean(day?.startedAt) && progress.done + (day?.skippedStepIds.length ?? 0) > 0
-  const minutesSpent = day?.startedAt && day.completedAt
-    ? Math.max(1, Math.round((day.completedAt - day.startedAt) / 60_000))
-    : null
+  const activeMinutes = Object.values(day?.elapsedMsByStep ?? {}).reduce((sum, ms) => sum + ms, 0) / 60_000
+  const minutesSpent = activeMinutes >= 1 ? Math.round(activeMinutes) : null
 
   const cta = progress.complete
     ? null
     : activeStep
-      ? `Resume · ${activeStep.title}`
+      ? 'Resume'
       : started && next
-        ? `Continue · ${next.title}`
-        : next ? `Start · ${next.title}` : 'Start practice'
+        ? 'Continue'
+        : next ? 'Start' : 'Start practice'
 
   return (
     <section className={`routine-board ${finished ? 'is-complete' : ''}`} aria-label="Today's routine">
@@ -996,16 +971,18 @@ function TodayBoard({
                 onClick={() => onStartStep(step.id)}
               >
                 <strong>{step.title}</strong>
-                <small>{skipped ? `Skipped · ${summary}` : summary || 'Tap to start'}</small>
+                {(skipped || !next || step.id !== next.id) &&
+                  <small>{skipped ? `Skipped · ${summary}` : summary || 'Tap to start'}</small>}
               </Pressable>
               <span className="routine-row__go" aria-hidden>
-                {active ? <em>Now</em> : <Play />}
+                {active ? <em>{day?.pausedStepId === step.id ? 'Paused' : 'Now'}</em> : <Play />}
               </span>
             </li>
           )
         })}
       </ol>
 
+      <RoutineProgressSummary day={day} onOpenHistory={onOpenItemHistory} />
       {finished ? (
         <div className="routine-done">
           <Check aria-hidden />

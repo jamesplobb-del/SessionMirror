@@ -7,6 +7,8 @@ export type PracticeComparisonMode =
   | 'reference-track'
 
 export interface PracticeSession {
+  routineId: string | null
+  routineStepId: string | null
   id: string
   projectId: string
   startedAt: number

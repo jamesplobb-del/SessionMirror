@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion'
-import { Check, ChevronDown, ChevronUp, GripVertical, ListChecks, Pause, SkipForward } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, GripVertical, Pause, Headphones, X } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import RoutineProgramControls from './RoutineProgramControls'
 import { iosSpringSnappy } from '../utils/motionPresets'
 import type { TunerTranspositionId } from '../utils/tunerTransposition'
 import { formatElapsed, summarizeStep, type RoutineStep } from '../utils/practiceRoutines'
@@ -21,6 +22,10 @@ interface RoutineBarProps {
   stepIndex: number
   stepCount: number
   nextStep: RoutineStep | null
+  elapsedMs?: number
+  busy?: boolean
+  referenceReady?: boolean
+  onRememberSetup?: () => void
   startedAt: number | null
   expanded: boolean
   /** Light surface on the audio tools; dark glass over the camera. */
@@ -34,8 +39,13 @@ interface RoutineBarProps {
   onSkip: () => void
   onOpenToday: () => void
   onPause: () => void
+  /** Put the routine down without being taken to Today. */
+  onClose?: () => void
   onReferences?: () => void
   onHistory?: () => void
+  contextText?: string
+  onListenReference?: () => void
+  onOpenProgram?: () => void
   onAdjustment?: () => void
 }
 
@@ -69,6 +79,10 @@ export default function RoutineBar({
   stepCount,
   nextStep,
   startedAt,
+  elapsedMs: accumulatedMs = 0,
+  busy = false,
+  referenceReady = false,
+  onRememberSetup,
   expanded,
   audioSurface,
   overLabs = false,
@@ -79,10 +93,18 @@ export default function RoutineBar({
   onSkip,
   onOpenToday,
   onPause,
+  onClose,
   onReferences,
   onHistory,
   onAdjustment,
+  onOpenProgram,
+  contextText,
+  onListenReference,
 }: RoutineBarProps) {
+  const [contextDismissed, setContextDismissed] = useState(false)
+  useEffect(() => { setContextDismissed(false) }, [step.id])
+  const [setupRemembered, setSetupRemembered] = useState(false)
+  useEffect(() => { setSetupRemembered(false) }, [step.id])
   const [now, setNow] = useState(() => Date.now())
   const barRef = useRef<HTMLElement | null>(null)
   const placedRef = useRef(false)
@@ -129,6 +151,7 @@ export default function RoutineBar({
       dragX.get(),
       dragY.get(),
     )
+    if (x === dragX.get() && y === dragY.get()) return
     dragX.set(x)
     dragY.set(y)
     if (placedRef.current) saveWidgetPosition(POSITION_ID, x, y)
@@ -148,6 +171,29 @@ export default function RoutineBar({
     const frame = window.requestAnimationFrame(reclamp)
     return () => window.cancelAnimationFrame(frame)
   }, [expanded, reclamp])
+
+  /**
+   * The outer `expanded` toggle is not the only thing that changes the bar's
+   * height: the context reminder, the program row and the reference-passage
+   * disclosure all grow it in place. Without this, opening one near the bottom
+   * of the screen leaves the bar's own controls hanging off the edge.
+   * Coalesced per frame because an animated `height: auto` fires this on every
+   * frame of the transition.
+   */
+  useEffect(() => {
+    const el = barRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(reclamp)
+    })
+    observer.observe(el)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [reclamp])
 
   /** Width-only resize: the height is whatever the step needs. */
   const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -186,7 +232,7 @@ export default function RoutineBar({
 
   if (typeof document === 'undefined') return null
 
-  const elapsedMs = startedAt ? now - startedAt : 0
+  const elapsedMs = accumulatedMs + (startedAt ? Math.max(0, now - startedAt) : 0)
   const targetMs = step.minutes * 60_000
   const overTarget = targetMs > 0 && elapsedMs >= targetMs
   const clock = step.minutes > 0
@@ -217,6 +263,17 @@ export default function RoutineBar({
       <span className="routine-bar__grip" aria-hidden>
         <GripVertical />
       </span>
+      {onClose && (
+        <button
+          type="button"
+          className="routine-bar__close"
+          disabled={busy}
+          aria-label="Close the routine bar"
+          onClick={onClose}
+        >
+          <X aria-hidden />
+        </button>
+      )}
 
       <Pressable
         type="button"
@@ -241,6 +298,9 @@ export default function RoutineBar({
         </span>
       )}
 
+      {contextText && !contextDismissed && <div className="routine-item-context"><span>{contextText}</span><button type="button" aria-label="Dismiss practice reminder" onClick={() => setContextDismissed(true)}><X aria-hidden /></button></div>}
+      {onReferences && <div className="routine-reference-shortcut"><button type="button" disabled={busy} onClick={referenceReady && onListenReference ? onListenReference : onReferences}><Headphones aria-hidden /><span>{referenceReady ? 'Listen to your reference' : 'Find a reference'}</span><ChevronDown aria-hidden /></button></div>}
+      {step.programId && <RoutineProgramControls key={step.programId} programId={step.programId} disabled={busy} onOpen={onOpenProgram} />}
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
@@ -251,37 +311,13 @@ export default function RoutineBar({
             transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
           >
             {summary && <p className="routine-bar__summary">{summary}</p>}
-            {onReferences && <div className="routine-bar__resources">
-              <button type="button" onClick={onReferences}>References</button>
-              <button type="button" onClick={onHistory}>Progress</button>
-              <button type="button" onClick={onAdjustment}>One adjustment</button>
-            </div>}
             <div className="routine-bar__actions">
               <Pressable
                 type="button"
                 intensity="soft"
                 haptic="light"
                 hapticFeedback={hapticFeedback}
-                onClick={onOpenToday}
-              >
-                <ListChecks aria-hidden />
-                <span>Today</span>
-              </Pressable>
-              <Pressable
-                type="button"
-                intensity="soft"
-                haptic="light"
-                hapticFeedback={hapticFeedback}
-                onClick={onSkip}
-              >
-                <SkipForward aria-hidden />
-                <span>Skip</span>
-              </Pressable>
-              <Pressable
-                type="button"
-                intensity="soft"
-                haptic="light"
-                hapticFeedback={hapticFeedback}
+                disabled={busy}
                 onClick={onPause}
                 aria-label="Pause the routine"
               >
@@ -294,12 +330,24 @@ export default function RoutineBar({
                 haptic="success"
                 hapticFeedback={hapticFeedback}
                 className="is-primary"
+                disabled={busy}
                 onClick={onDone}
               >
                 <Check aria-hidden />
-                <span>{nextStep ? 'Done & next' : 'Finish item'}</span>
+                <span>{busy ? 'Saving…' : nextStep ? 'Done & next' : 'Finish item'}</span>
               </Pressable>
             </div>
+            <details className="routine-bar__more">
+              <summary>More options</summary>
+              <div className="routine-bar__resources">
+                <button type="button" disabled={busy} onClick={onOpenToday}>Today’s routine</button>
+                <button type="button" disabled={busy} onClick={onSkip}>Skip item</button>
+                {onReferences && <button type="button" disabled={busy} onClick={onReferences}>Change reference</button>}
+                {onHistory && <button type="button" onClick={onHistory}>Item journal</button>}
+                {onAdjustment && <button type="button" onClick={onAdjustment}>One adjustment</button>}
+              </div>
+              {onRememberSetup && <button type="button" className="routine-bar__remember" disabled={busy} onClick={() => { onRememberSetup(); setSetupRemembered(true) }}>{setupRemembered ? 'Starting setup saved' : 'Use these tool settings next time'}</button>}
+            </details>
             {nextStep && (
               <p className="routine-bar__next">
                 Next · {nextStep.title}

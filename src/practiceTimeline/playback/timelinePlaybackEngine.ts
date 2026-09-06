@@ -49,11 +49,20 @@ export class TimelinePlaybackEngine {
   private measure = 1
   private sessionActive = false
   private playing = false
+  private playGeneration = 0
   private finished = false
   private elapsedSeconds = 0
   private tempoScale = 1
   private markers: PracticeTimelineMarker[] = []
   private callbacks: TimelinePlaybackCallbacks = {}
+  private listeners = new Set<(state: TimelinePlaybackState) => void>()
+
+  /** Additional read-only observers must not replace the program view's callbacks. */
+  subscribe(listener: (state: TimelinePlaybackState) => void): () => void {
+    this.listeners.add(listener)
+    listener(this.getState())
+    return () => { this.listeners.delete(listener) }
+  }
   private unsubscribeBar: (() => void) | null = null
   private unsubscribePulse: (() => void) | null = null
   private countInRemaining = 0
@@ -154,6 +163,7 @@ export class TimelinePlaybackEngine {
   ): boolean {
     if (timeline.sections.length === 0) return false
 
+    this.playGeneration++
     this.detachBarListener()
     sharedMetronomeEngine.stop()
 
@@ -206,7 +216,9 @@ export class TimelinePlaybackEngine {
     this.applyCurrentSection()
     this.attachBarListener()
 
+    const generation = ++this.playGeneration
     const started = await sharedMetronomeEngine.start()
+    if (generation !== this.playGeneration || !this.sessionActive) return false
     if (!started) {
       this.detachBarListener()
       return false
@@ -218,7 +230,8 @@ export class TimelinePlaybackEngine {
   }
 
   pause(): void {
-    if (!this.playing) return
+    // Cancel preparation too: the audio route may still be starting.
+    this.playGeneration++
     this.playing = false
     this.detachBarListener()
     sharedMetronomeEngine.stop()
@@ -244,6 +257,7 @@ export class TimelinePlaybackEngine {
   }
 
   exitSession(): void {
+    this.playGeneration++
     this.detachBarListener()
     sharedMetronomeEngine.stop()
     this.timeline = null
@@ -378,7 +392,9 @@ export class TimelinePlaybackEngine {
   }
 
   private emitState(): void {
-    this.callbacks.onStateChange?.(this.getState())
+    const state = this.getState()
+    this.callbacks.onStateChange?.(state)
+    this.listeners.forEach(listener => listener(state))
   }
 
   private armCountInForCurrentPosition(

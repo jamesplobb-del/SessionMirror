@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS projects (
 );
 
 CREATE TABLE IF NOT EXISTS practice_sessions (
+  routine_id TEXT,
+  routine_step_id TEXT,
   id TEXT PRIMARY KEY NOT NULL,
   project_id TEXT NOT NULL,
   started_at INTEGER NOT NULL,

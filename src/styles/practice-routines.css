@@ -15,10 +15,10 @@
 .routine-board { border: 0 !important; padding: 0 0 12px !important; background: none !important; box-shadow: none !important; gap: 12px !important; }
 .routine-board__head h3 { font-size: clamp(1.35rem, 5vw, 1.75rem) !important; letter-spacing: -.04em !important; }
 .routine-board__head p { margin-top: 6px !important; font-size: 0.75rem !important; }
-.routine-next-item { padding: 1.15rem 1.1rem; border-radius: 1.25rem; border: 1px solid var(--practice-menu-divider); background: linear-gradient(135deg, var(--sm-gold-soft, #f7a60018), transparent 65%), var(--practice-menu-group); }
-.routine-next-item h4 { font-size: clamp(1.35rem, 5.5vw, 1.85rem); font-weight: 700; line-height: 1.15; letter-spacing: -.035em; margin: 8px 0; overflow-wrap: anywhere; }
-.routine-next-item p { font-size: 0.75rem; line-height: 1.55; color: var(--practice-menu-secondary); margin: 0 0 1rem; }
-.routine-next-item .practice-menu-primary { width: 100%; min-height: 3rem; white-space: normal; overflow-wrap: anywhere; }
+.routine-next-item { padding: 1rem 1.05rem; border-radius: 1.25rem; border: 1px solid var(--practice-menu-divider); background: linear-gradient(135deg, var(--sm-gold-soft, #f7a60018), transparent 65%), var(--practice-menu-group); }
+.routine-next-item h4 { font-size: clamp(1.15rem, 4.4vw, 1.45rem); font-weight: 700; line-height: 1.18; letter-spacing: -.03em; margin: 5px 0; overflow-wrap: anywhere; }
+.routine-next-item p { font-size: 0.75rem; line-height: 1.5; color: var(--practice-menu-secondary); margin: 0 0 0.78rem; }
+.routine-next-item .practice-menu-primary { width: 100%; min-height: 2.8rem; white-space: normal; overflow-wrap: anywhere; }
 .routine-board__list { display: grid; gap: 0.45rem; }
 .routine-board__list .routine-row {
   min-height: 3.6rem;
@@ -1056,6 +1056,27 @@
   border-bottom: 0;
 }
 
+/* Each toggle says what it actually does once the item starts; a bare
+ * "Drone" switch told a musician nothing about what they would hear. */
+.routine-tool__hint {
+  display: block;
+  margin: -0.1rem 0.8rem 0.7rem;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.practice-menu-form > .routine-tool__hint {
+  margin-inline: 0;
+}
+
+.routine-tools-lead__intro {
+  margin: 0.3rem 0 0.8rem;
+  color: var(--practice-menu-secondary, #6c7077);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
 .routine-tool .routine-tool__toggle {
   border-bottom: 0;
 }
@@ -1538,6 +1559,33 @@ html.dark .onboarding-lite__routine-choice.is-primary small {
   width: 1rem;
   height: 0.7rem;
   rotate: 90deg;
+}
+
+/* Puts the routine down and leaves you where you are. Deliberately quiet: it
+ * sits opposite the drag grip and must not compete with Done. */
+.routine-bar__close {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.3rem;
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: currentColor;
+  opacity: 0.42;
+}
+
+.routine-bar__close svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.routine-bar__close:disabled {
+  opacity: 0.2;
 }
 
 .routine-bar.is-dragging {

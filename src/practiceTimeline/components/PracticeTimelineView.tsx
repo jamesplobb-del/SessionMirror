@@ -16,9 +16,11 @@ import TimelinePracticeSessionView from './TimelinePracticeSessionView'
 import TimelineSectionCard from './TimelineSectionCard'
 import TimelineSectionEditor from './TimelineSectionEditor'
 import TrackSettingsPanel from './TrackSettingsPanel'
+import { getTimelineById } from '../storage/timelineStorage'
 import { useTutorialAction } from '../../context/TutorialContext'
 
 export interface PracticeTimelineViewProps {
+  linkedProgramId?: string | null
   isRecording?: boolean
   onStartRecording?: () => void
   onStopRecording?: () => void
@@ -26,6 +28,7 @@ export interface PracticeTimelineViewProps {
 }
 
 export default function PracticeTimelineView({
+  linkedProgramId,
   isRecording = false,
   onStartRecording,
   onStopRecording,
@@ -70,6 +73,12 @@ export default function PracticeTimelineView({
     return () => onPracticeSessionActiveChange?.(false)
   }, [onPracticeSessionActiveChange])
 
+  useEffect(() => {
+    if (!linkedProgramId) return
+    const program = getTimelineById(linkedProgramId)
+    if (program) loadTimeline(program)
+  }, [linkedProgramId, loadTimeline])
+
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [recordEnabled, setRecordEnabled] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -87,10 +96,10 @@ export default function PracticeTimelineView({
   )
 
   useEffect(() => {
-    if (!openedRoutine) return
+    if (!openedRoutine || linkedProgramId) return
     if (openedRoutine.status === 'imported') loadTimeline(openedRoutine.routine)
     clearRoutineOpen(openedRoutine.id)
-  }, [openedRoutine, loadTimeline])
+  }, [openedRoutine, loadTimeline, linkedProgramId])
 
   const handleAddSection = () => {
     addSection()
@@ -167,7 +176,7 @@ export default function PracticeTimelineView({
         type="button"
         intensity="soft"
         className="practice-timeline__footer-btn practice-timeline__footer-btn--secondary"
-        onClick={() => setLibraryOpen(true)}
+        disabled={Boolean(linkedProgramId)} onClick={() => setLibraryOpen(true)}
       >
         <BookOpen size={18} aria-hidden />
         Routines

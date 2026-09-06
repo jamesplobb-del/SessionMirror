@@ -1,12 +1,51 @@
 # Focused practice and references
 
+## Session foundation — September 5, 2026
+
+The second pass also adds optional existing metronome programs, per-source reference passage/position memory, item journals from the recap, archived title snapshots, and compact session controls. The user requested handoff at 17% remaining; see the latest checkpoint in `PRACTICE_SESSION_HANDOFF.md` for implementation status and runtime checks still needed.
+
+See `PRACTICE_SESSION_HANDOFF.md` for the current implementation contracts, verification, and the remaining work. The session layer now guards navigation, resumes open sittings, retains daily routine history, separates temporary desks from presets, offers explicit comparison targets, and waits for SQLite persistence before reporting a saved take. The sections below include prior UI/API implementation history; the handoff describes the current behavior.
+
+## Guided routine builder
+
+The current visual pass uses geometric Avenir typography (with platform fallbacks), cool blue surfaces, layered cobalt accents, and illuminated primary controls. The custom list offers tappable suggestions from the selected instrument’s template set directly beneath the item input; selection appends items in order.
+
+Reference setup is now a visible card in each item editor and during custom tool setup, rather than an advanced setting. It explains the actual behavior: starting an item with a query opens in-app YouTube search, the user chooses the recording, and a previously pinned reference takes priority. The suggested query combines the selected instrument with the item title; the hard-coded Haydn trumpet placeholder has been removed. Custom queries persist per item. Trumpet-specific book suggestions are restricted to trumpet, and clarinet break drills are restricted to clarinets.
+
+Home’s “Build routine” opens the full-screen `GuidedRoutineBuilder`: instrument → exercise selection → ordered lineup → save → routine library. A remembered instrument skips the first question. Six instrument-specific exercises appear initially; additional choices live under “More exercises.” “Build your own” asks for a name and main tool, saves the exercise, and returns to the picker with it selected. The recorder preset uses the current camera/audio surface; existing desk settings can be included.
+
+The lineup opens the existing step editor, with tools/references and books/exercises behind optional disclosures. All recording, desk restoration, reference search, and practice-history behavior continues through the existing routine callbacks. Save returns to the library; “Use this routine” puts it on Today. Removing it from Today keeps a library copy.
+
+Saved routine and exercise libraries are device-local (`besttake:routine-library:v1` and `besttake:exercise-library:v1`), validated by the existing routine parsers. They do not sync across devices. The shared repository contains the UI and native web assets; the YouTube server credential remains on Netlify. No API credential changes are needed for this UI.
+
+The guide supports light/dark appearance, phone/tablet layouts, safe areas, keyboard navigation, haptic selection, and Reduce Motion. Validation for this change is the TypeScript/production build and Capacitor iOS asset sync; no browser or simulator interaction pass was requested.
+
+### Instrument research basis
+
+The picker now starts with an individual template set and builds both Quick Essentials and Complete Session presets from that instrument’s own exercise IDs. The underlying categories were checked against teacher and professional-association material: Yamaha’s trumpet pedagogy (air, middle-register sound, flow, scales, lip flexibility); International Horn Society guidance (entrances, harmonic slurs, lip trills, stopped horn, transposition, and planned rest); National Flute Association pedagogy levels and practice resources (tone, harmonics, finger work, scales, articulation, and dynamic control); International Clarinet Association guidance (voicing, register slurs, break coordination, and bass-clarinet low-register work); International Double Reed Society material (oboe air/face/tongue/fingers, drone work, bassoon register stability, flicking/venting, and articulation); ASTA-aligned string curricula (bowing, intonation, scales, shifting, instrument-specific hand frames); Guitar Foundation of America technique material (two-hand coordination, scales, and arpeggios); Berklee bass curricula (scales, arpeggios, groove, muting, transcription, and performance runs); NATS voice pedagogy (SOVT, glides, sustained vowels, registration, and articulation); and MTNA piano pedagogy (scales, arpeggios, chords, hand independence, and sight-reading).
+
+Reference pages:
+
+- https://hub.yamaha.com/music-educators/instruments/winds-instruments/trumpet-pedagogy/
+- https://www.hornsociety.org/hornzone/642-three-things-you-should-practice-every-day
+- https://www.nfaonline.org/docs/default-source/default-document-library/nfa-guide-to-levels-for-pedagogy-publications.pdf
+- https://clarinet.org/developing-a-healthy-clarinet-practice/
+- https://clarinet.org/pedagogy-corner-not-like-others-playing-strategies-e-flat-bass-clarinet/
+- https://www.idrs.org/video/collection/oboe-warm-ups-short-teachable-and-doable-exercises-for-every-level/
+- https://www.idrs.org/MIDI/MIDI_HP.htm
+- https://www.stringeducation.org/lessons/string-warm-ups
+- https://www.guitarfoundation.org/page/MarianoAguirre2020
+- https://online.berklee.edu/takenote/bass-players-how-to-practice-bass-effectively-pt1/
+- https://www.nats.org/cgi/page.cgi/5/_articles.html/Pedagogy/The_Five_Best_Vocal_Warm-Up_Exercises
+- https://www.mtna.org/Reading.html
+
 ## Today’s practice refinement
 
-Home now prioritizes the next routine item, with other practice items under “Practice something else.” Routine is the daily plan; tuner, metronome, and recorder steps all bind to reusable project IDs so attempts and references accumulate in the same journal. Existing bindings are retained; unbound steps reuse an exact name match or create a project on first start. Games and checklist-only steps remain lightweight.
+Home now prioritizes the next routine item, with other practice items under “Practice something else.” Routine is the daily plan; tuner, metronome, and recorder steps all bind to reusable project IDs so attempts and references accumulate in the same journal. Existing bindings are retained. Unbound steps recover their exact routine/step binding from SQLite or create a project on first start; names are never used to merge histories. Games and checklist-only steps remain lightweight.
 
 The running routine uses one compact session bar instead of also displaying the standalone focus strip. Camera and audio capture remain the existing implementations. The post-take menu distinguishes retrying from completing the item. Completing the final item closes its sitting and saves its desk; switching to independent practice pauses the routine.
 
-Saved references restore automatically. For an item with a reference search query and no saved selection, the reference browser opens with suggestions for the user to choose. It no longer silently bookmarks the first search result. Desk changes made during practice are reused, and explicit tool-preset edits in the routine builder update the linked item’s desk.
+Saved references restore automatically. For an item with a reference search query and no saved selection, the reference browser opens with suggestions for the user to choose. It no longer silently bookmarks the first search result. Temporary desk changes are remembered for that routine item on that day. The routine preset is changed only by editing the routine or choosing “Use these tool settings next time.” Standalone focus keeps its separate project desk memory.
 
 The practice loop now keeps an excerpt and its attempts together:
 
@@ -24,7 +63,7 @@ Search and saved references share the existing YouTube link dialog and Capacitor
 
 The library and per-project selected video IDs are stored on this device in `besttake:practice-references:v1`. Removing a bookmark does not unload an active reference. Unloading the reference box or choosing a local benchmark clears the selected YouTube reference for that project. Switching projects restores the destination's selected reference. These bookmarks do not sync between devices.
 
-Recorded takes remain in the existing SQLite vault; no schema or destructive migration was added. The journal derives its entries from saved take metadata. Ratings are personal notes, not an automated performance score.
+Recorded takes remain in the existing SQLite vault. The session-foundation pass adds nullable routine_id and routine_step_id columns to practice_sessions through an idempotent, additive migration. The journal derives its entries from saved take metadata. Ratings are personal notes, not an automated performance score.
 
 ## Enable live search
 
