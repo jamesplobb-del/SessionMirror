@@ -58,17 +58,32 @@ export function buildTakeVideoExportTransform(
   }
 }
 
-/** Draw one decoded frame into the export/thumbnail canvas. */
+/**
+ * Draw one decoded frame into the export/thumbnail canvas.
+ *
+ * `maxDimension` caps the long edge. The video export path passes nothing and
+ * keeps full resolution; thumbnails pass a cap, because a thumbnail rendered at
+ * the source's full 1080p (or 4K) costs a big canvas and a big encode for an
+ * image that is never displayed larger than a take box.
+ */
 export function drawTakeVideoFrame(
-  ctx: CanvasRenderingContext2D,
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   video: HTMLVideoElement,
   transform: TakeVideoTransform,
+  maxDimension?: number,
 ): void {
   const vw = video.videoWidth
   const vh = video.videoHeight
   if (vw <= 0 || vh <= 0) return
 
-  const { width, height } = outputDimensionsForTransform(vw, vh, transform)
+  const full = outputDimensionsForTransform(vw, vh, transform)
+  const scale =
+    maxDimension && maxDimension > 0
+      ? Math.min(1, maxDimension / Math.max(full.width, full.height))
+      : 1
+  const width = Math.max(1, Math.round(full.width * scale))
+  const height = Math.max(1, Math.round(full.height * scale))
+
   const canvas = ctx.canvas
   if (canvas.width !== width || canvas.height !== height) {
     canvas.width = width
@@ -79,11 +94,20 @@ export function drawTakeVideoFrame(
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, width, height)
 
+  // Downscale via the canvas transform rather than by rewriting the rotate and
+  // mirror maths below — that way the capped path and the full-size export path
+  // stay the same code, and only the scale differs.
+  if (scale !== 1) {
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.scale(scale, scale)
+  }
+
   const landscapeRecording = transform.recordingOrientation === 'landscape'
   const portraitBuffer = vh >= vw
 
   if (landscapeRecording && portraitBuffer) {
-    ctx.translate(width, 0)
+    ctx.translate(full.width, 0)
     ctx.rotate(Math.PI / 2)
     if (transform.unmirror) {
       ctx.translate(-vh, 0)
@@ -93,11 +117,11 @@ export function drawTakeVideoFrame(
       ctx.drawImage(video, 0, 0, vh, vw)
     }
   } else if (transform.unmirror) {
-    ctx.translate(width, 0)
+    ctx.translate(full.width, 0)
     ctx.scale(-1, 1)
-    ctx.drawImage(video, 0, 0, width, height)
+    ctx.drawImage(video, 0, 0, full.width, full.height)
   } else {
-    ctx.drawImage(video, 0, 0, width, height)
+    ctx.drawImage(video, 0, 0, full.width, full.height)
   }
 
   ctx.restore()

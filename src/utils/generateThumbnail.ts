@@ -7,6 +7,7 @@ import {
   buildTakeVideoTransform,
   drawTakeVideoFrame,
   type RecordingOrientation,
+  type TakeVideoTransform,
 } from './takeVideoTransform'
 import { assignMediaPlaybackSrc } from './mediaPlayback'
 import { applyBulletproofVideoElement } from './mobileVideo'
@@ -14,6 +15,15 @@ import type { Take } from '../types'
 
 const THUMBNAIL_SEEK_SECONDS = 0.1
 const THUMBNAIL_LOAD_TIMEOUT_MS = 5_000
+/**
+ * Long-edge cap for a stored thumbnail. Take boxes and vault cards never draw
+ * one larger than a few hundred CSS px, so even at 3x this is oversampled —
+ * while the previous behaviour (draw at the source's own resolution) meant a
+ * full 1080p canvas and a full 1080p JPEG encode per take, on the main thread,
+ * right after a recording finished.
+ */
+const THUMBNAIL_MAX_DIMENSION = 900
+const THUMBNAIL_JPEG_QUALITY = 0.82
 const THUMBNAIL_CONCURRENCY = 2
 const HEAL_CONCURRENCY = 2
 
@@ -136,6 +146,64 @@ function configureThumbnailVideoElement(video: HTMLVideoElement): void {
   applyBulletproofVideoElement(video)
 }
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result)
+      else reject(new Error('Thumbnail encode produced no data URL'))
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('Thumbnail encode failed'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+/**
+ * Encode the captured frame without blocking the main thread.
+ *
+ * `toDataURL()` is synchronous: it rasterises and base64-encodes the whole
+ * canvas inline, which stalled the UI for the length of a full-resolution JPEG
+ * encode at exactly the moment a take finished recording. OffscreenCanvas hands
+ * the encode to the browser off-thread; `toBlob()` is the async fallback, and a
+ * synchronous `toDataURL()` remains as the last resort so a browser without
+ * either still produces a thumbnail.
+ */
+async function renderThumbnailDataUrl(
+  video: HTMLVideoElement,
+  transform: TakeVideoTransform,
+): Promise<string> {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    try {
+      const offscreen = new OffscreenCanvas(1, 1)
+      const offscreenCtx = offscreen.getContext('2d')
+      if (offscreenCtx) {
+        drawTakeVideoFrame(offscreenCtx, video, transform, THUMBNAIL_MAX_DIMENSION)
+        const blob = await offscreen.convertToBlob({
+          type: 'image/jpeg',
+          quality: THUMBNAIL_JPEG_QUALITY,
+        })
+        return await blobToDataUrl(blob)
+      }
+    } catch {
+      // Fall through to the DOM canvas path below.
+    }
+  }
+
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas context unavailable')
+  drawTakeVideoFrame(ctx, video, transform, THUMBNAIL_MAX_DIMENSION)
+
+  if (typeof canvas.toBlob === 'function') {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', THUMBNAIL_JPEG_QUALITY)
+    })
+    if (blob) return await blobToDataUrl(blob)
+  }
+
+  return canvas.toDataURL('image/jpeg', THUMBNAIL_JPEG_QUALITY)
+}
+
 function captureThumbnailFromVideoUrl(
   url: string,
   options: ThumbnailCaptureOptions = {},
@@ -149,6 +217,11 @@ function captureThumbnailFromVideoUrl(
 
     let settled = false
     let seekPending = false
+    /* The encode is async now, so `settled` is not set until it finishes. Without
+       this, a second seek/ready event landing mid-encode would start a redundant
+       second encode — harmless, since the later finish() is a no-op, but it is
+       exactly the main-thread work this change exists to avoid. */
+    let capturing = false
 
     const cleanup = () => {
       video.pause()
@@ -178,25 +251,23 @@ function captureThumbnailFromVideoUrl(
     }, THUMBNAIL_LOAD_TIMEOUT_MS)
 
     const captureFrame = () => {
-      if (settled) return
+      if (settled || capturing) return
 
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth <= 0) {
         return
       }
 
-      try {
-        const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          fail(new Error('Canvas context unavailable'))
-          return
+      capturing = true
+      void (async () => {
+        try {
+          const dataUrl = await renderThumbnailDataUrl(video, transform)
+          finish(dataUrl)
+        } catch (err) {
+          fail(err instanceof Error ? err : new Error('Thumbnail capture failed'))
+        } finally {
+          capturing = false
         }
-
-        drawTakeVideoFrame(ctx, video, transform)
-        finish(canvas.toDataURL('image/jpeg', 0.82))
-      } catch (err) {
-        fail(err instanceof Error ? err : new Error('Thumbnail capture failed'))
-      }
+      })()
     }
 
     const seekTargetForVideo = (): number =>
