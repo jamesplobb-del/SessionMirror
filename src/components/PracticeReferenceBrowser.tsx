@@ -99,7 +99,7 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
           autoCapitalize="off" autoCorrect="off" spellCheck={false}
           onChange={event => {
             request.current?.abort(); setLoading(false); setSearched(false); setResults([]); setError(''); setQuery(event.target.value)
-          }} placeholder={placeholder || initialQuery || "Piece, instrument, or performer"} enterKeyHint="search" />
+          }} placeholder={placeholder || "Piece, artist, or a YouTube link"} enterKeyHint="search" />
         {!linkId && <button type="submit" disabled={loading || query.trim().length < 2}>{loading ? 'Searching…' : 'Search'}</button>}
       </div>
       <p className="focus-help">{selectionHelp || 'Tap any recording to load it into your take box.'}</p>

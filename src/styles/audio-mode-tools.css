@@ -1798,6 +1798,41 @@ html.app-dark-mode .app-ui-overlay--audio-mode .audio-tuner-take-pill__mini-btn 
   color: var(--audio-blue);
 }
 
+/*
+ * The tap cycle walks weak -> medium -> strong -> silent, but medium and
+ * strong both rendered as the same flat blue, so half the cycle was invisible
+ * and you had to count taps to know where you were. Each level now differs in
+ * BOTH colour and shape: shape is what keeps the ramp readable at a glance on
+ * a moving bar, and what makes it survive a colour-vision difference.
+ *
+ *   silent  dimmed, dashed ring   — off
+ *   weak    muted ink, no ring    — plays, no emphasis
+ *   medium  blue, hollow ring     — some emphasis
+ *   strong  blue, filled ring     — most emphasis
+ */
+.metronome-beat-marker--medium .metronome-beat-marker__halo {
+  border-color: color-mix(in srgb, var(--audio-blue) 55%, transparent);
+}
+
+.metronome-beat-marker--strong .metronome-beat-marker__halo {
+  border-color: var(--audio-blue);
+  background: color-mix(in srgb, var(--audio-blue) 18%, transparent);
+}
+
+.metronome-beat-marker--strong .metronome-beat-marker__number {
+  font-weight: 850;
+}
+
+/* Downbeat keeps gold, so its ring follows the gold rather than the blue. */
+.metronome-beat-marker--downbeat.metronome-beat-marker--medium .metronome-beat-marker__halo {
+  border-color: color-mix(in srgb, var(--audio-gold) 55%, transparent);
+}
+
+.metronome-beat-marker--downbeat.metronome-beat-marker--strong .metronome-beat-marker__halo {
+  border-color: var(--audio-gold);
+  background: color-mix(in srgb, var(--audio-gold) 20%, transparent);
+}
+
 .metronome-beat-marker--downbeat {
   color: var(--audio-gold);
 }

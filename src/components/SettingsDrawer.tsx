@@ -833,8 +833,8 @@ export default function SettingsDrawer({
               footer={activeInstrument.description}
             >
               <SegmentBlock
-                label="Source Instrument"
-                hint="Tunes pitch detection and trace smoothing for the Tuner tab and pitch analysis."
+                label="Sensitivity"
+                hint="How hard the tuner listens: pick the preset that matches your instrument family, and pitch detection plus trace smoothing follow."
                 value={settings.tunerInstrument}
                 layoutId="settings-instrument-segment"
                 onChange={(tunerInstrument: TunerInstrument) => onUpdate({ tunerInstrument })}

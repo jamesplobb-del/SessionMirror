@@ -19,7 +19,7 @@ export const METRONOME_VISUAL_STYLES = [
 ] as const satisfies ReadonlyArray<{ id: MetronomeVisualStyle; label: string }>
 
 const STORAGE_KEY = 'besttake.metronome.visualStyle'
-const DEFAULT_STYLE: MetronomeVisualStyle = 'ribbon'
+const DEFAULT_STYLE: MetronomeVisualStyle = 'columns'
 
 const KNOWN = new Set<MetronomeVisualStyle>(METRONOME_VISUAL_STYLES.map((item) => item.id))
 
@@ -28,8 +28,9 @@ function parse(value: string | null): MetronomeVisualStyle {
     return value as MetronomeVisualStyle
   }
   // Preserve the nearest equivalent for existing installs. The retired bars
-  // view becomes Pulse Columns; Orbit and Pendulum return to the new default.
-  return value === 'bars' ? 'columns' : DEFAULT_STYLE
+  // view was already Pulse Columns, which is now the default anyway; Orbit and
+  // Pendulum fall through to it too.
+  return DEFAULT_STYLE
 }
 
 let current: MetronomeVisualStyle = DEFAULT_STYLE

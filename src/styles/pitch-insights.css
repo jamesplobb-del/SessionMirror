@@ -555,13 +555,17 @@ html.app-dark-mode .pitch-insights-screen {
 }
 
 /* Graph Wrap & Styling */
+/* These were flattened to bare text on the page background, so a heading, its
+   graph and the next section all ran together with nothing saying where one
+   ended. Giving them a real card edge is what separates them. */
 .pitch-insights-all-time,
-.pitch-insights-detail__trend-card {
+.pitch-insights-detail__trend-card,
+.pitch-insights-history-card {
   margin-top: 1rem;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
+  border: 1px solid var(--pi-border);
+  border-radius: 0.9rem;
+  background: var(--pi-surface);
+  padding: 0.9rem;
   box-shadow: none;
 }
 
@@ -979,15 +983,17 @@ html.app-dark-mode .pitch-insights-screen {
   margin-top: 0.85rem;
 }
 
+/* Three unbounded numbers side by side read as one run-on row. A soft tile
+   each gives them their own edge without shouting over the values. */
 .pitch-insights-detail__metrics article {
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
+  border: 1px solid var(--pi-border);
+  border-radius: 0.7rem;
+  background: var(--pi-surface-soft);
+  padding: 0.55rem 0.6rem;
 }
 
 .pitch-insights-detail__metrics article > span {

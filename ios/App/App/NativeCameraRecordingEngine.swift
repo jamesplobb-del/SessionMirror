@@ -89,12 +89,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     // Preview-only pump sizing. The recorded movie file uses a separate
     // full-resolution AVCaptureMovieFileOutput and is UNAFFECTED by these.
     // 1080px/0.75 JPEG base64 at 60fps saturates the Capacitor/WKWebView bridge
-    // and stutters; 720px/0.6 is ample for an on-screen phone preview and cuts
-    // per-frame payload ~2.5x, letting the bridge sustain a far smoother rate.
-    // iPad gets a modest bump (960px) — larger display, more SoC headroom — but
-    // stays below full 1080 bridge flood levels.
-    private var bridgeMaxPixelDimension: CGFloat { isPad ? 960 : 720 }
-    private var bridgeJpegQuality: CGFloat { isPad ? 0.68 : 0.6 }
+    // and stutters, so these stay below that. 720px/0.6 was under-sampling the
+    // preview though: the canvas backs itself at clientWidth * devicePixelRatio,
+    // which is a ~1170px-wide buffer on a 3x phone, so a 720px frame was being
+    // upscaled and read soft in the take boxes and the deck. 900px/0.72 lands
+    // much closer to the buffer while keeping payload well under the 1080/0.75
+    // flood point. iPad has the display and the SoC headroom for full 1080.
+    private var bridgeMaxPixelDimension: CGFloat { isPad ? 1080 : 900 }
+    private var bridgeJpegQuality: CGFloat { isPad ? 0.75 : 0.72 }
     private let bridgeMaxPixelDimensionRecordingPlayAlong: CGFloat = 540
     private let bridgeJpegQualityRecordingPlayAlong: CGFloat = 0.45
     private lazy var ciContext = CIContext(options: [.useSoftwareRenderer: false])

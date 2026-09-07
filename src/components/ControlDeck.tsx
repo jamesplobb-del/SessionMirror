@@ -2,7 +2,9 @@ import {
   Bookmark,
   Camera,
   ChevronDown,
+  ChevronUp,
   History,
+  Library,
   House,
   Layers3,
   MessageSquareText,
@@ -756,7 +758,8 @@ function VaultHandle({ onOpen }: { onOpen: () => void }) {
     }}
     onPointerCancel={() => { start.current = null; swiped.current = true }}
     onClick={() => { if (!swiped.current) onOpen(); swiped.current = false }}>
-    <i aria-hidden /><span>Takes · swipe up</span>
+    <Library aria-hidden className="take-vault-handle__icon" />
+    <ChevronUp aria-hidden className="take-vault-handle__hint" />
   </button>
 }
 

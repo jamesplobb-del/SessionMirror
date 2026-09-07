@@ -142,14 +142,20 @@ html.app-dark-mode .native-bottom-sheet--audio-light textarea::placeholder {
   color: rgba(192, 201, 215, 0.68);
 }
 
+/* Was a 140px grabber bar plus a "Takes · swipe up" caption, which read as a
+   sheet handle sitting under controls that are not a sheet — it widened the
+   deck and gave the bottom of the screen a second, competing edge. Now a
+   single compact icon under the controls. The swipe-up gesture is unchanged;
+   the chevron is what advertises it. */
 .take-vault-handle {
   order: 20; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 5px; min-height: 44px; width: 140px;
-  padding: 6px 12px; border: 0; background: transparent; color: inherit;
-  touch-action: none; cursor: pointer; font-size: 10px; letter-spacing: .06em;
+  justify-content: center; gap: 1px; min-height: 44px; width: 44px;
+  padding: 4px; border: 0; background: transparent; color: inherit;
+  touch-action: none; cursor: pointer;
 }
-.take-vault-handle i { width: 32px; height: 3px; border-radius: 2px; background: currentColor; opacity: .5; }
-.take-vault-handle span { opacity: .75; }
+.take-vault-handle__icon { width: 20px; height: 20px; opacity: .8; }
+.take-vault-handle__hint { width: 12px; height: 12px; opacity: .45; margin-top: -2px; }
+.take-vault-handle:active .take-vault-handle__icon { opacity: 1; }
 .pitch-living-canvas .pitch-living-tool-rail {
   grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
   border-top: 1px solid #1598ff25;

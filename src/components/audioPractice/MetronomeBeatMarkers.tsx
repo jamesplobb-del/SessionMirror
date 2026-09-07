@@ -45,6 +45,12 @@ export default function MetronomeBeatMarkers({
           'metronome-beat-marker',
           index === 0 ? 'metronome-beat-marker--downbeat' : '',
           accented ? 'metronome-beat-marker--accented' : '',
+          // Strong and medium both used to render as one flat "accented" blue,
+          // so two of the four states the tap cycle walks through were
+          // indistinguishable. Each level now carries its own class.
+          level === 'strong' ? 'metronome-beat-marker--strong' : '',
+          level === 'medium' ? 'metronome-beat-marker--medium' : '',
+          level === 'weak' ? 'metronome-beat-marker--weak' : '',
           level === 'silent' ? 'metronome-beat-marker--silent' : '',
           mainTick ? 'metronome-beat-marker--active' : '',
           subTick ? 'metronome-beat-marker--sub-active' : '',
