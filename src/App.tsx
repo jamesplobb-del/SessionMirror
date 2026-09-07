@@ -280,7 +280,6 @@ import {
   loadRoutineDay,
   nextOpenStep,
   reconcileDay,
-  routineProgress,
   savePreferredInstrumentId,
   saveRoutine,
   saveRoutineDay,
@@ -555,7 +554,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [practiceItemStates, setPracticeItemStates] = useState<PracticeItemState[]>(
     bootSnapshot.practiceItemStates,
   )
-  const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(false)
+  // Returning players land on Practice Home on the first rendered frame. The
+  // recorder can initialize underneath without flashing before Home appears.
+  const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
   const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
   const [focusPanel, setFocusPanel] = useState<'references' | 'history' | 'routine-history' | null>(null)
   const [routineJournal, setRoutineJournal] = useState<{ projectId: string; title: string } | null>(null)
@@ -787,14 +788,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     if (isOnboardingComplete()) {
-      // Returning players with a routine open on Today, unless today is done.
-      const stored = routineRef.current
-      if (!stored || stored.steps.length === 0) return
-      if (routineProgress(stored, routineDayRef.current).complete) return
-      const timer = window.setTimeout(() => {
-        setIsPracticeHubOpen(true)
-      }, BOOT_REVEAL_DELAY_MS + 240)
-      return () => window.clearTimeout(timer)
+      // Practice Home is already open in initial state, before the recorder's
+      // first frame can paint.
+      return
     }
     const timer = window.setTimeout(() => {
       setShowOnboardingTutorial(true)
@@ -2992,6 +2988,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   ])
 
   const handleFocusedPostTakeRetry = useCallback(() => {
+    if (practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
     setFocusedCueOpen(false)
     setFocusedPostTakeId(null)
     setFocusedPostTakeReviewed(false)
@@ -4558,8 +4555,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void updatePracticeItemState(projectId, { comparison }).catch(() => setTakeDeleteError('Could not remember the comparison choice. Your takes are saved.'))
   }, [])
 
+  const handleFocusedPostTakeListen = useCallback(() => {
+    if (!focusedPostTakeId || practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
+    if (!takesRef.current.some(take => take.id === focusedPostTakeId)) return
+    deferHudMediaPause()
+    pauseRoutineProgram()
+    pauseYoutubeProxy(youtubeIframeRef.current)
+    challengerUserDismissedRef.current = false
+    pendingChallengerIdRef.current = focusedPostTakeId
+    setChallengerId(focusedPostTakeId)
+    setFocusedSoloReview(true)
+    setFocusedReferenceTakeId(null)
+    handleOpenCompareReview('challenger')
+  }, [deferHudMediaPause, focusedPostTakeId, handleOpenCompareReview])
+
   const handleFocusedPostTakeReview = useCallback(() => {
-    if (!focusedPostTakeId || practiceTransition.current.busy) return
+    if (!focusedPostTakeId || practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
     const projectId = focusedPracticeRef.current?.projectId
     if (!projectId) return
     const mode = practiceItemStatesRef.current.find(state => state.projectId === projectId)?.comparison ?? 'current-best'
@@ -5480,6 +5491,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return routine.steps.find((step) => step.id === routineDay.activeStepId) ?? null
   }, [routine, routineDay?.activeStepId])
 
+  const previousPracticeTake = useMemo(() => takes
+    .filter(take => take.practiceSessionId && take.practiceSessionId !== focusedPracticeSessionId)
+    .sort((a, b) => b.timestamp - a.timestamp)[0], [takes, focusedPracticeSessionId])
+
   const routineNextStep = useMemo(() => {
     if (!routine || !routineActiveStep) return null
     return nextOpenStep(routine, routineDay, routineActiveStep.id)
@@ -5658,6 +5673,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {routine &&
                 routineActiveStep &&
+                !focusedPostTakeId &&
                 !isPracticeHubOpen &&
                 !isReviewOpen &&
                 !isVaultOpen &&
@@ -5676,8 +5692,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     busy={practiceTransitionBusy || pendingTakeSaves > 0}
                     contextText={focusedPracticeState?.pendingIntention.trim()
                       ? `Next take · ${focusedPracticeState.pendingIntention.trim()}`
-                      : takes.find(take => take.practiceSessionId !== focusedPracticeSessionId)?.timestamp
-                        ? `Last practiced ${new Date(takes.find(take => take.practiceSessionId !== focusedPracticeSessionId)!.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}${benchmarkTake?.name ? ` · Best: ${benchmarkTake.name}` : ''}` : undefined}
+                      : previousPracticeTake
+                        ? `Last time · ${previousPracticeTake.notes?.trim() || new Date(previousPracticeTake.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : undefined}
+
                     onListenReference={() => {
                       const projectId = focusedPracticeRef.current?.projectId
                       const url = projectId ? getSelectedReferenceUrl(projectId) : null
@@ -6416,6 +6433,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
                         onOpenHome={handleOpenPracticeHome}
+                        onOpenVault={handleOpenVaultFromPracticeHub}
                         onOpenSettings={handleOpenSettings}
                         expandViewActive={isSplitView}
                         onToggleExpandView={handleToggleSplitView}
@@ -6443,6 +6461,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         focusedRecordingGoal={
                           focusedPracticeState?.pendingIntention.trim() ?? ''
                         }
+                        focusedFinishLabel={routineNextStep ? 'Done & next' : 'Finish item'}
+                        onFocusedPostTakeListen={handleFocusedPostTakeListen}
                         onFocusedPostTakeReview={handleFocusedPostTakeReview}
                         onFocusedPostTakeNote={() => setFocusedCueOpen(true)}
                         onFocusedPostTakeRate={handleFocusedPostTakeRate}
@@ -6502,7 +6522,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onBranchOpenChange={handleQuickSettingsOpenChange}
                         hapticFeedback={settings.hapticFeedback}
                         collapsible={
-                          isAudioPracticeTunerTab ||
                           isAudioPracticeMetronomeTab ||
                           (isAudioPracticeTimelineTab && practiceSessionActive)
                         }

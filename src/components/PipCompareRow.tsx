@@ -227,6 +227,7 @@ function MovableTakeSlot({
   const dragControls = useDragControls()
   const slotNodeRef = useRef<HTMLDivElement | null>(null)
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
+  const layoutReady = useRef(false)
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
   const dragY = useMotionValue(savedPosition.current?.y ?? 0)
   const handledResetNonceRef = useRef(resetNonce)
@@ -246,13 +247,14 @@ function MovableTakeSlot({
   const [dragging, setDragging] = useState(false)
 
   const clampPositionToBoundary = useCallback(() => {
-    if (!movable || editing || draggingRef.current) return
+    if (!layoutReady.current || !movable || editing || draggingRef.current) return
     const node = slotNodeRef.current
     const boundary = boundaryRef.current
     if (!node || !boundary) return
 
     const currentX = dragX.get()
     const currentY = dragY.get()
+    if (!savedPosition.current && currentX === 0 && currentY === 0) return
     const rect = node.getBoundingClientRect()
     const bounds = boundary.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0 || bounds.width <= 0 || bounds.height <= 0) {
@@ -279,7 +281,7 @@ function MovableTakeSlot({
 
     dragX.set(nextX)
     dragY.set(nextY)
-    savePersistentWidgetPosition(positionId, nextX, nextY)
+    // Viewport correction is temporary; only a deliberate drag is persisted.
   }, [boundaryRef, dragX, dragY, editing, movable, positionId])
 
   useLayoutEffect(() => {
@@ -309,7 +311,7 @@ function MovableTakeSlot({
     scheduleClamp()
     // The camera row enters with a short y-axis animation. Re-clamp once its
     // parent transform has settled so a restored edge position stays reachable.
-    const settledClampTimer = window.setTimeout(scheduleClamp, 360)
+    const settledClampTimer = window.setTimeout(() => { layoutReady.current = true; scheduleClamp() }, 360)
 
     return () => {
       window.removeEventListener('resize', scheduleClamp)
@@ -459,7 +461,10 @@ function MovableTakeSlot({
 
   const handleDragEnd = useCallback(() => {
     const completedLayoutDrag = dragTravelRef.current >= TAKE_CARD_DRAG_COMPLETION_PX
-    savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
+    if (completedLayoutDrag) {
+      savedPosition.current = { x: dragX.get(), y: dragY.get() }
+      savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
+    }
     draggingRef.current = false
     pressRef.current = null
     setDragging(false)

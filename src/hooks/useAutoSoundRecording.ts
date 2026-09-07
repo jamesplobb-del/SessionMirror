@@ -1,3 +1,4 @@
+import { advanceAutoStart } from '../utils/autoStartGate'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
@@ -15,7 +16,7 @@ import type { PluginListenerHandle } from '@capacitor/core'
 
 const POLL_INTERVAL_MS = 48
 const MIN_RECORDING_MS = 400
-const COOLDOWN_MS = 120
+const COOLDOWN_MS = 600
 const MONITOR_WARMUP_MS = 280
 // The native tap starts from an already-running pre-roll recorder. Keep enough
 // settling time to establish a quiet baseline without making normal speech feel
@@ -24,12 +25,10 @@ const NATIVE_MONITOR_WARMUP_MS = 180
 // Arming: a fresh monitor must see a few genuinely quiet frames before its
 // first trigger. AVAudioSession activation and the WebKit mic ramp both land
 // as a burst right at the start of the stream, and that burst used to read as
-// an attack the instant hands-free came on. The wait is bounded so a player
-// who is already mid-phrase still gets started — the hidden pre-roll has been
-// writing the whole time, so nothing is lost by arming a beat later.
+// an attack the instant hands-free came on. Wait for a quiet baseline before
+// arming; the existing pre-roll preserves the onset of a sustained phrase.
 const ARM_QUIET_FRAMES = 3
-const ARM_DEADLINE_MS = 600
-const POST_PLAYBACK_WARMUP_MS = 0
+const POST_PLAYBACK_WARMUP_MS = 450
 const START_LATCH_MS = 1200
 const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
@@ -731,9 +730,7 @@ export function useAutoSoundRecording({
           // console.debug('[AutoSound] levels', { rms: metrics.rms.toFixed(4), peak: metrics.peak.toFixed(4) })
         }
 
-        const gateLevel = profile.usePeak
-          ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
-          : metrics.rms
+
 
         if (isNativePath && !nativeFrameFresh) {
           return
@@ -768,19 +765,11 @@ export function useAutoSoundRecording({
           void warmRecorderRef.current()
         }
 
-        // Arm on a short quiet baseline, or on the deadline — whichever comes
-        // first. The baseline rejects the session-activation burst that
-        // arrives with the first frames; the deadline keeps a performer who
-        // is already playing from waiting on a pause that never comes.
+        // Require consecutive quiet frames. A timeout must never arm in
+        // ongoing room noise; the musician can always use manual recording.
         if (!armed) {
-          if (metrics.rms < effectiveGateRef.current * 0.9) {
-            quietFramesSeen += 1
-          }
-          const armClockStartedAt = firstFrameAt ?? setupStartedAt
-          if (
-            quietFramesSeen < ARM_QUIET_FRAMES &&
-            now - armClockStartedAt < ARM_DEADLINE_MS
-          ) {
+          quietFramesSeen = metrics.rms < effectiveGateRef.current * 0.9 ? quietFramesSeen + 1 : 0
+          if (quietFramesSeen < ARM_QUIET_FRAMES) {
             loudSinceRef.current = null
             attackSinceRef.current = null
             return
@@ -823,7 +812,6 @@ export function useAutoSoundRecording({
           const currentGate = effectiveGateRef.current
           const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
           const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
-          const aboveGate = metronomeActive ? metrics.rms >= currentGate : gateLevel >= currentGate
 
           if (metronomeTransient) {
             loudSinceRef.current = null
@@ -831,43 +819,12 @@ export function useAutoSoundRecording({
             return
           }
 
-          const attackEligible =
-            !metronomeActive &&
-            profile.attackHoldMs > 0 &&
-            profile.attackPeakRatio > 0 &&
-            metrics.peak >= currentGate * profile.attackPeakRatio
-
-          if (attackEligible) {
-            if (attackSinceRef.current === null) {
-              attackSinceRef.current = now
-            } else if (
-              now - attackSinceRef.current >= profile.attackHoldMs &&
-              !startLatchRef.current
-            ) {
-              console.info('[AutoSound] triggerAutoStart')
-              triggerAutoStart()
-            }
-            loudSinceRef.current = null
-          } else {
-            attackSinceRef.current = null
-
-            if (aboveGate) {
-              if (loudSinceRef.current === null) {
-                loudSinceRef.current = now
-              } else if (
-                now - loudSinceRef.current >=
-                  (metronomeActive
-                    ? Math.max(profile.holdMs, METRONOME_START_HOLD_MS)
-                    : profile.holdMs) &&
-                !startLatchRef.current
-              ) {
-                console.info('[AutoSound] triggerAutoStart')
-                triggerAutoStart()
-              }
-            } else {
-              loudSinceRef.current = null
-            }
-          }
+          // Require sustained energy, not a peak from a tap, click, or mic bump.
+          attackSinceRef.current = null
+          const decision = advanceAutoStart(loudSinceRef.current, now, metrics.rms, currentGate,
+            Math.max(profile.holdMs, metronomeActive ? METRONOME_START_HOLD_MS : 0))
+          loudSinceRef.current = decision.since
+          if (decision.start && !startLatchRef.current) triggerAutoStart()
 
           return
         }

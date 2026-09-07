@@ -90,6 +90,7 @@ function ModeSlot({
   const longPressHandlers = useLongPress({
     onClick: onActivate,
     onLongPress: () => onLongPress?.(),
+    delay: 900,
     // NOTE: `disabled` here gates BOTH the long-press gesture AND the plain
     // tap (useLongPress's onPointerUp returns early on disabled, before ever
     // calling onClick). It must NOT include `isRecording` — that made the

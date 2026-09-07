@@ -278,14 +278,11 @@ export default function StaffJumperGame({
   const holdBeats = formatBeats(target.rhythm.durationUnits, meterSpec)
   /** Past the attack: the answer is now the note's length, not its name. */
   const holding = cue.walking || state.isSustaining
-  const playDisplay = cue.leading
-    ? config.difficulty === 'easy'
-      ? nextNote.noteLabel
-      : 'See staff'
-    : targetDisplay
+  // Read-ahead is a separate cue; the main target must agree with the judge.
+  const playDisplay = targetDisplay
 
   const responseHint = readingHint({
-    cue,
+    cue: { ...cue, leading: false },
     easy: config.difficulty === 'easy',
     rhythmMode,
     holding,
@@ -791,7 +788,7 @@ export default function StaffJumperGame({
             {/* Noteheads */}
             <div className="sj-noteheads">
               {displayedPlatforms.map((slot) => {
-                const isPlayLit = cue.litStep === slot.step
+                const isPlayLit = !target.isRest && state.sequenceStep === slot.step
                 const isHolding = slot.step === state.sequenceStep && cue.walking && !isPlayLit
                 const inkOpacity = isPlayLit || isHolding ? 1 : slot.opacity
                 const shake = missActive && !state.isFalling && slot.step === state.sequenceStep
@@ -1043,13 +1040,17 @@ export default function StaffJumperGame({
               </div>
               <div className="sj-target-dock__notes">
                 <div className="sj-target-note">
-                  <small>{cue.leading ? 'Next' : holding ? 'Holding' : 'Target'}</small>
+                  <small>{holding ? 'Hold' : 'Play now'}</small>
                   <strong>{playDisplay}</strong>
-                  {writtenRhythm && !cue.leading && (
+                  {writtenRhythm && (
                     <span className="sj-target-note__rhythm">
                       {writtenRhythm.name} · {writtenRhythm.beats}
                     </span>
                   )}
+                </div>
+                <div className="sj-next-note">
+                  <small>Next</small>
+                  <strong>{nextNote.isRest ? 'Rest' : config.difficulty === 'easy' ? nextNote.noteLabel : 'See staff'}</strong>
                 </div>
                 <div className={`sj-detected-note ${isPlayableMatch ? 'sj-detected-note--match' : ''}`}>
                   <small>Detected</small>

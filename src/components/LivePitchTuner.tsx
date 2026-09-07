@@ -356,6 +356,7 @@ function LiveAudioTunerPane({
                   title="Pitch Insights"
                 >
                   <BarChart3 aria-hidden />
+                  <span>Insights</span>
                 </button>
               ) : null}
 

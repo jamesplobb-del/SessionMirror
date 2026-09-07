@@ -30,8 +30,9 @@ interface SettingsBranchWheelProps {
   showMetronome: boolean
   audioEnhancerEnabled: boolean
   handsFreeEnabled?: boolean
-  /** Hidden while a video take is rolling — hands-free turns itself off there. */
+  /** Keep discoverable on both recording surfaces, including during capture. */
   handsFreeToggleVisible?: boolean
+  handsFreeToggleDisabled?: boolean
   layoutMode?: SettingsBranchLayoutMode
   metronomeToggleVisible?: boolean
   showDrone?: boolean
@@ -77,6 +78,7 @@ interface BranchItem {
     | 'multitrack'
   kind?: 'toggle' | 'action'
   active: boolean
+  disabled?: boolean
   onSelect: () => void
 }
 
@@ -106,7 +108,7 @@ function DeskChip({
         type="button"
         className={`settings-branch-tray__desk-name ${NATIVE_SQUISH}`}
         aria-pressed={active}
-        aria-label={`Set up the ${desk.name} desk${active ? '. Already set up' : ''}`}
+        aria-label={`Load ${desk.name} setup${active ? '. Already loaded' : ''}`}
         onClick={onApply}
       >
         {desk.name}
@@ -114,7 +116,7 @@ function DeskChip({
       <button
         type="button"
         className="settings-branch-tray__desk-forget"
-        aria-label={`Forget the ${desk.name} desk`}
+        aria-label={`Forget the ${desk.name} setup`}
         onClick={onDelete}
       >
         <X aria-hidden />
@@ -134,6 +136,7 @@ export default function SettingsBranchWheel({
   audioEnhancerEnabled,
   handsFreeEnabled = false,
   handsFreeToggleVisible = false,
+  handsFreeToggleDisabled = false,
   layoutMode = 'camera',
   metronomeToggleVisible = true,
   showDrone = false,
@@ -170,6 +173,7 @@ export default function SettingsBranchWheel({
     viewportLeft: number
     viewportTop: number
     viewportWidth: number
+    viewportHeight: number
   } | null>(null)
 
   useLayoutEffect(() => {
@@ -189,6 +193,7 @@ export default function SettingsBranchWheel({
         viewportLeft,
         viewportTop,
         viewportWidth,
+        viewportHeight: visualViewport?.height ?? window.innerHeight,
       })
     }
 
@@ -227,7 +232,7 @@ export default function SettingsBranchWheel({
 
   const confirmDeleteDesk = (desk: WorkspaceDesk) => {
     void showConfirm({
-      message: `Forget the “${desk.name}” desk?`,
+      message: `Forget the “${desk.name}” setup?`,
       destructive: true,
       confirmLabel: 'Forget',
     }).then((confirmed) => {
@@ -328,6 +333,7 @@ export default function SettingsBranchWheel({
     if (handsFreeToggleVisible && onHandsFreeChange) {
       items.push({
         id: 'hands-free',
+        disabled: handsFreeToggleDisabled,
         label: 'Hands-Free',
         icon: 'hands-free',
         active: handsFreeEnabled,
@@ -363,6 +369,7 @@ export default function SettingsBranchWheel({
     droneToggleVisible,
     handsFreeEnabled,
     handsFreeToggleVisible,
+    handsFreeToggleDisabled,
     expandViewActive,
     metronomeToggleVisible,
     onShowDroneChange,
@@ -431,9 +438,9 @@ export default function SettingsBranchWheel({
             className="settings-branch-tray-anchor pointer-events-none fixed z-[201]"
             style={{
               left: trayGeometry.centerX,
-              top: trayGeometry.top,
+              top: savingDesk ? `calc(${anchor.viewportTop}px + max(20px, env(safe-area-inset-top)))` : trayGeometry.top,
               width: trayGeometry.width,
-              transform: 'translate(-50%, -100%)',
+              transform: savingDesk ? 'translateX(-50%)' : 'translate(-50%, -100%)',
             }}
           >
             <motion.div
@@ -446,6 +453,7 @@ export default function SettingsBranchWheel({
               transition={BRANCH_MOTION}
               style={{
                 ...motionGpuLayer,
+                ...(savingDesk ? { maxHeight: Math.max(100, anchor.viewportHeight - 100), overflowY: 'auto' as const } : {}),
                 transformOrigin: `${trayGeometry.arrowX}px 100%`,
               }}
             >
@@ -454,7 +462,8 @@ export default function SettingsBranchWheel({
               </div>
 
               {desksVisible && !savingDesk && (
-                <div className="settings-branch-tray__desks" role="group" aria-label="Saved desks">
+                <div className="settings-branch-tray__desks" role="group" aria-label="Saved setups">
+                  <span className="settings-branch-tray__desks-empty">Saved setups</span>
                   {desks.map((desk) => (
                     <DeskChip
                       key={desk.id}
@@ -466,7 +475,7 @@ export default function SettingsBranchWheel({
                   ))}
                   {desks.length === 0 && (
                     <span className="settings-branch-tray__desks-empty">
-                      Save the room you set up — click, drone, hands-free — as one tap.
+                      Your tools, tempo, and hands-free settings, ready in one tap.
                     </span>
                   )}
                 </div>
@@ -481,17 +490,16 @@ export default function SettingsBranchWheel({
                   }}
                 >
                   <label className="settings-branch-tray__save-label" htmlFor="workspace-desk-name">
-                    Save this desk
+                    Save this setup
                   </label>
                   <input
                     id="workspace-desk-name"
                     list="workspace-desk-names"
                     className="settings-branch-tray__save-input"
                     value={deskNameDraft}
-                    autoFocus
                     maxLength={24}
                     placeholder="Long tones, Excerpt run, Lesson…"
-                    aria-label="Desk name"
+                    aria-label="Setup name"
                     onChange={(event) => setDeskNameDraft(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
@@ -501,11 +509,11 @@ export default function SettingsBranchWheel({
                     }}
                   />
                   <datalist id="workspace-desk-names">{desks.map(desk => <option key={desk.id} value={desk.name} />)}</datalist>
-                  <p className="settings-branch-tray__save-note">Use an existing name to update that desk.</p>
+                  <p className="settings-branch-tray__save-note">Save your tools together. Tap a saved setup to restore it.</p>
                   <p className="settings-branch-tray__save-summary">{liveDeskSummary}</p>
                   {desks.length >= MAX_WORKSPACE_DESKS && !desks.some(desk => desk.name.toLocaleLowerCase() === deskNameDraft.trim().toLocaleLowerCase()) && (
                     <p className="settings-branch-tray__save-note">
-                      Three desks already — this replaces the oldest.
+                      Three setups already — this replaces the oldest.
                     </p>
                   )}
                   <div className="settings-branch-tray__save-actions">
@@ -521,7 +529,7 @@ export default function SettingsBranchWheel({
                       className={`settings-branch-tray__save-btn settings-branch-tray__save-btn--primary ${NATIVE_SQUISH}`}
                       disabled={!deskNameDraft.trim()}
                     >
-                      {desks.some(desk => desk.name.toLocaleLowerCase() === deskNameDraft.trim().toLocaleLowerCase()) ? 'Update desk' : 'Save'}
+                      {desks.some(desk => desk.name.toLocaleLowerCase() === deskNameDraft.trim().toLocaleLowerCase()) ? 'Update setup' : 'Save setup'}
                     </button>
                   </div>
                 </form>
@@ -553,6 +561,8 @@ export default function SettingsBranchWheel({
                       exit={nativeGlideIn}
                       transition={BRANCH_MOTION}
                       style={motionGpuLayer}
+                      disabled={item.disabled}
+                      title={item.disabled ? 'Stop the take to change hands-free' : undefined}
                       aria-label={item.label}
                       {...(item.kind === 'action' ? {} : { 'aria-checked': item.active })}
                       onClick={() => {
@@ -600,15 +610,15 @@ export default function SettingsBranchWheel({
                     setSavingDesk(true)
                   }}
                 >
-                  Save this desk…
+                  Save this setup
                 </button>
               )}
 
-              <span
+              {!savingDesk && <span
                 className="settings-branch-tray__arrow"
                 style={{ left: trayGeometry.arrowX }}
                 aria-hidden="true"
-              />
+              />}
             </motion.div>
           </div>
         </>

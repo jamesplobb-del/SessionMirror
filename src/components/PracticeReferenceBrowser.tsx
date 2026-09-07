@@ -1,5 +1,5 @@
-import { useContext, useEffect, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { Search, Trash2 } from 'lucide-react'
 import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
 import { loadReferenceLibrary, removePracticeReference, savePracticeReference, searchPracticeReferences, type PracticeReference } from '../utils/practiceReferences'
 import { buildYoutubeProxyUrl, parseYoutubeVideoId } from '../utils/youtubeEmbed'
@@ -12,7 +12,15 @@ const decode = (text: string) => text.replace(/&amp;/g, '&').replace(/&#39;/g, "
  * row to load it. This used to be two tabs plus a separate paste form with its
  * own submit button, which meant four ways in and no obvious one.
  */
-export default function PracticeReferenceBrowser({ onSelect }: { onSelect: (url: string) => void }) {
+export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, savedAsTab = false }: {
+  onSelect: (url: string) => void
+  suggestedQuery?: string
+  placeholder?: string
+  selectionHelp?: string
+  savedAsTab?: boolean
+}) {
+  const searchId = useId()
+  const [view, setView] = useState<'search' | 'saved'>('search')
   const { query: initialQuery, projectId, autoSearch } = useContext(PracticeReferenceContext)
   const [query, setQuery] = useState(initialQuery)
   const [results, setResults] = useState<PracticeReference[]>([])
@@ -28,14 +36,14 @@ export default function PracticeReferenceBrowser({ onSelect }: { onSelect: (url:
   // at worst it offers one extra row the musician ignores.
   const linkId = parseYoutubeVideoId(query)
 
-  const search = async () => {
-    if (query.trim().length < 2) return
+  const search = async (searchQuery = query) => {
+    if (searchQuery.trim().length < 2) return
     request.current?.abort()
     const controller = new AbortController()
     request.current = controller
     setLoading(true); setError(''); setResults([]); setSearched(false)
     try {
-      const items = await searchPracticeReferences(query, controller.signal)
+      const items = await searchPracticeReferences(searchQuery, controller.signal)
       if (!controller.signal.aborted) { setResults(items); setSearched(true) }
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Search failed. Please try again.')
@@ -78,20 +86,28 @@ export default function PracticeReferenceBrowser({ onSelect }: { onSelect: (url:
     Number(b.projectIds.includes(projectId ?? '')) - Number(a.projectIds.includes(projectId ?? '')))
 
   return <section className="focus-reference-browser" aria-label="References">
-    <form onSubmit={event => { event.preventDefault(); void search() }}>
-      <label htmlFor="reference-search">Search YouTube, or paste a link</label>
+    {savedAsTab && <div className="routine-segment" role="group" aria-label="Reference source">
+      <button type="button" aria-pressed={view === 'search'} onClick={() => setView('search')}>Search or link</button>
+      <button type="button" aria-pressed={view === 'saved'} onClick={() => setView('saved')}>Saved · {saved.length}</button>
+    </div>}
+    {view === 'search' && <>
+    <form onSubmit={event => { event.preventDefault(); if (!linkId) void search() }}>
+      <label htmlFor={searchId}>Search YouTube, or paste a link</label>
       <div className="focus-search-row">
-        <input id="reference-search" value={query} maxLength={160} inputMode="search"
+        <Search aria-hidden className="focus-search-icon" />
+        <input type="search" id={searchId} value={query} maxLength={160} inputMode="search"
           autoCapitalize="off" autoCorrect="off" spellCheck={false}
           onChange={event => {
             request.current?.abort(); setLoading(false); setSearched(false); setResults([]); setError(''); setQuery(event.target.value)
-          }} placeholder="Mahler 5 trumpet Michael Sachs" enterKeyHint="search" />
-        <button type="submit" disabled={loading || query.trim().length < 2}>{loading ? 'Searching…' : 'Search'}</button>
+          }} placeholder={placeholder || initialQuery || "Piece, instrument, or performer"} enterKeyHint="search" />
+        {!linkId && <button type="submit" disabled={loading || query.trim().length < 2}>{loading ? 'Searching…' : 'Search'}</button>}
       </div>
-      <p className="focus-help">Tap any recording to load it into your take box.</p>
+      <p className="focus-help">{selectionHelp || 'Tap any recording to load it into your take box.'}</p>
+      {suggestedQuery && <button type="button" className="focus-suggested-search" onClick={() => {
+        setView('search'); setQuery(suggestedQuery); void search(suggestedQuery)
+      }}><Search aria-hidden /><span>Search YouTube for “{suggestedQuery}”</span></button>}
     </form>
 
-    {error && <p className="focus-error" role="alert">{error}</p>}
 
     {linkId && <div className="focus-reference-group">
       <h4>From your link</h4>
@@ -112,11 +128,13 @@ export default function PracticeReferenceBrowser({ onSelect }: { onSelect: (url:
       <div className="focus-reference-results">{results.map(item => row(item))}</div>
     </div>}
 
-    <div className="focus-reference-group">
+    </>}
+    {error && <p className="focus-error" role="alert">{error}</p>}
+    {(!savedAsTab || view === 'saved') && <div className="focus-reference-group">
       <h4>Saved{saved.length ? ` · ${saved.length}` : ''}</h4>
       {sortedSaved.length
         ? <div className="focus-reference-results">{sortedSaved.map(item => row(item, true))}</div>
         : <p className="focus-help">Recordings you use are kept here, ready for next time.</p>}
-    </div>
+    </div>}
   </section>
 }

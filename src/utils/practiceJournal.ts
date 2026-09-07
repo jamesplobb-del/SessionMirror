@@ -94,3 +94,19 @@ export function groupIntoSittings(
 export function countJournalDays(attempts: JournalAttempt[]): number {
   return new Set(attempts.map(item => new Date(item.take.timestamp).toDateString())).size
 }
+
+/** Prefer a previous sitting so the default comparison spans practice sessions.
+ * A single sitting falls back to its first attempt. Explicit choices survive
+ * asynchronous reloads while that recording remains available.
+ */
+export function journalComparison(attempts: JournalAttempt[], selectedId?: string | null) {
+  const latest = attempts[0] ?? null
+  const selected = attempts.find(item => item.take.id === selectedId)
+  const earlierSitting = latest && attempts.find(item =>
+    item.take.id !== latest.take.id && (
+      new Date(item.take.timestamp).toDateString() !== new Date(latest.take.timestamp).toDateString() ||
+      Boolean(item.take.practiceSessionId && latest.take.practiceSessionId && item.take.practiceSessionId !== latest.take.practiceSessionId)
+    ))
+  const baseline = selected ?? earlierSitting ?? attempts[attempts.length - 1] ?? null
+  return { latest, baseline, canCompare: Boolean(latest && baseline && latest.take.id !== baseline.take.id) }
+}

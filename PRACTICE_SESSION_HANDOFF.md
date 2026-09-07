@@ -1,5 +1,28 @@
 # BestTake session foundation
 
+## September 7 — workspace reliability and goal-based plans
+
+- Hands-free stays listed in Workspace for camera/audio; it is disabled during a take instead of disappearing. The record-button long press now takes 900 ms. Start detection requires 140–220 ms sustained RMS, rejects peak-only spikes, requires a quiet baseline without a timeout bypass, and has longer rearm/playback settling. Existing silence-stop and pre-roll paths remain. Default threshold increases only for settings without an explicit saved value. Real instrument/native microphone tuning remains to be checked; do not promise zero false starts.
+- Take cards persist only deliberate drags, not viewport clamping. Legacy positions lacking user-placement provenance fall back to default (one-time layout reset); offsets from a substantially different viewport also fall back. Startup clamps wait for the entry animation. No take files or recording data are moved/deleted.
+- SwipeRoutineItem supports horizontal reveal + explicit Remove, keyboard focus reveal, and vertical scroll. A browser walkthrough caught and fixed a swipe opening the exercise; pointer capture now suppresses the click after horizontal movement. Removal affects the routine draft, not media or the exercise library.
+- Goal planning takes instrument, goal, and duration; uses the existing instrument-specific template catalog and produces an editable routine. Existing tools → reference setup remains required. No external AI or new API key.
+- Home and routine tool settings share the builder's palette, font family, full-screen surface, panel styling, and blue actions.
+- Verification: new verify-practice-refinements.mjs passes synthetic transient/sustained detection, every instrument/goal/time combination, and intentional-position restoration cases; existing practice-routine checks pass. Browser inspected Home and a piccolo plan; swipe reveal/removal verified. Native audio performance and physical phone gestures are still unverified.
+- The prior LAN browser address 192.168.1.172:5173 stopped responding. Current workspace preview runs at http://127.0.0.1:5174/ (local machine only). Do not claim that the old LAN preview or installed iOS build has been updated.
+
+
+## September 6 — practice-loop refinement
+
+This checkpoint supersedes the earlier feature freeze. Preserve the routine-builder changes already in this shared working tree.
+
+- ControlDeck now separates solo **Listen to take** and **Try again** from an optional comparison disclosure. Notes/rating are optional; comparison also links directly to earlier sessions. Finish distinguishes the last item from Done & next. RoutineBar is hidden while the post-take dock owns the current item actions.
+- App's solo listening callback uses existing ReviewModeOverlay with focusedSoloReview, pauses reference/program playback, and preserves the selected reference. Retry/listen/compare guard pending take saves at the handler boundary.
+- Journal comparison is derived from loaded attempts (fixing the empty baseline after asynchronous loading), prefers the previous sitting, and supports explicit earlier-take selection. `journalComparison` is covered in `verify-focus-practice.mjs` for empty/single-take data, session defaults, explicit selection, and deleted recordings.
+- Reference passage playback has a visible replay button outside the editor disclosure; persistence and YouTube telemetry remain in the existing hook.
+- Routine context can show the previous sitting's latest take reflection, with a date fallback. It does not invent a progress score or overwrite the next-take intention.
+- Verification: focus-practice deterministic checks passed. Type checking and production build passed during this pass. No microphone, simulator, or physical-device walkthrough performed; native playback/interruptions and compact-screen interaction remain unverified. No API credentials, backend service, or iOS assets changed in this pass.
+
+
 Functional implementation, September 5, 2026. This shared working tree also contains the earlier guided-builder/instrument-design work. Preserve it. There is no replacement recording engine or new media backend in this change.
 
 ## Latest checkpoint — user requested handoff at 17% remaining

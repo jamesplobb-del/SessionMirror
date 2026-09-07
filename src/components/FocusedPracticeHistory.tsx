@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import type { Take } from '../types'
 import {
   countJournalDays,
+  journalComparison,
   groupIntoSittings,
   toJournalAttempts,
 } from '../utils/practiceJournal'
@@ -29,9 +30,10 @@ export default function FocusedPracticeHistory({ name, takes, notice, onClose, o
       })
     : null
 
-  // Compare against where you started, until you pick something else.
-  const [baselineId, setBaselineId] = useState(() => attempts[attempts.length - 1]?.take.id ?? '')
-  const latestId = attempts[0]?.take.id ?? ''
+  const [selectedBaselineId, setBaselineId] = useState<string | null>(null)
+  const comparison = journalComparison(attempts, selectedBaselineId)
+  const baselineId = comparison.baseline?.take.id ?? ''
+  const latestId = comparison.latest?.take.id ?? ''
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
@@ -66,6 +68,15 @@ export default function FocusedPracticeHistory({ name, takes, notice, onClose, o
           {firstDay && attempts.length > 1 && <> · first on {firstDay}</>}
         </p>
       )}
+
+      {comparison.canCompare && comparison.latest && comparison.baseline && <section className="focus-progress-comparison" aria-label="Hear your progress">
+        <span className="focus-eyebrow">Hear your progress</span>
+        <h3>Earlier → Latest</h3>
+        <p>Attempt {comparison.baseline.number} · {new Date(comparison.baseline.take.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          {' → '}Attempt {comparison.latest.number}</p>
+        <button type="button" disabled={Boolean(notice)} onClick={() => onCompare(latestId, baselineId)}>Compare earlier with latest</button>
+        <small>Choose a different earlier take using “Compare from here” below.</small>
+      </section>}
 
       {!attempts.length ? (
         <div className="focus-history-empty">
@@ -105,6 +116,7 @@ export default function FocusedPracticeHistory({ name, takes, notice, onClose, o
                             ? `Attempt ${number} is the comparison baseline`
                             : `Compare against attempt ${number}`
                         }
+                        disabled={isLatest && attempts.length > 1}
                         onClick={() => setBaselineId(take.id)}
                       />
                       <div className="focus-node-heading">
@@ -127,9 +139,10 @@ export default function FocusedPracticeHistory({ name, takes, notice, onClose, o
                           <span />
                         )}
                         <span className="focus-node-actions">
-                          <button type="button" onClick={() => onListen(take)}>Listen</button>
+                          <button type="button" disabled={Boolean(notice)} onClick={() => onListen(take)}>Listen</button>
+                          {!isLatest && <button type="button" aria-pressed={isBaseline} onClick={() => setBaselineId(take.id)}>{isBaseline ? 'Comparing from here' : 'Compare from here'}</button>}
                           {attempts.length > 1 && !isBaseline && baselineId && (
-                            <button type="button" onClick={() => onCompare(take.id, baselineId)}>Compare</button>
+                            <button type="button" disabled={Boolean(notice)} onClick={() => onCompare(take.id, baselineId)}>Compare</button>
                           )}
                         </span>
                       </div>

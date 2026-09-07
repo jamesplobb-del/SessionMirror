@@ -16,8 +16,16 @@ export default function ReferencePassageControls({ controls }: { controls: Retur
     }
     update({ startSeconds: a, endSeconds: b }); setValidation('')
   }
-  return <details className="reference-passage">
-    <summary><span>Reference passage</span><small>{passage.startSeconds !== null && passage.endSeconds !== null
+  const hasPassage = passage.startSeconds !== null && passage.endSeconds !== null
+  return <section className="reference-passage-workspace" aria-label="Reference playback">
+    <button type="button" className="reference-passage-listen" disabled={!ready} onClick={play}>
+      <Play aria-hidden /><span>{hasPassage ? 'Listen to saved passage' : 'Listen to reference'}<small>{hasPassage
+        ? `${formatPassageTime(passage.startSeconds)}–${formatPassageTime(passage.endSeconds)}` : 'Save a passage below to return to the same excerpt'}</small></span>
+    </button>
+    {!ready && <p className="focus-help" role="status">Waiting for the reference player…</p>}
+    {error && <p className="focus-error" role="alert">{error}</p>}
+    <details className="reference-passage">
+    <summary><span>{hasPassage ? 'Edit passage' : 'Choose a passage'}</span><small>{passage.startSeconds !== null && passage.endSeconds !== null
       ? `${formatPassageTime(passage.startSeconds)}–${formatPassageTime(passage.endSeconds)}` : 'Choose the part you’re practicing'}</small></summary>
     <div className="reference-passage__fields">
       <label>From<input inputMode="decimal" placeholder="0:00" value={start} onChange={event => setStart(event.target.value)} /><button type="button" disabled={!ready} onClick={() => setStart(formatPassageTime(position))}>Use current</button></label>
@@ -29,7 +37,8 @@ export default function ReferencePassageControls({ controls }: { controls: Retur
       <button type="button" disabled={passage.endSeconds === null} aria-pressed={passage.loop} onClick={() => update({ loop: !passage.loop })}><Repeat2 aria-hidden />Loop</button>
       <button type="button" onClick={() => { update({ startSeconds: null, endSeconds: null, loop: false }); setStart(''); setEnd(''); setValidation('') }}>Clear</button>
     </div>
-    {(validation || error) && <p role="alert">{validation || error}</p>}
+    {validation && <p role="alert">{validation}</p>}
     {!ready && <p>Waiting for the reference player. You can still enter and save a passage.</p>}
   </details>
+  </section>
 }

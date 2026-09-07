@@ -69,7 +69,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   darkMode: false,
   autoSoundRecording: false,
   soundSilenceSeconds: 2,
-  soundVolumeThreshold: 20,
+  soundVolumeThreshold: 45,
   hapticFeedback: true,
   pitchTrackerEnabled: false,
   liveMicTunerEnabled: true,
@@ -272,7 +272,7 @@ export interface AutoRecordProfile {
   peakWeight?: number
 }
 
-/** Per-slider detection profile — loud mode rejects peak-only spikes; sensitive mode triggers fast. */
+/** Per-slider detection profile; start detection always requires sustained RMS. */
 export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
   const baseGate = volumeThresholdToLevel(sliderValue)
   const t = clamp(sliderValue, 1, 100)
@@ -284,8 +284,8 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
     return {
       gate: baseGate * 1.12,
       usePeak: true,
-      holdMs: 36,
-      attackHoldMs: 14,
+      holdMs: 220,
+      attackHoldMs: 0,
       noiseHeadroom: 1.45,
       noiseMargin: 0.00008,
       attackPeakRatio: 1.35,
@@ -299,8 +299,8 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
     return {
       gate: baseGate,
       usePeak: true,
-      holdMs: 24,
-      attackHoldMs: 12,
+      holdMs: 140,
+      attackHoldMs: 0,
       noiseHeadroom: 1.8,
       noiseMargin: 0.0001,
       attackPeakRatio: 1.6,
@@ -312,8 +312,8 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
   return {
     gate: baseGate,
     usePeak: true,
-    holdMs: 36,
-    attackHoldMs: 16,
+    holdMs: 220,
+    attackHoldMs: 0,
     noiseHeadroom: 2,
     noiseMargin: 0.0002,
     attackPeakRatio: 1.75,

@@ -255,3 +255,19 @@ assert.equal(journal.countJournalDays(attempts), 2, 'distinct calendar days, not
 assert.equal(journal.groupIntoSittings(journal.toJournalAttempts([]), NOW).length, 0, 'no takes, no spine')
 
 console.log('Journal grouping checks passed: attempt numbering, sitting split, day labels, single-sitting days, and the empty run.')
+
+// A journal mounts empty while SQLite loads; its default must be derived from
+// the loaded takes, not frozen in an empty useState initializer.
+assert.equal(journal.journalComparison([]).canCompare, false)
+const loadedComparison = journal.journalComparison(attempts)
+assert.equal(loadedComparison.latest.take.id, attempts[0].take.id)
+assert.notEqual(loadedComparison.baseline.take.practiceSessionId, loadedComparison.latest.take.practiceSessionId)
+assert.equal(loadedComparison.canCompare, true)
+const explicitBaseline = attempts[attempts.length - 1].take.id
+assert.equal(journal.journalComparison(attempts, explicitBaseline).baseline.take.id, explicitBaseline)
+assert.equal(journal.journalComparison(attempts, 'deleted-take').baseline.take.id, loadedComparison.baseline.take.id)
+assert.equal(journal.journalComparison([attempts[0]]).canCompare, false)
+const sameSitting = journal.toJournalAttempts([at(0, 9, 'same'), at(0, 10, 'same'), at(0, 11, 'same')])
+assert.equal(journal.journalComparison(sameSitting).baseline.take.id, sameSitting[2].take.id)
+assert.equal(journal.journalComparison(attempts, attempts[0].take.id).canCompare, false)
+console.log('Journal comparison checks passed: async load, previous sitting, explicit choice, deleted baseline, and single take.')

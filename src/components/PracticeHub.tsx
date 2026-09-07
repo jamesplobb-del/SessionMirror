@@ -365,9 +365,9 @@ export default function PracticeHub({
   if (typeof document === 'undefined') return null
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {isOpen && (
-        <div className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : ''}`}>
+        <div className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : activePage === 'home' ? 'practice-menu-layer--home' : ''}`}>
           <motion.button
             type="button"
             className="practice-menu-backdrop"
@@ -604,8 +604,43 @@ export default function PracticeHub({
                     transition={iosFade}
                   >
                     <section className="practice-menu-focus-flow">
+                      <div className="practice-home-actions" aria-label="Start practicing">
+                        <Pressable
+                          type="button"
+                          intensity="soft"
+                          haptic="light"
+                          hapticFeedback={hapticFeedback}
+                          className="practice-home-quick-start"
+                          onClick={onOpenQuickPractice}
+                        >
+                          <span className="practice-home-action-icon" aria-hidden><Disc3 /></span>
+                          <span className="practice-home-action-copy">
+                            <small>Camera or audio</small>
+                            <strong>Quick start</strong>
+                            <em>Open the recorder and play</em>
+                          </span>
+                          <ChevronRight aria-hidden />
+                        </Pressable>
+
+                        <Pressable
+                          type="button"
+                          intensity="soft"
+                          haptic="light"
+                          hapticFeedback={hapticFeedback}
+                          className="practice-home-build-routine"
+                          onClick={() => onOpenRoutineBuilder('build')}
+                        >
+                          <span className="practice-home-action-copy">
+                            <small>Your practice plan</small>
+                            <strong>Build your routine</strong>
+                            <em>{routine?.steps.length ? 'Adjust today’s exercises and setup' : 'Choose a goal and BestTake will shape the session'}</em>
+                          </span>
+                          <ChevronRight aria-hidden />
+                        </Pressable>
+                      </div>
+
                       {routine && routine.steps.length > 0 ? (
-                        <TodayBoard
+                        <RoutineHomeDisclosure
                           routine={routine}
                           day={routineDay}
                           tunerTransposition={tunerTransposition}
@@ -616,58 +651,39 @@ export default function PracticeHub({
                           onToggleStep={onToggleRoutineStep}
                           onEdit={() => onOpenRoutineBuilder('edit')}
                         />
-                      ) : (
-                        <section className="routine-invite" aria-label="This sitting">
-                          <SittingWave />
-                          <h3>What&rsquo;s the plan today?</h3>
-                          <Pressable
-                            type="button"
-                            intensity="soft"
-                            haptic="light"
-                            hapticFeedback={hapticFeedback}
-                            className="practice-menu-primary"
-                            onClick={() => onOpenRoutineBuilder('build')}
-                          >
-                            Build routine
-                          </Pressable>
-                          <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-                            className="routine-link" onClick={() => onOpenRoutineBuilder('presets')}>
-                            Browse routines
-                          </Pressable>
-                        </section>
-                      )}
-
-                      {routine && routine.steps.length > 0 && onBench ? (
-                        <section className="practice-on-bench" aria-label="On the bench">
-                          <span className="practice-menu-eyebrow">On the bench</span>
-                          <Pressable
-                            type="button"
-                            intensity="soft"
-                            haptic="light"
-                            hapticFeedback={hapticFeedback}
-                            className="practice-on-bench__card"
-                            disabled={startingFocusedPractice}
-                            onClick={() => void resumePractice(onBench.project.id)}
-                          >
-                            <strong>{onBench.project.name}</strong>
-                            <small>
-                              {onBench.age}
-                              {onBench.project.id === focusedPractice?.projectId && focusDeskSummary
-                                ? ` · ${focusDeskSummary}`
-                                : ''}
-                              {' · Open outside the routine'}
-                            </small>
-                          </Pressable>
-                        </section>
                       ) : null}
-                      <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-                        className="practice-home-row" onClick={onOpenQuickPractice}>
-                        <span className="practice-home-row-icon" aria-hidden><Disc3 /></span>
-                        <span><strong>Just record</strong><small>Camera or audio, whenever you need it</small></span>
-                        <ChevronRight className="practice-home-row-chevron" aria-hidden />
-                      </Pressable>
 
-                      <div className="practice-menu-focus-tools">
+                      {onBench ? (
+                        <details className="practice-home-disclosure practice-home-more">
+                          <summary>
+                            <span className="practice-home-disclosure__copy">
+                              <strong>Continue practicing</strong>
+                              <small>{onBench.project.name} · {onBench.age}</small>
+                            </span>
+                            <ChevronDown aria-hidden />
+                          </summary>
+                          <div className="practice-home-more__content">
+                            <Pressable
+                              type="button"
+                              intensity="soft"
+                              haptic="light"
+                              hapticFeedback={hapticFeedback}
+                              className="practice-on-bench__card"
+                              disabled={startingFocusedPractice}
+                              onClick={() => void resumePractice(onBench.project.id)}
+                            >
+                              <strong>{onBench.project.name}</strong>
+                              <small>
+                                {onBench.project.id === focusedPractice?.projectId && focusDeskSummary
+                                  ? focusDeskSummary
+                                  : 'Open outside today’s routine'}
+                              </small>
+                            </Pressable>
+                          </div>
+                        </details>
+                      ) : null}
+
+                      <div className="practice-menu-focus-tools" aria-label="Practice tools">
                         <Pressable
                           type="button"
                           intensity="soft"
@@ -851,6 +867,35 @@ interface TodayBoardProps {
   onStartStep: (stepId: string) => void
   onToggleStep: (stepId: string) => void
   onEdit: () => void
+  compact?: boolean
+}
+
+function RoutineHomeDisclosure(props: TodayBoardProps) {
+  const { routine, day } = props
+  const progress = routineProgress(routine, day)
+  const skipped = day?.skippedStepIds.length ?? 0
+  const status = progress.complete
+    ? 'Complete for today'
+    : `${progress.done} of ${progress.total} done${progress.minutesLeft > 0 ? ` · ${formatMinutes(progress.minutesLeft)} left` : ''}`
+
+  return (
+    <details className="practice-home-disclosure practice-home-routine">
+      <summary>
+        <span className={`practice-home-routine__count ${progress.complete ? 'is-complete' : ''}`} aria-hidden>
+          {progress.complete ? <Check /> : `${progress.done}/${progress.total}`}
+        </span>
+        <span className="practice-home-disclosure__copy">
+          <small>Today&rsquo;s routine</small>
+          <strong>{routine.name}</strong>
+          <em>{status}{skipped > 0 && !progress.complete ? ` · ${skipped} skipped` : ''}</em>
+        </span>
+        <ChevronDown aria-hidden />
+      </summary>
+      <div className="practice-home-routine__content">
+        <TodayBoard {...props} compact />
+      </div>
+    </details>
+  )
 }
 
 function TodayBoard({
@@ -863,6 +908,7 @@ function TodayBoard({
   onStartStep,
   onToggleStep,
   onEdit,
+  compact = false,
 }: TodayBoardProps) {
   const progress = routineProgress(routine, day)
   const resumableId = day?.activeStepId ?? day?.pausedStepId
@@ -884,30 +930,32 @@ function TodayBoard({
         : next ? 'Start' : 'Start practice'
 
   return (
-    <section className={`routine-board ${finished ? 'is-complete' : ''}`} aria-label="Today's routine">
-      <SittingWave compact />
-      <header className="routine-board__head">
-        <div>
-          <span className="practice-menu-eyebrow">Today · {describeToday()}</span>
-          <h3>{routine.name}</h3>
-          <p>
-            {finished
-              ? `${progress.done} completed${progress.total > progress.done ? ` · ${progress.total - progress.done} skipped` : ''}${minutesSpent ? ` · ${formatMinutes(minutesSpent)}` : ''}`
-              : `${progress.done} of ${progress.total} done${progress.minutesLeft > 0 ? ` · ${formatMinutes(progress.minutesLeft)} left` : ''}`}
-          </p>
-        </div>
-        <Pressable
-          type="button"
-          intensity="icon"
-          haptic="light"
-          hapticFeedback={hapticFeedback}
-          className="practice-menu-icon-button routine-board__edit"
-          aria-label="Edit routine"
-          onClick={onEdit}
-        >
-          <Pencil aria-hidden />
-        </Pressable>
-      </header>
+    <section className={`routine-board ${compact ? 'routine-board--compact' : ''} ${finished ? 'is-complete' : ''}`} aria-label="Today's routine">
+      {!compact ? <SittingWave compact /> : null}
+      {!compact ? (
+        <header className="routine-board__head">
+          <div>
+            <span className="practice-menu-eyebrow">Today · {describeToday()}</span>
+            <h3>{routine.name}</h3>
+            <p>
+              {finished
+                ? `${progress.done} completed${progress.total > progress.done ? ` · ${progress.total - progress.done} skipped` : ''}${minutesSpent ? ` · ${formatMinutes(minutesSpent)}` : ''}`
+                : `${progress.done} of ${progress.total} done${progress.minutesLeft > 0 ? ` · ${formatMinutes(progress.minutesLeft)} left` : ''}`}
+            </p>
+          </div>
+          <Pressable
+            type="button"
+            intensity="icon"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            className="practice-menu-icon-button routine-board__edit"
+            aria-label="Edit routine"
+            onClick={onEdit}
+          >
+            <Pencil aria-hidden />
+          </Pressable>
+        </header>
+      ) : null}
 
       <div className="routine-board__track" aria-hidden>
         {routine.steps.map((step) => (

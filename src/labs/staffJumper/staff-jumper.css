@@ -1551,7 +1551,7 @@
 
 .sj-target-dock__notes {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.2fr .8fr 1fr;
   align-items: center;
   gap: 0.7rem;
   margin-top: 0.3rem;
@@ -1778,3 +1778,7 @@
   pointer-events: none;
   transform: translateX(-50%);
 }
+.sj-next-note { display: grid; align-content: center; gap: 4px; opacity: .72; }
+.sj-next-note small { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.sj-next-note strong { font-size: 20px; font-weight: 600; }
+.sj-target-dock__notes { gap: 16px; }

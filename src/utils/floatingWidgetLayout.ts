@@ -72,7 +72,9 @@ export function loadPersistentWidgetPosition(id: string): WidgetPosition | null 
   try {
     const raw = localStorage.getItem(`${PERSISTENT_POSITION_STORAGE_PREFIX}${id}`)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<WidgetPosition>
+    const parsed = JSON.parse(raw) as Partial<WidgetPosition> & { userPlaced?: boolean; viewportWidth?: number; viewportHeight?: number }
+    if (!parsed.userPlaced) return null // Older offsets may have been saved by startup clamping.
+    if (typeof window !== 'undefined' && (Math.abs((parsed.viewportWidth ?? 0) - window.innerWidth) > 80 || Math.abs((parsed.viewportHeight ?? 0) - window.innerHeight) > 200)) return null
     if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') return null
     if (!Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return null
     return { x: parsed.x, y: parsed.y }
@@ -85,7 +87,7 @@ export function savePersistentWidgetPosition(id: string, x: number, y: number): 
   try {
     localStorage.setItem(
       `${PERSISTENT_POSITION_STORAGE_PREFIX}${id}`,
-      JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
+      JSON.stringify({ x: Math.round(x), y: Math.round(y), userPlaced: true, viewportWidth: window.innerWidth, viewportHeight: window.innerHeight }),
     )
   } catch {
     /* private mode / quota */

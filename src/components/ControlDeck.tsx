@@ -1,13 +1,13 @@
 import {
   Bookmark,
   Camera,
-  Check,
   ChevronDown,
   History,
   House,
   Layers3,
   MessageSquareText,
   Mic,
+  Play,
   RotateCcw,
   ScanSearch,
   Settings,
@@ -37,6 +37,7 @@ interface ControlDeckProps {
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenHome: () => void
+  onOpenVault?: () => void
   onOpenSettings: () => void
   expandViewActive?: boolean
   onToggleExpandView?: () => void
@@ -59,6 +60,8 @@ interface ControlDeckProps {
   focusedPostTakeHasNote?: boolean
   focusedPostTakeRating?: number
   focusedRecordingGoal?: string
+  focusedFinishLabel?: string
+  onFocusedPostTakeListen?: () => void
   onFocusedPostTakeReview?: () => void
   onFocusedPostTakeNote?: () => void
   onFocusedPostTakeRate?: (rating: number) => void
@@ -134,6 +137,7 @@ function ControlDeck({
   onRecordingModeChange,
   onToggleRecord,
   onOpenHome,
+  onOpenVault,
   onOpenSettings,
   expandViewActive = false,
   onToggleExpandView,
@@ -156,6 +160,8 @@ function ControlDeck({
   focusedPostTakeHasNote = false,
   focusedPostTakeRating = 0,
   focusedRecordingGoal = '',
+  focusedFinishLabel = 'Finish item',
+  onFocusedPostTakeListen,
   onFocusedPostTakeReview,
   onFocusedPostTakeNote,
   onFocusedPostTakeRate,
@@ -369,6 +375,9 @@ function ControlDeck({
         isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
       }`}
     >
+      {onOpenVault && !isRecording && !isStopping && !branchActive && !focusedPostTakeActive && (
+        <VaultHandle onOpen={onOpenVault} />
+      )}
       <SettingsBranchWheel
         open={branchOpen}
         onClose={closeBranch}
@@ -379,7 +388,8 @@ function ControlDeck({
         showMetronome={showMetronome}
         audioEnhancerEnabled={audioEnhancerEnabled}
         handsFreeEnabled={autoSoundRecording}
-        handsFreeToggleVisible={Boolean(onAutoSoundRecordingChange) && !isRecording}
+        handsFreeToggleVisible={Boolean(onAutoSoundRecordingChange)}
+        handsFreeToggleDisabled={isRecording || isStopping}
         onHandsFreeChange={onAutoSoundRecordingChange}
         layoutMode={settingsLayoutMode}
         metronomeToggleVisible={metronomeToggleVisible}
@@ -504,58 +514,47 @@ function ControlDeck({
               onClick={onFocusedPostTakeDismiss}
               aria-label={routineStepActive ? 'Finish this item and continue' : 'Done for now'}
             >
-              {routineStepActive ? 'Done & next' : 'Finish'}
+              {routineStepActive ? focusedFinishLabel : 'Finish'}
             </Pressable>
           </header>
-          {onFocusedComparisonChange && <div className="practice-compare-choice" role="group" aria-label="Compare this take with">
-            {(['current-best', 'previous-take', 'reference-track'] as const).map(mode => <button type="button" key={mode}
-              disabled={practiceTransitionBusy || (mode === 'previous-take' && !focusedHasPrevious)}
-              aria-pressed={focusedComparison === mode || (focusedComparison === 'yesterday' && mode === 'current-best')}
-              onClick={() => onFocusedComparisonChange(mode)}>
-              {mode === 'current-best' ? focusedHasBest ? 'My best' : 'This take' : mode === 'previous-take' ? 'Previous' : 'Reference'}
-            </button>)}
-          </div>}
-          <div className="focused-post-take-actions">
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              className={focusedPostTakeReviewed ? 'is-complete' : ''}
-              disabled={practiceTransitionBusy}
-              onClick={onFocusedPostTakeReview}
-            >
-              {focusedPostTakeReviewed ? <Check aria-hidden /> : <ScanSearch aria-hidden />}
-              <span>{focusedComparison === 'reference-track' && !focusedHasReference ? 'Find reference' : focusedComparison === 'current-best' && !focusedHasBest ? 'Listen' : 'Compare'}</span>
+          <div className="focused-post-take-actions focused-post-take-actions--listen">
+            <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
+              disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeListen}>
+              <Play aria-hidden /><span>Listen to take</span>
             </Pressable>
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              className={focusedPostTakeHasNote ? 'is-complete' : ''}
-              onClick={onFocusedPostTakeNote}
-            >
-              {focusedPostTakeHasNote ? <Check aria-hidden /> : <MessageSquareText aria-hidden />}
-              <span>{focusedPostTakeHasNote ? 'Edit adjustment' : 'One adjustment'}</span>
-            </Pressable>
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              className="is-primary"
-              disabled={practiceTransitionBusy}
-              onClick={onFocusedPostTakeRetry}
-            >
-              <RotateCcw aria-hidden />
-              <span>Try again</span>
+            <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
+              className="is-primary" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeRetry}>
+              <RotateCcw aria-hidden /><span>Try again</span>
             </Pressable>
           </div>
-          <details className="focus-optional-rating">
-            <summary>Rate this take · optional</summary>
-            <StarRating rating={focusedPostTakeRating} onChange={(value) => onFocusedPostTakeRate?.(value)} size="md" />
+          <details className="focus-post-take-compare">
+            <summary><ScanSearch aria-hidden />Compare this take</summary>
+            {onFocusedComparisonChange && <div className="practice-compare-choice" role="group" aria-label="Compare this take with">
+              {(['current-best', 'previous-take', 'reference-track'] as const).map(mode => <button type="button" key={mode}
+                disabled={practiceTransitionBusy || focusedTakeSaving || (mode === 'previous-take' && !focusedHasPrevious) || (mode === 'current-best' && !focusedHasBest)}
+                aria-pressed={focusedComparison === mode || (focusedComparison === 'yesterday' && mode === 'current-best')}
+                onClick={() => onFocusedComparisonChange(mode)}>
+                {mode === 'current-best' ? 'My best' : mode === 'previous-take' ? 'Previous take' : 'Reference'}
+              </button>)}
+            </div>}
+            <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving}
+              onClick={onFocusedPostTakeReview}>
+              {focusedComparison === 'reference-track' && !focusedHasReference ? 'Find a reference'
+                : (focusedComparison === 'current-best' || focusedComparison === 'yesterday') && !focusedHasBest ? 'Listen to this take'
+                : focusedPostTakeReviewed ? 'Open comparison again' : 'Open comparison'}
+            </button>
+            {onOpenFocusHistory && <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onOpenFocusHistory}>
+              <History aria-hidden />Compare with earlier sessions
+            </button>}
           </details>
+          <details className="focus-optional-rating">
+            <summary>Note & rating · optional</summary>
+            <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeNote}>
+              <MessageSquareText aria-hidden />{focusedPostTakeHasNote ? 'Edit adjustment' : 'One adjustment for next time'}
+            </button>
+            <StarRating rating={focusedPostTakeRating} onChange={(value) => { if (!practiceTransitionBusy && !focusedTakeSaving) onFocusedPostTakeRate?.(value) }} size="md" />
+          </details>
+
         </section>
       ) : isCameraPresentation ? (
         <div className="camera-control-deck__main-row">
@@ -736,6 +735,29 @@ function ControlDeck({
       )}
     </div>
   )
+}
+
+function VaultHandle({ onOpen }: { onOpen: () => void }) {
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const swiped = useRef(false)
+  return <button type="button" className="take-vault-handle" aria-label="Open takes. Swipe up or tap."
+    onPointerDown={event => {
+      start.current = { x: event.clientX, y: event.clientY }
+      swiped.current = false
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }}
+    onPointerUp={event => {
+      const origin = start.current
+      start.current = null
+      if (origin && origin.y - event.clientY > 32 && Math.abs(origin.x - event.clientX) < 60) {
+        swiped.current = true
+        onOpen()
+      }
+    }}
+    onPointerCancel={() => { start.current = null; swiped.current = true }}
+    onClick={() => { if (!swiped.current) onOpen(); swiped.current = false }}>
+    <i aria-hidden /><span>Takes · swipe up</span>
+  </button>
 }
 
 export default memo(ControlDeck)
