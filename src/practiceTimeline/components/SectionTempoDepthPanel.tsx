@@ -193,118 +193,140 @@ export default function SectionTempoDepthPanel({ section, onChange }: SectionTem
           <ul className="practice-timeline-editor__tempo-marker-list">
             {markers.map((marker) => (
               <li key={marker.id} className="practice-timeline-editor__tempo-marker-row">
-                <span className="practice-timeline-editor__tempo-marker-pos">
-                  {markerPositionLabel(marker)}
-                </span>
-                <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Earlier bar"
-                    onClick={() =>
-                      updateMarker(marker.id, {
-                        measure: Math.max(1, marker.measure - 1),
-                      })
-                    }
-                  >
-                    −
-                  </Pressable>
-                  <span className="practice-timeline-editor__stepper-value">{marker.measure}</span>
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Later bar"
-                    onClick={() =>
-                      updateMarker(marker.id, {
-                        measure: Math.min(totalMeasures, marker.measure + 1),
-                      })
-                    }
-                  >
-                    +
-                  </Pressable>
-                </div>
-                <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Earlier beat"
-                    onClick={() => {
-                      const beat = marker.beat ?? 1
-                      if (beat <= 1) {
-                        updateMarker(marker.id, { beat: undefined })
-                      } else {
-                        updateMarker(marker.id, { beat: beat - 1 })
-                      }
-                    }}
-                  >
-                    −
-                  </Pressable>
-                  <span
-                    className="practice-timeline-editor__stepper-value"
-                    title="Beat within bar (1 = bar line)"
-                  >
-                    {marker.beat && marker.beat > 1 ? marker.beat : '—'}
+                <div className="practice-timeline-editor__tempo-marker-head">
+                  <span className="practice-timeline-editor__tempo-marker-pos">
+                    {markerPositionLabel(marker)}
                   </span>
                   <Pressable
                     type="button"
                     intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Later beat"
-                    onClick={() =>
-                      updateMarker(marker.id, {
-                        beat: Math.min(timing.pulseCount, (marker.beat ?? 1) + 1),
-                      })
-                    }
+                    aria-label="Remove tempo pin"
+                    onClick={() => removeMarker(marker.id)}
                   >
-                    +
+                    <Trash2 size={16} />
                   </Pressable>
                 </div>
-                <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Decrease pinned tempo"
-                    onClick={() =>
-                      updateMarker(marker.id, {
-                        bpm: Math.max(40, marker.bpm - 1),
-                      })
-                    }
-                  >
-                    −
-                  </Pressable>
-                  <EditableNumberValue
-                    value={marker.bpm}
-                    min={40}
-                    max={300}
-                    ariaLabel="Type pinned tempo"
-                    onCommit={(bpm) => updateMarker(marker.id, { bpm })}
-                  />
-                  <Pressable
-                    type="button"
-                    intensity="icon"
-                    className="practice-timeline-editor__stepper-btn"
-                    aria-label="Increase pinned tempo"
-                    onClick={() =>
-                      updateMarker(marker.id, {
-                        bpm: Math.min(300, marker.bpm + 1),
-                      })
-                    }
-                  >
-                    +
-                  </Pressable>
+
+                <div className="practice-timeline-editor__tempo-marker-cell">
+                  <span className="practice-timeline-editor__tempo-marker-cell-label">Bar</span>
+                  <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Earlier bar"
+                      onClick={() =>
+                        updateMarker(marker.id, {
+                          measure: Math.max(1, marker.measure - 1),
+                        })
+                      }
+                    >
+                      −
+                    </Pressable>
+                    <EditableNumberValue
+                      value={marker.measure}
+                      min={1}
+                      max={totalMeasures}
+                      ariaLabel="Type the bar this tempo pin lands on"
+                      onCommit={(measure) => updateMarker(marker.id, { measure })}
+                    />
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Later bar"
+                      onClick={() =>
+                        updateMarker(marker.id, {
+                          measure: Math.min(totalMeasures, marker.measure + 1),
+                        })
+                      }
+                    >
+                      +
+                    </Pressable>
+                  </div>
                 </div>
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  aria-label="Remove tempo pin"
-                  onClick={() => removeMarker(marker.id)}
-                >
-                  <Trash2 size={16} />
-                </Pressable>
+
+                <div className="practice-timeline-editor__tempo-marker-cell">
+                  <span
+                    className="practice-timeline-editor__tempo-marker-cell-label"
+                    title="Beat within bar (1 = bar line)"
+                  >
+                    Beat
+                  </span>
+                  <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Earlier beat"
+                      onClick={() => {
+                        const beat = marker.beat ?? 1
+                        if (beat <= 1) {
+                          updateMarker(marker.id, { beat: undefined })
+                        } else {
+                          updateMarker(marker.id, { beat: beat - 1 })
+                        }
+                      }}
+                    >
+                      −
+                    </Pressable>
+                    <span className="practice-timeline-editor__stepper-value">
+                      {marker.beat && marker.beat > 1 ? marker.beat : '—'}
+                    </span>
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Later beat"
+                      onClick={() =>
+                        updateMarker(marker.id, {
+                          beat: Math.min(timing.pulseCount, (marker.beat ?? 1) + 1),
+                        })
+                      }
+                    >
+                      +
+                    </Pressable>
+                  </div>
+                </div>
+
+                <div className="practice-timeline-editor__tempo-marker-cell">
+                  <span className="practice-timeline-editor__tempo-marker-cell-label">Tempo</span>
+                  <div className="practice-timeline-editor__stepper practice-timeline-editor__stepper--compact">
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Decrease pinned tempo"
+                      onClick={() =>
+                        updateMarker(marker.id, {
+                          bpm: Math.max(40, marker.bpm - 1),
+                        })
+                      }
+                    >
+                      −
+                    </Pressable>
+                    <EditableNumberValue
+                      value={marker.bpm}
+                      min={40}
+                      max={300}
+                      ariaLabel="Type pinned tempo"
+                      onCommit={(bpm) => updateMarker(marker.id, { bpm })}
+                    />
+                    <Pressable
+                      type="button"
+                      intensity="icon"
+                      className="practice-timeline-editor__stepper-btn"
+                      aria-label="Increase pinned tempo"
+                      onClick={() =>
+                        updateMarker(marker.id, {
+                          bpm: Math.min(300, marker.bpm + 1),
+                        })
+                      }
+                    >
+                      +
+                    </Pressable>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>

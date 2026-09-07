@@ -32,7 +32,12 @@ import { usePhysicalOrientation } from './hooks/usePhysicalOrientation'
 import { useAppSettings } from './hooks/useAppSettings'
 import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
-import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
+import {
+  applyDroneFromDesk,
+  getDroneSnapshot,
+  setDroneKeepAlive,
+  subscribeDrone,
+} from './hooks/useDrone'
 import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
@@ -4288,6 +4293,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     handleShowDroneSettingChange(false)
   }, [handleShowDroneSettingChange])
 
+  /*
+   * The drone widget only lives on the record surfaces, so crossing to the
+   * Practice tab used to leave nothing holding the engine and the held pitch
+   * died about the time a routine started. While the drone is switched on it
+   * stays retained no matter which tab is showing; switching it off is what
+   * stops it (handleShowDroneSettingChange silences the note).
+   */
+  useEffect(() => {
+    setDroneKeepAlive(settings.showDrone)
+    return () => setDroneKeepAlive(false)
+  }, [settings.showDrone])
+
   /* ---- "Again": one breath of Record when Current finishes playing back --- */
   const currentPlaybackActive = autoPlaybackPlaying || challengerPipPlaying
   const currentPlaybackWasActiveRef = useRef(currentPlaybackActive)
@@ -6719,6 +6736,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onSkip={handleSkipOnboardingTutorial}
                         onSelectInstrument={handleSelectInstrument}
                         onChooseRoutine={handleOnboardingRoutineChoice}
+                        tunerTransposition={settings.tunerTransposition}
                         hapticFeedback={settings.hapticFeedback}
                       />
                     )}

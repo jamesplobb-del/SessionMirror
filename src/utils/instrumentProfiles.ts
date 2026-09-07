@@ -2,17 +2,24 @@
  * Instrument presets for Practice Home and onboarding.
  *
  * The Home title is the chooser: picking an instrument is shorthand for the
- * settings a player would otherwise have to find individually:
+ * two settings a player would otherwise have to find individually:
  *
  *   - `tunerInstrument`  — the pitch detection profile (voice / strings / winds).
- *   - `tunerTransposition` — the note the player reads off the page, so a
- *     trumpet playing written C does not read as a concert B♭.
  *   - `soundVolumeThreshold` — hands-free auto-record needs a higher gate for a
  *     trumpet than for a nylon-string guitar.
  *
- * Capture profile, enhancer, and drone timbre stay where they are: those are
- * taste, not instrument facts. Switching horns does not reset today’s routine
- * checks or rewrite desks the player already built.
+ * `tunerTransposition` is deliberately NOT applied. Which key a player reads in
+ * is a preference, not a fact about the instrument — plenty of working players
+ * on transposing instruments read and think in concert pitch, and silently
+ * moving their tuner to B♭ because they picked "Trumpet" is wrong for them and
+ * hard to notice. The field stays on the profile as the conventional reading
+ * for that instrument, so the picker can offer it as a suggestion; only an
+ * explicit choice in Settings changes the setting.
+ *
+ * Nothing else is derived from the instrument. Capture profile, enhancer, and
+ * drone timbre stay where they are: those are taste, not instrument facts.
+ * Switching horns does not reset today’s routine checks or rewrite desks the
+ * player already built.
  */
 import type { TunerInstrument } from './pitchConfig'
 import type { TunerTranspositionId } from './tunerTransposition'
@@ -26,6 +33,10 @@ export interface InstrumentProfile {
   label: string
   family: InstrumentFamily
   tunerInstrument: TunerInstrument
+  /**
+   * The key this instrument conventionally reads in. Suggested to the player,
+   * never applied for them — see the note at the top of this file.
+   */
   tunerTransposition: TunerTranspositionId
   /** Hands-free auto-record gate (1–100). Higher = must play louder to start. */
   soundVolumeThreshold: number
@@ -271,10 +282,13 @@ export function getInstrumentProfilesByFamily(family: InstrumentFamily): Instrum
   return INSTRUMENT_PROFILES.filter((profile) => profile.family === family)
 }
 
-/** The settings patch a chosen instrument implies. */
+/**
+ * The settings patch a chosen instrument implies. Written pitch is not in here
+ * on purpose: it is the player's call, not the picker's.
+ */
 export type InstrumentSettingsPatch = Pick<
   AppSettings,
-  'tunerInstrument' | 'tunerTransposition' | 'soundVolumeThreshold'
+  'tunerInstrument' | 'soundVolumeThreshold'
 >
 
 export function getInstrumentSettings(id: string): InstrumentSettingsPatch | null {
@@ -282,7 +296,6 @@ export function getInstrumentSettings(id: string): InstrumentSettingsPatch | nul
   if (!profile) return null
   return {
     tunerInstrument: profile.tunerInstrument,
-    tunerTransposition: profile.tunerTransposition,
     soundVolumeThreshold: profile.soundVolumeThreshold,
   }
 }

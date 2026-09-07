@@ -8,6 +8,11 @@ interface EditableNumberValueProps {
   onCommit: (value: number) => void
   ariaLabel: string
   suffix?: string
+  /**
+   * Text to show instead of the raw number — for steppers that read as words
+   * ("Off", "Once", "3×"). Typing still edits the underlying number.
+   */
+  displayValue?: string
   className?: string
 }
 
@@ -22,6 +27,7 @@ export default function EditableNumberValue({
   onCommit,
   ariaLabel,
   suffix,
+  displayValue,
   className = '',
 }: EditableNumberValueProps) {
   const [editing, setEditing] = useState(false)
@@ -72,11 +78,13 @@ export default function EditableNumberValue({
     )
   }
 
+  // The pill is a text field in disguise, so say so as well as showing it.
   return (
     <button
       type="button"
       className={`practice-timeline-editor__stepper-value practice-timeline-editor__stepper-value--editable ${className}`}
       aria-label={ariaLabel}
+      title="Tap to type a value"
       onClick={(event) => {
         event.stopPropagation()
         triggerLightHaptic()
@@ -84,8 +92,10 @@ export default function EditableNumberValue({
         setEditing(true)
       }}
     >
-      {value}
-      {suffix ? <span className="practice-timeline-editor__stepper-value-suffix">{suffix}</span> : null}
+      {displayValue ?? value}
+      {displayValue === undefined && suffix ? (
+        <span className="practice-timeline-editor__stepper-value-suffix">{suffix}</span>
+      ) : null}
     </button>
   )
 }

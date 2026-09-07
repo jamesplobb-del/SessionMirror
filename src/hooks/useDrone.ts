@@ -297,6 +297,25 @@ export function useDrone({
   }
 }
 
+/*
+ * Keep-alive for the surfaces that have no drone UI of their own.
+ *
+ * The widget and the Tuner tab are the only things that retain the engine, and
+ * neither is mounted on the Practice tab — so walking over to start a routine
+ * dropped the subscriber count to zero and the drone a player had deliberately
+ * left sounding went quiet a beat later. While the drone is switched on it is
+ * the player's choice, not the current screen's, so hold a retain for as long
+ * as the setting is on and let turning it off be what stops the pitch.
+ */
+let keepAliveHeld = false
+
+export function setDroneKeepAlive(active: boolean): void {
+  if (active === keepAliveHeld) return
+  keepAliveHeld = active
+  if (active) retain()
+  else release()
+}
+
 /** Read the live drone state outside React (desk snapshots). */
 export function readDroneState(): DronePrefs {
   return prefs

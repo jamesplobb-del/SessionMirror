@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import { COUNT_IN_WHEN_OPTIONS } from '../timelineEditorOptions'
+import EditableNumberValue from './EditableNumberValue'
 import type { PracticeTrackSettings } from '../types'
 import TimelineEditorSelect from './TimelineEditorSelect'
 
@@ -63,11 +64,18 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
               >
                 −
               </Pressable>
-              <span className="practice-timeline-editor__stepper-value">
-                {settings.countInBars <= 0
-                  ? 'Off'
-                  : `${settings.countInBars} bar${settings.countInBars === 1 ? '' : 's'}`}
-              </span>
+              <EditableNumberValue
+                value={settings.countInBars}
+                min={0}
+                max={8}
+                displayValue={
+                  settings.countInBars <= 0
+                    ? 'Off'
+                    : `${settings.countInBars} bar${settings.countInBars === 1 ? '' : 's'}`
+                }
+                ariaLabel="Type routine count-in bars"
+                onCommit={(countInBars) => onChange({ countInBars })}
+              />
               <Pressable
                 type="button"
                 intensity="icon"

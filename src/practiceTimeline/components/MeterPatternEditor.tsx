@@ -215,7 +215,14 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
           >
             −
           </Pressable>
-          <span className="practice-timeline-editor__stepper-value">{repeat.cycles}×</span>
+          <EditableNumberValue
+            value={repeat.cycles}
+            min={1}
+            max={99}
+            displayValue={`${repeat.cycles}×`}
+            ariaLabel="Type how many times the pattern cycles"
+            onCommit={(cycles) => onChange({ patternRepeat: { kind: 'cycles', cycles } })}
+          />
           <span className="practice-timeline-editor__hint">{cycleBars * repeat.cycles} bars total</span>
           <Pressable
             type="button"
@@ -247,7 +254,16 @@ export default function MeterPatternEditor({ section, onChange }: MeterPatternEd
           >
             −
           </Pressable>
-          <span className="practice-timeline-editor__stepper-value">{repeat.measures} bars</span>
+          <EditableNumberValue
+            value={repeat.measures}
+            min={cycleBars}
+            max={512}
+            displayValue={`${repeat.measures} bars`}
+            ariaLabel="Type total bars for the pattern"
+            onCommit={(measures) =>
+              onChange({ patternRepeat: { kind: 'totalMeasures', measures } })
+            }
+          />
           <span className="practice-timeline-editor__hint">{patternRepeatSummary(section)}</span>
           <Pressable
             type="button"

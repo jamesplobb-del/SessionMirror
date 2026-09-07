@@ -12,7 +12,7 @@ import {
   getInstrumentProfilesByFamily,
 } from '../utils/instrumentProfiles'
 import { getTunerProfile } from '../utils/pitchConfig'
-import { getTunerTransposition } from '../utils/tunerTransposition'
+import { getTunerTransposition, type TunerTranspositionId } from '../utils/tunerTransposition'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { triggerLightHaptic } from '../utils/haptics'
 
@@ -23,6 +23,8 @@ interface OnboardingTutorialProps {
   onSelectInstrument: (instrumentId: string) => void
   /** Ends the cards and opens the routine builder in the hub. */
   onChooseRoutine: (mode: RoutineBuilderMode) => void
+  /** Current written-pitch setting — reported, never changed by this picker. */
+  tunerTransposition: TunerTranspositionId
   hapticFeedback?: boolean
 }
 
@@ -31,6 +33,7 @@ export default function OnboardingTutorial({
   onSkip,
   onSelectInstrument,
   onChooseRoutine,
+  tunerTransposition,
   hapticFeedback = true,
 }: OnboardingTutorialProps) {
   const [index, setIndex] = useState(0)
@@ -105,9 +108,21 @@ export default function OnboardingTutorial({
   if (typeof document === 'undefined') return null
 
   const selectedProfile = selectedInstrument ? getInstrumentProfile(selectedInstrument) : undefined
+  /*
+   * Written pitch is not part of what the picker applies — plenty of players on
+   * transposing instruments read concert pitch and would not thank us for
+   * moving their tuner behind their back. So the summary reports the profile
+   * that was set and points at Settings for the rest.
+   */
   const selectionSummary = selectedProfile
-    ? `${getTunerProfile(selectedProfile.tunerInstrument).label} · Written pitch: ${
-        getTunerTransposition(selectedProfile.tunerTransposition).shortLabel
+    ? `${getTunerProfile(selectedProfile.tunerInstrument).label} · Reading in ${
+        getTunerTransposition(tunerTransposition).shortLabel
+      }${
+        selectedProfile.tunerTransposition === tunerTransposition
+          ? ''
+          : ` — ${
+              getTunerTransposition(selectedProfile.tunerTransposition).shortLabel
+            } is in Settings`
       }`
     : null
 

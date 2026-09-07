@@ -232,12 +232,14 @@ export default function TimelineSectionEditor({
                     >
                       −
                     </Pressable>
-                    <span className="practice-timeline-editor__stepper-value">
-                      {section.bars}
-                      <span className="practice-timeline-editor__stepper-value-suffix">
-                        {section.bars === 1 ? 'bar' : 'bars'}
-                      </span>
-                    </span>
+                    <EditableNumberValue
+                      value={section.bars}
+                      min={1}
+                      max={128}
+                      suffix={section.bars === 1 ? 'bar' : 'bars'}
+                      ariaLabel="Type bars"
+                      onCommit={(bars) => onChange({ bars })}
+                    />
                     <Pressable
                       type="button"
                       intensity="icon"
@@ -357,9 +359,14 @@ export default function TimelineSectionEditor({
                 >
                   −
                 </Pressable>
-                <span className="practice-timeline-editor__stepper-value">
-                  {repeatLabel(section.repeatCount)}
-                </span>
+                <EditableNumberValue
+                  value={section.repeatCount}
+                  min={1}
+                  max={16}
+                  displayValue={repeatLabel(section.repeatCount)}
+                  ariaLabel="Type how many times this section repeats"
+                  onCommit={(repeatCount) => onChange({ repeatCount })}
+                />
                 <Pressable
                   type="button"
                   intensity="icon"
@@ -494,13 +501,24 @@ export default function TimelineSectionEditor({
                     >
                       −
                     </Pressable>
-                    <span className="practice-timeline-editor__stepper-value">
-                      {(section.advanced?.countInBars ?? 0) <= 0
-                        ? 'Off'
-                        : `${section.advanced?.countInBars} ${
-                            section.advanced?.countInBars === 1 ? 'bar' : 'bars'
-                          }`}
-                    </span>
+                    <EditableNumberValue
+                      value={section.advanced?.countInBars ?? 0}
+                      min={0}
+                      max={8}
+                      displayValue={
+                        (section.advanced?.countInBars ?? 0) <= 0
+                          ? 'Off'
+                          : `${section.advanced?.countInBars} ${
+                              section.advanced?.countInBars === 1 ? 'bar' : 'bars'
+                            }`
+                      }
+                      ariaLabel="Type section count-in bars"
+                      onCommit={(countInBars) =>
+                        onChange({
+                          advanced: { ...section.advanced, countInBars },
+                        })
+                      }
+                    />
                     <Pressable
                       type="button"
                       intensity="icon"
