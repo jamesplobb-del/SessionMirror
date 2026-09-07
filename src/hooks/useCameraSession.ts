@@ -606,11 +606,15 @@ export function useCameraSession({
     }
   }, [isNativeVideoRecordingEnabled])
 
+  /** Returns whether any live WebKit video track actually had to be stopped —
+   * the native bridge only needs to wait out a handoff delay when one did. */
   const releaseWebKitVideoTracksForNativeBridge = useCallback(() => {
+    let releasedLiveTrack = false
     const stream = streamRef.current
     if (stream) {
       for (const track of stream.getVideoTracks()) {
         try {
+          if (track.readyState === 'live') releasedLiveTrack = true
           track.stop()
         } catch {
           /* ignore */
@@ -632,6 +636,7 @@ export function useCameraSession({
     }
     detachAllPreviewTargets()
     setStreamGeneration((generation) => generation + 1)
+    return releasedLiveTrack
   }, [detachAllPreviewTargets])
 
   /**
@@ -653,20 +658,9 @@ export function useCameraSession({
     }
   }, [])
 
-  const acquireNativeVideoBridge = useCallback(async (): Promise<boolean> => {
-    if (recordingModeRef.current !== 'video') {
-      return false
-    }
-    if (!isNativeVideoRecordingEnabled()) return false
-    if (nativePreviewActiveRef.current) {
-      setNativeLivePreviewActive(true)
-      setNeedsPermission(false)
-      setReady(true)
-      return true
-    }
-    const existingAcquire = nativeBridgeAcquireInFlightRef.current
-    if (existingAcquire) return existingAcquire
-
+  /** One attempt at owning the native bridge. Callers go through
+   * `acquireNativeVideoBridge`, which handles sharing and retry. */
+  const runNativeVideoBridgeAcquire = useCallback(async (): Promise<boolean> => {
     const acquire = (async (): Promise<boolean> => {
       const pendingRelease = nativeBridgeReleaseInFlightRef.current
       if (pendingRelease) {
@@ -676,8 +670,13 @@ export function useCameraSession({
         return false
       }
 
-      releaseWebKitVideoTracksForNativeBridge()
-      if (Capacitor.isNativePlatform()) {
+      // The delay exists to let WebKit finish giving the camera back before
+      // AVCaptureSession claims it. With no live WebKit video track there is
+      // nothing to hand off — on the common Tools → Camera path the native
+      // bridge owned the camera all along — so charging the wait there was
+      // dead time in front of an already-slow start.
+      const releasedWebKitVideo = releaseWebKitVideoTracksForNativeBridge()
+      if (Capacitor.isNativePlatform() && releasedWebKitVideo) {
         await new Promise((resolve) => window.setTimeout(resolve, IOS_NATIVE_BRIDGE_HANDOFF_MS))
       }
 
@@ -732,7 +731,44 @@ export function useCameraSession({
         nativeBridgeAcquireInFlightRef.current = null
       }
     }
-  }, [isNativeVideoRecordingEnabled, releaseWebKitVideoTracksForNativeBridge])
+  }, [releaseWebKitVideoTracksForNativeBridge])
+
+  const acquireNativeVideoBridge = useCallback(async (): Promise<boolean> => {
+    /*
+     * Two passes at most. An acquire already in flight is shared rather than
+     * duplicated, but its `false` must not be handed to a caller that still
+     * wants the camera: that attempt may have bailed for a mode which has
+     * since changed back, and nothing anywhere retries a false result — the
+     * camera just stayed off. So a shared failure costs this caller one fresh
+     * attempt of its own, and a second failure is reported honestly.
+     */
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (recordingModeRef.current !== 'video') return false
+      if (!isNativeVideoRecordingEnabled()) return false
+      if (nativePreviewActiveRef.current) {
+        setNativeLivePreviewActive(true)
+        setNeedsPermission(false)
+        setReady(true)
+        return true
+      }
+
+      const existingAcquire = nativeBridgeAcquireInFlightRef.current
+      if (existingAcquire) {
+        if (await existingAcquire) return true
+        // The owner's own cleanup may not have run yet — it resumes from the
+        // same settled promise we just awaited. Clear the slot ourselves so
+        // the retry pass starts a real attempt instead of re-awaiting a
+        // failure. The owner's `finally` identity-checks, so this is safe.
+        if (nativeBridgeAcquireInFlightRef.current === existingAcquire) {
+          nativeBridgeAcquireInFlightRef.current = null
+        }
+        continue
+      }
+
+      return await runNativeVideoBridgeAcquire()
+    }
+    return false
+  }, [isNativeVideoRecordingEnabled, runNativeVideoBridgeAcquire])
 
   const stopNativeVideoBridge = useCallback(async () => {
     nativePreviewStartTokenRef.current += 1
@@ -2963,7 +2999,18 @@ export function useCameraSession({
           setNativeLivePreviewActive(false)
           setNativeLivePreviewSeedUrl(null)
           nativePreviewActiveRef.current = false
-          void preRollDiscard.catch(() => {}).then(() => stopNativeVideoBridge())
+          void preRollDiscard
+            .catch(() => {})
+            .then(() => {
+              // Discarding the pre-roll's movie file takes long enough for a
+              // quick Tools → Camera round trip to have started a *new* bridge
+              // underneath us. Stopping it here left the camera off with
+              // nothing queued to bring it back — the preview simply never
+              // came on again. Only tear down if audio is still the mode that
+              // owns this teardown.
+              if (recordingModeRef.current !== 'audio') return undefined
+              return stopNativeVideoBridge()
+            })
         } else {
           void stopNativeVideoBridge()
         }

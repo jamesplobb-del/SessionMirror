@@ -73,6 +73,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var consecutiveBridgeAckTimeouts = 0
     private let bridgeFrameAckTimeout: TimeInterval = 0.25
     private let bridgeMaxAckTimeouts = 3
+    /// Retry cadence once the ack budget is spent. Delivery is throttled, never
+    /// abandoned — see the timeout handler in `drainBridgeFrames()`.
+    private let bridgeStalledRetryInterval: TimeInterval = 0.5
     private var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
     /// Preview JPEG pump — recording uses AVCaptureMovieFileOutput at full session resolution.
     /// Keep the admission ceiling above the camera's usual 30fps cadence. A
@@ -850,7 +853,19 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.session.stopRunning()
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.end")
             }
-            
+
+            // Hand the caller back here, not after the teardown below. Once
+            // stopRunning() returns the hardware is released, which is all a
+            // waiting start actually needs — and every camera start awaits this
+            // resolve (see useCameraSession's release serialisation), so the
+            // clearConfiguration pass below was charged straight to the black
+            // screen the user sits through on a Tools → Camera round trip. It
+            // still runs before any queued start: both are sessionQueue blocks,
+            // and the queue is serial.
+            DispatchQueue.main.async {
+                completion?()
+            }
+
             // Clear inputs and outputs when stopped to prevent zombie hardware devices
             // (like Bluetooth HFP inputs) from triggering capture session crashes
             // when the audio route changes while the preview is inactive.
@@ -868,9 +883,6 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             self.isSessionConfigured = false
             self.session.commitConfiguration()
             AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview clearConfiguration.end")
-            DispatchQueue.main.async {
-                completion?()
-            }
         }
     }
 
@@ -2681,14 +2693,25 @@ extension NativeCameraRecordingEngine {
                         self.bridgeFrameAwaitingAck == frameId
                     else { return }
                     self.consecutiveBridgeAckTimeouts += 1
+                    // Always release the in-flight slot. Holding it until a late
+                    // acknowledgement arrived assumed some consumer would
+                    // eventually ack *this* frame — but a frame delivered while
+                    // no JS listener is attached (expand view showing a pinned
+                    // take, preview held for take playback, a listener swapped
+                    // between the fullscreen and embedded canvas) is never acked
+                    // by anyone, so the preview froze until the whole bridge was
+                    // torn down and rebuilt. Past the budget we keep delivering
+                    // at a reduced rate instead of stopping: a genuinely stalled
+                    // WebKit costs one JPEG every bridgeStalledRetryInterval, and
+                    // a consumer that comes back repaints within that window.
+                    self.bridgeFrameAwaitingAck = nil
                     guard self.consecutiveBridgeAckTimeouts < self.bridgeMaxAckTimeouts else {
-                        // Keep this frame in-flight. A late acknowledgement can
-                        // resume delivery, while a permanently stalled WebKit
-                        // process can never accumulate more than three JPEGs.
-                        print("[NativeCameraFrameBridge] delivery paused waiting for WebKit frame acknowledgement")
+                        self.frameBridgeQueue.asyncAfter(deadline: .now() + self.bridgeStalledRetryInterval) {
+                            guard self.bridgeGeneration == generation else { return }
+                            self.drainBridgeFrames()
+                        }
                         return
                     }
-                    self.bridgeFrameAwaitingAck = nil
                     self.drainBridgeFrames()
                 }
             }

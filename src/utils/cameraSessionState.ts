@@ -53,6 +53,12 @@ export async function forceNativeRecordingMode(mode: 'video' | 'audio'): Promise
     })
   } catch (error) {
     console.warn('[AudioRoute] failed to force native recording mode', error)
+  } finally {
+    // This wrote native state behind syncNativeCameraSessionState's back, so
+    // its dedupe key no longer describes what native holds. Clearing it keeps
+    // the next sync from being short-circuited as a no-op and leaving native
+    // parked on the previewActive:false this call just pushed.
+    lastSyncedCameraSessionStateKey = null
   }
 }
 

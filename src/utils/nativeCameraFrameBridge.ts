@@ -54,7 +54,17 @@ export function subscribeNativeCameraPreviewFrames(
   onFrame: (event: NativeCameraPreviewFrameEvent) => void,
 ): Promise<PluginListenerHandle> | null {
   if (!isNativeCameraTestAvailable()) return null
-  return BestTakeAudioPlugin.addListener('nativeCameraPreviewFrame', onFrame)
+  return BestTakeAudioPlugin.addListener('nativeCameraPreviewFrame', (event) => {
+    /* Acknowledge at receipt, ahead of any consumer-side gating. Native keeps
+     * exactly one frame in flight and stops delivering entirely once a few go
+     * unacknowledged, so a consumer that means to *drop* this frame (bridge not
+     * primed, preview suppressed for take playback, pump paused behind a modal)
+     * must still ack it. Acking inside the consumer instead let a few hundred ms
+     * of suppressed preview wedge the bridge until it was torn down and rebuilt.
+     * Extra acks are harmless — native ignores any id it is not waiting on. */
+    void acknowledgeNativePreviewFrame(event.frameId)
+    onFrame(event)
+  })
 }
 
 /** Draw a frame into a cover-fit canvas (mirrors video.camera-preview object-fit: cover). */
@@ -197,10 +207,10 @@ export function createNativePreviewFramePump(
 
   return {
     push: (event: NativeCameraPreviewFrameEvent) => {
-      /* Acknowledging at receipt keeps exactly one native-to-WebKit delivery in
-       * flight, but removes decode + paint + bridge round-trip latency from the
-       * camera cadence. The decode loop itself remains latest-frame-only. */
-      void acknowledgeNativePreviewFrame(event.frameId)
+      /* Acknowledgement happens in subscribeNativeCameraPreviewFrames, at
+       * receipt, so that frames dropped here are still acked and the native
+       * one-in-flight gate keeps advancing. The decode loop remains
+       * latest-frame-only. */
       if (cancelled || paused || !extractJpegBase64(event)) return
       latestFrame = event
       void decodeLoop()
