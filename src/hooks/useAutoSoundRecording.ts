@@ -1,4 +1,5 @@
 import { advanceAutoStart } from '../utils/autoStartGate'
+import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
@@ -227,6 +228,8 @@ export function useAutoSoundRecording({
     !monitoringPaused &&
     appForeground &&
     (ready || nativeCaptureActive)
+  const shouldMonitorRef = useRef(shouldMonitor)
+  shouldMonitorRef.current = shouldMonitor
 
   useEffect(() => subscribeAppForeground(setAppForeground), [])
 
@@ -282,7 +285,8 @@ export function useAutoSoundRecording({
   }
 
   const triggerAutoStart = () => {
-    if (startLatchRef.current || isRecordingRef.current || suppressStartRef.current) {
+    if (!shouldMonitorRef.current || !isAppInForeground() ||
+        startLatchRef.current || isRecordingRef.current || suppressStartRef.current) {
       return
     }
 
@@ -327,6 +331,11 @@ export function useAutoSoundRecording({
 
   const tryCommitPendingPerformanceStart = (): boolean => {
     if (!pendingPerformanceGateRef.current) return false
+    if (!shouldMonitorRef.current || !isAppInForeground() || suppressStartRef.current) {
+      pendingPerformanceGateRef.current = false
+      clearStartLatch()
+      return false
+    }
     const mark = tryMarkAutoPerformanceRef.current?.()
     if (mark !== 'started') return false
 
@@ -567,6 +576,7 @@ export function useAutoSoundRecording({
       nativeTapReadyRef.current = false
       setMonitorReady(false)
       let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
+      const readFrameFreshness = createAudioFrameFreshness()
       const setupStartedAt = performance.now()
       // When levels actually began flowing. Native frames only start once
       // AVCapture has finished (re)configuring the session, which can be well
@@ -717,7 +727,15 @@ export function useAutoSoundRecording({
         let nativeFrameFresh = false
         if (useNativeMetrics) {
           const frame = nativeFrameRef
-          if (frame && now - frame.timestamp < 1000) {
+          const freshness = readFrameFreshness(frame?.timestamp, now)
+          if (freshness === 'stale' || freshness === 'gap') {
+            // Missing audio is neither sustained playing nor sustained silence.
+            loudSinceRef.current = null
+            attackSinceRef.current = null
+            silenceSinceRef.current = null
+            quietFramesSeen = 0
+          }
+          if (frame && (freshness === 'fresh' || freshness === 'gap')) {
             metrics = measureNativeFrameMetrics(frame.buffer)
             nativeFrameFresh = true
           }
@@ -732,7 +750,7 @@ export function useAutoSoundRecording({
 
 
 
-        if (isNativePath && !nativeFrameFresh) {
+        if (useNativeMetrics && !nativeFrameFresh) {
           return
         }
 
@@ -750,6 +768,8 @@ export function useAutoSoundRecording({
           if (metrics.rms < profile.gate * 0.9) {
             calibrationSamples.push(metrics.rms)
             quietFramesSeen += 1
+          } else {
+            quietFramesSeen = 0
           }
           loudSinceRef.current = null
           attackSinceRef.current = null
@@ -806,6 +826,8 @@ export function useAutoSoundRecording({
           if (suppressStartRef.current) {
             loudSinceRef.current = null
             attackSinceRef.current = null
+            armed = false
+            quietFramesSeen = 0
             return
           }
 
@@ -833,7 +855,12 @@ export function useAutoSoundRecording({
         attackSinceRef.current = null
 
         if (!autoTriggeredRef.current) return
-        maybeAutoStopFromSilence(metrics, now)
+        if (maybeAutoStopFromSilence(metrics, now)) {
+          // Each new take must earn a fresh quiet baseline after cooldown.
+          armed = false
+          quietFramesSeen = 0
+          setMonitorReady(false)
+        }
       }
 
       pollTimerRef.current = window.setInterval(tick, POLL_INTERVAL_MS)

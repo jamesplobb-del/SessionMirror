@@ -12,16 +12,16 @@ import {
   recoverNativeTunerMonitor,
   releaseNativeTunerMonitor,
 } from '../../utils/nativeAudioPitchTap'
-import { isNativeCaptureSessionActive } from '../../utils/cameraSessionState'
+import { isNativeCaptureSessionActive, subscribeNativeCaptureSessionActive } from '../../utils/cameraSessionState'
 import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
 import {
-  APP_FOREGROUND_RECOVERY_EVENT,
   APP_INTERACTIVE_MEDIA_RECOVERY_EVENT,
   isAppInForeground,
   requestInteractiveMediaRecovery,
   subscribeAppForeground,
 } from '../../utils/appForeground'
 import { triggerLightHaptic } from '../../utils/haptics'
+import { createAudioRecovery } from '../../utils/audioRecovery'
 
 interface AudioTunerTabProps {
   /** False while a sheet or another full-screen surface covers the tuner. */
@@ -59,23 +59,6 @@ function micStreamIsLive(
   )
 }
 
-/*
- * Checking whether the mic is live is free; repairing it is not — a repair
- * reconfigures the whole AVCaptureSession. This poll used to repair every
- * 500ms for as long as the source stayed down, so any state the mic could not
- * come back from (another app holding it, a failed route change, a session
- * that errors on every rebuild) turned into thousands of capture-session
- * rebuilds a minute, and the app was killed out from under a long sitting.
- *
- * Detect often, repair rarely: a handful of attempts on a widening delay, then
- * stand down to a slow watch and hand the decision to the Reactivate button.
- * If the mic comes back on its own the watch still picks it up within seconds.
- */
-const MIC_POLL_LIVE_MS = 1500
-const MIC_POLL_IDLE_MS = 6000
-const MIC_REPAIR_BASE_MS = 600
-const MIC_REPAIR_MAX_ATTEMPTS = 4
-
 export default function AudioTunerTab({
   active,
   streamRef,
@@ -97,10 +80,14 @@ export default function AudioTunerTab({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
 
   const [micLiveEpoch, setMicLiveEpoch] = useState(0)
+  const [micSessionReady, setMicSessionReady] = useState(false)
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('connecting')
   const [showRecoveryPrompt, setShowRecoveryPrompt] = useState(false)
   const [appForeground, setAppForeground] = useState(isAppInForeground)
   const automaticRecoveryAttemptsRef = useRef(0)
+  const recoveryRef = useRef(createAudioRecovery())
+  const micAccessRef = useRef({ active, isRecording, permissionRequestInFlight, onRequestMicStream })
+  micAccessRef.current = { active, isRecording, permissionRequestInFlight, onRequestMicStream }
   const previousRecordingRef = useRef(isRecording)
 
   const drone = useDrone({
@@ -132,29 +119,13 @@ export default function AudioTunerTab({
     ],
   )
 
-  const liveMicReady = active && appForeground
+  const liveMicReady =
+    active &&
+    appForeground &&
+    (micSessionReady ||
+      micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording))
 
   useEffect(() => subscribeAppForeground(setAppForeground), [])
-
-  useEffect(() => {
-    let cancelled = false
-    if (!active || !appForeground) return
-    if (handsFreeEnabled) {
-      if (isNativeCaptureSessionActive()) {
-        setMicLiveEpoch((epoch) => epoch + 1)
-      }
-      return
-    }
-    void acquireNativeTunerMonitor(micInputPreference).then((active) => {
-      if (!cancelled && active) {
-        setMicLiveEpoch((epoch) => epoch + 1)
-      }
-    })
-    return () => {
-      cancelled = true
-      void releaseNativeTunerMonitor()
-    }
-  }, [active, appForeground, handsFreeEnabled, micInputPreference])
 
   const recoverNativeSource = useCallback(async (): Promise<boolean> => {
     if (!active || !isAppInForeground()) return false
@@ -171,6 +142,82 @@ export default function AudioTunerTab({
     return recoverNativeTunerMonitor(micInputPreference)
   }, [active, handsFreeEnabled, micInputPreference])
 
+  const runTunerRecovery = useCallback(() => recoveryRef.current.run(async (isCurrent) => {
+    const access = micAccessRef.current
+    if (!access.active || !isAppInForeground()) return false
+    // Never reconfigure capture beneath an actual recording.
+    if (access.isRecording) return isNativeCaptureSessionActive()
+    const nativeActive = await recoverNativeSource()
+    if (!isCurrent() || !micAccessRef.current.active || !isAppInForeground()) return false
+    if (nativeActive) return true
+    if (handsFreeEnabled || micAccessRef.current.isRecording || micAccessRef.current.permissionRequestInFlight) return false
+    return Boolean(await micAccessRef.current.onRequestMicStream({ forceRecovery: true }))
+  }), [handsFreeEnabled, recoverNativeSource])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!active || !appForeground) {
+      setMicSessionReady(false)
+      return
+    }
+
+    setMicSessionReady(false)
+    setSourceHealth('connecting')
+    setShowRecoveryPrompt(false)
+    automaticRecoveryAttemptsRef.current = 0
+    const recovery = recoveryRef.current
+    void recovery.run(async (isCurrent) => {
+      let sourceActive = false
+      try {
+        if (handsFreeEnabled) {
+          await ensureNativeCameraSessionHealthy()
+          sourceActive = isNativeCaptureSessionActive()
+        } else {
+          sourceActive = await acquireNativeTunerMonitor(micInputPreference)
+          if (!cancelled && isCurrent() && micAccessRef.current.active && isAppInForeground() &&
+              !sourceActive && !micAccessRef.current.isRecording && !micAccessRef.current.permissionRequestInFlight) {
+            sourceActive = Boolean(await micAccessRef.current.onRequestMicStream({ forceRecovery: true }))
+          }
+        }
+      } catch (error) {
+        console.warn('[AudioTuner] microphone startup failed', error)
+      }
+      return sourceActive
+    }).then((sourceActive) => {
+      if (cancelled) return
+      setMicSessionReady(sourceActive)
+      if (sourceActive) {
+        setMicLiveEpoch((epoch) => epoch + 1)
+      } else {
+        setSourceHealth('stalled')
+        setShowRecoveryPrompt(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      recovery.cancel()
+      setMicSessionReady(false)
+      if (!handsFreeEnabled) void releaseNativeTunerMonitor()
+    }
+  }, [
+    active,
+    appForeground,
+    handsFreeEnabled,
+    micInputPreference,
+  ])
+
+  useEffect(() => {
+    if (!active || !appForeground) return
+    const observeCapture = () => {
+      if (isNativeCaptureSessionActive() || micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording)) {
+        setMicSessionReady(true)
+      }
+    }
+    observeCapture()
+    return subscribeNativeCaptureSessionActive(observeCapture)
+  }, [active, appForeground, isRecording, nativeLivePreviewActive, streamGeneration, streamRef])
+
   useEffect(() => {
     const wasRecording = previousRecordingRef.current
     previousRecordingRef.current = isRecording
@@ -179,18 +226,22 @@ export default function AudioTunerTab({
     // mount needlessly reconfigured the same AVCaptureSession twice.
     if (!active || isRecording || !wasRecording) return
     let cancelled = false
-    void recoverNativeSource().then((active) => {
-      if (!cancelled && active) setMicLiveEpoch((epoch) => epoch + 1)
+    void runTunerRecovery().then((active) => {
+      if (!cancelled && active) {
+        setMicSessionReady(true)
+        setMicLiveEpoch((epoch) => epoch + 1)
+      }
     })
     return () => {
       cancelled = true
     }
-  }, [active, isRecording, recoverNativeSource])
+  }, [active, isRecording, runTunerRecovery])
 
   const handleSourceHealthChange = useCallback((health: PitchSourceHealth) => {
     setSourceHealth(health)
     if (health === 'healthy') {
       automaticRecoveryAttemptsRef.current = 0
+      setMicSessionReady(true)
       setShowRecoveryPrompt(false)
     }
   }, [])
@@ -207,13 +258,11 @@ export default function AudioTunerTab({
       }
       setShowRecoveryPrompt(false)
       setSourceHealth('connecting')
-      const nativeActive = await recoverNativeSource()
+      const nativeActive = await runTunerRecovery()
       if (cancelled) return
-      if (!nativeActive && !handsFreeEnabled && !permissionRequestInFlight) {
-        await onRequestMicStream({ forceRecovery: true })
-        if (cancelled) return
-      }
-      setMicLiveEpoch((epoch) => epoch + 1)
+      setMicSessionReady(nativeActive)
+      if (nativeActive) setMicLiveEpoch((epoch) => epoch + 1)
+      else setShowRecoveryPrompt(true)
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     return () => {
@@ -222,96 +271,7 @@ export default function AudioTunerTab({
     }
   }, [
     active,
-    handsFreeEnabled,
-    onRequestMicStream,
-    permissionRequestInFlight,
-    recoverNativeSource,
-  ])
-
-  useEffect(() => {
-    let fallbackTimer: number | null = null
-    let fallbackAttempts = 0
-    let cancelled = false
-
-    const clearFallback = () => {
-      if (fallbackTimer !== null) {
-        window.clearTimeout(fallbackTimer)
-        fallbackTimer = null
-      }
-    }
-
-    const runForegroundFallback = async () => {
-      fallbackTimer = null
-      if (
-        cancelled ||
-        !isAppInForeground() ||
-        handsFreeEnabled ||
-        isRecording ||
-        permissionRequestInFlight
-      ) {
-        return
-      }
-
-      fallbackAttempts += 1
-      const recovered = await onRequestMicStream({ forceRecovery: true })
-      if (cancelled) return
-
-      if (recovered) {
-        setMicLiveEpoch((epoch) => epoch + 1)
-        return
-      }
-
-      if (fallbackAttempts < 3) {
-        fallbackTimer = window.setTimeout(runForegroundFallback, 900)
-      }
-    }
-
-    const recoverAfterForeground = async (event: Event) => {
-      // The foreground state subscriber drives a fresh native monitor
-      // acquisition. Ignore this recovery event until that render commits so
-      // it cannot race ahead and open a second WebKit microphone.
-      if (!active || !appForeground) return
-      const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
-      if (reason?.endsWith(':settled')) return
-
-      clearFallback()
-      fallbackAttempts = 0
-      automaticRecoveryAttemptsRef.current = 0
-      setShowRecoveryPrompt(false)
-      setSourceHealth('connecting')
-      const nativeActive = await recoverNativeSource()
-      if (cancelled) return
-
-      if (nativeActive) {
-        setMicLiveEpoch((epoch) => epoch + 1)
-        return
-      }
-
-      let webKitRecovered = false
-      if (!handsFreeEnabled && !permissionRequestInFlight) {
-        webKitRecovered = await onRequestMicStream()
-        if (cancelled) return
-      }
-      setMicLiveEpoch((epoch) => epoch + 1)
-      if (!webKitRecovered) {
-        fallbackTimer = window.setTimeout(runForegroundFallback, 1200)
-      }
-    }
-
-    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAfterForeground)
-    return () => {
-      cancelled = true
-      clearFallback()
-      window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverAfterForeground)
-    }
-  }, [
-    active,
-    appForeground,
-    handsFreeEnabled,
-    isRecording,
-    onRequestMicStream,
-    permissionRequestInFlight,
-    recoverNativeSource,
+    runTunerRecovery,
   ])
 
   useEffect(() => {
@@ -334,77 +294,26 @@ export default function AudioTunerTab({
     requestInteractiveMediaRecovery('tuner-auto-source-stalled')
   }, [active, appForeground, isRecording, permissionRequestInFlight, sourceHealth])
 
-  useEffect(() => {
-    if (!active || !appForeground) return
-    let cancelled = false
-    let sourceWasLive =
-      micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
-      isNativeCaptureSessionActive()
-    let retryTimer: number | null = null
-    let repairAttempts = 0
-
-    const verifyMicSource = () => {
-      if (cancelled) return
-
-      const sourceIsLive =
-        micStreamIsLive(streamRef.current, nativeLivePreviewActive, isRecording) ||
-        isNativeCaptureSessionActive()
-
-      if (sourceIsLive) {
-        if (!sourceWasLive) setMicLiveEpoch((epoch) => epoch + 1)
-        repairAttempts = 0
-      } else if (!handsFreeEnabled && !isRecording && !permissionRequestInFlight) {
-        if (repairAttempts < MIC_REPAIR_MAX_ATTEMPTS) {
-          repairAttempts += 1
-          void onRequestMicStream()
-        } else if (repairAttempts === MIC_REPAIR_MAX_ATTEMPTS) {
-          // Out of automatic attempts: stop touching the hardware and let the
-          // player decide, through the Reactivate button that already exists.
-          repairAttempts += 1
-          setShowRecoveryPrompt(true)
-        }
-      }
-
-      sourceWasLive = sourceIsLive
-      const nextDelay = sourceIsLive
-        ? MIC_POLL_LIVE_MS
-        : Math.min(
-            MIC_POLL_IDLE_MS,
-            MIC_REPAIR_BASE_MS * 2 ** Math.max(0, repairAttempts - 1),
-          )
-      retryTimer = window.setTimeout(verifyMicSource, nextDelay)
-    }
-
-    retryTimer = window.setTimeout(verifyMicSource, sourceWasLive ? MIC_POLL_LIVE_MS : 650)
-
-    return () => {
-      cancelled = true
-      if (retryTimer !== null) {
-        window.clearTimeout(retryTimer)
-      }
-    }
-  }, [
-    active,
-    appForeground,
-    isRecording,
-    handsFreeEnabled,
-    nativeLivePreviewActive,
-    onRequestMicStream,
-    permissionRequestInFlight,
-    streamGeneration,
-    streamRef,
-  ])
+  // The pitch tracker's delivery watchdog owns stall detection. A second
+  // timer here used to open WebKit capture while native startup was pending.
+  // Foreground changes are handled by the acquisition effect above.
 
   const reactivateTuner = useCallback(() => {
     triggerLightHaptic(hapticFeedback)
     automaticRecoveryAttemptsRef.current = 0
     setShowRecoveryPrompt(false)
     setSourceHealth('connecting')
-    void recoverNativeSource().then((active) => {
-      if (active) setMicLiveEpoch((epoch) => epoch + 1)
+    void runTunerRecovery().then((sourceActive) => {
+      if (!micAccessRef.current.active || !isAppInForeground()) return
+      setMicSessionReady(sourceActive)
+      if (sourceActive) {
+        setMicLiveEpoch((epoch) => epoch + 1)
+      } else {
+        setSourceHealth('stalled')
+        setShowRecoveryPrompt(true)
+      }
     })
-    requestInteractiveMediaRecovery('tuner-manual-reactivate')
-  }, [hapticFeedback, recoverNativeSource])
+  }, [hapticFeedback, runTunerRecovery])
 
   return (
     <section

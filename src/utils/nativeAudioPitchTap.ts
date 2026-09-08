@@ -32,6 +32,7 @@ let tapOperation: Promise<void> = Promise.resolve()
 let tunerMonitorRefCount = 0
 let tunerMonitorActive = false
 let tunerMonitorOperation: Promise<void> = Promise.resolve()
+let tunerRecovery: { preference: MicInputPreference | undefined; result: Promise<boolean> } | null = null
 
 function enqueueTunerMonitorOperation<T>(operation: () => Promise<T>): Promise<T> {
   const result = tunerMonitorOperation.then(operation, operation)
@@ -94,7 +95,8 @@ export async function acquireNativeTunerMonitor(
     if (tunerMonitorActive) return true
     const active = await startTunerMonitor(micInputPreference)
     if (active && tunerMonitorRefCount === 0) {
-      await stopTunerMonitor()
+      // releaseNativeTunerMonitor already queued the stop behind this start.
+      // Stopping here too would restore the audio route twice.
       return false
     }
     return active
@@ -105,15 +107,21 @@ export async function recoverNativeTunerMonitor(
   micInputPreference?: MicInputPreference,
 ): Promise<boolean> {
   if (!isNativeCameraTestAvailable() || tunerMonitorRefCount === 0) return false
-  return enqueueTunerMonitorOperation(async () => {
+  if (tunerRecovery && tunerRecovery.preference === micInputPreference) return tunerRecovery.result
+  const result = enqueueTunerMonitorOperation(async () => {
     if (tunerMonitorRefCount === 0) return false
     const active = await startTunerMonitor(micInputPreference)
     if (active && tunerMonitorRefCount === 0) {
-      await stopTunerMonitor()
       return false
     }
     return active
   })
+  const recovery = { preference: micInputPreference, result }
+  tunerRecovery = recovery
+  void result.then(() => {
+    if (tunerRecovery === recovery) tunerRecovery = null
+  })
+  return result
 }
 
 export async function releaseNativeTunerMonitor(): Promise<void> {
@@ -185,11 +193,11 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
   if (sharedPitchFrameListenerPromise) return sharedPitchFrameListenerPromise
 
   const pending = BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
-    // Acknowledge receipt even if a payload is invalid or consumers have gone
-    // away. Analysis stays synchronous below; rendering remains independent.
-    if (event.frameId !== undefined) {
-      void BestTakeAudioPlugin.ackNativeAudioPitchFrame({ frameId: event.frameId }).catch(() => {})
-    }
+    // Keep the bridge listener for the lifetime of the app, but skip decoding
+    // entirely while no pitch feature is using it. Removing and recreating the
+    // listener during a quick Games -> Tuner switch can race Capacitor's
+    // asynchronous addListener response and leave the new tuner subscribed to
+    // a listener that was already removed.
     if (pitchFrameSubscribers.size === 0) return
     if (!event.pcmBase64 || !event.sampleRate) return
     const samples = decodePcmBase64(event.pcmBase64)
@@ -211,7 +219,7 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
         }
       }
     }
-  }).then(async (handle) => {
+  }).then((handle) => {
     sharedPitchFrameListener = handle
     return handle
   }).finally(() => {
@@ -225,9 +233,10 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
 }
 
 async function releaseSharedPitchFrameListenerIfIdle(): Promise<void> {
-  // Keep one process-wide receiver to acknowledge messages already in flight
-  // after the final graph unsubscribes. No graph callbacks or PCM are retained.
-  // Removing it during a tab switch can strand native delivery slots forever.
+  // Deliberately retain the single bridge receiver. Subscriber callbacks are
+  // still removed immediately, and releaseNativeAudioTap disables native PCM
+  // production when the final pitch graph closes. This avoids an async
+  // remove/add race without leaving the microphone or decoder running.
 }
 
 export function subscribeNativeAudioPitchFrames(
@@ -241,10 +250,10 @@ export function subscribeNativeAudioPitchFrames(
   // Return the subscription wrapper immediately. Waiting for Capacitor's
   // asynchronous addListener call before exposing remove() meant a quick tab
   // switch could retain an abandoned graph callback until the bridge replied.
-  void listenerReady.catch(() => {
-    pitchFrameSubscribers.delete(onChunk)
-    void releaseSharedPitchFrameListenerIfIdle()
-  })
+  // A failed bridge registration is retried when the pitch graph watchdog
+  // recreates its subscription. Keep this subscriber until its own graph is
+  // disposed so a late recovery cannot lose the callback.
+  void listenerReady.catch(() => {})
 
   return Promise.resolve({
     remove: async () => {

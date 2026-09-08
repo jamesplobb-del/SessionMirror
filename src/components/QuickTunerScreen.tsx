@@ -26,6 +26,7 @@ import {
 } from '../utils/quickTunerLaunch'
 import { applyDarkHudStatusBar } from '../utils/nativeStatusBar'
 import { triggerLightHaptic } from '../utils/haptics'
+import type { PitchSourceHealth } from '../hooks/useLivePitchTracker'
 
 interface QuickTunerScreenProps {
   request: QuickTunerLaunchRequest
@@ -139,16 +140,23 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
       source: request.source,
       micInputPreference: settings.micInputPreference,
     })
-    void acquireNativeTunerMonitor(settings.micInputPreference).then((active) => {
-      if (cancelled) return
-      setMonitorReady(active || !isNativeIOS)
-      setMonitorAttemptComplete(true)
-      setMonitorEpoch((epoch) => epoch + 1)
-      console.info('[QuickTuner] tuner engine started', {
-        nativeMonitorActive: active,
-        source: request.source,
+    void acquireNativeTunerMonitor(settings.micInputPreference)
+      .then((active) => {
+        if (cancelled) return
+        setMonitorReady(active || !isNativeIOS)
+        setMonitorAttemptComplete(true)
+        setMonitorEpoch((epoch) => epoch + 1)
+        console.info('[QuickTuner] tuner engine started', {
+          nativeMonitorActive: active,
+          source: request.source,
+        })
       })
-    })
+      .catch((error) => {
+        if (cancelled) return
+        console.warn('[QuickTuner] tuner engine start failed', error)
+        setMonitorReady(false)
+        setMonitorAttemptComplete(true)
+      })
 
     return () => {
       cancelled = true
@@ -220,13 +228,30 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   const retryMonitor = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setMonitorAttemptComplete(false)
-    void recoverNativeTunerMonitor(settings.micInputPreference).then((active) => {
-      setMonitorReady(active || !isNativeIOS)
-      setMonitorAttemptComplete(true)
-      setMonitorEpoch((epoch) => epoch + 1)
-      console.info('[QuickTuner] tuner engine recovery result', { active })
-    })
+    void recoverNativeTunerMonitor(settings.micInputPreference)
+      .then((active) => {
+        setMonitorReady(active || !isNativeIOS)
+        setMonitorAttemptComplete(true)
+        setMonitorEpoch((epoch) => epoch + 1)
+        console.info('[QuickTuner] tuner engine recovery result', { active })
+      })
+      .catch((error) => {
+        console.warn('[QuickTuner] tuner engine recovery failed', error)
+        setMonitorReady(false)
+        setMonitorAttemptComplete(true)
+      })
   }, [isNativeIOS, settings.hapticFeedback, settings.micInputPreference])
+
+  const handleSourceHealthChange = useCallback((health: PitchSourceHealth) => {
+    if (!isNativeIOS) return
+    if (health === 'healthy') {
+      setMonitorReady(true)
+      setMonitorAttemptComplete(true)
+    } else if (health === 'stalled') {
+      setMonitorReady(false)
+      setMonitorAttemptComplete(true)
+    }
+  }, [isNativeIOS])
 
   const activeProfile = useMemo(
     () => getTunerProfile(settings.tunerInstrument),
@@ -286,13 +311,14 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
               enabled={appForeground}
               isPlaying={false}
               mediaKey={`quick-tuner-${request.id}-${monitorEpoch}`}
-              liveMicEnabled={appForeground}
+              liveMicEnabled={appForeground && (!isNativeIOS || monitorReady)}
               micStreamRef={streamRef}
               liveMicOnly
               tunerInstrument={settings.tunerInstrument}
               tunerTransposition={settings.tunerTransposition}
               hapticsEnabled={settings.hapticFeedback}
               audioToolsEnabled={false}
+              onLiveSourceHealthChange={handleSourceHealthChange}
             />
             {isNativeIOS && monitorAttemptComplete && !monitorReady ? (
               <button

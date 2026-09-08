@@ -2746,9 +2746,9 @@ extension NativeCameraRecordingEngine {
             self.didLogFirstTapSample = false
             if !enabled {
                 self.tapAccumulator.removeAll()
-                self.audioTapBacklogLock.lock()
-                self.audioTapBacklog = 0
-                self.audioTapBacklogLock.unlock()
+                // Already queued encoders still decrement this count when
+                // they finish. Resetting it here made it negative on rapid
+                // tool switches, defeating the queue's memory bound.
             }
         }
     }
