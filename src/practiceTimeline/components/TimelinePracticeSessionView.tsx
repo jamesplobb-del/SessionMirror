@@ -78,7 +78,10 @@ export default function TimelinePracticeSessionView({
     [currentSection, playbackState.countInActive, playbackState.measure],
   )
 
-  const canGoPrev = playbackState.sectionIndex > 0
+  // Back has somewhere to go whenever the run is past the top of a section,
+  // which includes the first one — restarting section 1 is the only way back
+  // to bar 1 once it is under way.
+  const canGoPrev = playbackState.sectionIndex > 0 || !playbackState.atSectionStart
   const canGoNext = playbackState.sectionIndex < timeline.sections.length - 1
   const displayMeasure = playbackState.countInActive
     ? 'Count-in'
@@ -130,7 +133,9 @@ export default function TimelinePracticeSessionView({
           intensity="icon"
           disabled={!canGoPrev}
           onClick={() => onSkipSection(-1)}
-          aria-label="Previous section"
+          aria-label={
+            playbackState.atSectionStart ? 'Previous section' : 'Back to the start of this section'
+          }
         >
           <ChevronLeft size={22} />
         </Pressable>
@@ -152,6 +157,9 @@ export default function TimelinePracticeSessionView({
                 className={`practice-timeline-session__section-pill ${isActive ? 'practice-timeline-session__section-pill--active' : ''}`}
                 onClick={() => onGoToSection(index)}
                 title={section.title}
+                aria-label={
+                  isActive ? `Restart ${section.title}` : `Go to ${section.title}`
+                }
               >
                 {abbreviateLabel(section.title, 10)}
               </Pressable>

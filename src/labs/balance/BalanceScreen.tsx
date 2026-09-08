@@ -31,7 +31,10 @@ import {
   getBalanceInstrument,
   inferBalanceInstrument,
 } from './balanceMusic'
-import { loadPracticeGameInstrumentId } from '../practiceGameInstrument'
+import {
+  loadPracticeGameInstrumentId,
+  savePracticeGameInstrumentId,
+} from '../practiceGameInstrument'
 import {
   balanceCurrentStreak,
   balanceDailyChallenge,
@@ -88,6 +91,13 @@ export default function BalanceScreen({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('idle')
   const [route, setRoute] = useState<BalanceRoute>('home')
+  // The picker is reached from the home screen and from Quick Play's setup, so
+  // it has to know which one to hand back to.
+  const [instrumentReturnRoute, setInstrumentReturnRoute] = useState<BalanceRoute>('home')
+  const openInstrumentPicker = useCallback((from: BalanceRoute) => {
+    setInstrumentReturnRoute(from)
+    setRoute('instrument')
+  }, [])
   const game = useBalanceGame({
     initialInstrumentId: initialInstrument.id,
     hapticFeedback,
@@ -161,6 +171,42 @@ export default function BalanceScreen({
    */
   const gameRef = useRef(game)
   gameRef.current = game
+
+  /**
+   * Moving horn moves every note the game asks for, so the saved quick-play
+   * target and scale root have to be pulled back inside the new range.
+   */
+  const settingsForInstrument = useCallback((instrumentId: string) => {
+    const next = getBalanceInstrument(instrumentId)
+    const current = gameRef.current.state.settings
+    return {
+      instrumentId: next.id,
+      single: {
+        ...current.single,
+        writtenMidi: clampWrittenMidi(current.single.writtenMidi, next),
+      },
+      scale: {
+        ...current.scale,
+        rootWrittenMidi: Math.min(
+          clampWrittenMidi(current.scale.rootWrittenMidi, next),
+          next.maxWrittenMidi - current.scale.octaveRange * 12,
+        ),
+      },
+    }
+  }, [])
+
+  /*
+   * The Games lobby is where the horn is chosen. Balance keeps its own copy in
+   * saved settings so a run can be replayed offline, but on the way in the
+   * shared pick wins — otherwise a player who changed instrument in the lobby
+   * would still be asked for the old horn's notes.
+   */
+  useEffect(() => {
+    if (gameRef.current.state.settings.instrumentId === initialInstrument.id) return
+    gameRef.current.updateSettings(settingsForInstrument(initialInstrument.id))
+    // Reconciled once on the way in; later changes come through the picker.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const stopTestHold = useCallback(() => {
     if (testHoldRef.current == null) return
@@ -236,7 +282,7 @@ export default function BalanceScreen({
           onQuickPlay={() => setRoute('quick')}
           onTrail={() => setRoute('trail')}
           onTrophies={() => setRoute('trophies')}
-          onInstrument={() => setRoute('instrument')}
+          onInstrument={() => openInstrumentPicker('home')}
         />
       )
     }
@@ -258,26 +304,13 @@ export default function BalanceScreen({
         <BalanceInstrumentPicker
           instrumentId={game.state.settings.instrumentId}
           hapticFeedback={hapticFeedback}
-          onBack={() => setRoute('home')}
+          onBack={() => setRoute(instrumentReturnRoute)}
           onSelect={(instrumentId) => {
-            // Changing horn moves every note, so the quick-play target has to
-            // be pulled back into the new range or it would sit outside it.
-            const next = getBalanceInstrument(instrumentId)
-            game.updateSettings({
-              instrumentId: next.id,
-              single: {
-                ...game.state.settings.single,
-                writtenMidi: clampWrittenMidi(game.state.settings.single.writtenMidi, next),
-              },
-              scale: {
-                ...game.state.settings.scale,
-                rootWrittenMidi: Math.min(
-                  clampWrittenMidi(game.state.settings.scale.rootWrittenMidi, next),
-                  next.maxWrittenMidi - game.state.settings.scale.octaveRange * 12,
-                ),
-              },
-            })
-            setRoute('home')
+            game.updateSettings(settingsForInstrument(instrumentId))
+            // One answer for every game: the lobby, Staff Jumper and Learn all
+            // read the same saved pick, so changing it here changes it there.
+            savePracticeGameInstrumentId(getBalanceInstrument(instrumentId).id)
+            setRoute(instrumentReturnRoute)
           }}
         />
       )
@@ -331,6 +364,7 @@ export default function BalanceScreen({
         suppressUntilRef={game.suppressUntilRef}
         onBack={() => setRoute('quick')}
         onStart={startQuick}
+        onChangeInstrument={() => openInstrumentPicker('options')}
         onRequestMic={onRequestMicStream}
         onUpdate={game.updateSettings}
         onSaveCustom={game.saveCustomRoutine}

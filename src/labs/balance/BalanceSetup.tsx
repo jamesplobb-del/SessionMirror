@@ -11,6 +11,7 @@ import {
 import {
   ArrowLeft,
   ChevronDown,
+  ChevronRight,
   Mic,
   Play,
 } from 'lucide-react'
@@ -20,9 +21,7 @@ import Pressable from '../../components/ui/Pressable'
 import { writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
 import {
   BALANCE_DIRECTION_LABELS,
-  BALANCE_INSTRUMENTS,
   BALANCE_SCALE_TYPE_LABELS,
-  clampWrittenMidi,
   getBalanceInstrument,
   midiToBalanceNoteName,
   routineSummary,
@@ -45,7 +44,7 @@ import {
   balanceGoalIndex,
 } from './balanceGoal'
 
-type SetupSection = 'routine' | 'instrument'
+type SetupSection = 'routine'
 
 interface BalanceSetupProps {
   settings: BalanceSettings
@@ -60,6 +59,8 @@ interface BalanceSetupProps {
   suppressUntilRef: MutableRefObject<number>
   onBack: () => void
   onStart: () => void
+  /** Opens the one instrument picker every game shares. */
+  onChangeInstrument: () => void
   onRequestMic: () => void
   onUpdate: (patch: Partial<BalanceSettings>) => void
   onSaveCustom: (routine: BalanceCustomRoutine) => void
@@ -124,6 +125,7 @@ export default function BalanceSetup({
   suppressUntilRef,
   onBack,
   onStart,
+  onChangeInstrument,
   onRequestMic,
   onUpdate,
   onSaveCustom,
@@ -598,6 +600,31 @@ export default function BalanceSetup({
             find out the game was configurable at all. Closed they sit two-up;
             the open one takes the full width. */}
         <div className="balance-setup-quick">
+      {/*
+        * The horn is settled before this screen opens — the Games lobby asks
+        * once and every game follows it — so it is reported here, not asked
+        * again. Tapping opens that same shared picker, which is the only place
+        * the answer lives.
+        */}
+      <Pressable
+        intensity="soft"
+        hapticFeedback={hapticFeedback}
+        className="balance-instrument-board balance-setup-instrument"
+        onClick={onChangeInstrument}
+        aria-label={`Playing on ${instrument.name}. Change instrument`}
+      >
+        <span>
+          <small>Playing on</small>
+          <strong>{instrument.name}</strong>
+          <b>
+            {midiToBalanceNoteName(instrument.minWrittenMidi)}–
+            {midiToBalanceNoteName(instrument.maxWrittenMidi)}
+            {previewTarget ? ` · target ${previewTarget.writtenLabel}` : ''}
+          </b>
+        </span>
+        <em>Change</em>
+        <ChevronRight aria-hidden />
+      </Pressable>
       <SetupGroup
         id="routine"
         open={openSection === 'routine'}
@@ -670,42 +697,6 @@ export default function BalanceSetup({
         )}
       </SetupGroup>
 
-      <SetupGroup
-        id="instrument"
-        open={openSection === 'instrument'}
-        title="Instrument"
-        summary={`${instrument.name} · ${instrument.clef[0]?.toUpperCase()}${instrument.clef.slice(1)} clef · Written pitch`}
-        hapticFeedback={hapticFeedback}
-        onToggle={(id) => setOpenSection(openSection === id ? null : id)}
-      >
-        <label className="balance-setting-row" htmlFor="balance-instrument"><span>Instrument</span>
-          <select
-            id="balance-instrument"
-            value={instrument.id}
-            onChange={(event) => {
-              const nextInstrument = getBalanceInstrument(event.target.value)
-              onUpdate({
-                instrumentId: nextInstrument.id,
-                single: { ...settings.single, writtenMidi: clampWrittenMidi(settings.single.writtenMidi, nextInstrument) },
-                scale: {
-                  ...settings.scale,
-                  rootWrittenMidi: Math.min(
-                    clampWrittenMidi(settings.scale.rootWrittenMidi, nextInstrument),
-                    nextInstrument.maxWrittenMidi - settings.scale.octaveRange * 12,
-                  ),
-                },
-              })
-            }}
-          >
-            {BALANCE_INSTRUMENTS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <div className="balance-instrument-facts">
-          <span>Transposition<strong>{instrument.transposition === 'concert' ? 'Concert C' : instrument.transposition.replace('_', ' · ')}</strong></span>
-          <span>Written range<strong>{midiToBalanceNoteName(instrument.minWrittenMidi)}–{midiToBalanceNoteName(instrument.maxWrittenMidi)}</strong></span>
-          <span>Current target<strong>{previewTarget ? `Written ${previewTarget.writtenLabel} · Concert ${previewTarget.concertLabel}` : '—'}</strong></span>
-        </div>
-      </SetupGroup>
         </div>
 
         <div className="balance-start">

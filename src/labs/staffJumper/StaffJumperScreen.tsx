@@ -185,6 +185,93 @@ function Options<T extends string>({
   )
 }
 
+/**
+ * The tempo number, typeable.
+ *
+ * Stepping in fours from 80 to 132 is thirteen taps, and the preset chip only
+ * offers eight tempi — neither gets you to the exact marking printed on the
+ * page you are working from. Tap the number and type it. The steppers and the
+ * slider still work for nudging.
+ */
+function TempoField({
+  value,
+  min,
+  max,
+  onCommit,
+  hapticFeedback,
+}: {
+  value: number
+  min: number
+  max: number
+  onCommit: (bpm: number) => void
+  hapticFeedback: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(String(value))
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!editing) setDraft(String(value))
+  }, [editing, value])
+
+  useEffect(() => {
+    if (!editing) return
+    window.requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+  }, [editing])
+
+  const commit = () => {
+    const parsed = Number(draft)
+    if (Number.isFinite(parsed)) {
+      onCommit(Math.max(min, Math.min(max, Math.round(parsed))))
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="sj-tempo__value sj-tempo__input"
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={draft}
+        aria-label="Tempo in beats per minute"
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit()
+          if (event.key === 'Escape') {
+            setDraft(String(value))
+            setEditing(false)
+          }
+        }}
+      />
+    )
+  }
+
+  return (
+    <Pressable
+      type="button"
+      intensity="soft"
+      hapticFeedback={hapticFeedback}
+      className="sj-tempo__value sj-tempo__value--editable"
+      aria-label={`Tempo ${value} beats per minute. Tap to type a tempo.`}
+      title="Tap to type a tempo"
+      onClick={() => {
+        setDraft(String(value))
+        setEditing(true)
+      }}
+    >
+      {value}
+    </Pressable>
+  )
+}
+
 function OptionsPanel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="sj-panel">
@@ -230,6 +317,14 @@ export default function StaffJumperScreen({
   const [draftMetronome, setDraftMetronome] = useState(true)
   const [draftDrone, setDraftDrone] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
+  /*
+   * The horn is settled in the Games lobby before this screen opens, so the
+   * instrument panel reports it rather than asking again. The manual clef and
+   * written-pitch rows are still here for anyone reading a part their horn is
+   * not printed in — one tap away, and open already if the saved setup is
+   * nobody's preset.
+   */
+  const [showReadingSetup, setShowReadingSetup] = useState(savedSetup.instrumentId === null)
   /**
    * The preview shows one sample of a randomized exercise, so it needs its own
    * seed — otherwise it would redraw different notes on every keystroke.
@@ -626,70 +721,88 @@ export default function StaffJumperScreen({
         </OptionsPanel>
 
         <OptionsPanel title="Instrument">
-          <div className="sj-field sj-field--stack">
-            <p className="sj-field__label">
-              I play
-              <span>
-                {selectedInstrument
-                  ? `${CLEF_LABELS[selectedInstrument.clef]} clef · reads ${selectedInstrument.range.label} · starts in ${homeKeyForInstrument(selectedInstrument, draftScaleMode)}`
-                  : 'Set the clef and written pitch yourself below.'}
-              </span>
-            </p>
-            {/*
-              * A plain <select>, like the onboarding picker: iOS draws it as
-              * the system wheel, so a list this long scrolls the way every
-              * other picker on the phone does.
-              */}
-            <div className="sj-select">
-              <select
-                className="sj-select__control"
-                aria-label="Instrument"
-                value={draftInstrumentId ?? ''}
-                onChange={(event) => chooseInstrument(event.target.value)}
-              >
-                <option value="">Other / custom</option>
-                {STAFF_JUMPER_INSTRUMENT_FAMILIES.map((family) => (
-                  <optgroup key={family} label={family}>
-                    {getStaffJumperInstrumentsByFamily(family).map((instrument) => (
-                      <option key={instrument.id} value={instrument.id}>
-                        {instrument.name}
-                      </option>
+          <p className="sj-instrument-summary">
+            <strong>{selectedInstrument ? selectedInstrument.name : 'Custom reading setup'}</strong>
+            <span>
+              {selectedInstrument
+                ? `${CLEF_LABELS[selectedInstrument.clef]} clef · reads ${selectedInstrument.range.label} · starts in ${homeKeyForInstrument(selectedInstrument, draftScaleMode)}`
+                : `${CLEF_LABELS[draftClef]} clef · written pitch ${writtenPitchChoice.name}`}
+            </span>
+            <small>Set in Games, and every game follows it.</small>
+          </p>
+
+          <Pressable
+            type="button"
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
+            className="balance-textlink sj-instrument-toggle"
+            onClick={() => setShowReadingSetup((open) => !open)}
+            aria-expanded={showReadingSetup}
+          >
+            {showReadingSetup ? 'Hide reading setup' : 'Change instrument or reading setup'}
+          </Pressable>
+
+          {showReadingSetup ? (
+            <>
+              <div className="sj-field sj-field--stack">
+                <p className="sj-field__label">I play</p>
+                {/*
+                  * A plain <select>, like the onboarding picker: iOS draws it as
+                  * the system wheel, so a list this long scrolls the way every
+                  * other picker on the phone does.
+                  */}
+                <div className="sj-select">
+                  <select
+                    className="sj-select__control"
+                    aria-label="Instrument"
+                    value={draftInstrumentId ?? ''}
+                    onChange={(event) => chooseInstrument(event.target.value)}
+                  >
+                    <option value="">Other / custom</option>
+                    {STAFF_JUMPER_INSTRUMENT_FAMILIES.map((family) => (
+                      <optgroup key={family} label={family}>
+                        {getStaffJumperInstrumentsByFamily(family).map((instrument) => (
+                          <option key={instrument.id} value={instrument.id}>
+                            {instrument.name}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
-              <ChevronDown className="sj-select__chevron" aria-hidden />
-            </div>
-            <p className="sj-field__note">
-              Picking an instrument sets the clef, the written pitch and the scale its
-              method book starts on. Change either below to set your own.
-            </p>
-          </div>
+                  </select>
+                  <ChevronDown className="sj-select__chevron" aria-hidden />
+                </div>
+                <p className="sj-field__note">
+                  Picking an instrument sets the clef, the written pitch and the scale its
+                  method book starts on, here and in every other game. Change either row
+                  below to set your own instead.
+                </p>
+              </div>
 
-          <div className="sj-field sj-field--stack">
-            <p className="sj-field__label">
-              Written pitch <span>{writtenPitchChoice.instruments}</span>
-            </p>
-            <Options
-              label="Written pitch"
-              value={draftTransposition}
-              onChange={chooseTransposition}
-              options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
-              hapticFeedback={hapticFeedback}
-            />
-          </div>
+              <div className="sj-field sj-field--stack">
+                <p className="sj-field__label">
+                  Written pitch <span>{writtenPitchChoice.instruments}</span>
+                </p>
+                <Options
+                  label="Written pitch"
+                  value={draftTransposition}
+                  onChange={chooseTransposition}
+                  options={WRITTEN_PITCH_CHOICES.map((item) => ({ id: item.id, label: item.name }))}
+                  hapticFeedback={hapticFeedback}
+                />
+              </div>
 
-          <div className="sj-field">
-            <p className="sj-field__label">Clef</p>
-            <Options
-              label="Clef"
-              value={draftClef}
-              onChange={chooseClef}
-              options={STAFF_JUMPER_READING_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
-              hapticFeedback={hapticFeedback}
-            />
-          </div>
-
+              <div className="sj-field">
+                <p className="sj-field__label">Clef</p>
+                <Options
+                  label="Clef"
+                  value={draftClef}
+                  onChange={chooseClef}
+                  options={STAFF_JUMPER_READING_CLEFS.map((clef) => ({ id: clef, label: CLEF_LABELS[clef] }))}
+                  hapticFeedback={hapticFeedback}
+                />
+              </div>
+            </>
+          ) : null}
         </OptionsPanel>
 
         <OptionsPanel title="Tempo & sound">
@@ -706,7 +819,13 @@ export default function StaffJumperScreen({
               >
                 <Minus aria-hidden />
               </Pressable>
-              <strong className="sj-tempo__value">{draftTempo}</strong>
+              <TempoField
+                value={draftTempo}
+                min={STAFF_JUMPER_TEMPO_MIN}
+                max={STAFF_JUMPER_TEMPO_MAX}
+                onCommit={setDraftTempo}
+                hapticFeedback={hapticFeedback}
+              />
               <Pressable
                 type="button"
                 intensity="soft"

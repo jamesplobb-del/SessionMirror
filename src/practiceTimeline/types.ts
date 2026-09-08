@@ -115,6 +115,8 @@ export interface TimelinePlaybackState {
   tempoScale: number
   effectiveBpm: number
   countInActive: boolean
+  /** Parked on the first beat of the current section — nothing to rewind to. */
+  atSectionStart: boolean
   /** Active pattern step when section uses meter pattern mode. */
   patternStepIndex?: number
   patternStepMeter?: MetronomeMeter

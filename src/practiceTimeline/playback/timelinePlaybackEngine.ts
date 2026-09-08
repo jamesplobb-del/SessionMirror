@@ -137,8 +137,22 @@ export class TimelinePlaybackEngine {
       tempoScale: this.tempoScale,
       effectiveBpm: section ? this.scaledBpm(baseBpm) : 0,
       countInActive: this.countInRemaining > 0,
+      atSectionStart: this.atSectionStart(),
       ...patternFields,
     }
+  }
+
+  /**
+   * Nothing to rewind to: first bar, first beat, not mid count-in, not at the
+   * end of a finished run. Anywhere else, "back" has somewhere to go.
+   */
+  private atSectionStart(): boolean {
+    return (
+      this.measure <= 1 &&
+      this.conductingBeat <= 1 &&
+      this.countInRemaining <= 0 &&
+      !this.finished
+    )
   }
 
   getTimeline(): PracticeTimeline | null {
@@ -299,9 +313,18 @@ export class TimelinePlaybackEngine {
     this.setTempoScale(bpm / baseBpm)
   }
 
+  /**
+   * Jump to a section and start it from its first bar.
+   *
+   * Re-selecting the section already playing restarts it rather than doing
+   * nothing. Tapping the pill you are on is how a player asks to take this bit
+   * again from the top, and while the run is under way it is the only way back
+   * to bar 1 of the section — especially the first one, which has nothing
+   * before it to step back to.
+   */
   goToSection(index: number): void {
     if (!this.timeline || index < 0 || index >= this.timeline.sections.length) return
-    if (index === this.sectionIndex && this.countInRemaining <= 0) return
+    if (index === this.sectionIndex && this.atSectionStart()) return
 
     this.sectionIndex = index
     this.measure = 1
@@ -316,7 +339,16 @@ export class TimelinePlaybackEngine {
     this.emitState()
   }
 
+  /**
+   * Transport skip, with the behaviour every media transport has: back part
+   * way through a section returns to the top of that section, and only steps
+   * to the previous one once you are already there.
+   */
   skipSection(direction: -1 | 1): void {
+    if (direction === -1 && !this.atSectionStart()) {
+      this.goToSection(this.sectionIndex)
+      return
+    }
     this.goToSection(this.sectionIndex + direction)
   }
 

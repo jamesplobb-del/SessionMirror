@@ -774,15 +774,34 @@
 
 /* Setup tiles — two across so both are on screen under the world, matching the
    scene's soft-card look rather than reading as a settings list. */
+/*
+ * One column now that the instrument is reported rather than asked: the horn
+ * board on top as the fact the routine is built against, the routine group
+ * under it. Two columns only made sense while there were two groups to pair.
+ */
 .balance-setup-quick {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
   align-items: start;
 }
 
-.balance-setup-quick .balance-setup-group.is-open {
-  grid-column: 1 / -1;
+/* Smaller than the lobby's hero board — here it is a line, not the headline. */
+.balance-setup-quick .balance-setup-instrument {
+  padding: 0.55rem 0.7rem 0.6rem;
+  border-radius: 0.9rem;
+}
+
+.balance-setup-quick .balance-setup-instrument strong {
+  font-size: 1rem;
+}
+
+.balance-setup-quick .balance-setup-instrument b {
+  font-size: 0.74rem;
+}
+
+.balance-setup-quick .balance-setup-instrument em {
+  font-size: 0.8rem;
 }
 
 .balance-setup-quick .balance-setup-group__head {
