@@ -185,6 +185,12 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
   if (sharedPitchFrameListenerPromise) return sharedPitchFrameListenerPromise
 
   const pending = BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
+    // Acknowledge receipt even if a payload is invalid or consumers have gone
+    // away. Analysis stays synchronous below; rendering remains independent.
+    if (event.frameId !== undefined) {
+      void BestTakeAudioPlugin.ackNativeAudioPitchFrame({ frameId: event.frameId }).catch(() => {})
+    }
+    if (pitchFrameSubscribers.size === 0) return
     if (!event.pcmBase64 || !event.sampleRate) return
     const samples = decodePcmBase64(event.pcmBase64)
     if (!samples || samples.length === 0) return
@@ -206,10 +212,6 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
       }
     }
   }).then(async (handle) => {
-    if (pitchFrameSubscribers.size === 0) {
-      await handle.remove()
-      return { remove: async () => {} }
-    }
     sharedPitchFrameListener = handle
     return handle
   }).finally(() => {
@@ -223,10 +225,9 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
 }
 
 async function releaseSharedPitchFrameListenerIfIdle(): Promise<void> {
-  if (pitchFrameSubscribers.size > 0) return
-  const handle = sharedPitchFrameListener
-  sharedPitchFrameListener = null
-  await handle?.remove()
+  // Keep one process-wide receiver to acknowledge messages already in flight
+  // after the final graph unsubscribes. No graph callbacks or PCM are retained.
+  // Removing it during a tab switch can strand native delivery slots forever.
 }
 
 export function subscribeNativeAudioPitchFrames(

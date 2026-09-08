@@ -45,6 +45,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setNativeCameraPassthrough", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ackNativeCameraPreviewFrame", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ackNativeAudioPitchFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeTunerMonitor", returnType: CAPPluginReturnPromise),
@@ -105,6 +106,39 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     }()
     private lazy var notificationGenerator = UINotificationFeedbackGenerator()
 
+    // Bound delivery through WebKit, not just the PCM encoder queue. A slot
+    // is released only when JS receives the payload; slow rendering cannot
+    // accumulate an unbounded queue of base64 audio messages.
+    private let pitchDeliveryLock = NSLock()
+    private var pendingPitchDeliveries = Set<Int>()
+    private var nextPitchDeliveryId = 0
+
+    private func deliverPitchFrame(_ pcm: String, sampleRate: Double, sampleCount: Int) {
+        guard hasListeners("nativeAudioPitchFrame") else { return }
+        pitchDeliveryLock.lock()
+        guard pendingPitchDeliveries.count < 3 else {
+            pitchDeliveryLock.unlock()
+            return
+        }
+        nextPitchDeliveryId += 1
+        let frameId = nextPitchDeliveryId
+        pendingPitchDeliveries.insert(frameId)
+        pitchDeliveryLock.unlock()
+        notifyListeners("nativeAudioPitchFrame", data: [
+            "pcmBase64": pcm, "sampleRate": sampleRate,
+            "sampleCount": sampleCount, "frameId": frameId,
+        ])
+    }
+
+    @objc func ackNativeAudioPitchFrame(_ call: CAPPluginCall) {
+        if let frameId = call.getInt("frameId") {
+            pitchDeliveryLock.lock()
+            pendingPitchDeliveries.remove(frameId)
+            pitchDeliveryLock.unlock()
+        }
+        call.resolve()
+    }
+
     override public func load() {
         super.load()
         nativeCameraEngine.onPreviewFrame = { [weak self] jpegBase64, width, height, frameId in
@@ -116,11 +150,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             ])
         }
         nativeCameraEngine.onAudioTapChunk = { [weak self] pcmBase64, sampleRate, sampleCount in
-            self?.notifyListeners("nativeAudioPitchFrame", data: [
-                "pcmBase64": pcmBase64,
-                "sampleRate": sampleRate,
-                "sampleCount": sampleCount,
-            ])
+            self?.deliverPitchFrame(pcmBase64, sampleRate: sampleRate, sampleCount: sampleCount)
             self?.appendSpokenFeedbackAudio(
                 pcmBase64: pcmBase64,
                 sampleRate: sampleRate,
