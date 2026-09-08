@@ -130,6 +130,10 @@ import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
 import { getInstrumentSettings } from './utils/instrumentProfiles'
+import {
+  practiceGameInstrumentIdFromProfile,
+  savePracticeGameInstrumentId,
+} from './labs/practiceGameInstrument'
 import { ActionSheetProvider, showAlertOutsideTree } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -835,6 +839,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       updateSettings(instrumentSettings)
       savePreferredInstrumentId(instrumentId)
       setPreferredInstrumentId(instrumentId)
+      // Home is where the horn is chosen, so the games follow it: Balance,
+      // Staff Jumper and Learn all read the one saved pick. An instrument no
+      // game has leaves them on whatever they had rather than guessing.
+      const gameInstrumentId = practiceGameInstrumentIdFromProfile(instrumentId)
+      if (gameInstrumentId) savePracticeGameInstrumentId(gameInstrumentId)
       setRoutine((current) =>
         current && current.instrumentId !== instrumentId
           ? { ...current, instrumentId, updatedAt: Date.now() }

@@ -200,6 +200,28 @@ export function savePracticeGameInstrumentId(id: string): void {
   patchLearnInstrumentId(canonicalId)
 }
 
+/**
+ * Practice Home's instrument ids → the games', where the two tables differ.
+ *
+ * Home offers one "Voice" and one "Piano / keys"; the games split each by the
+ * clef it reads, so the treble side is the sensible landing place.
+ */
+const FROM_PROFILE: Record<string, string> = {
+  voice: 'voice-treble',
+  piano: 'piano-treble',
+}
+
+/**
+ * The games' id for a Practice Home instrument, or null when no game has it.
+ *
+ * "Something else" and viola-less tables end up here; a null just means the
+ * games keep whatever horn they already had rather than guessing.
+ */
+export function practiceGameInstrumentIdFromProfile(profileId: string): string | null {
+  const candidate = FROM_PROFILE[profileId] ?? profileId
+  return isPracticeGameInstrumentId(candidate) ? getBalanceInstrument(candidate).id : null
+}
+
 export function loadLastPracticeGame(): PracticeGameId | null {
   if (typeof window === 'undefined') return null
   try {
