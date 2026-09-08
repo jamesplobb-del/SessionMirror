@@ -6460,7 +6460,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
                         onOpenHome={handleOpenPracticeHome}
-                        onOpenVault={handleOpenVaultFromPracticeHub}
                         onOpenSettings={handleOpenSettings}
                         onOpenVault={handleOpenVaultFromDeck}
                         takeCount={takes.length}
