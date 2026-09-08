@@ -1634,3 +1634,38 @@ html.dark .onboarding-lite__routine-choice.is-primary small {
 @media (prefers-reduced-motion: reduce) {
   .routine-bar { transition: none; }
 }
+
+/*
+ * "Start from the top" sits on the session heading rather than under the list:
+ * going back is a decision made while reading the items, not after them.
+ */
+.routine-board__list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.routine-board__restart {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 1.9rem;
+  padding: 0 0.55rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--practice-menu-secondary, #6c7077);
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.routine-board__restart svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  stroke-width: 2.2;
+}
+
+.routine-board__restart:disabled {
+  opacity: 0.45;
+}

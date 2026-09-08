@@ -9,6 +9,7 @@ import {
   Disc3,
   Pencil,
   Play,
+  RotateCcw,
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
@@ -982,7 +983,29 @@ function TodayBoard({
           className="practice-menu-primary" disabled={startingStepId !== null}
           onClick={() => onStartStep(next.id)}>{startingStepId ? 'Opening…' : cta}</Pressable>
       </div>}
-      <span className="practice-menu-eyebrow">Your session</span>
+      <div className="routine-board__list-head">
+        <span className="practice-menu-eyebrow">Your session</span>
+        {/* Every row starts its own item, but with a routine part way through
+            there was nothing that said so — and nothing that named going back
+            to the top as a thing you are allowed to do. Reopening the first
+            item clears only its own tick, not the rest of the day. */}
+        {routine.steps.length > 1 &&
+        routine.steps[0]!.id !== activeStep?.id &&
+        (progress.done > 0 || Boolean(activeStep) || progress.complete) ? (
+          <Pressable
+            type="button"
+            intensity="soft"
+            haptic="light"
+            hapticFeedback={hapticFeedback}
+            className="routine-board__restart"
+            disabled={startingStepId !== null}
+            onClick={() => onStartStep(routine.steps[0]!.id)}
+          >
+            <RotateCcw aria-hidden />
+            Start from the top
+          </Pressable>
+        ) : null}
+      </div>
       <ol className="routine-board__list">
         {routine.steps.map((step, index) => {
           const done = isStepDone(day, step.id)

@@ -502,6 +502,19 @@ export function isStepSettled(day: RoutineDay | null, stepId: string): boolean {
   return isStepDone(day, stepId) || isStepSkipped(day, stepId)
 }
 
+/**
+ * The step before this one in routine order.
+ *
+ * "Back" is positional, not progress-based: a player retaking the bit they
+ * just finished wants the item above this one, whether or not it is ticked
+ * off. Reopening it clears only that step's own done/skipped mark.
+ */
+export function previousStep(routine: Routine, stepId: string | null | undefined): RoutineStep | null {
+  if (!stepId) return null
+  const index = routine.steps.findIndex((step) => step.id === stepId)
+  return index > 0 ? routine.steps[index - 1] ?? null : null
+}
+
 /** The first step that is neither done nor skipped, after `afterStepId` when given. */
 export function nextOpenStep(routine: Routine, day: RoutineDay | null, afterStepId?: string | null): RoutineStep | null {
   const startIndex = afterStepId ? routine.steps.findIndex((step) => step.id === afterStepId) + 1 : 0

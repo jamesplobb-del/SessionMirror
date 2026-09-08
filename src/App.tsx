@@ -278,6 +278,7 @@ import {
   pauseRoutineDay,
   holdRoutineDay,
   resumeRoutineDay,
+  previousStep as previousRoutineStep,
   startRoutineDayStep,
   settleRoutineDayStep,
   loadPreferredInstrumentId,
@@ -5531,6 +5532,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     ? routine.steps.findIndex((step) => step.id === routineActiveStep.id) + 1
     : 0
 
+  const routinePreviousStep = useMemo(
+    () => (routine && routineActiveStep ? previousRoutineStep(routine, routineActiveStep.id) : null),
+    [routine, routineActiveStep],
+  )
+
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => {
       const next = !current
@@ -5739,8 +5745,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     tunerTransposition={settings.tunerTransposition}
                     hapticFeedback={settings.hapticFeedback}
                     onExpandedChange={setRoutineBarExpanded}
+                    previousStep={routinePreviousStep}
                     onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
                     onSkip={() => handleSkipRoutineStep(routineActiveStep.id)}
+                    onBack={
+                      routinePreviousStep
+                        ? () => void handleStartRoutineStep(routinePreviousStep.id)
+                        : undefined
+                    }
                     onOpenToday={handleOpenRoutineToday}
                     onPause={handlePauseRoutine}
                     onClose={handleCloseRoutineBar}

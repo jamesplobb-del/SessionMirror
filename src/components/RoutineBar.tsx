@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useMotionValue } from 'framer-motion'
-import { Check, ChevronDown, ChevronUp, GripVertical, Pause, Headphones, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronUp, GripVertical, Pause, Headphones, X } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import RoutineProgramControls from './RoutineProgramControls'
 import { iosSpringSnappy } from '../utils/motionPresets'
@@ -22,6 +22,8 @@ interface RoutineBarProps {
   stepIndex: number
   stepCount: number
   nextStep: RoutineStep | null
+  /** The item above this one, so a player can go back and take it again. */
+  previousStep: RoutineStep | null
   elapsedMs?: number
   busy?: boolean
   referenceReady?: boolean
@@ -37,6 +39,8 @@ interface RoutineBarProps {
   onExpandedChange: (expanded: boolean) => void
   onDone: () => void
   onSkip: () => void
+  /** Reopens an earlier item. Absent on the first step, which has none. */
+  onBack?: () => void
   onOpenToday: () => void
   onPause: () => void
   /** Put the routine down without being taken to Today. */
@@ -77,6 +81,7 @@ export default function RoutineBar({
   step,
   stepIndex,
   stepCount,
+  previousStep,
   nextStep,
   startedAt,
   elapsedMs: accumulatedMs = 0,
@@ -91,6 +96,7 @@ export default function RoutineBar({
   onExpandedChange,
   onDone,
   onSkip,
+  onBack,
   onOpenToday,
   onPause,
   onClose,
@@ -312,6 +318,23 @@ export default function RoutineBar({
           >
             {summary && <p className="routine-bar__summary">{summary}</p>}
             <div className="routine-bar__actions">
+              {/* Done and Skip only ever move forward, which left the routine a
+                  one-way street: the item you just finished was unreachable
+                  without going out to Today. Back reopens it in place. */}
+              {onBack && previousStep && (
+                <Pressable
+                  type="button"
+                  intensity="soft"
+                  haptic="light"
+                  hapticFeedback={hapticFeedback}
+                  disabled={busy}
+                  onClick={onBack}
+                  aria-label={`Go back to ${previousStep.title}`}
+                >
+                  <ChevronLeft aria-hidden />
+                  <span>Back</span>
+                </Pressable>
+              )}
               <Pressable
                 type="button"
                 intensity="soft"
