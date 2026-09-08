@@ -7,6 +7,7 @@ import {
   Library,
   House,
   Layers3,
+  ListMusic,
   MessageSquareText,
   Mic,
   Play,
@@ -39,8 +40,11 @@ interface ControlDeckProps {
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenHome: () => void
-  onOpenVault?: () => void
   onOpenSettings: () => void
+  /** Opens the Take Vault from the pill under the deck. */
+  onOpenVault?: () => void
+  /** Takes in the current session, shown on the vault pill. */
+  takeCount?: number
   expandViewActive?: boolean
   onToggleExpandView?: () => void
   onOpenMultitrack?: () => void
@@ -140,6 +144,7 @@ function ControlDeck({
   onToggleRecord,
   onOpenHome,
   onOpenVault,
+  takeCount = 0,
   onOpenSettings,
   expandViewActive = false,
   onToggleExpandView,
@@ -367,6 +372,47 @@ function ControlDeck({
     </div>
   )
 
+  /*
+   * The Take Vault, back under the deck.
+   *
+   * It used to be a slot in the control pill until Practice Home took that
+   * slot; reaching your own takes then meant opening a sheet and finding a
+   * tile in it. This is the old affordance in the deck's own language — a
+   * short horizontal pill, the same glass as the row above it, carrying the
+   * icon and the number of takes rather than the words.
+   */
+  const vaultStrip =
+    onOpenVault &&
+    !isRecording &&
+    !isStopping &&
+    !focusedPostTakeActive &&
+    !(collapsible && !deckExpanded) ? (
+      <Pressable
+        type="button"
+        intensity="soft"
+        squish={false}
+        haptic="light"
+        hapticFeedback={hapticFeedback}
+        onClick={onOpenVault}
+        data-tutorial="vault-button"
+        className={`control-deck__vault-strip pointer-events-auto ${
+          isCameraPresentation
+            ? 'camera-control-deck__vault-strip'
+            : 'audio-control-deck__vault-strip'
+        }`}
+        aria-label={`Open Take Vault${takeCount > 0 ? `, ${takeCount} saved` : ''}`}
+      >
+        <span className="ui-orient-spin control-deck__vault-strip-content">
+          <ListMusic aria-hidden strokeWidth={1.9} />
+          {takeCount > 0 ? (
+            <span className="control-deck__vault-strip-count">
+              {takeCount > 99 ? '99+' : takeCount}
+            </span>
+          ) : null}
+        </span>
+      </Pressable>
+    ) : null
+
   return (
     <div
       className={`control-deck pointer-events-auto flex w-full flex-col items-center px-4 ${
@@ -377,9 +423,6 @@ function ControlDeck({
         isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
       }`}
     >
-      {onOpenVault && !isRecording && !isStopping && !branchActive && !focusedPostTakeActive && (
-        <VaultHandle onOpen={onOpenVault} />
-      )}
       <SettingsBranchWheel
         open={branchOpen}
         onClose={closeBranch}
@@ -735,32 +778,12 @@ function ControlDeck({
           </div>
         </div>
       )}
+
+      {/* Sibling of the control row, not a child: the row is a flex line, so
+          anything inside it would land beside the pill instead of under it. */}
+      {vaultStrip}
     </div>
   )
-}
-
-function VaultHandle({ onOpen }: { onOpen: () => void }) {
-  const start = useRef<{ x: number; y: number } | null>(null)
-  const swiped = useRef(false)
-  return <button type="button" className="take-vault-handle" aria-label="Open takes. Swipe up or tap."
-    onPointerDown={event => {
-      start.current = { x: event.clientX, y: event.clientY }
-      swiped.current = false
-      event.currentTarget.setPointerCapture(event.pointerId)
-    }}
-    onPointerUp={event => {
-      const origin = start.current
-      start.current = null
-      if (origin && origin.y - event.clientY > 32 && Math.abs(origin.x - event.clientX) < 60) {
-        swiped.current = true
-        onOpen()
-      }
-    }}
-    onPointerCancel={() => { start.current = null; swiped.current = true }}
-    onClick={() => { if (!swiped.current) onOpen(); swiped.current = false }}>
-    <Library aria-hidden className="take-vault-handle__icon" />
-    <ChevronUp aria-hidden className="take-vault-handle__hint" />
-  </button>
 }
 
 export default memo(ControlDeck)

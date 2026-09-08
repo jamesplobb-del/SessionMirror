@@ -3461,6 +3461,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     handleOpenFullPracticeTool('metronome')
   }, [handleOpenFullPracticeTool])
 
+  /** The vault strip under the control deck. */
+  const handleOpenVaultFromDeck = useCallback(() => {
+    if (!canOpenOverlaySheet() || isExperimentalOpen) return
+    triggerLightHaptic(settings.hapticFeedback)
+    setShowPitch(false)
+    setIsSettingsOpen(false)
+    setIsVaultOpen(true)
+    deferHudMediaPause()
+  }, [canOpenOverlaySheet, deferHudMediaPause, isExperimentalOpen, settings.hapticFeedback])
+
   const handleOpenVaultFromPracticeHub = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setIsPracticeHubOpen(false)
@@ -6452,6 +6462,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onOpenHome={handleOpenPracticeHome}
                         onOpenVault={handleOpenVaultFromPracticeHub}
                         onOpenSettings={handleOpenSettings}
+                        onOpenVault={handleOpenVaultFromDeck}
+                        takeCount={takes.length}
                         expandViewActive={isSplitView}
                         onToggleExpandView={handleToggleSplitView}
                         onOpenMultitrack={handleOpenMultitrack}

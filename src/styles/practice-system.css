@@ -2623,3 +2623,55 @@ html.app-dark-mode
     min-height: clamp(8rem, 13vh, 9.5rem) !important;
   }
 }
+
+/*
+ * Take Vault strip — Audio Mode.
+ *
+ * A short horizontal pill under the control row in the same glass as the row
+ * above it, so it reads as part of the deck rather than something parked on
+ * top of the screen. Icon and count only: the words "Take Vault" would make it
+ * a label, and the deck has no other labels.
+ */
+.app-ui-overlay--audio-mode .control-deck__vault-strip {
+  display: inline-flex;
+  min-height: 1.95rem;
+  margin-top: 0.4rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.85rem;
+  border: 0.75px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.14)),
+    rgba(222, 234, 244, 0.16);
+  box-shadow:
+    0 0.35rem 0.9rem rgba(29, 61, 84, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  color: var(--audio-text-primary, #171a22);
+}
+
+.control-deck__vault-strip-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.control-deck__vault-strip svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.control-deck__vault-strip-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* The strip takes the band the deck's bottom padding was holding, so the
+   record button stays where it is instead of riding up. */
+.app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+  padding-bottom: clamp(0.3rem, 0.9vh, 0.5rem) !important;
+}
