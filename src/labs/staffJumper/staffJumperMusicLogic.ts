@@ -132,6 +132,7 @@ export type StaffJumperPhase = 'setup' | 'playing' | 'paused' | 'gameover'
 export type StaffJumperFeedback = 'perfect' | 'good' | 'wrong' | 'timeout' | 'missed-beat' | null
 
 export interface StaffJumperConfig {
+  customPitchClasses?: number[]
   key: StaffJumperKey
   scaleMode: StaffJumperScaleMode
   range: StaffJumperRange
@@ -150,6 +151,15 @@ export interface StaffJumperConfig {
   tempoBpm: number
   metronome: boolean
   drone: boolean
+  /**
+   * Three lives, and the run ends when they are gone.
+   *
+   * Off by default. Standard practice is endless: a wrong note is recorded
+   * against the accuracy and the reader carries on, the way it would with a
+   * teacher in the room. Nothing but the player ends the run. Turning this on
+   * is opting into the arcade version.
+   */
+  lives: boolean
   sessionSeed?: number
 }
 
@@ -213,6 +223,7 @@ export interface TargetNote {
   midi: number
   pitchClass: number
   noteLabel: string
+  customAccidental?: string
   yPx: number
   kind: 'ledger' | 'space' | 'line'
   ledgerLineYPx: number[]
@@ -519,6 +530,17 @@ export function resolveScaleRootMidi(
   return root
 }
 
+/** Custom notes are written pitches, filtered to the selected instrument range. */
+export function customNotePool(config: StaffJumperConfig): number[] {
+  if (!config.customPitchClasses?.length) return []
+  const selected = new Set(config.customPitchClasses.filter(pc => Number.isInteger(pc) && pc >= 0 && pc < 12))
+  const root = resolveScaleRootMidi(config)
+  const range = resolveWrittenRange(config.instrumentId, config.transposition, config.clef, config.tunerInstrument)
+  const low = Math.max(root, range.minMidi)
+  const high = Math.min(root + (config.range === '1-octave' ? 12 : 24), range.maxMidi)
+  return Array.from({ length: Math.max(0, high - low + 1) }, (_, i) => low + i).filter(midi => selected.has(midi % 12))
+}
+
 const topDegreeCache = new WeakMap<object, number>()
 
 /**
@@ -534,6 +556,8 @@ function topDegreeForConfig(config: StaffJumperConfig): number {
   const cached = topDegreeCache.get(config)
   if (cached !== undefined) return cached
 
+  const custom = customNotePool(config)
+  if (custom.length >= 2) return custom.length - 1
   const wanted = config.range === '1-octave' ? 7 : 14
   const rootMidi = resolveScaleRootMidi(config)
   const { maxMidi } = resolveWrittenRange(
@@ -826,17 +850,22 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
   const exerciseStep = exerciseStepForSequenceStep(config, rhythm.noteIndex)
   const degreeIndex = exerciseStep.degree
   const rootMidi = resolveScaleRootMidi(config)
-  const midi = midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
+  const custom = customNotePool(config)
+  const midi = custom.length >= 2 ? custom[Math.min(degreeIndex, custom.length - 1)]! : midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
   const pitchClass = ((midi % 12) + 12) % 12
   // The root's letter octave — writtenScaleNote walks letters up from here.
   const rootOctave = Math.floor(rootMidi / 12) - 1
-  const written = writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
+  const customLabel = SHARP_LABELS[pitchClass]!
+  const written = custom.length >= 2
+    ? { letter: customLabel[0] as StaffNoteLetter, octave: Math.floor(midi / 12) - 1, label: `${customLabel}${Math.floor(midi / 12) - 1}`, accidental: customLabel.length > 1 ? "#" as const : null }
+    : writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
   const staff = getStaffPositionForNote(written.letter, written.octave, config.clef)
   return {
     sequenceIndex: sequenceStep,
     midi,
     pitchClass,
     noteLabel: written.label,
+    customAccidental: custom.length >= 2 ? (customLabel.length > 1 ? "♯" : "♮") : undefined,
     // A rest is written against the middle line whatever pitch surrounds it.
     yPx: rhythm.isRest ? STAFF_MIDDLE_Y : staff.yPx,
     kind: rhythm.isRest ? 'line' : staff.kind,
@@ -853,7 +882,7 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
 
 /** Concert pitch class of the tonic — what the drone should actually sound. */
 export function getConcertTonicPitchClass(config: StaffJumperConfig): number {
-  const written = keyPitchClass(config.key)
+  const written = customNotePool(config)[0] ?? keyPitchClass(config.key)
   return ((written - getTunerTransposition(config.transposition).writtenOffsetSemitones) % 12 + 12) % 12
 }
 
@@ -884,9 +913,13 @@ export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePrevi
   const rootOctave = Math.floor(rootMidi / 12) - 1
 
   const noteAt = (degreeIndex: number) => {
-    const midi = midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
+    const custom = customNotePool(config)
+  const midi = custom.length >= 2 ? custom[Math.min(degreeIndex, custom.length - 1)]! : midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
     const pitchClass = ((midi % 12) + 12) % 12
-    const written = writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
+    const customLabel = SHARP_LABELS[pitchClass]!
+  const written = custom.length >= 2
+    ? { letter: customLabel[0] as StaffNoteLetter, octave: Math.floor(midi / 12) - 1, label: `${customLabel}${Math.floor(midi / 12) - 1}`, accidental: customLabel.length > 1 ? "#" as const : null }
+    : writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
     return prettyNoteLabel(written.letter, written.accidental, written.octave)
   }
 
@@ -902,7 +935,7 @@ export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePrevi
     lowLabel: noteAt(0),
     highLabel: noteAt(topDegree),
     noteCount: buildScaleIntroDegreePath(config).length,
-    signatureLabel,
+    signatureLabel: config.customPitchClasses?.length ? "Custom notes · accidentals shown" : signatureLabel,
   }
 }
 

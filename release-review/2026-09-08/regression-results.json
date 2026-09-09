@@ -1,0 +1,57 @@
+[
+  {
+    "file": "verify-audio-lifecycle.mjs",
+    "status": 0,
+    "output": "[PitchTap] JS received first PCM frame (2 samples @ 48000Hz)\n[PitchTap] JS enabled native audio tap\nAudio lifecycle passed: cancelled startup, shared recovery, fresh-frame triggering, rapid tool switches, and shared tap ownership.\n"
+  },
+  {
+    "file": "verify-daily-challenge-plan.mjs",
+    "status": 0,
+    "output": "Daily plans passed: every instrument, frozen targets, untouched routine, duration thresholds, exact game settings, midnight, and duplicate awards.\n"
+  },
+  {
+    "file": "verify-daily-challenges.mjs",
+    "status": 0,
+    "output": "Daily challenges passed: daily caps, rollover, thresholds, old unlocks, routine duration, corrupt storage, and failed writes.\n"
+  },
+  {
+    "file": "verify-drone-transitions.mjs",
+    "status": 0,
+    "output": "Drone checks passed: initial restoration, shared recovery, and stale stop responses preserve newer commands.\n"
+  },
+  {
+    "file": "verify-focus-practice.mjs",
+    "status": 0,
+    "output": "Focus practice checks passed: bookmark persistence, project isolation, storage failures, desk restore, URL validation, search filtering, cache, limits, and network failures.\nPractice journal checks passed: real SQLite persistence, new sitting IDs, closed sessions, intentions, focus labels, and project isolation.\nJournal grouping checks passed: attempt numbering, sitting split, day labels, single-sitting days, and the empty run.\nJournal comparison checks passed: async load, previous sitting, explicit choice, deleted baseline, and single take.\n"
+  },
+  {
+    "file": "verify-handsfree-cycle.mjs",
+    "status": 0,
+    "output": "Hands-free checks passed: delayed silence, missing audio, resumed playing, repeated takes, and visible cycle states.\n"
+  },
+  {
+    "file": "verify-new-features.mjs",
+    "status": 0,
+    "output": "All verify-new-features checks passed.\n"
+  },
+  {
+    "file": "verify-playback-route.mjs",
+    "status": 0,
+    "output": "[PlaybackRoute] applying playback session\n[PlaybackRoute] playback ended\n[PlaybackRoute] restoring camera session\n[PlaybackRoute] applying playback session\n[PlaybackRoute] playback ended\n[PlaybackRoute] restoring camera session\n[PlaybackRoute] applying playback session\nPlayback route checks passed: pending preparation, ordered restore/replay, native rejection, retry, and lifecycle cleanup.\n"
+  },
+  {
+    "file": "verify-practice-refinements.mjs",
+    "status": 0,
+    "output": "Passed: transient rejection, sustained starts, instrument-specific goal plans, duration totals, and deliberate take-card positions.\n"
+  },
+  {
+    "file": "verify-practice-routines.mjs",
+    "status": 0,
+    "output": "practice routines: ok\nSession flow checks passed: paused time, restart recovery, daily archive, plan isolation, skipped outcomes, storage errors, duplicate taps, competing navigation, and retry after failure.\n"
+  },
+  {
+    "file": "verify-session-extensions.mjs",
+    "status": 0,
+    "output": "Session extensions passed: passage/source isolation, time validation, program IDs, historical snapshots, timeline observers, and cancellation during native startup.\n"
+  }
+]

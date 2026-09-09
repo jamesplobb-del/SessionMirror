@@ -587,11 +587,16 @@ export default function BalanceSetup({
           <p className={previewInTune ? 'is-growing' : ''} aria-live="polite">
             {previewInTune
               ? `Growing · ${(previewHeldMs / 1000).toFixed(1)}s`
-              : 'Drag island for time · note for pitch · rope for cents'}
+              : 'Choose your time, pitch precision and target.'}
           </p>
         </div>
       </section>
 
+      <section className="electric-balance-controls" aria-label="Challenge controls">
+        <label><span>Crossing time <strong>{goalDisplayLabel}</strong></span><input aria-label="Crossing time" aria-valuetext={goalLabel} type="range" min={0} max={BALANCE_GOAL_OPTIONS.length - 1} step={1} value={goalIndex} onChange={event => setGoalIndex(Number(event.target.value))} /></label>
+        <label><span>Pitch precision <strong>±{tolerance}¢</strong></span><input aria-label="Pitch precision" aria-valuetext={`plus or minus ${tolerance} cents`} type="range" min={3} max={30} value={tolerance} onChange={event => onUpdate({ tolerancePreset: 'custom', customToleranceCents: Number(event.target.value) })} /></label>
+        {targetCanChange && <label><span>Target note <strong>{targetLabel}</strong></span><input aria-label="Target note" aria-valuetext={targetLabel} type="range" min={targetMin} max={targetMax} step={1} value={targetMidi} onChange={event => setTargetMidi(Number(event.target.value))} /></label>}
+      </section>
       <div className="balance-setup-sheet">
         {/* Above Start, not below it: these were off the bottom of the screen
             and a new player had no reason to scroll past a big Start button to

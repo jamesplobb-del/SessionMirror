@@ -1,6 +1,6 @@
 import SimpleSegmentedControl from './ui/SimpleSegmentedControl'
 
-export type VaultSection = 'takes' | 'library'
+export type VaultSection = 'takes' | 'library' | 'practice'
 
 interface VaultSectionTabsProps {
   value: VaultSection
@@ -33,11 +33,12 @@ export default function VaultSectionTabs({
             </>
           ),
         },
+        ...(document.documentElement.dataset.refinement === 'depth-electric' ? [{id:'practice' as const,label:'Practice'}] : []),
         {
           id: 'library' as const,
           label: (
             <>
-              Library
+              {document.documentElement.dataset.refinement === 'depth-electric' ? 'References' : 'Library'}
               {libraryCount > 0 && (
                 <span className="ml-1.5 text-xs text-stone-400">({libraryCount})</span>
               )}

@@ -180,6 +180,11 @@ enum NativeCameraTestAudio {
         var peak: Float = 0
         var sumSq: Double = 0
         var sampleCount = 0
+        // Bounded by the existing analysis window (about 8.7 MB at the default).
+        // Reuse decoded PCM for the gated pass rather than reopening the asset.
+        var decodedSamples: [Float] = []
+        decodedSamples.reserveCapacity(max(0, maxSamples))
+        defer { reader.cancelReading() }
 
         while reader.status == .reading, sampleCount < maxSamples {
             guard let sampleBuffer = output.copyNextSampleBuffer(),
@@ -199,6 +204,7 @@ enum NativeCameraTestAudio {
             dataPointer.withMemoryRebound(to: Float.self, capacity: floatCount) { floats in
                 for i in 0..<floatCount {
                     let sample = floats[i]
+                    decodedSamples.append(sample)
                     let abs = fabsf(sample)
                     if abs > peak { peak = abs }
                     sumSq += Double(sample * sample)
@@ -210,7 +216,7 @@ enum NativeCameraTestAudio {
         guard sampleCount > 0 else { return nil }
 
         let rms = sqrt(sumSq / Double(sampleCount))
-        let activeRms = measureActiveRms(fileURL: fileURL, gateRatio: 0.12, peak: Double(peak), maxSeconds: maxSeconds)
+        let activeRms = measureActiveRms(samples: decodedSamples, gateRatio: 0.12, peak: Double(peak))
             ?? rms
 
         return LevelMeasurement(
@@ -220,60 +226,17 @@ enum NativeCameraTestAudio {
         )
     }
 
-    private static func measureActiveRms(
-        fileURL: URL,
-        gateRatio: Double,
-        peak: Double,
-        maxSeconds: Double
-    ) -> Double? {
+    private static func measureActiveRms(samples: [Float], gateRatio: Double, peak: Double) -> Double? {
         let gate = max(peak * gateRatio, 1e-8)
-        let asset = AVURLAsset(url: fileURL)
-        guard let track = asset.tracks(withMediaType: .audio).first else { return nil }
-
-        guard let reader = try? AVAssetReader(asset: asset) else { return nil }
-        let outputSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVLinearPCMIsFloatKey: true,
-            AVLinearPCMBitDepthKey: 32,
-            AVLinearPCMIsNonInterleaved: false,
-        ]
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings)
-        guard reader.canAdd(output) else { return nil }
-        reader.add(output)
-        guard reader.startReading() else { return nil }
-
-        let maxSamples = Int(maxSeconds * 48_000)
         var activeSumSq: Double = 0
         var activeCount = 0
-        var sampleCount = 0
-
-        while reader.status == .reading, sampleCount < maxSamples {
-            guard let sampleBuffer = output.copyNextSampleBuffer(),
-                  let block = CMSampleBufferGetDataBuffer(sampleBuffer) else { break }
-
-            var length = 0
-            var dataPointer: UnsafeMutablePointer<Int8>?
-            guard CMBlockBufferGetDataPointer(
-                block,
-                atOffset: 0,
-                lengthAtOffsetOut: nil,
-                totalLengthOut: &length,
-                dataPointerOut: &dataPointer
-            ) == kCMBlockBufferNoErr, let dataPointer = dataPointer else { continue }
-
-            let floatCount = length / MemoryLayout<Float>.size
-            dataPointer.withMemoryRebound(to: Float.self, capacity: floatCount) { floats in
-                for i in 0..<floatCount {
-                    let sample = Double(floats[i])
-                    if abs(sample) >= gate {
-                        activeSumSq += sample * sample
-                        activeCount += 1
-                    }
-                    sampleCount += 1
-                }
+        for value in samples {
+            let sample = Double(value)
+            if abs(sample) >= gate {
+                activeSumSq += sample * sample
+                activeCount += 1
             }
         }
-
         guard activeCount > 0 else { return nil }
         return sqrt(activeSumSq / Double(activeCount))
     }

@@ -1,4 +1,4 @@
-import { Pause, Play } from 'lucide-react'
+import { Pause, Play, Scissors } from 'lucide-react'
 import { useRef, useState, type RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
 import { useMediaWaveform } from '../hooks/useMediaWaveform'
@@ -86,14 +86,24 @@ export default function ReviewTimeline({
     }
   }
 
+  const adjustTrimWithKeyboard = (event: React.KeyboardEvent, handle: 'start' | 'end') => {
+    if (trimApplying || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const minimum = Math.min(0.1, safeDuration)
+    const value = handle === 'start' ? safeTrimStart : safeTrimEnd
+    const proposed = event.key === 'Home' ? 0 : event.key === 'End' ? safeDuration : value + (event.key === 'ArrowLeft' ? -0.1 : 0.1)
+    onTrimStart?.()
+    if (handle === 'start') onTrimChange?.(Math.max(0, Math.min(proposed, safeTrimEnd - minimum)), safeTrimEnd, handle)
+    else onTrimChange?.(safeTrimStart, Math.min(safeDuration, Math.max(proposed, safeTrimStart + minimum)), handle)
+    onTrimEnd?.()
+  }
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
 
-    if (!trimActive && trimAvailable) {
-      onRequestTrim?.()
-      return
-    }
+    if (trimApplying) return
 
     if (trimActive && safeDuration > 0) {
       const rect = e.currentTarget.getBoundingClientRect()
@@ -184,10 +194,10 @@ export default function ReviewTimeline({
 
         <div
           ref={trackRef}
-          role="slider"
-          aria-valuemin={0}
-          aria-valuemax={safeDuration}
-          aria-valuenow={safeCurrentTime}
+          role={trimActive ? "group" : "slider"}
+          aria-valuemin={trimActive ? undefined : 0}
+          aria-valuemax={trimActive ? undefined : safeDuration}
+          aria-valuenow={trimActive ? undefined : safeCurrentTime}
           aria-label="Video timeline"
           className="review-timeline-track review-timeline-track--waveform relative h-12 min-w-0 flex-1 cursor-pointer touch-none"
           style={{ touchAction: 'none' }}
@@ -223,12 +233,14 @@ export default function ReviewTimeline({
                   style={{ left: `${trimStartPercent}%`, width: `${trimSelectionPercent}%` }}
                 >
                   <span
-                    className={`absolute inset-y-0 left-0 w-[4px] -translate-x-1/2 rounded-full bg-[#171a22] shadow-[0_0_0_2px_rgba(255,255,255,0.8)] ${
+                    role="slider" tabIndex={trimApplying ? -1 : 0} aria-label="Trim start" aria-valuemin={0} aria-valuemax={Math.max(0,safeTrimEnd - 0.1)} aria-valuenow={safeTrimStart} onKeyDown={e => adjustTrimWithKeyboard(e, 'start')}
+                    className={`review-trim-handle absolute inset-y-0 left-0 w-[4px] -translate-x-1/2 rounded-full bg-[#171a22] shadow-[0_0_0_2px_rgba(255,255,255,0.8)] ${
                       trimHandle === 'start' ? 'scale-x-125' : ''
                     }`}
                   />
                   <span
-                    className={`absolute inset-y-0 right-0 w-[4px] translate-x-1/2 rounded-full bg-[#171a22] shadow-[0_0_0_2px_rgba(255,255,255,0.8)] ${
+                    role="slider" tabIndex={trimApplying ? -1 : 0} aria-label="Trim end" aria-valuemin={safeTrimStart + 0.1} aria-valuemax={safeDuration} aria-valuenow={safeTrimEnd} onKeyDown={e => adjustTrimWithKeyboard(e, 'end')}
+                    className={`review-trim-handle absolute inset-y-0 right-0 w-[4px] translate-x-1/2 rounded-full bg-[#171a22] shadow-[0_0_0_2px_rgba(255,255,255,0.8)] ${
                       trimHandle === 'end' ? 'scale-x-125' : ''
                     }`}
                   />
@@ -250,6 +262,7 @@ export default function ReviewTimeline({
           {formatTime(safeDuration)}
         </span>
       </div>
+      {trimAvailable && !trimActive && <button type="button" className="review-trim-entry" onClick={onRequestTrim}><Scissors size={15} aria-hidden />Trim</button>}
       {trimActive && (
         <div className="review-trim-actions flex items-center justify-between gap-3 px-3 pb-2 pt-1">
           <Pressable
@@ -273,7 +286,7 @@ export default function ReviewTimeline({
             disabled={trimApplying || trimSelectionPercent <= 0}
             className="review-trim-action review-trim-action--done min-h-9 px-3 text-[13px] font-semibold"
           >
-            {trimApplying ? 'Trimming...' : 'Done'}
+            {trimApplying ? 'Saving…' : 'Save trim'}
           </Pressable>
         </div>
       )}

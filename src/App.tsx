@@ -1,3 +1,5 @@
+import { recordPlannedRoutine, resolveDailyPractice, isChallengeRoutine, type DailyChallengePlan } from './utils/dailyChallengePlan'
+import ChallengeRewardNotice from './components/ChallengeRewardNotice'
 import {
   lazy,
   startTransition,
@@ -37,15 +39,10 @@ import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
 import {
-  upsertWorkspaceDesk,
-  deskMatchesSnapshot,
   loadFocusDesk,
-  loadWorkspaceDesks,
   saveFocusDesk,
-  saveWorkspaceDesks,
   summarizeDesk,
   type DeskSnapshot,
-  type WorkspaceDesk,
 } from './utils/workspaceDesks'
 import { shareTakeToSystem } from './utils/shareTakeVideo'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
@@ -257,7 +254,6 @@ import PracticeHub, {
 } from './components/PracticeHub'
 import FocusedPracticeCue from './components/FocusedPracticeCue'
 import FocusedPracticeHistory from './components/FocusedPracticeHistory'
-import RoutineItemJournal from './components/RoutineItemJournal'
 import YoutubeUrlDialog from './components/YoutubeUrlDialog'
 import { PracticeReferenceContext } from './context/PracticeReferenceContext'
 import {
@@ -379,7 +375,7 @@ interface AppBootSnapshot {
   practiceItemStates: PracticeItemState[]
 }
 
-const BOOT_REVEAL_DELAY_MS = 500
+const BOOT_REVEAL_DELAY_MS = 0
 
 function formatBootFailureMessage(error: unknown): string {
   const detail = error instanceof Error ? error.message : typeof error === 'string' ? error : null
@@ -468,9 +464,6 @@ export default function App() {
           await SplashScreen.hide()
         }
 
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, BOOT_REVEAL_DELAY_MS)
-        })
         if (cancelled) return
 
         setBootSnapshot(snapshot)
@@ -558,8 +551,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // recorder can initialize underneath without flashing before Home appears.
   const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
   const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
-  const [focusPanel, setFocusPanel] = useState<'references' | 'history' | 'routine-history' | null>(null)
-  const [routineJournal, setRoutineJournal] = useState<{ projectId: string; title: string } | null>(null)
+  const [focusPanel, setFocusPanel] = useState<'references' | 'history' | null>(null)
   const [focusedCueOpen, setFocusedCueOpen] = useState(false)
   const [focusedPostTakeId, setFocusedPostTakeId] = useState<string | null>(null)
   const [focusedPostTakeReviewed, setFocusedPostTakeReviewed] = useState(false)
@@ -572,6 +564,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
   const [sortMode, setSortMode] = useState<SortMode>('newest')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [dailyGameLaunch, setDailyGameLaunch] = useState<DailyChallengePlan | null>(null)
   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
   const [multitrackOpen, setMultitrackOpen] = useState(false)
   const [multitrackPendingRecordingTakeId, setMultitrackPendingRecordingTakeId] = useState<
@@ -598,7 +591,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
   /** Saved desks — chips at the top of the Workspace tray. */
-  const [workspaceDesks, setWorkspaceDesks] = useState<WorkspaceDesk[]>(() => loadWorkspaceDesks())
   /** The live room, kept current so a focused take can remember the desk it was played on. */
   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
   const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
@@ -642,14 +634,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const captureBusyRef = useRef(false)
   const pendingTakeSavesRef = useRef(new Set<string>())
   const [pendingTakeSaves, setPendingTakeSaves] = useState(0)
-  const [routineBarExpanded, setRoutineBarExpanded] = useState(true)
   const routineRef = useRef<Routine | null>(routine)
   routineRef.current = routine
   const routineDayRef = useRef<RoutineDay | null>(routineDay)
   routineDayRef.current = routineDay
 
   useEffect(() => {
-    saveRoutine(routine)
+    if (!isChallengeRoutine(routine)) saveRoutine(routine)
   }, [routine])
 
   useEffect(() => {
@@ -661,7 +652,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Synchronous ref commit prevents rapid Done/Next from seeing yesterday's state.
     routineDayRef.current = next
     setRoutineDay(next)
-    try { saveRoutineDay(next) }
+    try { saveRoutineDay(next); recordPlannedRoutine(next) }
     catch { setTakeDeleteError('Practice progress could not be saved on this device. Your recordings are separate and remain saved.') }
   }, [])
 
@@ -1637,8 +1628,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         resolveTakePlaybackUrlFast(filePath, videoUrl) ??
         (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
       const projectId = activeProjectIdRef.current
-      const focusedAtCapture = focusedPracticeRef.current
-      const practiceSessionIdAtCapture = focusedPracticeSessionIdRef.current
+      const focusedAtCapture = focusedRoutineContextRef.current ? null : focusedPracticeRef.current
+      const practiceSessionIdAtCapture = focusedRoutineContextRef.current ? null : focusedPracticeSessionIdRef.current
       const practiceStateAtCapture = focusedAtCapture
         ? practiceItemStatesRef.current.find(
             (state) => state.projectId === focusedAtCapture.projectId,
@@ -2475,7 +2466,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !isExperimentalOpen &&
     (ready || nativeHandsFreeCaptureActive)
 
-  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor } =
+  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake } =
     useAutoSoundRecording({
       enabled: settings.autoSoundRecording,
       monitoringAllowed: autoMonitoringAllowed,
@@ -2848,6 +2839,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isExperimentalOpen,
   ])
 
+  /*
+   * Tools and Camera are two different rooms, and the workspace widgets do not
+   * travel between them (see the effect near `handleCloseDrone`). A desk being
+   * restored sets the mode itself, so it raises this to keep what it just
+   * applied.
+   */
+  const workspaceModeRef = useRef(recordingModeRef.current)
+  const keepWorkspaceAcrossModeRef = useRef(false)
+
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
       const modeChanged = mode !== recordingModeRef.current
@@ -3073,15 +3073,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   ])
   liveDeskSnapshotRef.current = liveDeskSnapshot
 
-  const activeDeskId = useMemo(
-    () => workspaceDesks.find((desk) => deskMatchesSnapshot(desk, liveDeskSnapshot))?.id ?? null,
-    [liveDeskSnapshot, workspaceDesks],
-  )
-  const liveDeskSummary = useMemo(
-    () => summarizeDesk(liveDeskSnapshot, settings.tunerTransposition),
-    [liveDeskSnapshot, settings.tunerTransposition],
-  )
-
   const applyDeskSnapshot = useCallback(
     (desk: DeskSnapshot) => {
       updateSettings({
@@ -3105,40 +3096,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         applyDroneFromDesk(null, desk.drone.octave)
       }
       if (desk.mode !== recordingModeRef.current) {
+        // The desk has just set every widget deliberately; the crossing must
+        // not then wipe them.
+        keepWorkspaceAcrossModeRef.current = true
         handleRecordingModeChangeRef.current(desk.mode)
       }
     },
     [handleAutoSoundRecordingChange, updateSettings],
   )
-
-  const handleApplyDesk = useCallback(
-    (deskId: string) => {
-      const desk = workspaceDesks.find((item) => item.id === deskId)
-      if (!desk) return
-      triggerLightHaptic(settings.hapticFeedback)
-      applyDeskSnapshot(desk)
-    },
-    [applyDeskSnapshot, settings.hapticFeedback, workspaceDesks],
-  )
-
-  const handleSaveDesk = useCallback(
-    (name: string) => {
-      setWorkspaceDesks((current) => {
-        const next = upsertWorkspaceDesk(current, name, liveDeskSnapshotRef.current ?? liveDeskSnapshot)
-        saveWorkspaceDesks(next)
-        return next
-      })
-    },
-    [liveDeskSnapshot],
-  )
-
-  const handleDeleteDesk = useCallback((deskId: string) => {
-    setWorkspaceDesks((current) => {
-      const next = current.filter((desk) => desk.id !== deskId)
-      saveWorkspaceDesks(next)
-      return next
-    })
-  }, [])
 
   /** Focus picks the piece; the desk it was last played on comes with it. */
   const restoreFocusDesk = useCallback(
@@ -3191,6 +3156,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestQuickFunctionFromApp('metronome', 'inAppSettings')
   }, [])
 
+  const restoreRoutineAfterChallenge = useCallback(() => {
+    if (!isChallengeRoutine(routineRef.current)) return
+    exitRoutineProgram()
+    const challengeDay = routineDayRef.current
+    if (challengeDay) commitRoutineDay(pauseRoutineDay(challengeDay, Date.now(), liveDeskSnapshotRef.current))
+    const saved = loadRoutine()
+    routineRef.current = saved
+    setRoutine(saved)
+    commitRoutineDay(saved ? loadRoutineDay(saved) : null)
+    // The challenge's timer is archived for resume, while Home shows the user's plan.
+    focusedRoutineContextRef.current = null
+    focusedPracticeRef.current = null
+    focusedPracticeSessionIdRef.current = null
+    setFocusedPractice(null)
+    setFocusedPracticeSessionId(null)
+    setFocusedPostTakeId(null)
+  }, [commitRoutineDay])
+
+  useEffect(() => {
+    if (isPracticeHubOpen) restoreRoutineAfterChallenge()
+  }, [isPracticeHubOpen, restoreRoutineAfterChallenge])
+
   const handleOpenPracticeHome = useCallback(() => {
     if (isRecording || isStopping) return
     if (!canOpenOverlaySheet() || isExperimentalOpen) return
@@ -3205,10 +3192,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setQuickSettingsOpen(false)
     setIsVaultOpen(false)
     setIsSettingsOpen(false)
+    restoreRoutineAfterChallenge()
     setIsPracticeHubOpen(true)
     deferHudMediaPause()
   }, [
     commitRoutineDay,
+    restoreRoutineAfterChallenge,
     canOpenOverlaySheet,
     deferHudMediaPause,
     isExperimentalOpen,
@@ -3231,9 +3220,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setQuickSettingsOpen(false)
     setIsVaultOpen(false)
     setIsSettingsOpen(false)
+    restoreRoutineAfterChallenge()
     setIsPracticeHubOpen(true)
     deferHudMediaPause()
-  }, [commitRoutineDay, deferHudMediaPause, isRecording, isStopping])
+  }, [commitRoutineDay, restoreRoutineAfterChallenge, deferHudMediaPause, isRecording, isStopping])
 
   /**
    * Leaving Practice Home lands the finger on the live HUD underneath, so borrow
@@ -3417,6 +3407,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     triggerLightHaptic(settings.hapticFeedback)
     dismissPracticeHub()
     handleRecordingModeChange('audio')
+    setDailyGameLaunch(null)
     setLabsRoute('menu')
     deferHudMediaPause()
   }, [
@@ -4072,9 +4063,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     autoSoundRecording: settings.autoSoundRecording,
     isRecording,
     handsFreePlaybackPending: handsFreePlaybackPending || autoPlaybackPlaying,
+    playbackPlaying: autoPlaybackPlaying,
+    replayCountdown,
     handsFreeListeningReady,
     dragDeleteActive: pipDragState.isDragging && !isRecording,
-    finishingTake: isStopping && recordingMode === 'video',
+    finishingTake: isStopping,
   })
   const handsFreeStageVisiblePhase =
     hudModalState === 'idle' && !showOnboardingTutorial ? handsFreeStagePhase : null
@@ -4268,9 +4261,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [pitchTrackerActive])
 
+  /*
+   * The Workspace toggle is the truth. Sheets hide the widget through
+   * `pitchHudSuspended` already, but they also used to latch `showPitch` off
+   * and never put it back — so the menu kept saying the tracker was on over a
+   * screen that had none. Re-raise it whenever nothing is covering the HUD.
+   */
+  useEffect(() => {
+    if (!pitchTrackerActive || pitchHudSuspended) return
+    setShowPitch(true)
+  }, [pitchHudSuspended, pitchTrackerActive])
+
+  /** Closing the widget means off, so the toggle has to go off with it. */
   const handleClosePitch = useCallback(() => {
-    setShowPitch(false)
-  }, [])
+    handlePitchTrackerSettingChange(false)
+  }, [handlePitchTrackerSettingChange])
 
   const handleCloseMetronome = useCallback(() => {
     handleShowMetronomeSettingChange(false)
@@ -4287,6 +4292,41 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseDrone = useCallback(() => {
     handleShowDroneSettingChange(false)
   }, [handleShowDroneSettingChange])
+
+  /* ---- Crossing between Tools and Camera clears the desk -----------------
+   *
+   * Carrying Pitch, Metronome, Drone and the Enhancer across the crossing
+   * meant arriving in a room with widgets switched on that the room may not
+   * even render — Workspace read "Pitch Analysis · on" over a surface showing
+   * no pitch at all. Each surface now opens quiet and the player turns on what
+   * they want there.
+   *
+   * Take Cards stay: they are the takes, not a tool, and losing them on every
+   * crossing would be losing the thing being compared. Hands-free is a
+   * recording behaviour with its own control on the deck, so it stays too.
+   */
+  useEffect(() => {
+    if (workspaceModeRef.current === recordingMode) return
+    workspaceModeRef.current = recordingMode
+    if (keepWorkspaceAcrossModeRef.current) {
+      keepWorkspaceAcrossModeRef.current = false
+      return
+    }
+    if (pitchCommitTimerRef.current !== null) {
+      window.clearTimeout(pitchCommitTimerRef.current)
+      pitchCommitTimerRef.current = null
+    }
+    setPendingPitchTrackerEnabled(null)
+    setShowPitch(false)
+    updateSettings({
+      pitchTrackerEnabled: false,
+      showMetronome: false,
+      showDrone: false,
+      audioEnhancerEnabled: false,
+    })
+    sharedMetronomeEngine.stop()
+    applyDroneFromDesk(null, getDroneSnapshot().octave)
+  }, [recordingMode, updateSettings])
 
   /* ---- "Again": one breath of Record when Current finishes playing back --- */
   const currentPlaybackActive = autoPlaybackPlaying || challengerPipPlaying
@@ -5224,7 +5264,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (!existing) setProjects(current => [project, ...current])
       if (step.projectId !== project.id) {
         target = { ...target, updatedAt: Date.now(), steps: target.steps.map(item => item.id === step.id ? { ...item, projectId: project.id } : item) }
-        saveRoutine(target)
+        if (!isChallengeRoutine(target)) saveRoutine(target)
         routineRef.current = target
         setRoutine(target)
       }
@@ -5269,7 +5309,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (programStatus === 'missing') setTakeDeleteError('This item’s metronome program is unavailable. You can practice normally or choose another program in the routine editor.')
     // Commit running only after the item and durable sitting are ready.
     commitRoutineDay(startRoutineDayStep(routineDayRef.current ?? day, step.id, sessionId, Date.now(), { title: step.title, projectId: itemProjectId }))
-    setRoutineBarExpanded(false)
     if (programStatus !== 'ready' && desk?.showMetronome && step.kind !== 'game' && step.kind !== 'free') {
       void sharedMetronomeEngine.start().catch(() => setTakeDeleteError('Your item is ready. Tap the metronome to start the click.'))
     }
@@ -5284,6 +5323,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
   [runPracticeTransition, openRoutineStep])
+  const handleDailyPractice = useCallback((plan: DailyChallengePlan) => {
+    void runPracticeTransition('daily-practice', async () => {
+      const target = resolveDailyPractice(plan, routineRef.current)
+      if (!target.temporary) {
+        await openRoutineStep(target.stepId)
+        return
+      }
+      const day = routineDayRef.current
+      if (day) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
+      // A temporary challenge never replaces the user's saved routine.
+      const temporary = target.routine
+      routineRef.current = temporary
+      setRoutine(temporary)
+      commitRoutineDay(loadRoutineDay(temporary))
+      await openRoutineStep(target.stepId)
+    }).catch(() => { restoreRoutineAfterChallenge(); setTakeDeleteError('Could not open the challenge. Your routine is safe; please try again.') })
+  }, [commitRoutineDay, openRoutineStep, restoreRoutineAfterChallenge, runPracticeTransition])
+
+  const handleDailyGame = useCallback((plan: DailyChallengePlan) => {
+    if (practiceTransition.current.busy || captureBusyRef.current) return
+    const day = routineDayRef.current
+    if (day?.activeStepId) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
+    pauseRoutineProgram()
+    sharedMetronomeEngine.stop()
+    applyDroneFromDesk(null, 4)
+    handleOpenPracticeGames()
+    setDailyGameLaunch(plan)
+    setLabsRoute(plan.game.route)
+  }, [commitRoutineDay, handleOpenPracticeGames])
+
   routineResumeRef.current = handleStartRoutineStep
 
   /** A focus step meets its practice item for the first time. */
@@ -5323,7 +5392,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (!target || !target.steps.some(step => step.id === stepId)) return
       const day = ensureRoutineDay(target)
       // Stale buttons cannot finish a different item after the UI advances.
-      if (day.activeStepId !== stepId) return
+      if ((day.activeStepId ?? day.pausedStepId) !== stepId) return
       rememberCurrentPracticeDesk()
       const sessionId = focusedPracticeSessionIdRef.current
       if (sessionId) await endPracticeSession(sessionId)
@@ -5342,7 +5411,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       deferHudMediaPause()
       const next = nextOpenStep(target, nextDay, stepId)
       if (next) await openRoutineStep(next.id)
-      else handleOpenRoutineToday()
+      else {
+        if (isChallengeRoutine(target)) {
+          const saved = loadRoutine()
+          routineRef.current = saved
+          setRoutine(saved)
+          commitRoutineDay(saved ? loadRoutineDay(saved) : null)
+        }
+        handleOpenRoutineToday()
+      }
     }).catch(() => {
       setTakeDeleteError('Could not advance practice. Your saved takes and completed items are safe; try again from Today.')
       handleOpenRoutineToday()
@@ -5354,14 +5431,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (stepId: string) => {
       triggerSuccessHaptic(settings.hapticFeedback)
       settleRoutineStep(stepId, 'done')
-    },
-    [settings.hapticFeedback, settleRoutineStep],
-  )
-
-  const handleSkipRoutineStep = useCallback(
-    (stepId: string) => {
-      triggerLightHaptic(settings.hapticFeedback)
-      settleRoutineStep(stepId, 'skipped')
     },
     [settings.hapticFeedback, settleRoutineStep],
   )
@@ -5408,34 +5477,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     sharedMetronomeEngine.stop()
     applyDroneFromDesk(null, 4)
     deferHudMediaPause()
-    handleOpenRoutineToday()
-  }, [commitRoutineDay, deferHudMediaPause, handleOpenRoutineToday, settings.hapticFeedback])
-
-  /** Put the routine down and stay where you are. Pause jumps to Today; this does not. */
-  const handleCloseRoutineBar = useCallback(() => {
-    if (practiceTransition.current.busy || captureBusyRef.current) return
-    const day = routineDayRef.current
-    if (!day?.activeStepId) return
-    triggerLightHaptic(settings.hapticFeedback)
-    commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
-    pauseRoutineProgram()
-    sharedMetronomeEngine.stop()
-    applyDroneFromDesk(null, 4)
-    deferHudMediaPause()
   }, [commitRoutineDay, deferHudMediaPause, settings.hapticFeedback])
-
-  const handleRememberRoutineSetup = useCallback(() => {
-    const target = routineRef.current
-    const stepId = routineDayRef.current?.activeStepId
-    const desk = liveDeskSnapshotRef.current
-    if (!target || !stepId || !desk || practiceTransition.current.busy) return
-    const next = { ...target, updatedAt: Date.now(), steps: target.steps.map(step => step.id === stepId ? { ...step, desk } : step) }
-    routineRef.current = next
-    setRoutine(next)
-    saveRoutine(next)
-    rememberCurrentPracticeDesk()
-    triggerSuccessHaptic(settings.hapticFeedback)
-  }, [rememberCurrentPracticeDesk, settings.hapticFeedback])
 
   // Save active time periodically. Backgrounding pauses accounting rather than
   // counting hours away; returning asks the player to resume explicitly.
@@ -5487,13 +5529,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [deferHudMediaPause, rememberCurrentPracticeDesk, runPracticeTransition])
 
   const routineActiveStep = useMemo(() => {
-    if (!routine || !routineDay?.activeStepId) return null
-    return routine.steps.find((step) => step.id === routineDay.activeStepId) ?? null
-  }, [routine, routineDay?.activeStepId])
-
-  const previousPracticeTake = useMemo(() => takes
-    .filter(take => take.practiceSessionId && take.practiceSessionId !== focusedPracticeSessionId)
-    .sort((a, b) => b.timestamp - a.timestamp)[0], [takes, focusedPracticeSessionId])
+    const id = routineDay?.activeStepId ?? routineDay?.pausedStepId
+    if (!routine || !id) return null
+    return routine.steps.find((step) => step.id === id) ?? null
+  }, [routine, routineDay?.activeStepId, routineDay?.pausedStepId])
 
   const routineNextStep = useMemo(() => {
     if (!routine || !routineActiveStep) return null
@@ -5576,6 +5615,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   return (
     <PracticeReferenceContext.Provider value={{ projectId: activeProjectId ?? undefined, query: routineActiveStep?.referenceQuery || activeProject?.name || '', autoSearch: Boolean(routineActiveStep?.referenceQuery) }}>
+      <ChallengeRewardNotice />
     <TutorialProvider
       active={showOnboardingTutorial || isPracticeHubOpen}
       enabled={tutorialTourEnabled}
@@ -5607,9 +5647,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 } as React.AudioHTMLAttributes<HTMLAudioElement>)}
               />
 
-              {focusPanel === 'routine-history' && routineJournal && <RoutineItemJournal key={routineJournal.projectId}
-                {...routineJournal} onPlaybackActiveChange={setReviewPlaybackPlaying}
-                onClose={() => { setRoutineJournal(null); setFocusPanel(null); setIsPracticeHubOpen(true); setReviewPlaybackPlaying(false) }} />}
               {focusPanel === 'references'  && <YoutubeUrlDialog open onClose={() => setFocusPanel(null)} onSubmit={handleSubmitYoutube} />}
               {focusPanel === 'history' && focusedPractice && <FocusedPracticeHistory
                 name={focusedPractice.focusArea} takes={takes}
@@ -5646,6 +5683,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onResumeFocusedPractice={(projectId) => { handlePauseRoutine(); return handleResumeFocusedPractice(projectId) }}
                 onCreatePracticeItem={handleCreateProject}
                 onOpenGames={handleOpenPracticeGames}
+                onDailyPractice={handleDailyPractice}
+                onDailyGame={handleDailyGame}
                 onOpenVault={handleOpenVaultFromPracticeHub}
                 onOpenTuner={handleOpenFullTunerFromPracticeHub}
                 onOpenMetronome={handleOpenFullMetronomeFromPracticeHub}
@@ -5656,11 +5695,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 instrumentId={preferredInstrumentId}
                 liveDeskSnapshot={liveDeskSnapshot}
                 onSelectInstrument={handleSelectInstrument}
-                onOpenItemHistory={(projectId, title) => {
-                  if (practiceTransition.current.busy || captureBusyRef.current) return
-                  deferHudMediaPause(); pauseRoutineProgram(); pauseYoutubeProxy(youtubeIframeRef.current)
-                  setRoutineJournal({ projectId, title }); setFocusPanel('routine-history'); setIsPracticeHubOpen(false)
-                }}
                 onStartRoutineStep={handleStartRoutineStep}
                 onToggleRoutineStep={handleToggleRoutineStep}
                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
@@ -5683,6 +5717,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 !isRecording &&
                 !isStopping && (
                   <RoutineBar
+                    goalMs={isChallengeRoutine(routine) ? 60_000 : undefined}
                     step={routineActiveStep}
                     stepIndex={routineStepIndex}
                     stepCount={routine.steps.length}
@@ -5690,36 +5725,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     startedAt={routineDay?.activeStepStartedAt ?? null}
                     elapsedMs={routineDay?.elapsedMsByStep[routineActiveStep.id] ?? 0}
                     busy={practiceTransitionBusy || pendingTakeSaves > 0}
-                    contextText={focusedPracticeState?.pendingIntention.trim()
-                      ? `Next take · ${focusedPracticeState.pendingIntention.trim()}`
-                      : previousPracticeTake
-                        ? `Last time · ${previousPracticeTake.notes?.trim() || new Date(previousPracticeTake.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : undefined}
-
-                    onListenReference={() => {
-                      const projectId = focusedPracticeRef.current?.projectId
-                      const url = projectId ? getSelectedReferenceUrl(projectId) : null
-                      deferHudMediaPause(); pauseRoutineProgram()
-                      if (url) { setYoutubeUrl(url); setYoutubeAutoPlayOnLoad(false); setIsSplitView(true); if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio') }
-                      else if (benchmarkBinding?.source === 'library') { setFocusedSoloReview(false); setFocusedReferenceTakeId(null); handleOpenCompareReview('benchmark') }
-                      else setFocusPanel('references')
-                    }}
-                    onRememberSetup={handleRememberRoutineSetup}
-                    onOpenProgram={() => { handleRecordingModeChange('audio'); handleAudioPracticeTabChange('practice') }}
-                    referenceReady={Boolean(routineActiveStep.projectId && getSelectedReferenceUrl(routineActiveStep.projectId)) || benchmarkBinding?.source === 'library'}
-                    expanded={routineBarExpanded}
                     audioSurface={recordingMode === 'audio' && !isLabsOpen}
                     overLabs={isLabsOpen}
-                    tunerTransposition={settings.tunerTransposition}
-                    hapticFeedback={settings.hapticFeedback}
-                    onExpandedChange={setRoutineBarExpanded}
                     onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
-                    onSkip={() => handleSkipRoutineStep(routineActiveStep.id)}
                     onOpenToday={handleOpenRoutineToday}
+                    paused={!routineDay?.activeStepId}
+                    onResume={() => handleStartRoutineStep(routineActiveStep.id)}
                     onPause={handlePauseRoutine}
-                    onClose={handleCloseRoutineBar}
-                    onReferences={focusedPractice ? () => { deferHudMediaPause(); setFocusPanel('references') } : undefined}
-                    onHistory={focusedPractice ? () => { deferHudMediaPause(); setFocusPanel('history') } : undefined}
-                    onAdjustment={focusedPractice ? () => setFocusedCueOpen(true) : undefined}
                   />
                 )}
 
@@ -6044,6 +6056,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   over the hands-free overlay. */}
               <HandsFreeStage
                 phase={handsFreeStageVisiblePhase}
+                replayCountdown={replayCountdown}
+                onFinishTake={finishHandsFreeTake}
+                onNextTake={finishAutoPlayback}
                 elapsed={elapsed}
                 onLightBackground={recordingMode === 'audio'}
                 placement={handsFreeStagePlacement}
@@ -6425,6 +6440,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         !quickSettingsOpen
                       ) && (
                       <ControlDeck
+                        vaultRevision={takes.length}
                         isRecording={isRecording}
                         isStopping={isStopping}
                         elapsed={elapsed}
@@ -6433,7 +6449,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
                         onOpenHome={handleOpenPracticeHome}
-                        onOpenVault={handleOpenVaultFromPracticeHub}
+                        onOpenVault={isAudioPracticeTunerTab ? undefined : handleOpenVaultFromPracticeHub}
                         onOpenSettings={handleOpenSettings}
                         expandViewActive={isSplitView}
                         onToggleExpandView={handleToggleSplitView}
@@ -6442,7 +6458,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         routineStepActive={Boolean(routineActiveStep)}
                         focusedAttemptCount={takes.filter(take => take.practiceSessionId === focusedPracticeSessionId && Boolean(focusedPracticeSessionId)).length}
                         onOpenFocusReferences={() => { deferHudMediaPause(); setFocusPanel('references') }}
-                        onOpenFocusHistory={() => { deferHudMediaPause(); setFocusPanel('history') }}
+                        onOpenFocusHistory={focusedRoutineContextRef.current ? undefined : () => { deferHudMediaPause(); setFocusPanel('history') }}
                         practiceTransitionBusy={practiceTransitionBusy || pendingTakeSaves > 0}
                         focusedTakeSaving={pendingTakeSaves > 0}
                         referenceControls={focusedPractice && youtubeUrl && isSplitView && !isRecording && !isStopping
@@ -6477,6 +6493,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         handsFreeRecording={handsFreeRecording}
                         handsFreeListeningReady={handsFreeListeningReady}
                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
+                        handsFreePlaybackPlaying={autoPlaybackPlaying}
+                        handsFreeReplayCountdown={replayCountdown}
                         autoSoundRecording={settings.autoSoundRecording}
                         onAutoSoundRecordingChange={handleAutoSoundRecordingChange}
                         recordDropRef={recordDeleteDropRef}
@@ -6493,12 +6511,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         showDrone={hudQuickSettings.showDrone}
                         droneToggleVisible={onRecordSurface}
                         onShowDroneChange={handleShowDroneSettingChange}
-                        desks={workspaceDesks}
-                        activeDeskId={activeDeskId}
-                        liveDeskSummary={liveDeskSummary}
-                        onApplyDesk={handleApplyDesk}
-                        onSaveDesk={handleSaveDesk}
-                        onDeleteDesk={handleDeleteDesk}
                         againPulse={againPulse}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
@@ -6670,6 +6682,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   />
 
                   <LabsOverlay
+                    dailyChallenge={dailyGameLaunch}
                     isOpen={isLabsOpen}
                     route={labsRoute ?? 'menu'}
                     streamRef={streamRef}
@@ -6679,8 +6692,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     hapticFeedback={settings.hapticFeedback}
                     micPermissionBlocked={cameraPermissionBlocked}
                     micPermissionPending={cameraPermissionRequestInFlight}
-                    onClose={handleCloseLabs}
-                    onNavigate={handleLabsNavigate}
+                    onClose={() => { setDailyGameLaunch(null); handleCloseLabs() }}
+                    onNavigate={(route) => { setDailyGameLaunch(null); handleLabsNavigate(route) }}
                     onRequestMicStream={handleRequestLabsMicStream}
                     onReleaseMicStream={releaseLiveStream}
                   />

@@ -1774,13 +1774,19 @@ button.compact-take-caption:active {
   stroke-width: 1.8;
 }
 
-/* Unified Camera Mode capsule: Vault · Overlays · Record · Practice · Settings. */
+/* Unified Camera Mode capsule: Vault · Overlays · Record · Practice · Settings.
+ *
+ * The overlay above already reserves the home indicator, so this padding is
+ * only breathing room — it can be small, which is what puts the pill back down
+ * at the bottom of the glass where it used to sit. */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
   display: flex !important;
   width: 100% !important;
   grid-template-columns: none !important;
+  flex-direction: column !important;
   align-items: center !important;
-  padding: 0 0 clamp(0.78rem, 2.2vh, 1.1rem) !important;
+  justify-content: flex-end !important;
+  padding: 0 0 clamp(0.3rem, 1vh, 0.5rem) !important;
 }
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-deck__main-row {
@@ -1791,7 +1797,9 @@ button.compact-take-caption:active {
   max-width: none !important;
   align-items: center;
   justify-content: center;
-  transform: translateY(0.58rem);
+  /* No nudge down. The row used to be shoved 0.58rem lower to fake sitting at
+     the bottom, which parked it on top of the takes grabber underneath. The
+     deck's own padding places it now, so the two stack instead of overlapping. */
 }
 
 .camera-control-pill {
@@ -2177,7 +2185,7 @@ button.compact-take-caption:active {
 
 .app-ui-overlay:not(.app-ui-overlay--audio-mode)
   .control-deck.control-deck--camera.control-deck--timer-below {
-  padding-bottom: calc(clamp(0.78rem, 2.2vh, 1.1rem) + 2rem) !important;
+  padding-bottom: calc(clamp(0.3rem, 1vh, 0.5rem) + 2rem) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2269,13 +2277,13 @@ button.compact-take-caption:active {
   }
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
-    padding-bottom: 0.48rem !important;
+    padding-bottom: 0.28rem !important;
   }
 
   /* Short screens keep their tighter base padding; just add the timer strip. */
   .app-ui-overlay:not(.app-ui-overlay--audio-mode)
     .control-deck.control-deck--camera.control-deck--timer-below {
-    padding-bottom: calc(0.48rem + 2rem) !important;
+    padding-bottom: calc(0.28rem + 2rem) !important;
   }
 }
 

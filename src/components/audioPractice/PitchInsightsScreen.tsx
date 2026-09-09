@@ -1409,6 +1409,7 @@ export default function PitchInsightsScreen({
         </header>
 
         <div className="pitch-insights-screen__scroll">
+
           <AnimatePresence mode="wait">
             {selected ? (
               <InsightDetail

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { AudioPracticeTab } from '../../types/audioPractice'
 import Pressable from '../ui/Pressable'
 import { requestInteractiveMediaRecovery } from '../../utils/appForeground'
@@ -27,6 +28,7 @@ export default function AudioPracticeTopTabs({
     <nav
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
+      style={{ '--electric-tab-index': Math.max(0,TABS.findIndex(tab => tab.id === activeTab)) } as CSSProperties}
     >
       {TABS.map((tab) => {
         const isActive = activeTab === tab.id

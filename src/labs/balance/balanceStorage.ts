@@ -2,13 +2,11 @@ import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
 import { resolveBalanceInstrumentId } from './balanceInstruments'
 import { isBalanceCharacterId } from './balanceCharacters'
 import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
-import { balanceStarsForRun, getBalanceLevel } from './balanceLevels'
 import { balanceCompleteDaily } from './balanceDaily'
 import type {
   BalanceCustomRoutine,
   BalanceDailyProgress,
   BalanceLaunch,
-  BalanceLevelProgress,
   BalanceNoteResult,
   BalanceRoutineResult,
   BalanceSettings,
@@ -20,9 +18,17 @@ import type {
 export const BALANCE_STORAGE_KEY = 'besttake:balance'
 const MAX_ROUTINE_SUMMARIES = 30
 
+/**
+ * Quick Play, already set up.
+ *
+ * The instrument comes from the one chosen when the app was first opened, so
+ * the opening note is the one a method book starts that instrument on rather
+ * than a fixed C5 squeezed into whatever range happens to be nearby — a tuba
+ * player should not have to go into Options before their first note.
+ */
 export function createDefaultBalanceSettings(instrumentId: string): BalanceSettings {
   const instrument = getBalanceInstrument(instrumentId)
-  const defaultMidi = clampWrittenMidi(72, instrument)
+  const defaultMidi = clampWrittenMidi(instrument.homeWrittenMidi, instrument)
   return {
     routineType: 'single',
     instrumentId: instrument.id,
@@ -69,26 +75,8 @@ function createEmptyData(instrumentId: string): BalanceStoredDataV3 {
     routineSummaries: [],
     trophies: {},
     unlockedCharacterIds: ['balancer', 'trumpeter'],
-    levels: {},
     daily: { ...EMPTY_DAILY },
   }
-}
-
-function normalizeLevels(value: unknown): Record<string, BalanceLevelProgress> {
-  if (!value || typeof value !== 'object') return {}
-  return Object.entries(value).reduce<Record<string, BalanceLevelProgress>>((result, [id, item]) => {
-    if (!getBalanceLevel(id) || !item || typeof item !== 'object') return result
-    const source = item as Partial<BalanceLevelProgress>
-    const stars = Math.max(0, Math.min(3, Math.round(finiteNumber(source.stars, 0))))
-    if (stars === 0) return result
-    result[id] = {
-      stars,
-      bestCenteredPercent: Math.max(0, Math.min(100, finiteNumber(source.bestCenteredPercent, 0))),
-      bestBalancedMs: Math.max(0, finiteNumber(source.bestBalancedMs, 0)),
-      clearedAt: finiteNumber(source.clearedAt, Date.now()),
-    }
-    return result
-  }, {})
 }
 
 function normalizeDaily(value: unknown): BalanceDailyProgress {
@@ -284,7 +272,6 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV3 {
       routineSummaries: summaries,
       trophies: normalizeTrophies(parsed.trophies),
       unlockedCharacterIds: [...unlockedCharacterIds],
-      levels: normalizeLevels(parsed.levels),
       daily: normalizeDaily(parsed.daily),
     }
     return awardBalanceTrophies(base).data
@@ -313,50 +300,16 @@ export function personalBestKey(result: Pick<BalanceNoteResult, 'target' | 'tole
   return `${result.target.instrumentId}:${result.target.writtenMidi}:${result.target.concertMidi}:${result.toleranceCents}`
 }
 
-/**
- * Fold a finished run into the trail: stars for a level, a tick for the day's
- * challenge. Stars only ever go up — replaying a level for a better score can
- * never take away the three you already earned.
- */
+/** Fold a finished run into the day's progress — a tick for the challenge. */
 export function recordBalanceLaunch(
   data: BalanceStoredDataV3,
   launch: BalanceLaunch,
   result: BalanceRoutineResult,
-): { data: BalanceStoredDataV3; earnedStars: number; previousStars: number } {
-  if (launch.kind === 'level' && launch.id) {
-    const level = getBalanceLevel(launch.id)
-    if (!level) return { data, earnedStars: 0, previousStars: 0 }
-    const earnedStars = balanceStarsForRun(level, result.completed, result.centeredPercent)
-    const previous = data.levels[launch.id]
-    const previousStars = previous?.stars ?? 0
-    if (earnedStars === 0) return { data, earnedStars, previousStars }
-    return {
-      data: {
-        ...data,
-        levels: {
-          ...data.levels,
-          [launch.id]: {
-            stars: Math.max(previousStars, earnedStars),
-            bestCenteredPercent: Math.max(previous?.bestCenteredPercent ?? 0, result.centeredPercent),
-            bestBalancedMs: Math.max(previous?.bestBalancedMs ?? 0, result.totalBalancedMs),
-            clearedAt: previous?.clearedAt ?? Date.now(),
-          },
-        },
-      },
-      earnedStars,
-      previousStars,
-    }
-  }
-
+): BalanceStoredDataV3 {
   if (launch.kind === 'daily' && launch.id && result.completed) {
-    return {
-      data: { ...data, daily: balanceCompleteDaily(data.daily, launch.id) },
-      earnedStars: 0,
-      previousStars: 0,
-    }
+    return { ...data, daily: balanceCompleteDaily(data.daily, launch.id) }
   }
-
-  return { data, earnedStars: 0, previousStars: 0 }
+  return data
 }
 
 export function recordBalanceResult(

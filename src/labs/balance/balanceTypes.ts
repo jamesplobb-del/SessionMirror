@@ -39,9 +39,10 @@ export interface BalanceInstrument {
   minWrittenMidi: number
   maxWrittenMidi: number
   /**
-   * The note a method book starts this instrument on. Sky Trail levels are
-   * written as semitone offsets from here, so one ladder fits every player
-   * instead of hard-coding a pitch a tuba could never reach.
+   * The note a method book starts this instrument on. The daily challenge and
+   * Quick Play's opening note are both semitone offsets from here, so one set
+   * of numbers fits every player instead of hard-coding a pitch a tuba could
+   * never reach.
    */
   homeWrittenMidi: number
 }
@@ -167,16 +168,18 @@ export interface BalanceState {
   bestBalancedMs: number
 }
 
-export type BalanceLaunchKind = 'quick' | 'level' | 'daily'
+export type BalanceLaunchKind = 'quick' | 'daily'
 
 /**
- * What a single run is: the quick-play settings, one Sky Trail level, or the
- * day's challenge. Everything the run needs that is *not* a player preference
- * travels here, so the persisted settings are never overwritten by a level.
+ * What a single run is: the quick-play settings, or the day's challenge.
+ * Everything the run needs that is *not* a player preference travels here, so
+ * the persisted settings are never overwritten by the challenge.
  */
 export interface BalanceLaunch {
+  /** A daily launch can override the instrument without changing player preferences. */
+  instrumentId?: string
   kind: BalanceLaunchKind
-  /** Level id, or the daily's YYYY-MM-DD key. Null for quick play. */
+  /** The daily's YYYY-MM-DD key. Null for quick play. */
   id: string | null
   title: string
   subtitle: string
@@ -184,13 +187,6 @@ export interface BalanceLaunch {
   writtenMidi: number[] | null
   goalSeconds: number | null
   toleranceCents: number | null
-}
-
-export interface BalanceLevelProgress {
-  stars: number
-  bestCenteredPercent: number
-  bestBalancedMs: number
-  clearedAt: number
 }
 
 export interface BalanceDailyProgress {
@@ -229,8 +225,6 @@ export interface BalanceStoredDataV3 {
   routineSummaries: BalanceRoutineResult[]
   trophies: Partial<Record<BalanceTrophyId, BalanceStoredTrophy>>
   unlockedCharacterIds: BalanceCharacterId[]
-  /** Star record per Sky Trail level id. */
-  levels: Record<string, BalanceLevelProgress>
   daily: BalanceDailyProgress
 }
 

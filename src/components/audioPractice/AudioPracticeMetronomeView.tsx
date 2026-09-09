@@ -64,8 +64,7 @@ function PracticeControlButton({
       aria-label={label}
       aria-pressed={active}
       data-tutorial={dataTutorial}
-      onPointerUp={(event) => {
-        if (event.button !== 0) return
+      onClick={() => {
         if (haptic === 'light') triggerLightHaptic()
         onPress()
       }}
@@ -489,16 +488,7 @@ export default function AudioPracticeMetronomeView({
               options={METRONOME_VISUAL_STYLES.map(({ id, label }) => ({
                 value: id,
                 label,
-                shortLabel:
-                  id === 'ribbon'
-                    ? 'Ribbon'
-                    : id === 'vertical'
-                      ? 'Vertical'
-                      : id === 'horizontal'
-                        ? 'Horizontal'
-                        : id === 'pulse'
-                          ? 'Pulse'
-                          : 'Columns',
+                shortLabel: id === 'horizontal' ? 'Horizontal' : id === 'pulse' ? 'Pulse' : 'Columns',
               }))}
               onChange={setMetronomeVisualStyle}
             />

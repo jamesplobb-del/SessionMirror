@@ -1,0 +1,58 @@
+
+> besttake@2.3.0 build
+> npm run copy:sql:wasm && tsc -b && vite build
+
+
+> besttake@2.3.0 copy:sql:wasm
+> copyfiles -u 3 node_modules/sql.js/dist/sql-wasm.wasm public/assets
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2818 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /private/tmp/besttake-baseline-20260908-1710/src/utils/nativeInlineTakeBoxPlayback.ts is dynamically imported by /private/tmp/besttake-baseline-20260908-1710/src/utils/takePlaybackAudio.ts but also statically imported by /private/tmp/besttake-baseline-20260908-1710/src/App.tsx, /private/tmp/besttake-baseline-20260908-1710/src/components/BestTakeBox.tsx, /private/tmp/besttake-baseline-20260908-1710/src/components/PipWindow.tsx, /private/tmp/besttake-baseline-20260908-1710/src/utils/audioModeNativePlayback.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /private/tmp/besttake-baseline-20260908-1710/src/utils/generateThumbnail.ts is dynamically imported by /private/tmp/besttake-baseline-20260908-1710/src/utils/takeThumbnailCache.ts but also statically imported by /private/tmp/besttake-baseline-20260908-1710/src/App.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                     1.50 kB │ gzip:   0.61 kB
+dist/assets/learn-instrument-BaKnkfFg.jpg          53.53 kB
+dist/assets/staff-jumper-DDMz5U0q.jpg              68.15 kB
+dist/assets/balance-DGI1z-gU.jpg                   74.46 kB
+dist/assets/LearnInstrumentScreen-DGl_-sGm.css     12.19 kB │ gzip:   2.86 kB
+dist/assets/BalanceScreen-bwL-fJ4a.css             42.79 kB │ gzip:   9.53 kB
+dist/assets/App-CS8vFlEW.css                       67.25 kB │ gzip:  11.60 kB
+dist/assets/LabsOverlay-DwypvD3n.css               90.25 kB │ gzip:  17.50 kB
+dist/assets/index-CX_itUvS.css                    835.38 kB │ gzip: 126.92 kB
+dist/assets/useVideoPlayback-Cc8Rk95G.js            0.19 kB │ gzip:   0.18 kB
+dist/assets/AnimatedExpand-TxJSzCBA.js              0.37 kB │ gzip:   0.26 kB
+dist/assets/videoDuration-Dwx7ESIe.js               0.46 kB │ gzip:   0.26 kB
+dist/assets/usePinchResize-C_L8fJjt.js              1.81 kB │ gzip:   0.74 kB
+dist/assets/QuickMetronomeScreen-CLTUQcTf.js        2.05 kB │ gzip:   0.88 kB
+dist/assets/CoachMark-CRxpsr06.js                   3.27 kB │ gzip:   1.46 kB
+dist/assets/DraggablePitchWidget-Cr96OYDV.js        3.59 kB │ gzip:   1.72 kB
+dist/assets/DraggableDroneWidget-BNoQi5YI.js        4.92 kB │ gzip:   1.93 kB
+dist/assets/OnboardingTutorial-Cp3abbAz.js          4.96 kB │ gzip:   1.84 kB
+dist/assets/DraggableMetronomeWidget-BR2oT6kO.js    9.24 kB │ gzip:   3.57 kB
+dist/assets/SettingsDrawer-D9sjF2-j.js             23.94 kB │ gzip:   7.65 kB
+dist/assets/capacitor-C275Luee.js                  27.14 kB │ gzip:   8.65 kB
+dist/assets/TakeVaultDrawer-BD1z_dso.js            31.75 kB │ gzip:   9.12 kB
+dist/assets/LearnInstrumentScreen-DqGWEFRl.js      33.85 kB │ gzip:  10.29 kB
+dist/assets/ReviewModeOverlay-CqlC9PBd.js          34.07 kB │ gzip:  11.02 kB
+dist/assets/motion-DurkFw70.js                     38.93 kB │ gzip:  13.80 kB
+dist/assets/AudioMetronomeTab-B6Yo_v5v.js          50.28 kB │ gzip:  14.55 kB
+dist/assets/BalanceScreen-Co1DclXd.js              62.28 kB │ gzip:  16.75 kB
+dist/assets/MultitrackOverlay-TPobBISi.js         113.51 kB │ gzip:  33.30 kB
+dist/assets/LabsOverlay-BDHOHGpu.js               121.21 kB │ gzip:  38.39 kB
+dist/assets/index-DhX7PQq5.js                     265.63 kB │ gzip:  77.70 kB
+dist/assets/sqlite-CVFbQjhg.js                    338.43 kB │ gzip:  94.05 kB
+dist/assets/vendor-DwhfSqU-.js                    345.58 kB │ gzip: 105.55 kB
+dist/assets/App-D352ctKP.js                       611.51 kB │ gzip: 172.59 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 19.93s

@@ -1,3 +1,4 @@
+import { createHandsFreeSilence } from '../utils/handsFreeSilence'
 import { advanceAutoStart } from '../utils/autoStartGate'
 import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
@@ -161,6 +162,9 @@ export function useAutoSoundRecording({
   const healthTimerRef = useRef<number | null>(null)
   const startFailureTimerRef = useRef<number | null>(null)
   const silenceSinceRef = useRef<number | null>(null)
+  const silenceGateRef = useRef(createHandsFreeSilence())
+  const [replayCountdown, setReplayCountdown] = useState<number | null>(null)
+  const stopRequestedRef = useRef(false)
   const loudSinceRef = useRef<number | null>(null)
   const attackSinceRef = useRef<number | null>(null)
   const recordingStartedAtRef = useRef<number | null>(null)
@@ -297,6 +301,8 @@ export function useAutoSoundRecording({
       // Native audio has been writing the hidden pre-roll already. The visible
       // take, its minimum length, and silence timeout all begin at the actual
       // performance trigger instead of at pre-roll startup.
+      silenceGateRef.current.reset()
+      stopRequestedRef.current = false
       recordingStartedAtRef.current = performance.now()
       silenceSinceRef.current = null
       setHandsFreeRecording(true)
@@ -319,6 +325,8 @@ export function useAutoSoundRecording({
     }
 
     autoTriggeredRef.current = true
+    silenceGateRef.current.reset()
+    stopRequestedRef.current = false
     recordingStartedAtRef.current = performance.now()
     silenceSinceRef.current = null
     setHandsFreeRecording(true)
@@ -341,6 +349,8 @@ export function useAutoSoundRecording({
 
     pendingPerformanceGateRef.current = false
     autoTriggeredRef.current = true
+    silenceGateRef.current.reset()
+    stopRequestedRef.current = false
     recordingStartedAtRef.current = performance.now()
     silenceSinceRef.current = null
     setHandsFreeRecording(true)
@@ -360,48 +370,37 @@ export function useAutoSoundRecording({
     setHandsFreeListeningReady(ready)
   }
 
-  const maybeAutoStopFromSilence = (
-    metrics: { rms: number; peak: number },
-    now: number
-  ): boolean => {
-    if (!autoTriggeredRef.current || !isRecordingRef.current) return false
-
-    const profile = profileRef.current
-    const gateLevel = profile.usePeak
-      ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
-      : metrics.rms
-    const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
-
-    if (recordingStartedAtRef.current === null) {
-      recordingStartedAtRef.current = now
-    }
-
-    const recordingDuration = now - recordingStartedAtRef.current
-    const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
-    const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
-    const stillLoud =
-      !metronomeTransient &&
-      (metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate)
-
-    if (stillLoud) {
-      silenceSinceRef.current = null
-      return false
-    }
-    if (recordingDuration < MIN_RECORDING_MS) return false
-
-    if (silenceSinceRef.current === null) {
-      silenceSinceRef.current = now
-      if (silenceMsRef.current > 0) return false
-    }
-    if (now - silenceSinceRef.current < silenceMsRef.current) return false
-
-    console.info('[AutoSound] autoStop (silence detected)')
+  const finishHandsFreeTake = () => {
+    if (!isRecordingRef.current || stopRequestedRef.current) return
+    stopRequestedRef.current = true
+    setReplayCountdown(null)
+    silenceGateRef.current.reset()
+    // Register replay intent before stop delivers the finalized take.
     onFinishedRef.current()
     autoTriggeredRef.current = false
     recordingStartedAtRef.current = null
-    silenceSinceRef.current = null
-    cooldownUntilRef.current = now + COOLDOWN_MS
+    cooldownUntilRef.current = performance.now() + COOLDOWN_MS
     stopRecordingRef.current()
+  }
+
+  const maybeAutoStopFromSilence = (
+    metrics: { rms: number; peak: number }, now: number, frameMs: number,
+  ): boolean => {
+    if (!autoTriggeredRef.current || !isRecordingRef.current || stopRequestedRef.current) return false
+    const profile = profileRef.current
+    const gateLevel = profile.usePeak
+      ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45) : metrics.rms
+    const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
+    if (recordingStartedAtRef.current === null) recordingStartedAtRef.current = now
+    if (now - recordingStartedAtRef.current < MIN_RECORDING_MS) return false
+    const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
+    const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
+    const loud = !metronomeTransient &&
+      (metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate)
+    const decision = silenceGateRef.current.sample(now, loud, silenceMsRef.current, frameMs)
+    setReplayCountdown(decision.remainingSeconds)
+    if (!decision.stop) return false
+    finishHandsFreeTake()
     return true
   }
 
@@ -450,6 +449,8 @@ export function useAutoSoundRecording({
     loudSinceRef.current = null
     attackSinceRef.current = null
     if (!preserve) {
+      silenceGateRef.current.reset()
+      setReplayCountdown(null)
       recordingStartedAtRef.current = null
       if (!startLatchRef.current) {
         autoTriggeredRef.current = false
@@ -480,6 +481,8 @@ export function useAutoSoundRecording({
 
   useEffect(() => {
     if (isRecording) {
+      if (!wasRecordingRef.current) stopRequestedRef.current = false
+      wasRecordingRef.current = true
       clearStartLatch()
       return
     }
@@ -575,7 +578,7 @@ export function useAutoSoundRecording({
       const isNativePath = path === 'native-tap'
       nativeTapReadyRef.current = false
       setMonitorReady(false)
-      let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
+      let nativeFrameRef: { buffer: Float32Array; timestamp: number; durationMs: number } | null = null
       const readFrameFreshness = createAudioFrameFreshness()
       const setupStartedAt = performance.now()
       // When levels actually began flowing. Native frames only start once
@@ -611,6 +614,7 @@ export function useAutoSoundRecording({
             if (cancelled) return
             nativeFrameRef = {
               buffer: chunk.samples,
+              durationMs: chunk.samples.length / chunk.sampleRate * 1000,
               timestamp: performance.now(),
             }
           })) ?? null
@@ -732,7 +736,6 @@ export function useAutoSoundRecording({
             // Missing audio is neither sustained playing nor sustained silence.
             loudSinceRef.current = null
             attackSinceRef.current = null
-            silenceSinceRef.current = null
             quietFramesSeen = 0
           }
           if (frame && (freshness === 'fresh' || freshness === 'gap')) {
@@ -855,7 +858,7 @@ export function useAutoSoundRecording({
         attackSinceRef.current = null
 
         if (!autoTriggeredRef.current) return
-        if (maybeAutoStopFromSilence(metrics, now)) {
+        if (maybeAutoStopFromSilence(metrics, now, useNativeMetrics ? (nativeFrameRef?.durationMs ?? 0) : POLL_INTERVAL_MS)) {
           // Each new take must earn a fresh quiet baseline after cooldown.
           armed = false
           quietFramesSeen = 0
@@ -1018,5 +1021,7 @@ export function useAutoSoundRecording({
     handsFreeRecording: handsFreeRecording && isRecording,
     handsFreeListeningReady: handsFreeListeningReady && shouldMonitor && !suppressStart,
     restartHandsFreeMonitor,
+    replayCountdown: isRecording ? replayCountdown : null,
+    finishHandsFreeTake,
   }
 }

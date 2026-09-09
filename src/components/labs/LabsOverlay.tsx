@@ -1,3 +1,4 @@
+import type { DailyChallengePlan } from '../../utils/dailyChallengePlan'
 import { lazy, Suspense, useState } from 'react'
 import type { GameMicRequest } from '../../labs/useGameMicRecovery'
 import { createPortal } from 'react-dom'
@@ -16,6 +17,7 @@ const LearnInstrumentScreen = lazy(
 export type LabsRoute = 'menu' | 'staff-jumper' | 'balance' | 'learn-instrument'
 
 interface LabsOverlayProps {
+  dailyChallenge?: DailyChallengePlan | null
   isOpen: boolean
   route: LabsRoute
   streamRef: RefObject<MediaStream | null>
@@ -32,6 +34,7 @@ interface LabsOverlayProps {
 }
 
 export default function LabsOverlay({
+  dailyChallenge,
   isOpen,
   route,
   streamRef,
@@ -192,6 +195,8 @@ export default function LabsOverlay({
             />
           ) : route === 'staff-jumper' ? (
             <StaffJumperScreen
+              key={dailyChallenge?.date + ":" + dailyChallenge?.instrumentId}
+              dailyChallenge={dailyChallenge?.game.route === 'staff-jumper' ? dailyChallenge : null}
               streamRef={streamRef}
               streamGeneration={streamGeneration}
               tunerInstrument={tunerInstrument}
@@ -202,6 +207,8 @@ export default function LabsOverlay({
           ) : route === 'balance' ? (
             <Suspense fallback={<div className="balance-route-loading" role="status">Opening Balance…</div>}>
               <BalanceScreen
+                key={dailyChallenge?.date + ":" + dailyChallenge?.instrumentId}
+                dailyChallenge={dailyChallenge?.game.route === 'balance' ? dailyChallenge : null}
                 streamRef={streamRef}
                 streamGeneration={streamGeneration}
                 tunerInstrument={tunerInstrument}

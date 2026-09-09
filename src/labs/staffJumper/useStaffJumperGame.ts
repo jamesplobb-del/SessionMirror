@@ -14,6 +14,7 @@ import {
   pitchClassesMatch,
   saveBestScore,
   type StaffJumperConfig,
+  type StaffJumperFeedback,
   type StaffJumperState,
   type StaffJumperTiming,
 } from './staffJumperMusicLogic'
@@ -41,10 +42,24 @@ import {
 } from './staffJumperAudio'
 import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
 
+/**
+ * `wrongMs` is how long one wrong pitch class has to keep sounding, steadily,
+ * before it is charged as a miss.
+ *
+ * These are generous on purpose. The front of a note is the least reliable
+ * part of it — a scoop, a cracked attack or a slow reed speaking can sit a
+ * semitone off for a good fraction of a second before the note settles where
+ * the player meant it. Judging that as a wrong note marked people wrong for
+ * notes they went on to play correctly, so the window is now wide enough that
+ * an attack has to lose its argument with the horn outright before it counts.
+ * The clock still restarts every time the sounding pitch class moves, so a
+ * wandering front never accumulates toward a miss — only a wrong note the
+ * player actually settles on does.
+ */
 const DIFFICULTY_TIMING = {
-  easy: { correctMs: 34, wrongMs: 620, cooldownMs: 12 },
-  medium: { correctMs: 30, wrongMs: 440, cooldownMs: 12 },
-  hard: { correctMs: 26, wrongMs: 300, cooldownMs: 12 },
+  easy: { correctMs: 34, wrongMs: 900, cooldownMs: 12 },
+  medium: { correctMs: 30, wrongMs: 680, cooldownMs: 12 },
+  hard: { correctMs: 26, wrongMs: 460, cooldownMs: 12 },
 } as const
 
 /**
@@ -120,6 +135,8 @@ type Action =
    */
   | { type: 'RHYTHM_ADVANCE'; holdQuality: HoldQuality | null }
   | { type: 'MISS'; reason: 'wrong' | 'timeout' | 'missed-beat' }
+  /** The player ended an endless run from the pause card. */
+  | { type: 'END_RUN' }
   | { type: 'FALL_COMPLETE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
@@ -170,6 +187,7 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
         ...createInitialState(),
         phase: 'playing',
         config,
+        hearts: config.lives ? INITIAL_HEARTS : 0,
         targetPitchClass: target.pitchClass,
         bestScore: loadBestScore(),
         startedAtMs: Date.now(),
@@ -273,38 +291,53 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
 
     case 'MISS': {
       if (state.phase !== 'playing' || !state.config) return state
-      const hearts = Math.max(0, state.hearts - 1)
-      const feedback =
+      const feedback: StaffJumperFeedback =
         action.reason === 'timeout'
           ? 'timeout'
           : action.reason === 'missed-beat'
             ? 'missed-beat'
             : 'wrong'
-      if (hearts <= 0) {
-        const bestScore = saveBestScore(state.score)
-        return {
-          ...state,
-          hearts: 0,
-          streak: 0,
-          missCount: state.missCount + 1,
-          missToken: state.missToken + 1,
-          phase: 'playing',
-          isFalling: true,
-          bestScore,
-          feedback,
-          feedbackToken: state.feedbackToken + 1,
-          endedAtMs: Date.now(),
-        }
-      }
-      return {
+      const missed: StaffJumperState = {
         ...state,
-        hearts,
         streak: 0,
         missCount: state.missCount + 1,
         missToken: state.missToken + 1,
         isSustaining: false,
         feedback,
         feedbackToken: state.feedbackToken + 1,
+      }
+
+      /*
+       * Standard practice: the miss goes on the accuracy and the reader keeps
+       * going. The character stumbles — the player is told — but nothing
+       * throws them off the staff, so a page can be read start to finish the
+       * way it would be in a lesson.
+       */
+      if (!state.config.lives) return missed
+
+      const hearts = Math.max(0, state.hearts - 1)
+      if (hearts <= 0) {
+        return {
+          ...missed,
+          hearts: 0,
+          phase: 'playing',
+          isFalling: true,
+          bestScore: saveBestScore(state.score),
+          endedAtMs: Date.now(),
+        }
+      }
+      return { ...missed, hearts }
+    }
+
+    /** Endless runs end when the player says so, from the pause card. */
+    case 'END_RUN': {
+      if (state.phase !== 'playing' && state.phase !== 'paused') return state
+      return {
+        ...state,
+        phase: 'gameover',
+        isFalling: false,
+        bestScore: saveBestScore(state.score),
+        endedAtMs: state.endedAtMs ?? Date.now(),
       }
     }
 
@@ -592,6 +625,13 @@ export function useStaffJumperGame(
     captureNoteClock()
     stopAudio()
     dispatch({ type: 'PAUSE' })
+  }, [captureNoteClock, stopAudio])
+
+  /** Endless runs have no failure state, so the player calls time on them. */
+  const endRun = useCallback(() => {
+    captureNoteClock()
+    stopAudio()
+    dispatch({ type: 'END_RUN' })
   }, [captureNoteClock, stopAudio])
 
   const resume = useCallback(() => {
@@ -1186,6 +1226,7 @@ export function useStaffJumperGame(
     completeFall,
     pause,
     resume,
+    endRun,
     noteRemainingMs: Math.max(0, Math.min(configuredTimeoutMs, noteRemainingMsRef.current)),
     noteTimeoutMs: configuredTimeoutMs,
     /** Rhythm mode: the pulse of the bar the click is on, 0-based; null without a running run. */

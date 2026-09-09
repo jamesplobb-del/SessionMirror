@@ -1,0 +1,86 @@
+/* Approval-only directions. Isolated preview; never imported by the real app. */
+html:is([data-refinement='studio'],[data-refinement='playful']) {
+  --concept-blue:#2164d9; --concept-bg:#f1f4f9; --concept-panel:#fff; --concept-ink:#152641;
+  --concept-muted:#5a6a80; --concept-line:#dce4ef; --concept-gold:#e9af3f; --concept-radius:18px;
+}
+html[data-refinement='playful'] { --concept-blue:#296cde; --concept-bg:#e9f2fe; --concept-line:#cfdef1; --concept-radius:24px; }
+html.app-dark-mode:is([data-refinement='studio'],[data-refinement='playful']) { --concept-bg:#111b2d; --concept-panel:#1d2a40; --concept-ink:#edf4ff; --concept-muted:#b2bfd3; --concept-line:#34445e; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card:is(.practice-menu-card--home,.practice-menu-card--routine-guide) {
+ --guide-bg:var(--concept-bg); --guide-panel:var(--concept-panel); --guide-ink:var(--concept-ink); --guide-muted:var(--concept-muted); --guide-line:var(--concept-line); --guide-accent:var(--concept-blue);
+ background:var(--concept-bg); color:var(--concept-ink);
+}
+html:is([data-refinement='studio'],[data-refinement='playful']) :is(.practice-menu-card--home,.routine-guide),
+html:is([data-refinement='studio'],[data-refinement='playful']) :is(.practice-menu-card--home,.routine-guide) :is(h1,h2,h3,button,input,small,strong,em) { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-header { background:var(--concept-panel); padding-bottom:16px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-scroll { padding:20px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-instrument-title { border:0; background:transparent; padding-left:0; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-instrument-title h2 { letter-spacing:-.035em; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card--home :is(.practice-home-quick-start,.practice-home-build-routine) { border-radius:var(--concept-radius); padding:18px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card--home .practice-home-quick-start { background:var(--concept-blue); border:1px solid #ffffff26; box-shadow:0 8px 18px #174b9d20; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card--home .practice-home-build-routine { background:var(--concept-panel); border:1px solid var(--concept-line); box-shadow:0 3px 9px #1d3c6807; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-home-action-copy strong { font-weight:650; letter-spacing:-.035em; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-home-action-copy small { letter-spacing:.06em; font-weight:600; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card--home .practice-home-action-icon { width:44px; height:44px; border-radius:14px; background:#ffffff20; flex-shrink:0; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-home-action-icon svg { display:none; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-home-action-icon::after { content:''; display:block; width:26px; height:26px; background:currentColor; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 10v4M7 6v12M12 3v18M17 7v10M21 10v4' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .daily-challenges { padding:14px; background:var(--concept-panel); border:1px solid var(--concept-line); border-radius:var(--concept-radius); }
+html:is([data-refinement='studio'],[data-refinement='playful']) .daily-challenges__item + .daily-challenges__item { border-top:1px solid var(--concept-line); }
+html:is([data-refinement='studio'],[data-refinement='playful']) .daily-challenges__mark { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--concept-bg); color:var(--concept-blue); opacity:1; flex-shrink:0; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .daily-challenges__collection { border-top:1px solid var(--concept-line); margin-top:10px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-layer .practice-menu-card--home .practice-menu-shortcut { background:var(--concept-panel); border:1px solid var(--concept-line); border-radius:16px; box-shadow:none; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-shortcut svg { box-sizing:content-box; width:22px; height:22px; padding:9px; background:#e5efff; color:#2463ce; border-radius:12px; stroke-width:1.8; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .practice-menu-card--home .practice-menu-shortcut:first-child svg { background:#fff0cc; color:#865a0d; }
+/* Studio: retain stacked start choices, bring tools together above daily goals. */
+html[data-refinement='studio'] .practice-menu-card--home .practice-home-actions { min-height:0; grid-template-rows:auto auto; }
+html[data-refinement='studio'] .practice-menu-layer .practice-menu-card--home .practice-home-quick-start { min-height:118px; }
+html[data-refinement='studio'] .practice-menu-layer .practice-menu-card--home .practice-home-build-routine { min-height:96px; border-left:4px solid var(--concept-gold); }
+html[data-refinement='studio'] .practice-menu-card--home .practice-menu-focus-tools { display:grid; grid-template-columns:1fr 1fr; order:2; gap:8px; }
+html[data-refinement='studio'] .practice-menu-card--home .daily-challenges { order:3; }
+html[data-refinement='studio'] .practice-menu-layer .practice-menu-card--home .practice-menu-shortcut { display:grid; grid-template-columns:40px 1fr; grid-template-rows:auto auto; text-align:left; justify-items:start; align-content:center; column-gap:10px; row-gap:3px; padding:10px; min-height:70px; }
+html[data-refinement='studio'] .practice-menu-card--home .practice-menu-shortcut svg { grid-column:1; grid-row:1/3; }
+html[data-refinement='studio'] .practice-menu-card--home .practice-menu-shortcut strong { font-size:12px; align-self:end; }
+html[data-refinement='studio'] .practice-menu-card--home .practice-menu-shortcut small { font-size:10px; align-self:start; }
+/* Playful: two clear start tiles and a colorful compact tools dock. */
+html[data-refinement='playful'] .practice-menu-card.practice-menu-card--home .practice-home-actions { min-height:0; grid-template-columns:1fr 1fr; grid-template-rows:auto; gap:10px; }
+html[data-refinement='playful'] .practice-menu-layer .practice-menu-card--home :is(.practice-home-quick-start,.practice-home-build-routine) { min-height:192px; padding:16px; display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; gap:12px; box-shadow:0 4px 0 #c2d4ed; }
+html[data-refinement='playful'] .practice-menu-layer .practice-menu-card--home .practice-home-quick-start { box-shadow:0 4px 0 #164aab; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-home-build-routine::before { content:'+'; display:grid; place-items:center; width:40px; height:40px; background:#ffe7a3; color:#654d11; border-radius:14px; font-size:28px; font-weight:500; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-home-action-copy strong { font-size:22px; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-home-action-copy em { font-size:11px; line-height:1.45; margin-top:8px; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-home-action-copy small { display:none; }
+html[data-refinement='playful'] :is(.practice-home-quick-start,.practice-home-build-routine) > svg { display:none; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-menu-focus-tools { order:2; gap:7px; }
+html[data-refinement='playful'] .practice-menu-card--home .daily-challenges { order:3; margin-top:6px; border-top:4px solid #edbf53; }
+html[data-refinement='playful'] .practice-menu-layer .practice-menu-card--home .practice-menu-shortcut { padding:12px 4px; border:0; background:transparent; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-menu-shortcut svg { border-radius:15px; padding:12px; width:24px; height:24px; box-shadow:0 3px 0 #bed2ef; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-menu-shortcut:first-child svg { box-shadow:0 3px 0 #e5c26b; }
+html[data-refinement='playful'] .practice-menu-card--home .practice-menu-shortcut:nth-child(2) svg { background:#e5e5ff; color:#6056af; }
+/* Apply the same vocabulary to the real routine builder. */
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide { background:var(--concept-bg); }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-heading { padding:24px 0; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-heading h2 { font-weight:650; letter-spacing:-.045em; white-space:normal; font-size:34px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-choice { border-radius:var(--concept-radius); background:var(--concept-panel); border:1px solid var(--concept-line); box-shadow:0 3px 10px #173e6c07; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-nav { background:var(--concept-panel); border-bottom:1px solid var(--concept-line); }
+html[data-refinement='playful'] .routine-guide-choice { border-bottom:4px solid var(--concept-line); padding:20px; }
+html[data-refinement='playful'] .routine-guide-heading { border-bottom:3px solid #edbf53; margin-bottom:22px; }
+/* Arcade stays an arcade. Same art, characters and three doors; better proportions. */
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall__doors { flex:0 0 300px; min-height:300px; max-height:300px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall { flex:0 0 auto; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-arcade__body { overflow-y:auto; }
+html[data-refinement='studio'] .balance-arcade--hall .balance-door { border-radius:18px; padding:5px; box-shadow:0 4px 12px #1e548a20; }
+html[data-refinement='studio'] .balance-arcade--hall .balance-door__world { border-radius:13px; }
+html[data-refinement='studio'] .balance-arcade--hall .balance-instrument-board { border-radius:18px; box-shadow:0 3px 12px #1e548a20; border:1px solid #c8dbee; }
+html[data-refinement='playful'] .balance-arcade--hall .balance-door { border-radius:24px 24px 18px 18px; box-shadow:0 5px 0 #89b5d2,0 8px 14px #1e548a24; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-door__name { padding:10px 2px; gap:5px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-door__name strong { font-size:18px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-door__name small { font-size:10px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-new-routine { border-radius:var(--concept-radius); background:var(--concept-panel); border-color:var(--concept-line); box-shadow:0 4px 14px #173e6c0c; }
+html[data-refinement='studio'] .routine-guide-new-routine { border-left:4px solid var(--concept-gold); }
+html[data-refinement='playful'] .routine-guide-new-routine { background:var(--concept-blue); color:#fff; border:0; border-bottom:4px solid #164aab; }
+html[data-refinement='playful'] .routine-guide-new-routine > :is(small,svg) { color:#fff; }
+html[data-refinement='playful'] .routine-guide-new-routine > span { background:#ffe7a3; color:#654d11; box-shadow:none; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .routine-guide-choice[aria-pressed='true'] { border-color:var(--concept-blue); background:color-mix(in srgb,var(--concept-panel) 88%,var(--concept-blue)); }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall__roster { grid-template-columns:repeat(6,82px); gap:8px; overflow-x:auto; padding:6px 4px 12px; scroll-snap-type:x proximity; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall__roster-pick { padding:8px 5px; min-height:126px; gap:4px; align-content:start; scroll-snap-align:start; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall__roster-pick strong { font-size:12px; }
+html:is([data-refinement='studio'],[data-refinement='playful']) .balance-arcade--hall .balance-hall__roster-pick small { font-size:10px; line-height:1.3; max-width:100%; white-space:normal; }

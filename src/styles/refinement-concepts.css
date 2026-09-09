@@ -1,0 +1,68 @@
+/* CONCEPT ONLY: cosmetic variations; no layout, text, navigation or behavior changes. */
+html:is([data-refinement='type'], [data-refinement='soft']) :is(
+  .routine-guide, .practice-menu-layer, .routine-bar, .native-bottom-sheet,
+  .app-ui-overlay--audio-mode, .practice-bench
+) {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+
+html:is([data-refinement='type'], [data-refinement='soft']) :is(
+  .routine-guide-heading h2, .practice-menu-heading,
+  .practice-home-action strong, .routine-board__head h3
+) {
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+/* All arcade backgrounds, artwork, rounded display type and game cards are retained. */
+html[data-refinement='soft'] {
+  --sm-blue: #368bf3;
+  --sm-blue-border: rgba(54, 139, 243, 0.42);
+  --sm-blue-border-strong: rgba(54, 139, 243, 0.58);
+  --sm-blue-soft: rgba(54, 139, 243, 0.12);
+  --sm-blue-glow: rgba(54, 139, 243, 0.14);
+  --sm-blue-glow-strong: rgba(54, 139, 243, 0.2);
+  --sm-gold: #eeb13e;
+  --sm-gold-border: rgba(238, 177, 62, 0.42);
+  --sm-gold-soft: rgba(238, 177, 62, 0.12);
+}
+html[data-refinement='soft'].app-audio-mode,
+html[data-refinement='soft'] .app-ui-overlay--audio-mode {
+  --audio-blue: #368bf3;
+  --audio-gold: #eeb13e;
+  --audio-shadow-segment: 0 5px 15px rgba(23, 26, 34, 0.07);
+  --audio-shadow-card: 0 8px 22px rgba(23, 26, 34, 0.06);
+}
+html[data-refinement='soft'] .routine-guide-choice {
+  background: var(--guide-panel);
+}
+html[data-refinement='soft'] :is(.practice-home-action, .practice-menu-focus-tool) {
+  box-shadow: 0 4px 12px rgba(8, 18, 32, 0.12);
+}
+html[data-refinement='soft'] .routine-bar {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+html[data-refinement='soft'] .balance-arcade {
+  --gold: #f8c653;
+  --gold-mid: #f0aa39;
+  --blue: #64ade9;
+  --blue-mid: #478fca;
+  --card-lift: 0 0.5rem 1.1rem rgba(30, 84, 138, 0.11);
+}
+
+/* Home declares its own fonts on individual controls; override those explicitly. */
+html:is([data-refinement='type'], [data-refinement='soft']) .practice-menu-card--home,
+html:is([data-refinement='type'], [data-refinement='soft']) .practice-menu-card--home :is(h1, h2, h3, button, input, small, strong, em) {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+}
+html:is([data-refinement='type'], [data-refinement='soft']) .practice-menu-card--home .practice-home-action-copy strong {
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+html[data-refinement='soft'] .practice-menu-layer .practice-menu-card--home .practice-home-quick-start {
+  background: #2864c4;
+  box-shadow: 0 4px 12px rgba(8, 18, 32, .12);
+}
+html[data-refinement='soft'] .practice-menu-layer .practice-menu-card--home .practice-home-build-routine {
+  border-color: rgba(54, 139, 243, .32);
+}

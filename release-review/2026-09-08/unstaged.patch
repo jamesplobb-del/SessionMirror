@@ -1,0 +1,4490 @@
+diff --git a/LAUNCH_READINESS.md b/LAUNCH_READINESS.md
+index 6e58cb2..91c8890 100644
+--- a/LAUNCH_READINESS.md
++++ b/LAUNCH_READINESS.md
+@@ -62,12 +62,45 @@ that every restart cause or all audio coexistence issues have been resolved.
+ 
+ ## Remaining work, in order
+ 
++### Follow-up: hands-free and shared playback
++
++- Corrected the earlier 150 ms silence-reset policy: it could prevent a take
++  from ending when native delivery was jittery. Fresh quiet observations now
++  tolerate up to one second of spacing; longer outages add only one frame's
++  duration. Duplicate/stale packets still cannot start a recording or count
++  toward silence. Physical-device verification remains necessary.
++- Hands-free now shows preparing, ready, recording, replay countdown, saving,
++  and actual playback separately. Finish & listen registers replay intent
++  before stopping; Next take ends replay through the existing cleanup path.
++- Playback preparation, restoration, count-in reassertion, and lifecycle
++  cleanup are serialized. A second player waits for native readiness; an old
++  restore/end notification cannot clear a newer playback generation. A failed
++  native route hold is cleaned up so later attempts can retry.
++- Drone initialization, recovery, and teardown responses respect newer user
++  commands. Repeated recovery events share one native restart.
++- New checks: verify-handsfree-cycle.mjs, verify-playback-route.mjs, and
++  verify-drone-transitions.mjs. These use the actual modules with mocked native
++  boundaries, not a simulator. Production build and Xcode asset copy passed.
++- Removed the saved Desk UI and its App callbacks. Existing saved data remains
++  intact; routines still use internal tool snapshots for presets and resume.
++- Routine widget now exposes Play/Pause and Done & next (Finish routine on the
++  last item), with the title opening the routine. Pause stays on the current
++  tool and preserves a visible Play control. Done also works while paused.
++- Removed the routine exercise-journal entry and panel. Routine recordings no
++  longer receive practice-session tags or the exercise post-take flow. Takes
++  still save to the existing recording library/project; old takes are untouched.
++  Daily checklist completion and elapsed practice time remain available.
++- Simplification validation: routine/session regression checks, hands-free and
++  audio transition checks, TypeScript, and production build passed. No simulator
++  was run. Physical-device behavior still needs the user’s verification.
++
++### Still outstanding
++
+ 1. Audio ownership audit across metronome/drone/reference playback, plus
+    explicit hands-free arming/cancel behavior beyond the frame gate fixes.
+ 2. Record/review/retry transitions and favorite-take comparison.
+ 3. Reference search/link flow and per-item passage restoration.
+-4. Routine Play/Pause and Done/Next semantics, preset application, then safe
+-   removal of Desks and exercise-history integration without deleting takes.
++4. Device verification of routine Play/Pause, Done/Next, and preset restoration.
+ 5. Instrument/transposition propagation and rhythm-focused defaults.
+ 
+ Keep edits bounded and check the working tree first: Claude may also be
+diff --git a/ios/App/App/Info.plist b/ios/App/App/Info.plist
+index cb3200d..9b365c0 100644
+--- a/ios/App/App/Info.plist
++++ b/ios/App/App/Info.plist
+@@ -25,9 +25,13 @@
+ 			</array>
+ 		</dict>
+ 	</array>
+-	<!-- Practice routines shared between musicians. Declaring the type is what
+-	     makes BestTake appear in "Open With" for a .btroutine attachment; iOS then
+-	     copies the file into Documents/Inbox and delivers the URL via appUrlOpen. -->
++	<!-- Two file types travel between musicians, and they are different things.
++	     .btplan is a practice routine: the ordered list of exercises a teacher
++	     sends a student. .btroutine is a metronome program: bars and tempo ramps
++	     for the practice timeline's click. Declaring each is what makes BestTake
++	     appear in "Open With" for that attachment; iOS then copies the file into
++	     Documents/Inbox and delivers the URL via appUrlOpen, where the extension
++	     decides which importer runs. -->
+ 	<key>CFBundleDocumentTypes</key>
+ 	<array>
+ 		<dict>
+@@ -38,6 +42,18 @@
+ 			<key>LSHandlerRank</key>
+ 			<string>Owner</string>
+ 			<key>LSItemContentTypes</key>
++			<array>
++				<string>com.besttake.app.practice-plan</string>
++			</array>
++		</dict>
++		<dict>
++			<key>CFBundleTypeName</key>
++			<string>BestTake Metronome Program</string>
++			<key>CFBundleTypeRole</key>
++			<string>Editor</string>
++			<key>LSHandlerRank</key>
++			<string>Owner</string>
++			<key>LSItemContentTypes</key>
+ 			<array>
+ 				<string>com.besttake.app.routine</string>
+ 			</array>
+@@ -47,7 +63,7 @@
+ 	<array>
+ 		<dict>
+ 			<key>UTTypeIdentifier</key>
+-			<string>com.besttake.app.routine</string>
++			<string>com.besttake.app.practice-plan</string>
+ 			<key>UTTypeDescription</key>
+ 			<string>BestTake Practice Routine</string>
+ 			<key>UTTypeConformsTo</key>
+@@ -55,6 +71,27 @@
+ 				<string>public.json</string>
+ 			</array>
+ 			<key>UTTypeTagSpecification</key>
++			<dict>
++				<key>public.filename-extension</key>
++				<array>
++					<string>btplan</string>
++				</array>
++				<key>public.mime-type</key>
++				<array>
++					<string>application/json</string>
++				</array>
++			</dict>
++		</dict>
++		<dict>
++			<key>UTTypeIdentifier</key>
++			<string>com.besttake.app.routine</string>
++			<key>UTTypeDescription</key>
++			<string>BestTake Metronome Program</string>
++			<key>UTTypeConformsTo</key>
++			<array>
++				<string>public.json</string>
++			</array>
++			<key>UTTypeTagSpecification</key>
+ 			<dict>
+ 				<key>public.filename-extension</key>
+ 				<array>
+diff --git a/scripts/verify-practice-routines.mjs b/scripts/verify-practice-routines.mjs
+index 3eeb9c5..4e3bd44 100644
+--- a/scripts/verify-practice-routines.mjs
++++ b/scripts/verify-practice-routines.mjs
+@@ -101,6 +101,10 @@ sitting = routines.pauseRoutineDay(sitting, 16000)
+ assert.equal(sitting.pausedStepId, tone.id)
+ assert.equal(sitting.activeStepId, null)
+ assert.equal(sitting.elapsedMsByStep[tone.id], 15000)
++const completedWhilePaused = routines.settleRoutineDayStep(sitting, plan, tone.id, 'done', 116000)
++assert.equal(completedWhilePaused.elapsedMsByStep[tone.id], 15000, 'Done while paused must not count break time')
++assert.equal(completedWhilePaused.pausedStepId, null, 'Done clears the paused resume target')
++assert.equal(routines.nextOpenStep(plan, completedWhilePaused, tone.id).id, excerpt.id)
+ sitting = routines.startRoutineDayStep(sitting, tone.id, 'sitting-a', 116000)
+ sitting = routines.settleRoutineDayStep(sitting, plan, tone.id, 'done', 121000)
+ assert.equal(sitting.elapsedMsByStep[tone.id], 20000, 'A long break contributes zero practice time')
+diff --git a/src/App.tsx b/src/App.tsx
+index 05dd549..7e4a111 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,3 +1,5 @@
++import { recordPlannedRoutine, resolveDailyPractice, isChallengeRoutine, type DailyChallengePlan } from './utils/dailyChallengePlan'
++import ChallengeRewardNotice from './components/ChallengeRewardNotice'
+ import {
+   lazy,
+   startTransition,
+@@ -37,15 +39,10 @@ import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
+ import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
+ import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
+ import {
+-  upsertWorkspaceDesk,
+-  deskMatchesSnapshot,
+   loadFocusDesk,
+-  loadWorkspaceDesks,
+   saveFocusDesk,
+-  saveWorkspaceDesks,
+   summarizeDesk,
+   type DeskSnapshot,
+-  type WorkspaceDesk,
+ } from './utils/workspaceDesks'
+ import { shareTakeToSystem } from './utils/shareTakeVideo'
+ import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
+@@ -257,7 +254,6 @@ import PracticeHub, {
+ } from './components/PracticeHub'
+ import FocusedPracticeCue from './components/FocusedPracticeCue'
+ import FocusedPracticeHistory from './components/FocusedPracticeHistory'
+-import RoutineItemJournal from './components/RoutineItemJournal'
+ import YoutubeUrlDialog from './components/YoutubeUrlDialog'
+ import { PracticeReferenceContext } from './context/PracticeReferenceContext'
+ import {
+@@ -558,8 +554,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   // recorder can initialize underneath without flashing before Home appears.
+   const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
+   const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
+-  const [focusPanel, setFocusPanel] = useState<'references' | 'history' | 'routine-history' | null>(null)
+-  const [routineJournal, setRoutineJournal] = useState<{ projectId: string; title: string } | null>(null)
++  const [focusPanel, setFocusPanel] = useState<'references' | 'history' | null>(null)
+   const [focusedCueOpen, setFocusedCueOpen] = useState(false)
+   const [focusedPostTakeId, setFocusedPostTakeId] = useState<string | null>(null)
+   const [focusedPostTakeReviewed, setFocusedPostTakeReviewed] = useState(false)
+@@ -572,6 +567,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   const [vaultReviewIndex, setVaultReviewIndex] = useState(0)
+   const [sortMode, setSortMode] = useState<SortMode>('newest')
+   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
++  const [dailyGameLaunch, setDailyGameLaunch] = useState<DailyChallengePlan | null>(null)
+   const [labsRoute, setLabsRoute] = useState<LabsRoute | null>(null)
+   const [multitrackOpen, setMultitrackOpen] = useState(false)
+   const [multitrackPendingRecordingTakeId, setMultitrackPendingRecordingTakeId] = useState<
+@@ -598,7 +594,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
+   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
+   /** Saved desks — chips at the top of the Workspace tray. */
+-  const [workspaceDesks, setWorkspaceDesks] = useState<WorkspaceDesk[]>(() => loadWorkspaceDesks())
+   /** The live room, kept current so a focused take can remember the desk it was played on. */
+   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
+   const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
+@@ -642,14 +637,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   const captureBusyRef = useRef(false)
+   const pendingTakeSavesRef = useRef(new Set<string>())
+   const [pendingTakeSaves, setPendingTakeSaves] = useState(0)
+-  const [routineBarExpanded, setRoutineBarExpanded] = useState(true)
+   const routineRef = useRef<Routine | null>(routine)
+   routineRef.current = routine
+   const routineDayRef = useRef<RoutineDay | null>(routineDay)
+   routineDayRef.current = routineDay
+ 
+   useEffect(() => {
+-    saveRoutine(routine)
++    if (!isChallengeRoutine(routine)) saveRoutine(routine)
+   }, [routine])
+ 
+   useEffect(() => {
+@@ -661,7 +655,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     // Synchronous ref commit prevents rapid Done/Next from seeing yesterday's state.
+     routineDayRef.current = next
+     setRoutineDay(next)
+-    try { saveRoutineDay(next) }
++    try { saveRoutineDay(next); recordPlannedRoutine(next) }
+     catch { setTakeDeleteError('Practice progress could not be saved on this device. Your recordings are separate and remain saved.') }
+   }, [])
+ 
+@@ -1637,8 +1631,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+         resolveTakePlaybackUrlFast(filePath, videoUrl) ??
+         (videoUrl ? resolveMediaPlaybackSrc(videoUrl) : '')
+       const projectId = activeProjectIdRef.current
+-      const focusedAtCapture = focusedPracticeRef.current
+-      const practiceSessionIdAtCapture = focusedPracticeSessionIdRef.current
++      const focusedAtCapture = focusedRoutineContextRef.current ? null : focusedPracticeRef.current
++      const practiceSessionIdAtCapture = focusedRoutineContextRef.current ? null : focusedPracticeSessionIdRef.current
+       const practiceStateAtCapture = focusedAtCapture
+         ? practiceItemStatesRef.current.find(
+             (state) => state.projectId === focusedAtCapture.projectId,
+@@ -2475,7 +2469,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     !isExperimentalOpen &&
+     (ready || nativeHandsFreeCaptureActive)
+ 
+-  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor } =
++  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake } =
+     useAutoSoundRecording({
+       enabled: settings.autoSoundRecording,
+       monitoringAllowed: autoMonitoringAllowed,
+@@ -2848,6 +2842,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     isExperimentalOpen,
+   ])
+ 
++  /*
++   * Tools and Camera are two different rooms, and the workspace widgets do not
++   * travel between them (see the effect near `handleCloseDrone`). A desk being
++   * restored sets the mode itself, so it raises this to keep what it just
++   * applied.
++   */
++  const workspaceModeRef = useRef(recordingModeRef.current)
++  const keepWorkspaceAcrossModeRef = useRef(false)
++
+   const handleRecordingModeChange = useCallback(
+     (mode: RecordingMode) => {
+       const modeChanged = mode !== recordingModeRef.current
+@@ -3073,15 +3076,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   ])
+   liveDeskSnapshotRef.current = liveDeskSnapshot
+ 
+-  const activeDeskId = useMemo(
+-    () => workspaceDesks.find((desk) => deskMatchesSnapshot(desk, liveDeskSnapshot))?.id ?? null,
+-    [liveDeskSnapshot, workspaceDesks],
+-  )
+-  const liveDeskSummary = useMemo(
+-    () => summarizeDesk(liveDeskSnapshot, settings.tunerTransposition),
+-    [liveDeskSnapshot, settings.tunerTransposition],
+-  )
+-
+   const applyDeskSnapshot = useCallback(
+     (desk: DeskSnapshot) => {
+       updateSettings({
+@@ -3105,41 +3099,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+         applyDroneFromDesk(null, desk.drone.octave)
+       }
+       if (desk.mode !== recordingModeRef.current) {
++        // The desk has just set every widget deliberately; the crossing must
++        // not then wipe them.
++        keepWorkspaceAcrossModeRef.current = true
+         handleRecordingModeChangeRef.current(desk.mode)
+       }
+     },
+     [handleAutoSoundRecordingChange, updateSettings],
+   )
+ 
+-  const handleApplyDesk = useCallback(
+-    (deskId: string) => {
+-      const desk = workspaceDesks.find((item) => item.id === deskId)
+-      if (!desk) return
+-      triggerLightHaptic(settings.hapticFeedback)
+-      applyDeskSnapshot(desk)
+-    },
+-    [applyDeskSnapshot, settings.hapticFeedback, workspaceDesks],
+-  )
+-
+-  const handleSaveDesk = useCallback(
+-    (name: string) => {
+-      setWorkspaceDesks((current) => {
+-        const next = upsertWorkspaceDesk(current, name, liveDeskSnapshotRef.current ?? liveDeskSnapshot)
+-        saveWorkspaceDesks(next)
+-        return next
+-      })
+-    },
+-    [liveDeskSnapshot],
+-  )
+-
+-  const handleDeleteDesk = useCallback((deskId: string) => {
+-    setWorkspaceDesks((current) => {
+-      const next = current.filter((desk) => desk.id !== deskId)
+-      saveWorkspaceDesks(next)
+-      return next
+-    })
+-  }, [])
+-
+   /** Focus picks the piece; the desk it was last played on comes with it. */
+   const restoreFocusDesk = useCallback(
+     (projectId: string) => {
+@@ -3191,6 +3159,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     requestQuickFunctionFromApp('metronome', 'inAppSettings')
+   }, [])
+ 
++  const restoreRoutineAfterChallenge = useCallback(() => {
++    if (!isChallengeRoutine(routineRef.current)) return
++    exitRoutineProgram()
++    const challengeDay = routineDayRef.current
++    if (challengeDay) commitRoutineDay(pauseRoutineDay(challengeDay, Date.now(), liveDeskSnapshotRef.current))
++    const saved = loadRoutine()
++    routineRef.current = saved
++    setRoutine(saved)
++    commitRoutineDay(saved ? loadRoutineDay(saved) : null)
++    // The challenge's timer is archived for resume, while Home shows the user's plan.
++    focusedRoutineContextRef.current = null
++    focusedPracticeRef.current = null
++    focusedPracticeSessionIdRef.current = null
++    setFocusedPractice(null)
++    setFocusedPracticeSessionId(null)
++    setFocusedPostTakeId(null)
++  }, [commitRoutineDay])
++
++  useEffect(() => {
++    if (isPracticeHubOpen) restoreRoutineAfterChallenge()
++  }, [isPracticeHubOpen, restoreRoutineAfterChallenge])
++
+   const handleOpenPracticeHome = useCallback(() => {
+     if (isRecording || isStopping) return
+     if (!canOpenOverlaySheet() || isExperimentalOpen) return
+@@ -3205,10 +3195,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     setQuickSettingsOpen(false)
+     setIsVaultOpen(false)
+     setIsSettingsOpen(false)
++    restoreRoutineAfterChallenge()
+     setIsPracticeHubOpen(true)
+     deferHudMediaPause()
+   }, [
+     commitRoutineDay,
++    restoreRoutineAfterChallenge,
+     canOpenOverlaySheet,
+     deferHudMediaPause,
+     isExperimentalOpen,
+@@ -3231,9 +3223,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     setQuickSettingsOpen(false)
+     setIsVaultOpen(false)
+     setIsSettingsOpen(false)
++    restoreRoutineAfterChallenge()
+     setIsPracticeHubOpen(true)
+     deferHudMediaPause()
+-  }, [commitRoutineDay, deferHudMediaPause, isRecording, isStopping])
++  }, [commitRoutineDay, restoreRoutineAfterChallenge, deferHudMediaPause, isRecording, isStopping])
+ 
+   /**
+    * Leaving Practice Home lands the finger on the live HUD underneath, so borrow
+@@ -3417,6 +3410,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     triggerLightHaptic(settings.hapticFeedback)
+     dismissPracticeHub()
+     handleRecordingModeChange('audio')
++    setDailyGameLaunch(null)
+     setLabsRoute('menu')
+     deferHudMediaPause()
+   }, [
+@@ -4072,9 +4066,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     autoSoundRecording: settings.autoSoundRecording,
+     isRecording,
+     handsFreePlaybackPending: handsFreePlaybackPending || autoPlaybackPlaying,
++    playbackPlaying: autoPlaybackPlaying,
++    replayCountdown,
+     handsFreeListeningReady,
+     dragDeleteActive: pipDragState.isDragging && !isRecording,
+-    finishingTake: isStopping && recordingMode === 'video',
++    finishingTake: isStopping,
+   })
+   const handsFreeStageVisiblePhase =
+     hudModalState === 'idle' && !showOnboardingTutorial ? handsFreeStagePhase : null
+@@ -4268,9 +4264,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     }
+   }, [pitchTrackerActive])
+ 
++  /*
++   * The Workspace toggle is the truth. Sheets hide the widget through
++   * `pitchHudSuspended` already, but they also used to latch `showPitch` off
++   * and never put it back — so the menu kept saying the tracker was on over a
++   * screen that had none. Re-raise it whenever nothing is covering the HUD.
++   */
++  useEffect(() => {
++    if (!pitchTrackerActive || pitchHudSuspended) return
++    setShowPitch(true)
++  }, [pitchHudSuspended, pitchTrackerActive])
++
++  /** Closing the widget means off, so the toggle has to go off with it. */
+   const handleClosePitch = useCallback(() => {
+-    setShowPitch(false)
+-  }, [])
++    handlePitchTrackerSettingChange(false)
++  }, [handlePitchTrackerSettingChange])
+ 
+   const handleCloseMetronome = useCallback(() => {
+     handleShowMetronomeSettingChange(false)
+@@ -4288,6 +4296,41 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     handleShowDroneSettingChange(false)
+   }, [handleShowDroneSettingChange])
+ 
++  /* ---- Crossing between Tools and Camera clears the desk -----------------
++   *
++   * Carrying Pitch, Metronome, Drone and the Enhancer across the crossing
++   * meant arriving in a room with widgets switched on that the room may not
++   * even render — Workspace read "Pitch Analysis · on" over a surface showing
++   * no pitch at all. Each surface now opens quiet and the player turns on what
++   * they want there.
++   *
++   * Take Cards stay: they are the takes, not a tool, and losing them on every
++   * crossing would be losing the thing being compared. Hands-free is a
++   * recording behaviour with its own control on the deck, so it stays too.
++   */
++  useEffect(() => {
++    if (workspaceModeRef.current === recordingMode) return
++    workspaceModeRef.current = recordingMode
++    if (keepWorkspaceAcrossModeRef.current) {
++      keepWorkspaceAcrossModeRef.current = false
++      return
++    }
++    if (pitchCommitTimerRef.current !== null) {
++      window.clearTimeout(pitchCommitTimerRef.current)
++      pitchCommitTimerRef.current = null
++    }
++    setPendingPitchTrackerEnabled(null)
++    setShowPitch(false)
++    updateSettings({
++      pitchTrackerEnabled: false,
++      showMetronome: false,
++      showDrone: false,
++      audioEnhancerEnabled: false,
++    })
++    sharedMetronomeEngine.stop()
++    applyDroneFromDesk(null, getDroneSnapshot().octave)
++  }, [recordingMode, updateSettings])
++
+   /* ---- "Again": one breath of Record when Current finishes playing back --- */
+   const currentPlaybackActive = autoPlaybackPlaying || challengerPipPlaying
+   const currentPlaybackWasActiveRef = useRef(currentPlaybackActive)
+@@ -5224,7 +5267,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+       if (!existing) setProjects(current => [project, ...current])
+       if (step.projectId !== project.id) {
+         target = { ...target, updatedAt: Date.now(), steps: target.steps.map(item => item.id === step.id ? { ...item, projectId: project.id } : item) }
+-        saveRoutine(target)
++        if (!isChallengeRoutine(target)) saveRoutine(target)
+         routineRef.current = target
+         setRoutine(target)
+       }
+@@ -5269,7 +5312,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     if (programStatus === 'missing') setTakeDeleteError('This item’s metronome program is unavailable. You can practice normally or choose another program in the routine editor.')
+     // Commit running only after the item and durable sitting are ready.
+     commitRoutineDay(startRoutineDayStep(routineDayRef.current ?? day, step.id, sessionId, Date.now(), { title: step.title, projectId: itemProjectId }))
+-    setRoutineBarExpanded(false)
+     if (programStatus !== 'ready' && desk?.showMetronome && step.kind !== 'game' && step.kind !== 'free') {
+       void sharedMetronomeEngine.start().catch(() => setTakeDeleteError('Your item is ready. Tap the metronome to start the click.'))
+     }
+@@ -5284,6 +5326,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   const handleStartRoutineStep = useCallback((stepId: string) =>
+     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
+   [runPracticeTransition, openRoutineStep])
++  const handleDailyPractice = useCallback((plan: DailyChallengePlan) => {
++    void runPracticeTransition('daily-practice', async () => {
++      const target = resolveDailyPractice(plan, routineRef.current)
++      if (!target.temporary) {
++        await openRoutineStep(target.stepId)
++        return
++      }
++      const day = routineDayRef.current
++      if (day) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
++      // A temporary challenge never replaces the user's saved routine.
++      const temporary = target.routine
++      routineRef.current = temporary
++      setRoutine(temporary)
++      commitRoutineDay(loadRoutineDay(temporary))
++      await openRoutineStep(target.stepId)
++    }).catch(() => { restoreRoutineAfterChallenge(); setTakeDeleteError('Could not open the challenge. Your routine is safe; please try again.') })
++  }, [commitRoutineDay, openRoutineStep, restoreRoutineAfterChallenge, runPracticeTransition])
++
++  const handleDailyGame = useCallback((plan: DailyChallengePlan) => {
++    if (practiceTransition.current.busy || captureBusyRef.current) return
++    const day = routineDayRef.current
++    if (day?.activeStepId) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
++    pauseRoutineProgram()
++    sharedMetronomeEngine.stop()
++    applyDroneFromDesk(null, 4)
++    handleOpenPracticeGames()
++    setDailyGameLaunch(plan)
++    setLabsRoute(plan.game.route)
++  }, [commitRoutineDay, handleOpenPracticeGames])
++
+   routineResumeRef.current = handleStartRoutineStep
+ 
+   /** A focus step meets its practice item for the first time. */
+@@ -5323,7 +5395,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+       if (!target || !target.steps.some(step => step.id === stepId)) return
+       const day = ensureRoutineDay(target)
+       // Stale buttons cannot finish a different item after the UI advances.
+-      if (day.activeStepId !== stepId) return
++      if ((day.activeStepId ?? day.pausedStepId) !== stepId) return
+       rememberCurrentPracticeDesk()
+       const sessionId = focusedPracticeSessionIdRef.current
+       if (sessionId) await endPracticeSession(sessionId)
+@@ -5342,7 +5414,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+       deferHudMediaPause()
+       const next = nextOpenStep(target, nextDay, stepId)
+       if (next) await openRoutineStep(next.id)
+-      else handleOpenRoutineToday()
++      else {
++        if (isChallengeRoutine(target)) {
++          const saved = loadRoutine()
++          routineRef.current = saved
++          setRoutine(saved)
++          commitRoutineDay(saved ? loadRoutineDay(saved) : null)
++        }
++        handleOpenRoutineToday()
++      }
+     }).catch(() => {
+       setTakeDeleteError('Could not advance practice. Your saved takes and completed items are safe; try again from Today.')
+       handleOpenRoutineToday()
+@@ -5358,14 +5438,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     [settings.hapticFeedback, settleRoutineStep],
+   )
+ 
+-  const handleSkipRoutineStep = useCallback(
+-    (stepId: string) => {
+-      triggerLightHaptic(settings.hapticFeedback)
+-      settleRoutineStep(stepId, 'skipped')
+-    },
+-    [settings.hapticFeedback, settleRoutineStep],
+-  )
+-
+   /** Checklist changes never create a recording or invent a completed sitting. */
+   const handleToggleRoutineStep = useCallback((stepId: string) => {
+     if (practiceTransition.current.busy || captureBusyRef.current) return
+@@ -5408,35 +5480,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+     sharedMetronomeEngine.stop()
+     applyDroneFromDesk(null, 4)
+     deferHudMediaPause()
+-    handleOpenRoutineToday()
+-  }, [commitRoutineDay, deferHudMediaPause, handleOpenRoutineToday, settings.hapticFeedback])
+-
+-  /** Put the routine down and stay where you are. Pause jumps to Today; this does not. */
+-  const handleCloseRoutineBar = useCallback(() => {
+-    if (practiceTransition.current.busy || captureBusyRef.current) return
+-    const day = routineDayRef.current
+-    if (!day?.activeStepId) return
+-    triggerLightHaptic(settings.hapticFeedback)
+-    commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
+-    pauseRoutineProgram()
+-    sharedMetronomeEngine.stop()
+-    applyDroneFromDesk(null, 4)
+-    deferHudMediaPause()
+   }, [commitRoutineDay, deferHudMediaPause, settings.hapticFeedback])
+ 
+-  const handleRememberRoutineSetup = useCallback(() => {
+-    const target = routineRef.current
+-    const stepId = routineDayRef.current?.activeStepId
+-    const desk = liveDeskSnapshotRef.current
+-    if (!target || !stepId || !desk || practiceTransition.current.busy) return
+-    const next = { ...target, updatedAt: Date.now(), steps: target.steps.map(step => step.id === stepId ? { ...step, desk } : step) }
+-    routineRef.current = next
+-    setRoutine(next)
+-    saveRoutine(next)
+-    rememberCurrentPracticeDesk()
+-    triggerSuccessHaptic(settings.hapticFeedback)
+-  }, [rememberCurrentPracticeDesk, settings.hapticFeedback])
+-
+   // Save active time periodically. Backgrounding pauses accounting rather than
+   // counting hours away; returning asks the player to resume explicitly.
+   useEffect(() => {
+@@ -5487,13 +5532,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+   }, [deferHudMediaPause, rememberCurrentPracticeDesk, runPracticeTransition])
+ 
+   const routineActiveStep = useMemo(() => {
+-    if (!routine || !routineDay?.activeStepId) return null
+-    return routine.steps.find((step) => step.id === routineDay.activeStepId) ?? null
+-  }, [routine, routineDay?.activeStepId])
+-
+-  const previousPracticeTake = useMemo(() => takes
+-    .filter(take => take.practiceSessionId && take.practiceSessionId !== focusedPracticeSessionId)
+-    .sort((a, b) => b.timestamp - a.timestamp)[0], [takes, focusedPracticeSessionId])
++    const id = routineDay?.activeStepId ?? routineDay?.pausedStepId
++    if (!routine || !id) return null
++    return routine.steps.find((step) => step.id === id) ?? null
++  }, [routine, routineDay?.activeStepId, routineDay?.pausedStepId])
+ 
+   const routineNextStep = useMemo(() => {
+     if (!routine || !routineActiveStep) return null
+@@ -5576,6 +5618,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+ 
+   return (
+     <PracticeReferenceContext.Provider value={{ projectId: activeProjectId ?? undefined, query: routineActiveStep?.referenceQuery || activeProject?.name || '', autoSearch: Boolean(routineActiveStep?.referenceQuery) }}>
++      <ChallengeRewardNotice />
+     <TutorialProvider
+       active={showOnboardingTutorial || isPracticeHubOpen}
+       enabled={tutorialTourEnabled}
+@@ -5607,9 +5650,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                 } as React.AudioHTMLAttributes<HTMLAudioElement>)}
+               />
+ 
+-              {focusPanel === 'routine-history' && routineJournal && <RoutineItemJournal key={routineJournal.projectId}
+-                {...routineJournal} onPlaybackActiveChange={setReviewPlaybackPlaying}
+-                onClose={() => { setRoutineJournal(null); setFocusPanel(null); setIsPracticeHubOpen(true); setReviewPlaybackPlaying(false) }} />}
+               {focusPanel === 'references'  && <YoutubeUrlDialog open onClose={() => setFocusPanel(null)} onSubmit={handleSubmitYoutube} />}
+               {focusPanel === 'history' && focusedPractice && <FocusedPracticeHistory
+                 name={focusedPractice.focusArea} takes={takes}
+@@ -5646,6 +5686,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                 onResumeFocusedPractice={(projectId) => { handlePauseRoutine(); return handleResumeFocusedPractice(projectId) }}
+                 onCreatePracticeItem={handleCreateProject}
+                 onOpenGames={handleOpenPracticeGames}
++                onDailyPractice={handleDailyPractice}
++                onDailyGame={handleDailyGame}
+                 onOpenVault={handleOpenVaultFromPracticeHub}
+                 onOpenTuner={handleOpenFullTunerFromPracticeHub}
+                 onOpenMetronome={handleOpenFullMetronomeFromPracticeHub}
+@@ -5656,11 +5698,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                 instrumentId={preferredInstrumentId}
+                 liveDeskSnapshot={liveDeskSnapshot}
+                 onSelectInstrument={handleSelectInstrument}
+-                onOpenItemHistory={(projectId, title) => {
+-                  if (practiceTransition.current.busy || captureBusyRef.current) return
+-                  deferHudMediaPause(); pauseRoutineProgram(); pauseYoutubeProxy(youtubeIframeRef.current)
+-                  setRoutineJournal({ projectId, title }); setFocusPanel('routine-history'); setIsPracticeHubOpen(false)
+-                }}
+                 onStartRoutineStep={handleStartRoutineStep}
+                 onToggleRoutineStep={handleToggleRoutineStep}
+                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
+@@ -5683,6 +5720,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                 !isRecording &&
+                 !isStopping && (
+                   <RoutineBar
++                    goalMs={isChallengeRoutine(routine) ? 60_000 : undefined}
+                     step={routineActiveStep}
+                     stepIndex={routineStepIndex}
+                     stepCount={routine.steps.length}
+@@ -5690,36 +5728,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                     startedAt={routineDay?.activeStepStartedAt ?? null}
+                     elapsedMs={routineDay?.elapsedMsByStep[routineActiveStep.id] ?? 0}
+                     busy={practiceTransitionBusy || pendingTakeSaves > 0}
+-                    contextText={focusedPracticeState?.pendingIntention.trim()
+-                      ? `Next take · ${focusedPracticeState.pendingIntention.trim()}`
+-                      : previousPracticeTake
+-                        ? `Last time · ${previousPracticeTake.notes?.trim() || new Date(previousPracticeTake.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : undefined}
+-
+-                    onListenReference={() => {
+-                      const projectId = focusedPracticeRef.current?.projectId
+-                      const url = projectId ? getSelectedReferenceUrl(projectId) : null
+-                      deferHudMediaPause(); pauseRoutineProgram()
+-                      if (url) { setYoutubeUrl(url); setYoutubeAutoPlayOnLoad(false); setIsSplitView(true); if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio') }
+-                      else if (benchmarkBinding?.source === 'library') { setFocusedSoloReview(false); setFocusedReferenceTakeId(null); handleOpenCompareReview('benchmark') }
+-                      else setFocusPanel('references')
+-                    }}
+-                    onRememberSetup={handleRememberRoutineSetup}
+-                    onOpenProgram={() => { handleRecordingModeChange('audio'); handleAudioPracticeTabChange('practice') }}
+-                    referenceReady={Boolean(routineActiveStep.projectId && getSelectedReferenceUrl(routineActiveStep.projectId)) || benchmarkBinding?.source === 'library'}
+-                    expanded={routineBarExpanded}
+                     audioSurface={recordingMode === 'audio' && !isLabsOpen}
+                     overLabs={isLabsOpen}
+-                    tunerTransposition={settings.tunerTransposition}
+-                    hapticFeedback={settings.hapticFeedback}
+-                    onExpandedChange={setRoutineBarExpanded}
+                     onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
+-                    onSkip={() => handleSkipRoutineStep(routineActiveStep.id)}
+                     onOpenToday={handleOpenRoutineToday}
++                    paused={!routineDay?.activeStepId}
++                    onResume={() => handleStartRoutineStep(routineActiveStep.id)}
+                     onPause={handlePauseRoutine}
+-                    onClose={handleCloseRoutineBar}
+-                    onReferences={focusedPractice ? () => { deferHudMediaPause(); setFocusPanel('references') } : undefined}
+-                    onHistory={focusedPractice ? () => { deferHudMediaPause(); setFocusPanel('history') } : undefined}
+-                    onAdjustment={focusedPractice ? () => setFocusedCueOpen(true) : undefined}
+                   />
+                 )}
+ 
+@@ -6044,6 +6059,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                   over the hands-free overlay. */}
+               <HandsFreeStage
+                 phase={handsFreeStageVisiblePhase}
++                replayCountdown={replayCountdown}
++                onFinishTake={finishHandsFreeTake}
++                onNextTake={finishAutoPlayback}
+                 elapsed={elapsed}
+                 onLightBackground={recordingMode === 'audio'}
+                 placement={handsFreeStagePlacement}
+@@ -6442,7 +6460,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                         routineStepActive={Boolean(routineActiveStep)}
+                         focusedAttemptCount={takes.filter(take => take.practiceSessionId === focusedPracticeSessionId && Boolean(focusedPracticeSessionId)).length}
+                         onOpenFocusReferences={() => { deferHudMediaPause(); setFocusPanel('references') }}
+-                        onOpenFocusHistory={() => { deferHudMediaPause(); setFocusPanel('history') }}
++                        onOpenFocusHistory={focusedRoutineContextRef.current ? undefined : () => { deferHudMediaPause(); setFocusPanel('history') }}
+                         practiceTransitionBusy={practiceTransitionBusy || pendingTakeSaves > 0}
+                         focusedTakeSaving={pendingTakeSaves > 0}
+                         referenceControls={focusedPractice && youtubeUrl && isSplitView && !isRecording && !isStopping
+@@ -6477,6 +6495,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                         handsFreeRecording={handsFreeRecording}
+                         handsFreeListeningReady={handsFreeListeningReady}
+                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
++                        handsFreePlaybackPlaying={autoPlaybackPlaying}
++                        handsFreeReplayCountdown={replayCountdown}
+                         autoSoundRecording={settings.autoSoundRecording}
+                         onAutoSoundRecordingChange={handleAutoSoundRecordingChange}
+                         recordDropRef={recordDeleteDropRef}
+@@ -6493,12 +6513,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                         showDrone={hudQuickSettings.showDrone}
+                         droneToggleVisible={onRecordSurface}
+                         onShowDroneChange={handleShowDroneSettingChange}
+-                        desks={workspaceDesks}
+-                        activeDeskId={activeDeskId}
+-                        liveDeskSummary={liveDeskSummary}
+-                        onApplyDesk={handleApplyDesk}
+-                        onSaveDesk={handleSaveDesk}
+-                        onDeleteDesk={handleDeleteDesk}
+                         againPulse={againPulse}
+                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
+                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
+@@ -6670,6 +6684,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                   />
+ 
+                   <LabsOverlay
++                    dailyChallenge={dailyGameLaunch}
+                     isOpen={isLabsOpen}
+                     route={labsRoute ?? 'menu'}
+                     streamRef={streamRef}
+@@ -6679,8 +6694,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+                     hapticFeedback={settings.hapticFeedback}
+                     micPermissionBlocked={cameraPermissionBlocked}
+                     micPermissionPending={cameraPermissionRequestInFlight}
+-                    onClose={handleCloseLabs}
+-                    onNavigate={handleLabsNavigate}
++                    onClose={() => { setDailyGameLaunch(null); handleCloseLabs() }}
++                    onNavigate={(route) => { setDailyGameLaunch(null); handleLabsNavigate(route) }}
+                     onRequestMicStream={handleRequestLabsMicStream}
+                     onReleaseMicStream={releaseLiveStream}
+                   />
+diff --git a/src/components/ControlDeck.tsx b/src/components/ControlDeck.tsx
+index 7634f59..c757386 100644
+--- a/src/components/ControlDeck.tsx
++++ b/src/components/ControlDeck.tsx
+@@ -70,6 +70,8 @@ interface ControlDeckProps {
+   handsFreeRecording?: boolean
+   handsFreeListeningReady?: boolean
+   handsFreePlaybackPending?: boolean
++  handsFreePlaybackPlaying?: boolean
++  handsFreeReplayCountdown?: number | null
+   autoSoundRecording?: boolean
+   onAutoSoundRecordingChange?: (enabled: boolean) => void
+   recordDropRef?: RefObject<HTMLDivElement | null>
+@@ -170,6 +172,8 @@ function ControlDeck({
+   handsFreeRecording = false,
+   handsFreeListeningReady = false,
+   handsFreePlaybackPending = false,
++  handsFreePlaybackPlaying,
++  handsFreeReplayCountdown,
+   autoSoundRecording = false,
+   onAutoSoundRecordingChange,
+   recordDropRef,
+@@ -213,6 +217,8 @@ function ControlDeck({
+     isRecording,
+     handsFreePlaybackPending,
+     handsFreeListeningReady,
++    playbackPlaying: handsFreePlaybackPlaying,
++    replayCountdown: handsFreeReplayCountdown,
+     dragDeleteActive: showDeleteDrop,
+     finishingTake: showFinishingTake,
+   })
+@@ -452,7 +458,7 @@ function ControlDeck({
+           </Pressable>
+ 
+           <div className="focus-strip-actions">
+-            <Pressable
++            {onOpenFocusHistory && <Pressable
+               type="button"
+               intensity="soft"
+               haptic="light"
+@@ -465,7 +471,7 @@ function ControlDeck({
+               {focusedAttemptCount > 0 && (
+                 <em className="focus-strip-count">{focusedAttemptCount}</em>
+               )}
+-            </Pressable>
++            </Pressable>}
+             <Pressable
+               type="button"
+               intensity="soft"
+@@ -484,7 +490,7 @@ function ControlDeck({
+               onClick={() => (branchActive ? closeBranch() : openBranch())}
+             >
+               <SlidersHorizontal aria-hidden />
+-              <span>Desk</span>
++              <span>Tools</span>
+             </Pressable>
+           </div>
+         </section>
+@@ -737,27 +743,27 @@ function ControlDeck({
+   )
+ }
+ 
++/**
++ * The takes grabber.
++ *
++ * Just the bar now — no label, no "swipe up". The strip of text was the tallest
++ * thing between the record button and the bottom of the screen, and it was
++ * explaining a gesture that the tap underneath it already covers. A grabber is
++ * the shape iOS uses for "there is a sheet under here", so it needs no words,
++ * and losing them lets the whole deck sit lower and gives the pitch graph
++ * above it the room back.
++ */
+ function VaultHandle({ onOpen }: { onOpen: () => void }) {
+-  const start = useRef<{ x: number; y: number } | null>(null)
+-  const swiped = useRef(false)
+-  return <button type="button" className="take-vault-handle" aria-label="Open takes. Swipe up or tap."
+-    onPointerDown={event => {
+-      start.current = { x: event.clientX, y: event.clientY }
+-      swiped.current = false
+-      event.currentTarget.setPointerCapture(event.pointerId)
+-    }}
+-    onPointerUp={event => {
+-      const origin = start.current
+-      start.current = null
+-      if (origin && origin.y - event.clientY > 32 && Math.abs(origin.x - event.clientX) < 60) {
+-        swiped.current = true
+-        onOpen()
+-      }
+-    }}
+-    onPointerCancel={() => { start.current = null; swiped.current = true }}
+-    onClick={() => { if (!swiped.current) onOpen(); swiped.current = false }}>
+-    <i aria-hidden /><span>Takes · swipe up</span>
+-  </button>
++  return (
++    <button
++      type="button"
++      className="take-vault-handle"
++      aria-label="Open takes"
++      onClick={onOpen}
++    >
++      <i aria-hidden />
++    </button>
++  )
+ }
+ 
+ export default memo(ControlDeck)
+diff --git a/src/components/GuidedRoutineBuilder.tsx b/src/components/GuidedRoutineBuilder.tsx
+index 85a14dd..b6d711d 100644
+--- a/src/components/GuidedRoutineBuilder.tsx
++++ b/src/components/GuidedRoutineBuilder.tsx
+@@ -2,7 +2,7 @@ import SwipeRoutineItem from './SwipeRoutineItem'
+ import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
+ import { useEffect, useMemo, useRef, useState } from 'react'
+ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
++import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+ import { StepEditor, type RoutineBuilderProps } from './RoutineBuilder'
+ import Pressable from './ui/Pressable'
+ import RoutineReferenceSetup from './RoutineReferenceSetup'
+@@ -10,6 +10,7 @@ import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamil
+ import { buildPresetRoutine, getRoutinePresets, getStepTemplates, stepFromTemplate } from '../utils/routinePresets'
+ import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
+ import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
++import { importPracticePlanFromText, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
+ import '../styles/routine-guide.css'
+ 
+ type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'detail' | 'library'
+@@ -224,6 +225,31 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
+     try { storeLibraryRoutine(routine); props.onDelete() }
+     catch { setError('Could not keep a copy of your routine. Please try again.') }
+   }
++
++  /* ---- Passing a routine to someone else --------------------------------
++   *
++   * A teacher writes the week once and sends it; every student opens the
++   * attachment and has the same session, with the same tools set up on each
++   * item. What travels is the routine, not a metronome program — see
++   * `utils/practiceRoutineShare.ts` for why those are separate file types.
++   */
++  const shareRoutine = (item: Routine) => {
++    setError('')
++    void sharePracticeRoutine(item).then(result => {
++      if (!result.ok) setError(result.error)
++    })
++  }
++
++  const importInputRef = useRef<HTMLInputElement>(null)
++  const importFile = (file: File) => {
++    setError('')
++    void file.text().then(text => {
++      const result = importPracticePlanFromText(text)
++      if (!result.ok) { setError(result.error); return }
++      setLibrary(loadRoutineLibrary())
++      openSavedRoutine(result.routine)
++    })
++  }
+   const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds([]); setLineupReturn('goals'); move('lineup') }
+     : screen === 'instrument' ? () => move(instrumentReturn)
+     : screen === 'choose' ? configureNext
+@@ -280,20 +306,54 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
+                       : 'General'
+                     const itemMinutes = item.steps.reduce((sum, step) => sum + step.minutes, 0)
+                     const active = item.id === routine?.id
+-                    return <button type="button" key={item.id} className="routine-guide-saved-routine" onClick={() => openSavedRoutine(item)}>
+-                      <span className="routine-guide-saved-routine__copy">
+-                        <strong>{item.name}</strong>
+-                        <small>{itemInstrument} · {item.steps.length} {item.steps.length === 1 ? 'exercise' : 'exercises'} · {formatMinutes(itemMinutes)}</small>
+-                      </span>
+-                      {active ? <em>Today</em> : null}
+-                      <ChevronRight aria-hidden />
+-                    </button>
++                    return <div key={item.id} className="routine-guide-saved-row">
++                      <button type="button" className="routine-guide-saved-routine" onClick={() => openSavedRoutine(item)}>
++                        <span className="routine-guide-saved-routine__copy">
++                          <strong>{item.name}</strong>
++                          <small>{itemInstrument} · {item.steps.length} {item.steps.length === 1 ? 'exercise' : 'exercises'} · {formatMinutes(itemMinutes)}</small>
++                        </span>
++                        {active ? <em>Today</em> : null}
++                        <ChevronRight aria-hidden />
++                      </button>
++                      <Pressable type="button" intensity="icon" haptic="light" hapticFeedback={hapticFeedback}
++                        className="routine-guide-saved-share" onClick={() => shareRoutine(item)}
++                        aria-label={`Share ${item.name}`} title={`Share ${item.name}`}>
++                        <Share2 aria-hidden />
++                      </Pressable>
++                    </div>
+                   })}
+                 </div>
+               ) : (
+                 <p>Your saved practice plans will stay together on this page.</p>
+               )}
+             </section>
++
++            {/* Receiving one. On device a shared routine usually arrives by
++              * tapping the attachment, which opens the app straight into it;
++              * this is the way in for a file already saved on the phone, and
++              * the only way in on the web build. */}
++            <section className="routine-guide-saved" aria-label="Open a shared routine">
++              <h3>Sent one by your teacher?</h3>
++              <button type="button" className="routine-guide-own" onClick={() => importInputRef.current?.click()}>
++                <Upload aria-hidden />
++                <span>
++                  <strong>Open a shared routine</strong>
++                  <small>Add a .{PRACTICE_PLAN_EXTENSION} routine someone sent you</small>
++                </span>
++                <ArrowRight aria-hidden />
++              </button>
++              <input
++                ref={importInputRef}
++                type="file"
++                accept={`.${PRACTICE_PLAN_EXTENSION},application/json`}
++                hidden
++                onChange={event => {
++                  const file = event.target.files?.[0]
++                  event.target.value = ''
++                  if (file) importFile(file)
++                }}
++              />
++            </section>
+           </div>}
+           {screen === 'goals' && <>
+             <div className="routine-guide-tool-list">{PRACTICE_GOALS.map(item => <button type="button" key={item.id} className="routine-guide-choice" aria-pressed={goal === item.id} onClick={() => setGoal(item.id)}><span><strong>{item.title}</strong><small>{item.detail}</small></span>{goal === item.id && <Check aria-hidden />}</button>)}</div>
+diff --git a/src/components/HandsFreeSettingsCard.tsx b/src/components/HandsFreeSettingsCard.tsx
+index e2a33cd..8f71619 100644
+--- a/src/components/HandsFreeSettingsCard.tsx
++++ b/src/components/HandsFreeSettingsCard.tsx
+@@ -84,7 +84,7 @@ export default function HandsFreeSettingsCard({
+             <header className="hands-free-card__header">
+               <div>
+                 <span className="hands-free-card__eyebrow">Hands-free</span>
+-                <h2 id="hands-free-card-title">While listening</h2>
++                <h2 id="hands-free-card-title">Play. Listen. Repeat.</h2>
+               </div>
+               <Pressable
+                 type="button"
+@@ -101,8 +101,8 @@ export default function HandsFreeSettingsCard({
+ 
+             <div className="hands-free-card__row">
+               <div className="hands-free-card__label">
+-                <strong>Quiet gap before stop</strong>
+-                <small>A rest longer than this ends the take</small>
++                <strong>Pause before playback</strong>
++                <small>Stay quiet this long to finish and hear your take</small>
+               </div>
+               <div className="hands-free-card__stepper" role="group" aria-label="Quiet gap">
+                 <Pressable
+@@ -167,7 +167,7 @@ export default function HandsFreeSettingsCard({
+               </div>
+             </div>
+ 
+-            <p className="hands-free-card__hint">Long-press Record to turn hands-free off.</p>
++            <p className="hands-free-card__hint">Start playing to record. Pause to listen back. After playback, wait for “Your turn” and play again. Use Finish & listen to end a take yourself. Long-press Record to turn hands-free off.</p>
+           </motion.section>
+         </div>
+       )}
+diff --git a/src/components/HandsFreeStage.tsx b/src/components/HandsFreeStage.tsx
+index 81493c0..ca88454 100644
+--- a/src/components/HandsFreeStage.tsx
++++ b/src/components/HandsFreeStage.tsx
+@@ -16,21 +16,23 @@ interface HandsFreeStageProps {
+   phase: HandsFreePhase | null
+   /** Seconds elapsed in the current take — shown while recording. */
+   elapsed: number
++  replayCountdown?: number | null
++  onFinishTake?: () => void
++  onNextTake?: () => void
+   /** Audio mode paints a light backdrop; camera mode is dark behind the copy. */
+   onLightBackground?: boolean
+   placement?: HandsFreeStagePlacement
+-  /**
+-   * Opens the quiet-gap / start-level card. Only offered while listening —
+-   * during recording and playback the overlay stays exactly as it was.
+-   */
++  /** Opens quiet-gap / start-level settings before recording. */
+   onTapForSettings?: () => void
+ }
+ 
+ const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
+-  recording: { title: 'Recording', detail: 'Take in progress' },
+-  playback: { title: 'Playing back', detail: 'Listen, then play again' },
+-  preparing: { title: 'Getting ready', detail: 'Connecting microphone' },
+-  listening: { title: 'Listening', detail: 'Play when you’re ready' },
++  recording: { title: 'Recording', detail: 'Pause your playing to hear this take' },
++  countdown: { title: 'Ready to listen', detail: 'Keep playing to continue the take' },
++  saving: { title: 'Preparing your take', detail: 'Playback starts when your take is ready' },
++  playback: { title: 'Listen back', detail: 'We’ll listen for your next take afterward' },
++  preparing: { title: 'Getting ready', detail: 'Give the microphone a quiet moment' },
++  listening: { title: 'Your turn', detail: 'Start playing — recording begins automatically' },
+ }
+ 
+ function formatElapsed(seconds: number): string {
+@@ -42,20 +44,21 @@ function formatElapsed(seconds: number): string {
+ /**
+  * Full-screen hands-free presence layer.
+  *
+- * Deliberately `pointer-events: none` end to end and only lightly tinted: the
+- * tuner, metronome and camera behind it stay both readable and usable while
+- * hands-free is running. Everything here is decoration plus a live status
+- * reading — never a control.
++ * Status is transparent to workspace gestures. Only explicit settings,
++ * finish, and next-take buttons intercept touches.
+  */
+ function HandsFreeStage({
+   phase,
+   elapsed,
++  replayCountdown,
++  onFinishTake,
++  onNextTake,
+   onLightBackground = false,
+   placement = 'center',
+   onTapForSettings,
+ }: HandsFreeStageProps) {
+   const copy = phase ? PHASE_COPY[phase] : null
+-  const settingsTappable = phase === 'listening' && Boolean(onTapForSettings)
++  const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
+ 
+   return (
+     <div
+@@ -77,13 +80,19 @@ function HandsFreeStage({
+ 
+       <div className="hands-free-stage__center">
+         <span className="hands-free-stage__pulse" aria-hidden />
+-        <strong className="hands-free-stage__title">{copy?.title ?? ''}</strong>
++        <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
+         <small className="hands-free-stage__detail">{copy?.detail ?? ''}</small>
+-        {phase === 'recording' && (
++        {(phase === 'recording' || phase === 'countdown') && (
+           <span className="hands-free-stage__elapsed tabular-nums">
+             {formatElapsed(elapsed)}
+           </span>
+         )}
++        {(phase === 'recording' || phase === 'countdown') && onFinishTake && (
++          <button type="button" className="hands-free-stage__action" onClick={onFinishTake}>Finish & listen</button>
++        )}
++        {phase === 'playback' && onNextTake && (
++          <button type="button" className="hands-free-stage__action" onClick={onNextTake}>Next take</button>
++        )}
+         {/* The centre treatment has room for the words; the compact pill on the
+           * dense Tools tabs takes a glyph instead, so the status copy is never
+           * squeezed on a narrow phone. Both open the same card. */}
+diff --git a/src/components/PracticeHub.tsx b/src/components/PracticeHub.tsx
+index 016fca2..d176fb1 100644
+--- a/src/components/PracticeHub.tsx
++++ b/src/components/PracticeHub.tsx
+@@ -1,3 +1,5 @@
++import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
++import DailyChallenges from './DailyChallenges'
+ import { useEffect, useMemo, useRef, useState } from 'react'
+ import { createPortal } from 'react-dom'
+ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+@@ -97,6 +99,8 @@ interface PracticeHubProps {
+   onResumeFocusedPractice: (projectId: string) => void | Promise<void>
+   onCreatePracticeItem: (name: string) => Promise<Project>
+   onOpenGames: () => void
++  onDailyPractice: (plan: DailyChallengePlan) => void
++  onDailyGame: (plan: DailyChallengePlan) => void
+   onOpenVault: () => void
+   onOpenTuner: () => void
+   onOpenMetronome: () => void
+@@ -148,6 +152,8 @@ export default function PracticeHub({
+   onResumeFocusedPractice,
+   onCreatePracticeItem,
+   onOpenGames,
++  onDailyPractice,
++  onDailyGame,
+   onOpenVault,
+   onOpenTuner,
+   onOpenMetronome,
+@@ -639,6 +645,8 @@ export default function PracticeHub({
+                         </Pressable>
+                       </div>
+ 
++                      <DailyChallenges routine={routine} day={routineDay} instrumentId={instrumentId}
++                        onPractice={onDailyPractice} onGame={onDailyGame} />
+                       {routine && routine.steps.length > 0 ? (
+                         <RoutineHomeDisclosure
+                           routine={routine}
+diff --git a/src/components/PracticeReferenceBrowser.tsx b/src/components/PracticeReferenceBrowser.tsx
+index 0e470f8..8f1afa1 100644
+--- a/src/components/PracticeReferenceBrowser.tsx
++++ b/src/components/PracticeReferenceBrowser.tsx
+@@ -1,5 +1,5 @@
+ import { useContext, useEffect, useId, useRef, useState } from 'react'
+-import { Search, Trash2 } from 'lucide-react'
++import { Play, Search, Trash2 } from 'lucide-react'
+ import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
+ import { loadReferenceLibrary, removePracticeReference, savePracticeReference, searchPracticeReferences, type PracticeReference } from '../utils/practiceReferences'
+ import { buildYoutubeProxyUrl, parseYoutubeVideoId } from '../utils/youtubeEmbed'
+@@ -69,11 +69,17 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
+   const row = (item: PracticeReference, removable = false) => (
+     <article key={item.videoId}>
+       <button type="button" className="focus-reference-result" onClick={() => choose(item)}>
+-        <span>
++        <span className="focus-reference-thumbnail" aria-hidden="true">
++          <Play />
++          <img src={`https://i.ytimg.com/vi/${item.videoId}/mqdefault.jpg`} alt=""
++            loading="lazy" decoding="async" referrerPolicy="no-referrer"
++            onError={event => { event.currentTarget.hidden = true }} />
++        </span>
++        <span className="focus-reference-description">
+           <strong>{decode(item.title)}</strong>
+           <small>{item.channel || 'YouTube'}{savedForThis(item.videoId) ? ' · Saved for this item' : ''}</small>
++          <span className="focus-reference-use">Use reference</span>
+         </span>
+-        <span className="focus-reference-use">Use</span>
+       </button>
+       {removable && <button type="button" className="focus-icon-button" aria-label={`Remove ${item.title} from saved references`} onClick={() => {
+         try { removePracticeReference(item.videoId); setSaved(loadReferenceLibrary().items) }
+diff --git a/src/components/RoutineBar.tsx b/src/components/RoutineBar.tsx
+index 3124612..17a0d98 100644
+--- a/src/components/RoutineBar.tsx
++++ b/src/components/RoutineBar.tsx
+@@ -1,22 +1,11 @@
+-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
++import { useEffect, useState } from 'react'
+ import { createPortal } from 'react-dom'
+-import { AnimatePresence, motion, useMotionValue } from 'framer-motion'
+-import { Check, ChevronDown, ChevronUp, GripVertical, Pause, Headphones, X } from 'lucide-react'
+-import Pressable from './ui/Pressable'
+-import RoutineProgramControls from './RoutineProgramControls'
+-import { iosSpringSnappy } from '../utils/motionPresets'
+-import type { TunerTranspositionId } from '../utils/tunerTransposition'
+-import { formatElapsed, summarizeStep, type RoutineStep } from '../utils/practiceRoutines'
+-import {
+-  clampWidgetPosition,
+-  getFloatingWidgetTopCenter,
+-  loadWidgetPosition,
+-  loadWidgetSize,
+-  saveWidgetPosition,
+-  saveWidgetSize,
+-} from '../utils/floatingWidgetLayout'
++import { motion } from 'framer-motion'
++import { Pause, Play, Check } from 'lucide-react'
++import { formatElapsed, type RoutineStep } from '../utils/practiceRoutines'
+ 
+ interface RoutineBarProps {
++  goalMs?: number
+   step: RoutineStep
+   /** 1-based. */
+   stepIndex: number
+@@ -24,347 +13,44 @@ interface RoutineBarProps {
+   nextStep: RoutineStep | null
+   elapsedMs?: number
+   busy?: boolean
+-  referenceReady?: boolean
+-  onRememberSetup?: () => void
+   startedAt: number | null
+-  expanded: boolean
+-  /** Light surface on the audio tools; dark glass over the camera. */
++  paused: boolean
+   audioSurface: boolean
+-  /** Games sit at z-index 135; the bar has to clear them. */
+   overLabs?: boolean
+-  tunerTransposition: TunerTranspositionId
+-  hapticFeedback: boolean
+-  onExpandedChange: (expanded: boolean) => void
++  onResume: () => void
++  onPause: () => void
+   onDone: () => void
+-  onSkip: () => void
+   onOpenToday: () => void
+-  onPause: () => void
+-  /** Put the routine down without being taken to Today. */
+-  onClose?: () => void
+-  onReferences?: () => void
+-  onHistory?: () => void
+-  contextText?: string
+-  onListenReference?: () => void
+-  onOpenProgram?: () => void
+-  onAdjustment?: () => void
+ }
+ 
+-const POSITION_ID = 'routine-bar'
+-const EDGE_INSET = 12
+-const MIN_WIDTH = 232
+-const MAX_WIDTH = 560
+-/** Clear of the audio tools header; over the camera it can sit higher. */
+-const AUDIO_TOP_OFFSET = 76
+-const CAMERA_TOP_OFFSET = 16
+-
+-function defaultWidth(): number {
+-  if (typeof window === 'undefined') return 384
+-  return Math.min(384, window.innerWidth - EDGE_INSET * 2)
+-}
+-
+-/**
+- * The routine's presence while a step is running. Collapsed it is one line —
+- * step, title, clock — so the tool underneath keeps the screen. Expanded it
+- * adds Done, Skip, and the way back to the board.
+- *
+- * It is positioned entirely by `x`/`y` motion values rather than CSS. It used
+- * to centre itself with `left: 50%` plus `transform: translateX(-50%)`, but the
+- * entry animation wrote its own inline transform over that, so the bar rendered
+- * half a screen to the right and ran off the edge. Owning both axes in motion
+- * values removes the conflict, and makes the bar draggable for free.
+- */
+-export default function RoutineBar({
+-  step,
+-  stepIndex,
+-  stepCount,
+-  nextStep,
+-  startedAt,
+-  elapsedMs: accumulatedMs = 0,
+-  busy = false,
+-  referenceReady = false,
+-  onRememberSetup,
+-  expanded,
+-  audioSurface,
+-  overLabs = false,
+-  tunerTransposition,
+-  hapticFeedback,
+-  onExpandedChange,
+-  onDone,
+-  onSkip,
+-  onOpenToday,
+-  onPause,
+-  onClose,
+-  onReferences,
+-  onHistory,
+-  onAdjustment,
+-  onOpenProgram,
+-  contextText,
+-  onListenReference,
+-}: RoutineBarProps) {
+-  const [contextDismissed, setContextDismissed] = useState(false)
+-  useEffect(() => { setContextDismissed(false) }, [step.id])
+-  const [setupRemembered, setSetupRemembered] = useState(false)
+-  useEffect(() => { setSetupRemembered(false) }, [step.id])
+-  const [now, setNow] = useState(() => Date.now())
+-  const barRef = useRef<HTMLElement | null>(null)
+-  const placedRef = useRef(false)
+-  const dragX = useMotionValue(0)
+-  const dragY = useMotionValue(0)
+-  const [width, setWidth] = useState(() => loadWidgetSize(POSITION_ID)?.width ?? defaultWidth())
+-  const [dragging, setDragging] = useState(false)
+-
++export default function RoutineBar({ goalMs, step, stepIndex, stepCount, nextStep,
++  startedAt, elapsedMs = 0, paused = false, busy = false, audioSurface, overLabs,
++  onPause, onResume, onDone, onOpenToday }: RoutineBarProps) {
++  const [now, setNow] = useState(Date.now)
+   useEffect(() => {
+-    if (!startedAt) return
++    setNow(Date.now())
++    if (!startedAt || paused) return
+     const timer = window.setInterval(() => setNow(Date.now()), 1000)
+     return () => window.clearInterval(timer)
+-  }, [startedAt])
+-
+-  /** Restore where it was left, or spawn top-centre clear of the header. */
+-  useLayoutEffect(() => {
+-    if (placedRef.current) return
+-    const el = barRef.current
+-    const elWidth = el?.offsetWidth ?? width
+-    const elHeight = el?.offsetHeight ?? 64
+-    const saved = loadWidgetPosition(POSITION_ID)
+-    const start = saved
+-      ? clampWidgetPosition(window.innerWidth, window.innerHeight, elWidth, elHeight, saved.x, saved.y)
+-      : getFloatingWidgetTopCenter(
+-          window.innerWidth,
+-          window.innerHeight,
+-          elWidth,
+-          elHeight,
+-          audioSurface ? AUDIO_TOP_OFFSET : CAMERA_TOP_OFFSET,
+-        )
+-    dragX.set(start.x)
+-    dragY.set(start.y)
+-    placedRef.current = true
+-  }, [audioSurface, dragX, dragY, width])
+-
+-  const reclamp = useCallback(() => {
+-    const el = barRef.current
+-    if (!el) return
+-    const { x, y } = clampWidgetPosition(
+-      window.innerWidth,
+-      window.innerHeight,
+-      el.offsetWidth,
+-      el.offsetHeight,
+-      dragX.get(),
+-      dragY.get(),
+-    )
+-    if (x === dragX.get() && y === dragY.get()) return
+-    dragX.set(x)
+-    dragY.set(y)
+-    if (placedRef.current) saveWidgetPosition(POSITION_ID, x, y)
+-  }, [dragX, dragY])
+-
+-  // A rotate, a keyboard, or expanding the body can leave it hanging off.
+-  useEffect(() => {
+-    window.addEventListener('resize', reclamp)
+-    window.addEventListener('orientationchange', reclamp)
+-    return () => {
+-      window.removeEventListener('resize', reclamp)
+-      window.removeEventListener('orientationchange', reclamp)
+-    }
+-  }, [reclamp])
+-
+-  useEffect(() => {
+-    const frame = window.requestAnimationFrame(reclamp)
+-    return () => window.cancelAnimationFrame(frame)
+-  }, [expanded, reclamp])
+-
+-  /**
+-   * The outer `expanded` toggle is not the only thing that changes the bar's
+-   * height: the context reminder, the program row and the reference-passage
+-   * disclosure all grow it in place. Without this, opening one near the bottom
+-   * of the screen leaves the bar's own controls hanging off the edge.
+-   * Coalesced per frame because an animated `height: auto` fires this on every
+-   * frame of the transition.
+-   */
+-  useEffect(() => {
+-    const el = barRef.current
+-    if (!el || typeof ResizeObserver === 'undefined') return
+-    let frame = 0
+-    const observer = new ResizeObserver(() => {
+-      window.cancelAnimationFrame(frame)
+-      frame = window.requestAnimationFrame(reclamp)
+-    })
+-    observer.observe(el)
+-    return () => {
+-      window.cancelAnimationFrame(frame)
+-      observer.disconnect()
+-    }
+-  }, [reclamp])
+-
+-  /** Width-only resize: the height is whatever the step needs. */
+-  const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+-    event.preventDefault()
+-    event.stopPropagation()
+-    const startX = event.clientX
+-    const startWidth = barRef.current?.offsetWidth ?? width
+-    const pointerId = event.pointerId
+-    const target = event.currentTarget
+-    target.setPointerCapture(pointerId)
+-
+-    const move = (moveEvent: PointerEvent) => {
+-      if (moveEvent.pointerId !== pointerId) return
+-      const next = Math.round(
+-        Math.min(
+-          Math.min(MAX_WIDTH, window.innerWidth - EDGE_INSET * 2),
+-          Math.max(MIN_WIDTH, startWidth + (moveEvent.clientX - startX)),
+-        ),
+-      )
+-      setWidth(next)
+-    }
+-    const end = (endEvent: PointerEvent) => {
+-      if (endEvent.pointerId !== pointerId) return
+-      target.releasePointerCapture?.(pointerId)
+-      window.removeEventListener('pointermove', move)
+-      window.removeEventListener('pointerup', end)
+-      window.removeEventListener('pointercancel', end)
+-      const finalWidth = barRef.current?.offsetWidth ?? width
+-      saveWidgetSize(POSITION_ID, finalWidth, barRef.current?.offsetHeight ?? 64)
+-      reclamp()
+-    }
+-    window.addEventListener('pointermove', move)
+-    window.addEventListener('pointerup', end)
+-    window.addEventListener('pointercancel', end)
+-  }
+-
+-  if (typeof document === 'undefined') return null
+-
+-  const elapsedMs = accumulatedMs + (startedAt ? Math.max(0, now - startedAt) : 0)
+-  const targetMs = step.minutes * 60_000
+-  const overTarget = targetMs > 0 && elapsedMs >= targetMs
+-  const clock = step.minutes > 0
+-    ? `${formatElapsed(elapsedMs)} / ${step.minutes}:00`
+-    : formatElapsed(elapsedMs)
+-  const progress = targetMs > 0 ? Math.min(1, elapsedMs / targetMs) : 0
+-  const summary = summarizeStep(step, tunerTransposition)
+-
++  }, [startedAt, paused])
++  const elapsed = elapsedMs + (!paused && startedAt ? Math.max(0, now - startedAt) : 0)
+   return createPortal(
+-    <motion.section
+-      ref={barRef}
+-      className={`routine-bar ${audioSurface ? 'routine-bar--audio' : ''} ${overLabs ? 'routine-bar--over-labs' : ''} ${expanded ? 'is-expanded' : ''} ${overTarget ? 'is-over' : ''} ${dragging ? 'is-dragging' : ''}`}
+-      aria-label="Routine step in progress"
+-      initial={{ opacity: 0, scale: 0.97 }}
+-      animate={{ opacity: 1, scale: 1 }}
+-      exit={{ opacity: 0, scale: 0.97 }}
+-      transition={iosSpringSnappy}
+-      style={{ x: dragX, y: dragY, width }}
+-      drag
+-      dragMomentum={false}
+-      dragElastic={0.04}
+-      onDragStart={() => setDragging(true)}
+-      onDragEnd={() => {
+-        setDragging(false)
+-        reclamp()
+-      }}
+-    >
+-      <span className="routine-bar__grip" aria-hidden>
+-        <GripVertical />
+-      </span>
+-      {onClose && (
+-        <button
+-          type="button"
+-          className="routine-bar__close"
+-          disabled={busy}
+-          aria-label="Close the routine bar"
+-          onClick={onClose}
+-        >
+-          <X aria-hidden />
+-        </button>
+-      )}
+-
+-      <Pressable
+-        type="button"
+-        intensity="soft"
+-        haptic="light"
+-        hapticFeedback={hapticFeedback}
+-        className="routine-bar__line"
+-        onClick={() => onExpandedChange(!expanded)}
+-        aria-expanded={expanded}
+-      >
+-        <span className="routine-bar__step">
+-          {stepIndex}
+-          <small>/{stepCount}</small>
+-        </span>
++    <motion.section className={`routine-bar routine-bar--simple ${audioSurface ? 'routine-bar--audio' : ''} ${overLabs ? 'routine-bar--over-labs' : ''}`}
++      aria-label={paused ? 'Routine paused' : 'Routine in progress'}
++      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
++      <button type="button" className="routine-bar__line" onClick={onOpenToday} disabled={busy} aria-label={`Open routine: ${step.title}`}>
++        <span className="routine-bar__step">{stepIndex}<small>/{stepCount}</small></span>
+         <span className="routine-bar__title">{step.title}</span>
+-        <span className="routine-bar__clock">{clock}</span>
+-        {expanded ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
+-      </Pressable>
+-      {targetMs > 0 && (
+-        <span className="routine-bar__track" aria-hidden>
+-          <i style={{ transform: `scaleX(${progress})` }} />
+-        </span>
+-      )}
+-
+-      {contextText && !contextDismissed && <div className="routine-item-context"><span>{contextText}</span><button type="button" aria-label="Dismiss practice reminder" onClick={() => setContextDismissed(true)}><X aria-hidden /></button></div>}
+-      {onReferences && <div className="routine-reference-shortcut"><button type="button" disabled={busy} onClick={referenceReady && onListenReference ? onListenReference : onReferences}><Headphones aria-hidden /><span>{referenceReady ? 'Listen to your reference' : 'Find a reference'}</span><ChevronDown aria-hidden /></button></div>}
+-      {step.programId && <RoutineProgramControls key={step.programId} programId={step.programId} disabled={busy} onOpen={onOpenProgram} />}
+-      <AnimatePresence initial={false}>
+-        {expanded && (
+-          <motion.div
+-            className="routine-bar__body"
+-            initial={{ height: 0, opacity: 0 }}
+-            animate={{ height: 'auto', opacity: 1 }}
+-            exit={{ height: 0, opacity: 0 }}
+-            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+-          >
+-            {summary && <p className="routine-bar__summary">{summary}</p>}
+-            <div className="routine-bar__actions">
+-              <Pressable
+-                type="button"
+-                intensity="soft"
+-                haptic="light"
+-                hapticFeedback={hapticFeedback}
+-                disabled={busy}
+-                onClick={onPause}
+-                aria-label="Pause the routine"
+-              >
+-                <Pause aria-hidden />
+-                <span>Pause</span>
+-              </Pressable>
+-              <Pressable
+-                type="button"
+-                intensity="soft"
+-                haptic="success"
+-                hapticFeedback={hapticFeedback}
+-                className="is-primary"
+-                disabled={busy}
+-                onClick={onDone}
+-              >
+-                <Check aria-hidden />
+-                <span>{busy ? 'Saving…' : nextStep ? 'Done & next' : 'Finish item'}</span>
+-              </Pressable>
+-            </div>
+-            <details className="routine-bar__more">
+-              <summary>More options</summary>
+-              <div className="routine-bar__resources">
+-                <button type="button" disabled={busy} onClick={onOpenToday}>Today’s routine</button>
+-                <button type="button" disabled={busy} onClick={onSkip}>Skip item</button>
+-                {onReferences && <button type="button" disabled={busy} onClick={onReferences}>Change reference</button>}
+-                {onHistory && <button type="button" onClick={onHistory}>Item journal</button>}
+-                {onAdjustment && <button type="button" onClick={onAdjustment}>One adjustment</button>}
+-              </div>
+-              {onRememberSetup && <button type="button" className="routine-bar__remember" disabled={busy} onClick={() => { onRememberSetup(); setSetupRemembered(true) }}>{setupRemembered ? 'Starting setup saved' : 'Use these tool settings next time'}</button>}
+-            </details>
+-            {nextStep && (
+-              <p className="routine-bar__next">
+-                Next · {nextStep.title}
+-                {nextStep.minutes > 0 ? ` · ${nextStep.minutes} min` : ''}
+-              </p>
+-            )}
+-          </motion.div>
+-        )}
+-      </AnimatePresence>
+-
+-      <button
+-        type="button"
+-        className="routine-bar__resize"
+-        aria-label="Resize the routine bar"
+-        onPointerDown={startResize}
+-      />
+-    </motion.section>,
+-    document.body,
++        <span className="routine-bar__clock">{paused ? 'Paused' : goalMs ? `${formatElapsed(elapsed)} / ${formatElapsed(goalMs)}` : formatElapsed(elapsed)}</span>
++      </button>
++      <div className="routine-bar__actions">
++        <button type="button" disabled={busy} onClick={paused ? onResume : onPause} aria-label={paused ? 'Resume routine' : 'Pause routine'}>
++          {paused ? <Play aria-hidden /> : <Pause aria-hidden />}<span>{paused ? 'Play' : 'Pause'}</span>
++        </button>
++        <button type="button" className="is-primary" disabled={busy} onClick={onDone}>
++          <Check aria-hidden /><span>{busy ? 'Saving…' : nextStep ? 'Done & next' : 'Finish routine'}</span>
++        </button>
++      </div>
++    </motion.section>, document.body,
+   )
+ }
+diff --git a/src/components/labs/LabsMenu.tsx b/src/components/labs/LabsMenu.tsx
+index b3de16b..e050072 100644
+--- a/src/components/labs/LabsMenu.tsx
++++ b/src/components/labs/LabsMenu.tsx
+@@ -1,3 +1,4 @@
++import { characterUnlocked, CHARACTER_COSTS } from '../../utils/dailyChallenges'
+ import { useEffect, useMemo, useRef, useState } from 'react'
+ import { Check, ChevronRight } from 'lucide-react'
+ import balanceShot from '../../assets/games/balance.jpg'
+@@ -126,6 +127,7 @@ export default function LabsMenu({
+   const range = `${midiToBalanceNoteName(instrument.minWrittenMidi)}–${midiToBalanceNoteName(instrument.maxWrittenMidi)}`
+ 
+   const selectCharacter = (id: PracticeGameCharacterId) => {
++    if (!characterUnlocked(id)) return
+     setCharacterId(id)
+     savePracticeGameCharacter(id)
+     setPage('plaza')
+@@ -221,6 +223,7 @@ export default function LabsMenu({
+         <div className="balance-plaza__characters" role="radiogroup" aria-label="Game character">
+           {PRACTICE_GAME_CHARACTERS.map((option) => {
+             const selected = option.id === characterId
++            const unlocked = characterUnlocked(option.id)
+             return (
+               <Pressable
+                 key={option.id}
+@@ -230,7 +233,8 @@ export default function LabsMenu({
+                 className={`balance-plaza__character ${selected ? 'is-selected' : ''}`}
+                 role="radio"
+                 aria-checked={selected}
+-                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
++                disabled={!unlocked}
++                aria-label={unlocked ? `Use ${option.name} in Staff Jumper and Balance` : `${option.name}: unlock at ${CHARACTER_COSTS[option.id]} trophies`}
+                 onClick={() => selectCharacter(option.id)}
+               >
+                 <span className="balance-plaza__character-art" aria-hidden>
+@@ -238,6 +242,8 @@ export default function LabsMenu({
+                   {selected ? <Check /> : null}
+                 </span>
+                 <strong>{option.name}</strong>
++                <small>{option.instrument}</small>
++                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
+               </Pressable>
+             )
+           })}
+@@ -372,6 +378,7 @@ export default function LabsMenu({
+         <div className="balance-hall__roster" role="radiogroup" aria-label="Game character">
+           {PRACTICE_GAME_CHARACTERS.map((option) => {
+             const selected = option.id === characterId
++            const unlocked = characterUnlocked(option.id)
+             return (
+               <Pressable
+                 key={option.id}
+@@ -381,7 +388,8 @@ export default function LabsMenu({
+                 className={`balance-hall__roster-pick ${selected ? 'is-selected' : ''}`}
+                 role="radio"
+                 aria-checked={selected}
+-                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
++                disabled={!unlocked}
++                aria-label={unlocked ? `Use ${option.name} in Staff Jumper and Balance` : `${option.name}: unlock at ${CHARACTER_COSTS[option.id]} trophies`}
+                 onClick={() => selectCharacter(option.id)}
+               >
+                 <span aria-hidden>
+@@ -389,6 +397,8 @@ export default function LabsMenu({
+                   {selected ? <Check /> : null}
+                 </span>
+                 <strong>{option.name}</strong>
++                <small>{option.instrument}</small>
++                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
+               </Pressable>
+             )
+           })}
+diff --git a/src/components/labs/LabsOverlay.tsx b/src/components/labs/LabsOverlay.tsx
+index 1966a72..44bf20a 100644
+--- a/src/components/labs/LabsOverlay.tsx
++++ b/src/components/labs/LabsOverlay.tsx
+@@ -1,3 +1,4 @@
++import type { DailyChallengePlan } from '../../utils/dailyChallengePlan'
+ import { lazy, Suspense, useState } from 'react'
+ import type { GameMicRequest } from '../../labs/useGameMicRecovery'
+ import { createPortal } from 'react-dom'
+@@ -16,6 +17,7 @@ const LearnInstrumentScreen = lazy(
+ export type LabsRoute = 'menu' | 'staff-jumper' | 'balance' | 'learn-instrument'
+ 
+ interface LabsOverlayProps {
++  dailyChallenge?: DailyChallengePlan | null
+   isOpen: boolean
+   route: LabsRoute
+   streamRef: RefObject<MediaStream | null>
+@@ -32,6 +34,7 @@ interface LabsOverlayProps {
+ }
+ 
+ export default function LabsOverlay({
++  dailyChallenge,
+   isOpen,
+   route,
+   streamRef,
+@@ -192,6 +195,8 @@ export default function LabsOverlay({
+             />
+           ) : route === 'staff-jumper' ? (
+             <StaffJumperScreen
++              key={dailyChallenge?.date + ":" + dailyChallenge?.instrumentId}
++              dailyChallenge={dailyChallenge?.game.route === 'staff-jumper' ? dailyChallenge : null}
+               streamRef={streamRef}
+               streamGeneration={streamGeneration}
+               tunerInstrument={tunerInstrument}
+@@ -202,6 +207,8 @@ export default function LabsOverlay({
+           ) : route === 'balance' ? (
+             <Suspense fallback={<div className="balance-route-loading" role="status">Opening Balance…</div>}>
+               <BalanceScreen
++                key={dailyChallenge?.date + ":" + dailyChallenge?.instrumentId}
++                dailyChallenge={dailyChallenge?.game.route === 'balance' ? dailyChallenge : null}
+                 streamRef={streamRef}
+                 streamGeneration={streamGeneration}
+                 tunerInstrument={tunerInstrument}
+diff --git a/src/hooks/useAutoSoundRecording.ts b/src/hooks/useAutoSoundRecording.ts
+index 6bc7e02..b7efab3 100644
+--- a/src/hooks/useAutoSoundRecording.ts
++++ b/src/hooks/useAutoSoundRecording.ts
+@@ -1,3 +1,4 @@
++import { createHandsFreeSilence } from '../utils/handsFreeSilence'
+ import { advanceAutoStart } from '../utils/autoStartGate'
+ import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
+ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+@@ -161,6 +162,9 @@ export function useAutoSoundRecording({
+   const healthTimerRef = useRef<number | null>(null)
+   const startFailureTimerRef = useRef<number | null>(null)
+   const silenceSinceRef = useRef<number | null>(null)
++  const silenceGateRef = useRef(createHandsFreeSilence())
++  const [replayCountdown, setReplayCountdown] = useState<number | null>(null)
++  const stopRequestedRef = useRef(false)
+   const loudSinceRef = useRef<number | null>(null)
+   const attackSinceRef = useRef<number | null>(null)
+   const recordingStartedAtRef = useRef<number | null>(null)
+@@ -297,6 +301,8 @@ export function useAutoSoundRecording({
+       // Native audio has been writing the hidden pre-roll already. The visible
+       // take, its minimum length, and silence timeout all begin at the actual
+       // performance trigger instead of at pre-roll startup.
++      silenceGateRef.current.reset()
++      stopRequestedRef.current = false
+       recordingStartedAtRef.current = performance.now()
+       silenceSinceRef.current = null
+       setHandsFreeRecording(true)
+@@ -319,6 +325,8 @@ export function useAutoSoundRecording({
+     }
+ 
+     autoTriggeredRef.current = true
++    silenceGateRef.current.reset()
++    stopRequestedRef.current = false
+     recordingStartedAtRef.current = performance.now()
+     silenceSinceRef.current = null
+     setHandsFreeRecording(true)
+@@ -341,6 +349,8 @@ export function useAutoSoundRecording({
+ 
+     pendingPerformanceGateRef.current = false
+     autoTriggeredRef.current = true
++    silenceGateRef.current.reset()
++    stopRequestedRef.current = false
+     recordingStartedAtRef.current = performance.now()
+     silenceSinceRef.current = null
+     setHandsFreeRecording(true)
+@@ -360,48 +370,37 @@ export function useAutoSoundRecording({
+     setHandsFreeListeningReady(ready)
+   }
+ 
++  const finishHandsFreeTake = () => {
++    if (!isRecordingRef.current || stopRequestedRef.current) return
++    stopRequestedRef.current = true
++    setReplayCountdown(null)
++    silenceGateRef.current.reset()
++    // Register replay intent before stop delivers the finalized take.
++    onFinishedRef.current()
++    autoTriggeredRef.current = false
++    recordingStartedAtRef.current = null
++    cooldownUntilRef.current = performance.now() + COOLDOWN_MS
++    stopRecordingRef.current()
++  }
++
+   const maybeAutoStopFromSilence = (
+-    metrics: { rms: number; peak: number },
+-    now: number
++    metrics: { rms: number; peak: number }, now: number, frameMs: number,
+   ): boolean => {
+-    if (!autoTriggeredRef.current || !isRecordingRef.current) return false
+-
++    if (!autoTriggeredRef.current || !isRecordingRef.current || stopRequestedRef.current) return false
+     const profile = profileRef.current
+     const gateLevel = profile.usePeak
+-      ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45)
+-      : metrics.rms
++      ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45) : metrics.rms
+     const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
+-
+-    if (recordingStartedAtRef.current === null) {
+-      recordingStartedAtRef.current = now
+-    }
+-
+-    const recordingDuration = now - recordingStartedAtRef.current
++    if (recordingStartedAtRef.current === null) recordingStartedAtRef.current = now
++    if (now - recordingStartedAtRef.current < MIN_RECORDING_MS) return false
+     const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
+     const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
+-    const stillLoud =
+-      !metronomeTransient &&
++    const loud = !metronomeTransient &&
+       (metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate)
+-
+-    if (stillLoud) {
+-      silenceSinceRef.current = null
+-      return false
+-    }
+-    if (recordingDuration < MIN_RECORDING_MS) return false
+-
+-    if (silenceSinceRef.current === null) {
+-      silenceSinceRef.current = now
+-      if (silenceMsRef.current > 0) return false
+-    }
+-    if (now - silenceSinceRef.current < silenceMsRef.current) return false
+-
+-    console.info('[AutoSound] autoStop (silence detected)')
+-    onFinishedRef.current()
+-    autoTriggeredRef.current = false
+-    recordingStartedAtRef.current = null
+-    silenceSinceRef.current = null
+-    cooldownUntilRef.current = now + COOLDOWN_MS
+-    stopRecordingRef.current()
++    const decision = silenceGateRef.current.sample(now, loud, silenceMsRef.current, frameMs)
++    setReplayCountdown(decision.remainingSeconds)
++    if (!decision.stop) return false
++    finishHandsFreeTake()
+     return true
+   }
+ 
+@@ -450,6 +449,8 @@ export function useAutoSoundRecording({
+     loudSinceRef.current = null
+     attackSinceRef.current = null
+     if (!preserve) {
++      silenceGateRef.current.reset()
++      setReplayCountdown(null)
+       recordingStartedAtRef.current = null
+       if (!startLatchRef.current) {
+         autoTriggeredRef.current = false
+@@ -480,6 +481,8 @@ export function useAutoSoundRecording({
+ 
+   useEffect(() => {
+     if (isRecording) {
++      if (!wasRecordingRef.current) stopRequestedRef.current = false
++      wasRecordingRef.current = true
+       clearStartLatch()
+       return
+     }
+@@ -575,7 +578,7 @@ export function useAutoSoundRecording({
+       const isNativePath = path === 'native-tap'
+       nativeTapReadyRef.current = false
+       setMonitorReady(false)
+-      let nativeFrameRef: { buffer: Float32Array; timestamp: number } | null = null
++      let nativeFrameRef: { buffer: Float32Array; timestamp: number; durationMs: number } | null = null
+       const readFrameFreshness = createAudioFrameFreshness()
+       const setupStartedAt = performance.now()
+       // When levels actually began flowing. Native frames only start once
+@@ -611,6 +614,7 @@ export function useAutoSoundRecording({
+             if (cancelled) return
+             nativeFrameRef = {
+               buffer: chunk.samples,
++              durationMs: chunk.samples.length / chunk.sampleRate * 1000,
+               timestamp: performance.now(),
+             }
+           })) ?? null
+@@ -732,7 +736,6 @@ export function useAutoSoundRecording({
+             // Missing audio is neither sustained playing nor sustained silence.
+             loudSinceRef.current = null
+             attackSinceRef.current = null
+-            silenceSinceRef.current = null
+             quietFramesSeen = 0
+           }
+           if (frame && (freshness === 'fresh' || freshness === 'gap')) {
+@@ -855,7 +858,7 @@ export function useAutoSoundRecording({
+         attackSinceRef.current = null
+ 
+         if (!autoTriggeredRef.current) return
+-        if (maybeAutoStopFromSilence(metrics, now)) {
++        if (maybeAutoStopFromSilence(metrics, now, useNativeMetrics ? (nativeFrameRef?.durationMs ?? 0) : POLL_INTERVAL_MS)) {
+           // Each new take must earn a fresh quiet baseline after cooldown.
+           armed = false
+           quietFramesSeen = 0
+@@ -1018,5 +1021,7 @@ export function useAutoSoundRecording({
+     handsFreeRecording: handsFreeRecording && isRecording,
+     handsFreeListeningReady: handsFreeListeningReady && shouldMonitor && !suppressStart,
+     restartHandsFreeMonitor,
++    replayCountdown: isRecording ? replayCountdown : null,
++    finishHandsFreeTake,
+   }
+ }
+diff --git a/src/hooks/useDrone.ts b/src/hooks/useDrone.ts
+index 1c92adf..14ed5a0 100644
+--- a/src/hooks/useDrone.ts
++++ b/src/hooks/useDrone.ts
+@@ -58,6 +58,7 @@ let commandSequence = 0
+ let restored = false
+ let recoveryListenerAttached = false
+ let pendingStopTimer: number | null = null
++let recoveryInFlight: Promise<void> | null = null
+ 
+ function emit(): void {
+   for (const listener of listeners) listener()
+@@ -92,10 +93,14 @@ function getSnapshot(): DronePrefs {
+   return prefs
+ }
+ 
+-async function syncFromNative(): Promise<void> {
+-  if (!isDroneNativeAvailable()) return
+-  const state = await droneGetState()
+-  commit(fromNative(state))
++async function syncFromNative(sequence = commandSequence): Promise<void> {
++  if (!isDroneNativeAvailable() || sequence !== commandSequence) return
++  try {
++    const state = await droneGetState()
++    if (sequence === commandSequence) commit(fromNative(state))
++  } catch (error) {
++    console.warn('[Drone] state refresh failed', error)
++  }
+ }
+ 
+ function runNative<T extends DroneState>(
+@@ -197,16 +202,22 @@ function attachRecoveryListener(): void {
+   if (recoveryListenerAttached || typeof window === 'undefined') return
+   recoveryListenerAttached = true
+   window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, () => {
+-    if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0) return
+-    void droneStart()
+-      .then(() => syncFromNative())
++    if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0 || recoveryInFlight) return
++    const sequence = commandSequence
++    const recovery = droneStart()
++      .then(() => syncFromNative(sequence))
+       .catch(() => {})
++    recoveryInFlight = recovery
++    void recovery.then(() => {
++      if (recoveryInFlight === recovery) recoveryInFlight = null
++    })
+   })
+ }
+ 
+ function restoreOnce(volume: number, waveform: DroneWaveform): void {
+   if (restored || !isDroneNativeAvailable()) return
+   restored = true
++  const sequence = ++commandSequence
+   const saved = loadDronePrefs()
+   void droneRestoreState({
+     activeNotes: [],
+@@ -214,7 +225,11 @@ function restoreOnce(volume: number, waveform: DroneWaveform): void {
+     volume,
+     waveform,
+   }).then((state) => {
++    if (sequence !== commandSequence) return
+     commit(fromNative(state, { ...prefs, lastPitchClass: saved.lastPitchClass }))
++  }).catch((error) => {
++    restored = false
++    console.warn('[Drone] initial restore failed', error)
+   })
+ }
+ 
+@@ -239,9 +254,7 @@ function release(): void {
+   pendingStopTimer = window.setTimeout(() => {
+     pendingStopTimer = null
+     if (subscriberCount > 0) return
+-    void droneStop().then((state) => {
+-      commit({ ...fromNative(state), activeNotes: [], enabled: false })
+-    })
++    runNative({ ...prefs, activeNotes: [], enabled: false }, () => droneStop())
+   }, 600)
+ }
+ 
+diff --git a/src/hooks/useLivePitchTracker.ts b/src/hooks/useLivePitchTracker.ts
+index 1ad97cf..b79789b 100644
+--- a/src/hooks/useLivePitchTracker.ts
++++ b/src/hooks/useLivePitchTracker.ts
+@@ -49,7 +49,17 @@ import {
+   subscribeNativeCaptureSessionActive,
+ } from '../utils/cameraSessionState'
+ const HISTORY_LENGTH = 140
+-const LIVING_TRACE_HISTORY_LENGTH = 110
++const LIVING_TRACE_HISTORY_LENGTH = 110
++
++/**
++ * Tuner trace stroke, in CSS px — one width for every profile.
++ *
++ * Voice reads thinner than winds at the same stroke because it spends more of
++ * a phrase near the silence floor, where the trace is broken into short
++ * segments. Drawing it heavier keeps it a line there too.
++ */
++const LIVING_TRACE_CORE_WIDTH = 3.3
++const LIVING_TRACE_GLOW_WIDTH = 6.6
+ const LIVING_TRACE_MAX_STEP_CENTS = 8
+ const LIVING_TRACE_END_BLEND_MAX = 0.42
+ 
+@@ -957,8 +967,8 @@ function drawSmoothPitchTrace(
+   if (points.length < 2) return
+ 
+   if (theme === 'living-audio') {
+-    drawColoredTraceSegments(ctx, points, 5.5, 0.14, true)
+-    drawColoredTraceSegments(ctx, points, 2.65, 0.98)
++    drawColoredTraceSegments(ctx, points, LIVING_TRACE_GLOW_WIDTH, 0.14, true)
++    drawColoredTraceSegments(ctx, points, LIVING_TRACE_CORE_WIDTH, 0.98)
+     return
+   }
+ 
+diff --git a/src/index.css b/src/index.css
+index 8d083d5..f92a018 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -9979,3 +9979,47 @@ html.app-dark-mode .hands-free-card__stepper {
+ .app-shell--audio-mode .metronome-widget .pitch-widget-close svg {
+   color: var(--audio-text-secondary, #6c7077);
+ }
++
++/* Hands-free actions remain reachable above camera and workspace content. */
++.hands-free-stage__action {
++  pointer-events: auto;
++  min-height: 44px;
++  padding: 8px 16px;
++  border: 1px solid currentColor;
++  border-radius: 12px;
++  background: rgba(12, 16, 24, .78);
++  color: #fff;
++  font: inherit;
++  font-size: 12px;
++  cursor: pointer;
++}
++.hands-free-stage--countdown { --hands-free-accent: 125, 211, 252; }
++.hands-free-stage--saving { --hands-free-accent: 180, 190, 205; }
++.hands-free-stage--chip .hands-free-stage__action { margin-left: 8px; padding: 6px 10px; }
++.hands-free-stage__action:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
++.hands-free-stage--chip .hands-free-stage__center {
++  flex-wrap: wrap;
++  justify-content: center;
++  align-items: center;
++  border-radius: 16px;
++}
++.hands-free-stage--chip .hands-free-stage__detail {
++  flex-basis: 100%;
++  order: 3;
++  white-space: normal;
++  line-height: 1.4;
++}
++
++.routine-bar--simple {
++  position: fixed;
++  top: calc(env(safe-area-inset-top) + 80px);
++  left: 12px;
++  right: 12px;
++  width: auto;
++  max-width: 440px;
++  margin: 0 auto;
++  padding: 10px;
++}
++.routine-bar--simple .routine-bar__line { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; }
++.routine-bar--simple .routine-bar__actions { margin-top: 8px; }
++.routine-bar--simple .routine-bar__actions button { min-height: 44px; }
+diff --git a/src/labs/balance/BalanceHome.tsx b/src/labs/balance/BalanceHome.tsx
+index 3977fde..9e0d3b3 100644
+--- a/src/labs/balance/BalanceHome.tsx
++++ b/src/labs/balance/BalanceHome.tsx
+@@ -1,5 +1,5 @@
+ import { useMemo } from 'react'
+-import { ChevronRight, CircleCheck, Flame, Map, Play, Trophy } from 'lucide-react'
++import { ChevronRight, CircleCheck, Flame, Play, Trophy } from 'lucide-react'
+ import Pressable from '../../components/ui/Pressable'
+ import BalanceArcadeShell from './BalanceArcadeShell'
+ import { getBalanceCharacter, type BalanceCharacterId } from './balanceCharacters'
+@@ -9,21 +9,15 @@ import {
+   balanceDailyIsComplete,
+   balanceDayKey,
+ } from './balanceDaily'
+-import {
+-  balanceNextLevel,
+-  balanceTotalStars,
+-  BALANCE_MAX_STARS,
+-} from './balanceLevels'
+ import { getBalanceInstrument } from './balanceInstruments'
+ import { midiToBalanceNoteName } from './balanceMusic'
+ import { formatBalanceDuration } from './balanceStorage'
+-import type { BalanceDailyProgress, BalanceLevelProgress } from './balanceTypes'
++import type { BalanceDailyProgress } from './balanceTypes'
+ import { BALANCE_TROPHIES } from './balanceTrophies'
+ 
+ interface BalanceHomeProps {
+   instrumentId: string
+   characterId: BalanceCharacterId
+-  levels: Record<string, BalanceLevelProgress>
+   daily: BalanceDailyProgress
+   trophyCount: number
+   bestBalancedMs: number
+@@ -31,20 +25,22 @@ interface BalanceHomeProps {
+   onBack: () => void
+   onStartDaily: () => void
+   onQuickPlay: () => void
+-  onTrail: () => void
+   onTrophies: () => void
+   onInstrument: () => void
+ }
+ 
+ /**
+- * The landing screen: today's challenge, the streak it feeds, and the two ways
+- * further in. A player who opens the game with two minutes to spare should be
+- * able to press one button and be playing.
++ * The landing screen.
++ *
++ * Quick Play is the game — one enormous button, already set up for the
++ * instrument chosen when the app was first opened, so a player with two
++ * minutes can press once and be playing. Today's challenge sits under it as
++ * the reason to come back, and the streak and the trophy case are the whole of
++ * the progression now that the Sky Trail is gone.
+  */
+ export default function BalanceHome({
+   instrumentId,
+   characterId,
+-  levels,
+   daily,
+   trophyCount,
+   bestBalancedMs,
+@@ -52,7 +48,6 @@ export default function BalanceHome({
+   onBack,
+   onStartDaily,
+   onQuickPlay,
+-  onTrail,
+   onTrophies,
+   onInstrument,
+ }: BalanceHomeProps) {
+@@ -63,8 +58,6 @@ export default function BalanceHome({
+   )
+   const streak = balanceCurrentStreak(daily, dayKey)
+   const doneToday = balanceDailyIsComplete(daily, dayKey)
+-  const nextLevel = balanceNextLevel(levels)
+-  const totalStars = balanceTotalStars(levels)
+   const character = getBalanceCharacter(characterId)
+   const instrument = getBalanceInstrument(instrumentId)
+ 
+@@ -81,7 +74,7 @@ export default function BalanceHome({
+       stat={bestBalancedMs > 0 ? { label: 'Best', value: formatBalanceDuration(bestBalancedMs) } : null}
+       className="balance-arcade--home"
+     >
+-      <h1 className="balance-display balance-display--page">Today&apos;s Challenge</h1>
++      <h1 className="balance-display balance-display--page">Balance</h1>
+ 
+       {/*
+         * The instrument sits above everything, because it decides every note
+@@ -114,7 +107,24 @@ export default function BalanceHome({
+         <b aria-hidden /><b aria-hidden /><b aria-hidden />
+       </div>
+ 
++      {/* Quick Play first and biggest: it is the game, and it is already set
++        * up for the instrument above, so there is nothing to decide before
++        * playing. The challenge is the reason to come back tomorrow, not the
++        * thing standing between the player and a note. */}
+       <section className="balance-card balance-home__challenge">
++        <Pressable
++          haptic="medium"
++          hapticFeedback={hapticFeedback}
++          className="balance-cta"
++          onClick={onQuickPlay}
++        >
++          <Play aria-hidden /> Quick Play
++        </Pressable>
++        <p className="balance-card__line">Hold your note. Reach the flag.</p>
++      </section>
++
++      <section className="balance-card balance-home__challenge">
++        <span className="balance-pill">Today&apos;s Challenge</span>
+         <h2 className="balance-card__title">{challenge.name}</h2>
+         <p className="balance-card__line">{challenge.objective}</p>
+ 
+@@ -124,23 +134,14 @@ export default function BalanceHome({
+           </p>
+         ) : (
+           <Pressable
+-            haptic="medium"
++            intensity="soft"
+             hapticFeedback={hapticFeedback}
+-            className="balance-cta"
++            className="balance-cta balance-cta--blue balance-cta--small"
+             onClick={onStartDaily}
+           >
+-            <Play aria-hidden /> Start Challenge
++            Start Challenge
+           </Pressable>
+         )}
+-
+-        <Pressable
+-          intensity="soft"
+-          hapticFeedback={hapticFeedback}
+-          className="balance-textlink"
+-          onClick={onQuickPlay}
+-        >
+-          Quick Play
+-        </Pressable>
+       </section>
+ 
+       <p className={`balance-streak ${streak === 0 ? 'is-cold' : ''}`}>
+@@ -158,18 +159,7 @@ export default function BalanceHome({
+         </strong>
+       </p>
+ 
+-      <div className="balance-home__nav">
+-        <Pressable
+-          intensity="soft"
+-          hapticFeedback={hapticFeedback}
+-          className="balance-tile"
+-          onClick={onTrail}
+-        >
+-          <span className="balance-tile__icon" aria-hidden><Map /></span>
+-          <strong>Sky Trail</strong>
+-          <small>Level {nextLevel.number} · {totalStars}/{BALANCE_MAX_STARS} ★</small>
+-        </Pressable>
+-
++      <div className="balance-home__nav balance-home__nav--single">
+         <Pressable
+           intensity="soft"
+           hapticFeedback={hapticFeedback}
+diff --git a/src/labs/balance/BalanceLevelResults.tsx b/src/labs/balance/BalanceLevelResults.tsx
+deleted file mode 100644
+index 476482f..0000000
+--- a/src/labs/balance/BalanceLevelResults.tsx
++++ /dev/null
+@@ -1,200 +0,0 @@
+-import { ChevronRight, Flame, Map, RotateCcw, Trophy } from 'lucide-react'
+-import Pressable from '../../components/ui/Pressable'
+-import BalanceArcadeShell from './BalanceArcadeShell'
+-import BalanceStars from './BalanceStars'
+-import { getBalanceCharacter } from './balanceCharacters'
+-import { getBalanceTrophy } from './balanceTrophies'
+-import { formatBalanceDuration } from './balanceStorage'
+-import type { BalanceLaunch, BalanceRoutineResult, BalanceTrophyId } from './balanceTypes'
+-import type { BalanceLevel } from './balanceLevels'
+-
+-interface BalanceLevelResultsProps {
+-  launch: BalanceLaunch
+-  level: BalanceLevel | null
+-  result: BalanceRoutineResult
+-  earnedStars: number
+-  previousStars: number
+-  newTrophyIds: BalanceTrophyId[]
+-  streak: number
+-  nextLevel: BalanceLevel | null
+-  hapticFeedback: boolean
+-  onReplay: () => void
+-  onNextLevel: () => void
+-  onTrail: () => void
+-  onHome: () => void
+-}
+-
+-/**
+- * The award screen for a level or the daily challenge.
+- *
+- * Star count is the headline because it is what the trail remembers; the three
+- * numbers under it are the ones a player can actually act on next time —
+- * whether they finished, how much of the sound was in the window, and how long
+- * they held it in total.
+- */
+-export default function BalanceLevelResults({
+-  launch,
+-  level,
+-  result,
+-  earnedStars,
+-  previousStars,
+-  newTrophyIds,
+-  streak,
+-  nextLevel,
+-  hapticFeedback,
+-  onReplay,
+-  onNextLevel,
+-  onTrail,
+-  onHome,
+-}: BalanceLevelResultsProps) {
+-  const isDaily = launch.kind === 'daily'
+-  const cleared = result.completed
+-  const beatBest = earnedStars > previousStars
+-
+-  const verdict = isDaily
+-    ? cleared ? 'Challenge complete' : 'Not this time'
+-    : cleared
+-      ? earnedStars === 3 ? 'Perfect crossing' : 'Level cleared'
+-      : 'Level failed'
+-
+-  const nextThreshold = level
+-    ? earnedStars >= 3
+-      ? null
+-      : earnedStars === 2
+-        ? level.threeStarPercent
+-        : level.twoStarPercent
+-    : null
+-
+-  return (
+-    <BalanceArcadeShell
+-      title={isDaily ? "Today's Challenge" : `Level ${level?.number ?? ''}`}
+-      hapticFeedback={hapticFeedback}
+-      onBack={onHome}
+-      backLabel="Back to Balance home"
+-      className="balance-arcade--award"
+-    >
+-      <div className="balance-arcade__spacer" />
+-
+-      <section className="balance-card balance-award">
+-        <span className="balance-pill">{isDaily ? launch.title : level?.name ?? 'Balance'}</span>
+-
+-        {isDaily ? (
+-          <span className="balance-award__stars" aria-hidden>
+-            <span className="balance-streak__flame" style={{ width: '3.2rem', height: '3.2rem' }}>
+-              <Flame style={{ width: '1.9rem', height: '1.9rem' }} />
+-            </span>
+-          </span>
+-        ) : (
+-          <BalanceStars earned={earnedStars} className="balance-award__stars" />
+-        )}
+-
+-        <h1 className="balance-award__verdict">{verdict}</h1>
+-
+-        {isDaily && cleared ? (
+-          <p className="balance-card__line" style={{ margin: 0 }}>
+-            {streak === 1 ? 'Streak started' : `${streak} day streak`}
+-          </p>
+-        ) : beatBest && previousStars > 0 ? (
+-          <p className="balance-card__line" style={{ margin: 0 }}>
+-            New best — up from {previousStars} star{previousStars === 1 ? '' : 's'}
+-          </p>
+-        ) : nextThreshold !== null && cleared ? (
+-          <p className="balance-card__line" style={{ margin: 0 }}>
+-            {nextThreshold}% centered earns the next star
+-          </p>
+-        ) : !cleared ? (
+-          <p className="balance-card__line" style={{ margin: 0 }}>
+-            {result.notesCompleted} of {result.noteResults.length || 1} notes held to the goal
+-          </p>
+-        ) : null}
+-
+-        <dl className="balance-award__stats">
+-          <div>
+-            <dt>Notes</dt>
+-            <dd>{result.notesCompleted}/{result.noteResults.length}</dd>
+-          </div>
+-          <div>
+-            <dt>Centered</dt>
+-            <dd>{Math.round(result.centeredPercent)}%</dd>
+-          </div>
+-          <div>
+-            <dt>Balanced</dt>
+-            <dd>{formatBalanceDuration(result.totalBalancedMs)}</dd>
+-          </div>
+-        </dl>
+-
+-        {newTrophyIds.length > 0 && (
+-          <section className="balance-award__unlocks" aria-live="polite">
+-            <header><Trophy aria-hidden /> {newTrophyIds.length === 1 ? 'New trophy' : 'New trophies'}</header>
+-            {newTrophyIds.map((id) => {
+-              const trophy = getBalanceTrophy(id)
+-              const reward = trophy.characterReward
+-                ? getBalanceCharacter(trophy.characterReward).name
+-                : null
+-              return (
+-                <div key={id}>
+-                  <strong>{trophy.title}</strong>
+-                  <small>{reward ? `${trophy.description} · ${reward} unlocked` : trophy.description}</small>
+-                </div>
+-              )
+-            })}
+-          </section>
+-        )}
+-
+-        <div className="balance-award__actions">
+-          {cleared && !isDaily && nextLevel ? (
+-            <>
+-              <Pressable
+-                haptic="medium"
+-                hapticFeedback={hapticFeedback}
+-                className="balance-cta"
+-                onClick={onNextLevel}
+-              >
+-                Next level <ChevronRight aria-hidden />
+-              </Pressable>
+-              <div className="balance-award__next">
+-                <Pressable
+-                  intensity="soft"
+-                  hapticFeedback={hapticFeedback}
+-                  className="balance-cta balance-cta--blue balance-cta--small"
+-                  onClick={onReplay}
+-                >
+-                  <RotateCcw aria-hidden /> Retry
+-                </Pressable>
+-                <Pressable
+-                  intensity="soft"
+-                  hapticFeedback={hapticFeedback}
+-                  className="balance-cta balance-cta--blue balance-cta--small"
+-                  onClick={onTrail}
+-                >
+-                  <Map aria-hidden /> Trail
+-                </Pressable>
+-              </div>
+-            </>
+-          ) : (
+-            <>
+-              <Pressable
+-                haptic="medium"
+-                hapticFeedback={hapticFeedback}
+-                className="balance-cta"
+-                onClick={onReplay}
+-              >
+-                <RotateCcw aria-hidden /> {cleared ? 'Play again' : 'Try again'}
+-              </Pressable>
+-              <Pressable
+-                intensity="soft"
+-                hapticFeedback={hapticFeedback}
+-                className="balance-cta balance-cta--blue balance-cta--small"
+-                onClick={isDaily ? onHome : onTrail}
+-              >
+-                {isDaily ? 'Home' : <><Map aria-hidden /> Back to trail</>}
+-              </Pressable>
+-            </>
+-          )}
+-        </div>
+-      </section>
+-
+-      <div className="balance-arcade__spacer" />
+-    </BalanceArcadeShell>
+-  )
+-}
+diff --git a/src/labs/balance/BalanceScreen.tsx b/src/labs/balance/BalanceScreen.tsx
+index 7ddae65..2f5826e 100644
+--- a/src/labs/balance/BalanceScreen.tsx
++++ b/src/labs/balance/BalanceScreen.tsx
+@@ -1,3 +1,4 @@
++import type { DailyChallengePlan } from '../../utils/dailyChallengePlan'
+ import {
+   useCallback,
+   useEffect,
+@@ -17,13 +18,12 @@ import Pressable from '../../components/ui/Pressable'
+ import BalanceArcadeShell from './BalanceArcadeShell'
+ import BalanceHome from './BalanceHome'
+ import BalanceInstrumentPicker from './BalanceInstrumentPicker'
+-import BalanceLevelResults from './BalanceLevelResults'
++import BalanceDailyResults from './BalanceDailyResults'
+ import BalanceQuickPlay from './BalanceQuickPlay'
+ import BalanceResults from './BalanceResults'
+ import BalanceScene from './BalanceScene'
+ import BalanceStaffNote from './BalanceStaffNote'
+ import BalanceSetup from './BalanceSetup'
+-import BalanceTrail from './BalanceTrail'
+ import BalanceTrophyCase from './BalanceTrophyCase'
+ import {
+   buildBalanceTargets,
+@@ -37,12 +37,6 @@ import {
+   balanceDailyChallenge,
+   balanceDailyLaunch,
+ } from './balanceDaily'
+-import {
+-  balanceLevelLaunch,
+-  getBalanceLevel,
+-  BALANCE_LEVELS,
+-  type BalanceLevel,
+-} from './balanceLevels'
+ import { centsFromConcertTarget } from './balanceScoring'
+ import { formatBalanceDuration } from './balanceStorage'
+ import { balanceInstrumentSettings, QUICK_PLAY_LAUNCH, useBalanceGame } from './useBalanceGame'
+@@ -50,9 +44,10 @@ import './balance.css'
+ import './balance-arcade.css'
+ 
+ /** Where the player is when no run is in progress. */
+-type BalanceRoute = 'home' | 'trail' | 'quick' | 'options' | 'trophies' | 'instrument'
++type BalanceRoute = 'home' | 'quick' | 'options' | 'trophies' | 'instrument'
+ 
+ interface BalanceScreenProps {
++  dailyChallenge?: DailyChallengePlan | null
+   streamRef: RefObject<MediaStream | null>
+   streamGeneration: number
+   tunerInstrument: TunerInstrument
+@@ -65,6 +60,7 @@ interface BalanceScreenProps {
+ }
+ 
+ export default function BalanceScreen({
++  dailyChallenge,
+   streamRef,
+   streamGeneration,
+   tunerInstrument,
+@@ -94,7 +90,7 @@ export default function BalanceScreen({
+   })
+   const selectedInstrument = balanceInstrumentSettings(game.state.settings.instrumentId)
+   /*
+-   * Home, the trail and the trophy case have nothing to listen for, so the
++   * Home and the trophy case have nothing to listen for, so the
+    * microphone only comes up on the two screens that show a live readout and
+    * for the run itself. Holding it open across the whole menu tree drained the
+    * battery for nothing.
+@@ -195,14 +191,6 @@ export default function BalanceScreen({
+     [game.customRoutines, game.state.settings],
+   )
+ 
+-  const startLevel = useCallback(
+-    (level: BalanceLevel) => {
+-      onRequestMicStream()
+-      gameRef.current.start(balanceLevelLaunch(level, gameRef.current.state.settings.instrumentId))
+-    },
+-    [onRequestMicStream],
+-  )
+-
+   const startDaily = useCallback(() => {
+     onRequestMicStream()
+     const settings = gameRef.current.state.settings
+@@ -220,13 +208,23 @@ export default function BalanceScreen({
+     setRoute(next)
+   }, [])
+ 
++  if (game.state.phase === 'setup' && dailyChallenge) {
++    return <BalanceArcadeShell title="Today’s challenge" hapticFeedback={hapticFeedback} onBack={onBack} backLabel="Back to Games">
++      <div className="challenge-game-ready">
++        <span>{dailyChallenge.instrumentLabel} · +1 trophy</span>
++        <h1>{dailyChallenge.game.title}</h1>
++        <p>{dailyChallenge.game.objective}</p>
++        <button className="balance-cta" onClick={() => { onRequestMicStream(); game.start({ ...dailyChallenge.game.balance, instrumentId: dailyChallenge.game.instrumentId }) }}>Start challenge</button>
++        <small>Your normal game settings stay saved.</small>
++      </div>
++    </BalanceArcadeShell>
++  }
+   if (game.state.phase === 'setup') {
+     if (route === 'home') {
+       return (
+         <BalanceHome
+           instrumentId={game.state.settings.instrumentId}
+           characterId={game.state.settings.characterId}
+-          levels={game.data.levels}
+           daily={game.data.daily}
+           trophyCount={Object.keys(game.data.trophies).length}
+           bestBalancedMs={game.state.bestBalancedMs}
+@@ -234,25 +232,12 @@ export default function BalanceScreen({
+           onBack={onBack}
+           onStartDaily={startDaily}
+           onQuickPlay={() => setRoute('quick')}
+-          onTrail={() => setRoute('trail')}
+           onTrophies={() => setRoute('trophies')}
+           onInstrument={() => setRoute('instrument')}
+         />
+       )
+     }
+ 
+-    if (route === 'trail') {
+-      return (
+-        <BalanceTrail
+-          instrumentId={game.state.settings.instrumentId}
+-          levels={game.data.levels}
+-          hapticFeedback={hapticFeedback}
+-          onBack={() => setRoute('home')}
+-          onPlayLevel={startLevel}
+-        />
+-      )
+-    }
+-
+     if (route === 'instrument') {
+       return (
+         <BalanceInstrumentPicker
+@@ -341,22 +326,14 @@ export default function BalanceScreen({
+ 
+   if (game.state.phase === 'routineResults' && game.routineResult) {
+     if (game.launch.kind !== 'quick') {
+-      const level = game.launch.id ? getBalanceLevel(game.launch.id) : null
+-      const nextLevel = level ? BALANCE_LEVELS[level.number] ?? null : null
+       return (
+-        <BalanceLevelResults
++        <BalanceDailyResults
+           launch={game.launch}
+-          level={level}
+           result={game.routineResult}
+-          earnedStars={game.levelAward?.earnedStars ?? 0}
+-          previousStars={game.levelAward?.previousStars ?? 0}
+           newTrophyIds={game.newTrophyIds}
+           streak={balanceCurrentStreak(game.data.daily)}
+-          nextLevel={nextLevel}
+           hapticFeedback={hapticFeedback}
+           onReplay={() => game.start()}
+-          onNextLevel={() => nextLevel && startLevel(nextLevel)}
+-          onTrail={() => goTo('trail')}
+           onHome={() => goTo('home')}
+         />
+       )
+@@ -377,18 +354,12 @@ export default function BalanceScreen({
+   const staffClef = getBalanceInstrument(game.state.settings.instrumentId).clef
+ 
+   /** What the run is, for the bars and cards shown while it is in progress. */
+-  const runTitle =
+-    game.launch.kind === 'level'
+-      ? `Level ${getBalanceLevel(game.launch.id ?? '')?.number ?? ''} · ${game.launch.title}`
+-      : game.launch.kind === 'daily'
+-        ? game.launch.title
+-        : 'Balance'
++  const runTitle = game.launch.kind === 'daily' ? game.launch.title : 'Balance'
+ 
+   /*
+    * Pause / stopped / error share one card. `game.reset` returns to the setup
+    * phase, and `route` is still whichever screen launched the run, so "Quit"
+-   * lands the player back on the trail or on Quick Play without extra
+-   * bookkeeping.
++   * lands the player back on Home or on Quick Play without extra bookkeeping.
+    */
+   if (game.state.phase === 'paused' || game.state.phase === 'stopped' || game.state.phase === 'error') {
+     const paused = game.state.phase === 'paused'
+diff --git a/src/labs/balance/BalanceStars.tsx b/src/labs/balance/BalanceStars.tsx
+deleted file mode 100644
+index 9e48f17..0000000
+--- a/src/labs/balance/BalanceStars.tsx
++++ /dev/null
+@@ -1,22 +0,0 @@
+-import { Star } from 'lucide-react'
+-
+-interface BalanceStarsProps {
+-  earned: number
+-  total?: number
+-  className?: string
+-}
+-
+-/**
+- * The three-star row. Filled stars are drawn with `fill` and no stroke so they
+- * read as solid game stars rather than outlined icons; empty ones keep the
+- * same silhouette in grey so the row never changes width.
+- */
+-export default function BalanceStars({ earned, total = 3, className = '' }: BalanceStarsProps) {
+-  return (
+-    <span className={className} aria-label={`${earned} of ${total} stars`}>
+-      {Array.from({ length: total }, (_, index) => (
+-        <Star key={index} className={index < earned ? 'is-on' : 'is-off'} aria-hidden />
+-      ))}
+-    </span>
+-  )
+-}
+diff --git a/src/labs/balance/balance-arcade.css b/src/labs/balance/balance-arcade.css
+index cc070f3..287d4f2 100644
+--- a/src/labs/balance/balance-arcade.css
++++ b/src/labs/balance/balance-arcade.css
+@@ -1,7 +1,7 @@
+ /*
+  * Balance — arcade shell.
+  *
+- * The Home / Sky Trail / Quick Play screens that wrap the game. The play scene
++ * The Home / Quick Play / Trophies screens that wrap the game. The play scene
+  * itself still lives in balance.css; this file is only the chrome around it.
+  *
+  * Everything here is built from four repeated devices, which is what makes a
+@@ -1590,101 +1590,6 @@
+     0 0.45rem 1rem rgba(176, 70, 48, 0.16);
+ }
+ 
+-/* --------------------------------------------------------------- trail ---- */
+-
+-.balance-trail__scroll {
+-  position: relative;
+-  display: flex;
+-  min-height: 0;
+-  flex: 1;
+-  flex-direction: column;
+-  gap: 0.5rem;
+-  overflow-y: auto;
+-  padding: 0 0.25rem 1.4rem;
+-  -webkit-overflow-scrolling: touch;
+-  overscroll-behavior: contain;
+-}
+-
+-.balance-trail__world {
+-  position: relative;
+-  padding: 0.35rem 0 1.1rem;
+-}
+-
+-.balance-trail__banner {
+-  position: sticky;
+-  z-index: 3;
+-  top: 0.15rem;
+-  display: flex;
+-  align-items: center;
+-  justify-content: space-between;
+-  gap: 0.6rem;
+-  padding: 0.55rem 0.9rem;
+-  border-radius: 1rem;
+-  color: #fff;
+-  background: linear-gradient(180deg, var(--world-accent), var(--world-accent-dark));
+-  box-shadow: 0 0.22rem 0 rgba(0, 0, 0, 0.16), 0 0.5rem 1rem rgba(30, 84, 138, 0.2);
+-}
+-
+-.balance-trail__banner strong {
+-  font-family: var(--display-font);
+-  font-size: 0.98rem;
+-  font-weight: 900;
+-  letter-spacing: 0.05em;
+-  text-transform: uppercase;
+-  text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.2);
+-}
+-
+-.balance-trail__banner span {
+-  display: inline-flex;
+-  align-items: center;
+-  gap: 0.22rem;
+-  padding: 0.16rem 0.5rem;
+-  border-radius: 999px;
+-  background: rgba(0, 0, 0, 0.18);
+-  font-size: 0.74rem;
+-  font-weight: 800;
+-  font-variant-numeric: tabular-nums;
+-}
+-
+-.balance-trail__banner span svg { width: 0.8rem; height: 0.8rem; fill: #ffd66b; stroke: none; }
+-
+-/* The path: nodes zig-zag, joined by a rope drawn behind them. */
+-.balance-trail__path {
+-  position: relative;
+-  width: min(100%, 22rem);
+-  margin: 0.4rem auto 0;
+-}
+-
+-.balance-trail__rope {
+-  position: absolute;
+-  z-index: 0;
+-  inset: 0;
+-  width: 100%;
+-  height: 100%;
+-  overflow: visible;
+-  pointer-events: none;
+-}
+-
+-.balance-trail__rope path {
+-  fill: none;
+-  stroke: #f0b24d;
+-  stroke-width: 7;
+-  stroke-linecap: round;
+-}
+-
+-.balance-trail__rope path.is-shadow { stroke: rgba(151, 96, 26, 0.28); stroke-width: 11; }
+-.balance-trail__rope path.is-locked { stroke: #cfdae4; }
+-
+-/*
+- * Nodes are placed absolutely in the same 0-100 space the rope path uses, so
+- * the two can never disagree about where a level sits.
+- */
+-.balance-trail__path > .balance-node {
+-  position: absolute;
+-  z-index: 1;
+-  transform: translate(-50%, -50%);
+-}
+-
+ /* --------------------------------------------------------------- node ---- */
+ 
+ .balance-node {
+@@ -1800,22 +1705,6 @@
+   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+ }
+ 
+-/* The bottom sheet on the trail: the selected level and its Play button. */
+-.balance-trail__dock {
+-  position: relative;
+-  z-index: 4;
+-  display: grid;
+-  gap: 0.65rem;
+-  padding: 0.85rem 0.9rem max(0.9rem, env(safe-area-inset-bottom, 0px));
+-  border-radius: 1.5rem 1.5rem 0 0;
+-  background: var(--card);
+-  box-shadow: 0 -0.5rem 1.4rem rgba(30, 84, 138, 0.18);
+-}
+-
+-.balance-trail__dock header { display: grid; justify-items: center; gap: 0.28rem; }
+-.balance-trail__dock h2 { margin: 0; font-family: var(--display-font); font-size: 1.2rem; font-weight: 900; }
+-.balance-trail__dock p { margin: 0; color: var(--ink-soft); font-size: 0.86rem; font-weight: 600; text-align: center; }
+-
+ /* ------------------------------------------------------------ results ---- */
+ 
+ .balance-award { display: grid; justify-items: center; gap: 0.55rem; }
+@@ -1870,7 +1759,6 @@
+ .balance-award__stats dd { margin: 0; font-family: var(--display-font); font-size: 1.02rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+ 
+ .balance-award__actions { display: grid; width: 100%; gap: 0.5rem; }
+-.balance-award__next { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+ 
+ .balance-award__unlocks {
+   display: grid;
+diff --git a/src/labs/balance/balanceEngine.ts b/src/labs/balance/balanceEngine.ts
+index 66b685e..fd5f0ac 100644
+--- a/src/labs/balance/balanceEngine.ts
++++ b/src/labs/balance/balanceEngine.ts
+@@ -64,7 +64,7 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
+       }
+       return {
+         ...state,
+-        // The run's own settings, not the stored ones: a Sky Trail level sets
++        // The run's own settings, not the stored ones: the daily challenge sets
+         // its own duration and tolerance without ever writing them back over
+         // what the player picked in Quick Play.
+         settings: action.settings,
+diff --git a/src/labs/balance/balanceLevels.ts b/src/labs/balance/balanceLevels.ts
+index a36989e..49b64a5 100644
+--- a/src/labs/balance/balanceLevels.ts
++++ b/src/labs/balance/balanceLevels.ts
+@@ -1,311 +1,12 @@
+-import { clampWrittenMidi, getBalanceInstrument, midiToBalanceNoteName } from './balanceMusic'
+-import type { BalanceInstrument, BalanceLaunch, BalanceLevelProgress } from './balanceTypes'
+-
+ /**
+- * The Sky Trail ladder.
++ * What a tolerance band is called.
+  *
+- * Levels are written as semitone offsets from the instrument's own starting
+- * note (`homeWrittenMidi`), never as absolute pitches — one ladder has to work
+- * for a tuba and a flute, and a level that asked both of them for C4 would be
+- * unplayable for one of them. Offsets are clamped into the instrument's range
+- * at build time, so a wide interval collapses toward home rather than falling
+- * off the end of the horn.
+- *
+- * The progression is the one every long-tone page in a method book uses:
+- * hold one note comfortably, hold it longer, hold it more accurately, then
+- * carry that steadiness through a moving line.
+- */
+-
+-export type BalanceWorldId = 'first-steps' | 'long-haul' | 'fine-tune' | 'scale-trail'
+-
+-export interface BalanceWorld {
+-  id: BalanceWorldId
+-  index: number
+-  name: string
+-  tagline: string
+-  /** Node and banner colour for this stretch of the trail. */
+-  accent: string
+-  accentDark: string
+-}
+-
+-export interface BalanceLevel {
+-  id: string
+-  worldId: BalanceWorldId
+-  /** 1-based position within its world. */
+-  index: number
+-  /** 1-based position on the whole trail. */
+-  number: number
+-  name: string
+-  /** Semitone offsets from the instrument's home note, one per held note. */
+-  offsets: readonly number[]
+-  goalSeconds: number
+-  toleranceCents: number
+-  /** Centered-percent needed for the 2nd and 3rd star. Clearing earns the 1st. */
+-  twoStarPercent: number
+-  threeStarPercent: number
+-  /** Worlds end on a marked level; the trail draws these bigger. */
+-  isBoss: boolean
+-}
+-
+-export const BALANCE_WORLDS: readonly BalanceWorld[] = [
+-  {
+-    id: 'first-steps',
+-    index: 1,
+-    name: 'First Steps',
+-    tagline: 'Find the note and stay on it',
+-    accent: '#4da3e8',
+-    accentDark: '#2b6fae',
+-  },
+-  {
+-    id: 'long-haul',
+-    index: 2,
+-    name: 'Long Haul',
+-    tagline: 'Hold it far longer than feels natural',
+-    accent: '#4bb98a',
+-    accentDark: '#2c8460',
+-  },
+-  {
+-    id: 'fine-tune',
+-    index: 3,
+-    name: 'Fine Tune',
+-    tagline: 'The rope narrows — centre it exactly',
+-    accent: '#b07ae0',
+-    accentDark: '#7a4bab',
+-  },
+-  {
+-    id: 'scale-trail',
+-    index: 4,
+-    name: 'Scale Trail',
+-    tagline: 'Carry that steadiness through a line',
+-    accent: '#ef9227',
+-    accentDark: '#c06c10',
+-  },
+-] as const
+-
+-interface LevelSeed {
+-  name: string
+-  offsets: readonly number[]
+-  goalSeconds: number
+-  toleranceCents: number
+-  twoStarPercent?: number
+-  threeStarPercent?: number
+-}
+-
+-const MAJOR_UP = [0, 2, 4, 5, 7, 9, 11, 12] as const
+-const MINOR_UP = [0, 2, 3, 5, 7, 8, 10, 12] as const
+-
+-const WORLD_SEEDS: Record<BalanceWorldId, readonly LevelSeed[]> = {
+-  'first-steps': [
+-    { name: 'Steady Start', offsets: [0], goalSeconds: 4, toleranceCents: 15 },
+-    { name: 'Hold It', offsets: [0], goalSeconds: 5, toleranceCents: 15 },
+-    { name: 'Second Wind', offsets: [0, 0], goalSeconds: 5, toleranceCents: 15 },
+-    { name: 'Step Up', offsets: [2], goalSeconds: 5, toleranceCents: 15 },
+-    { name: 'Step Down', offsets: [-2], goalSeconds: 5, toleranceCents: 15 },
+-    { name: 'Neighbours', offsets: [-2, 0, 2], goalSeconds: 4, toleranceCents: 15 },
+-    { name: 'Longer Line', offsets: [0], goalSeconds: 7, toleranceCents: 15 },
+-    { name: 'Two Peaks', offsets: [0, 4], goalSeconds: 5, toleranceCents: 15 },
+-    { name: 'First Crossing', offsets: [0, 2, 4], goalSeconds: 5, toleranceCents: 15 },
+-  ],
+-  'long-haul': [
+-    { name: 'Deep Breath', offsets: [0], goalSeconds: 8, toleranceCents: 12 },
+-    { name: 'Eight and Eight', offsets: [0, 0], goalSeconds: 8, toleranceCents: 12 },
+-    { name: 'Ten Steady', offsets: [0], goalSeconds: 10, toleranceCents: 12 },
+-    { name: 'Upper Air', offsets: [5], goalSeconds: 8, toleranceCents: 12 },
+-    { name: 'Lower Air', offsets: [-5], goalSeconds: 8, toleranceCents: 12 },
+-    { name: 'Twelve', offsets: [0], goalSeconds: 12, toleranceCents: 12 },
+-    { name: 'Three Pillars', offsets: [0, 4, 7], goalSeconds: 8, toleranceCents: 12 },
+-    { name: 'Fifteen', offsets: [0], goalSeconds: 15, toleranceCents: 12 },
+-    { name: 'The Long Haul', offsets: [0, 7], goalSeconds: 12, toleranceCents: 12 },
+-  ],
+-  'fine-tune': [
+-    { name: 'Tighten Up', offsets: [0], goalSeconds: 6, toleranceCents: 8 },
+-    { name: 'Narrow Path', offsets: [2], goalSeconds: 6, toleranceCents: 8 },
+-    { name: 'Fine Line', offsets: [0], goalSeconds: 8, toleranceCents: 8 },
+-    { name: 'Thread the Gap', offsets: [0, 3, 5], goalSeconds: 6, toleranceCents: 8 },
+-    { name: 'Precision', offsets: [0], goalSeconds: 6, toleranceCents: 5 },
+-    { name: "Hair's Breadth", offsets: [7], goalSeconds: 6, toleranceCents: 5 },
+-    { name: 'Steady Hand', offsets: [0], goalSeconds: 10, toleranceCents: 5 },
+-    { name: 'Tightrope', offsets: [0, 4, 7], goalSeconds: 8, toleranceCents: 5 },
+-    { name: 'Perfect Centre', offsets: [0], goalSeconds: 15, toleranceCents: 5 },
+-  ],
+-  'scale-trail': [
+-    { name: 'Five Up', offsets: [0, 2, 4, 5, 7], goalSeconds: 4, toleranceCents: 10 },
+-    { name: 'Five Down', offsets: [7, 5, 4, 2, 0], goalSeconds: 4, toleranceCents: 10 },
+-    { name: 'Major Climb', offsets: MAJOR_UP, goalSeconds: 4, toleranceCents: 10 },
+-    { name: 'Chromatic Steps', offsets: [0, 1, 2, 3, 4, 5], goalSeconds: 4, toleranceCents: 10 },
+-    { name: 'Arpeggio Air', offsets: [0, 4, 7, 12], goalSeconds: 6, toleranceCents: 10 },
+-    { name: 'Minor Climb', offsets: MINOR_UP, goalSeconds: 4, toleranceCents: 10 },
+-    { name: 'Up and Over', offsets: [...MAJOR_UP, 11, 9, 7, 5, 4, 2, 0], goalSeconds: 3, toleranceCents: 10 },
+-    { name: 'Long Scale', offsets: MAJOR_UP, goalSeconds: 6, toleranceCents: 8 },
+-    { name: 'Sky Trail', offsets: [...MAJOR_UP, 11, 9, 7, 5, 4, 2, 0], goalSeconds: 5, toleranceCents: 8 },
+-  ],
+-}
+-
+-/** Star bars tighten as the ladder goes on; a boss asks for a little more. */
+-const WORLD_STAR_BARS: Record<BalanceWorldId, [number, number]> = {
+-  'first-steps': [62, 80],
+-  'long-haul': [66, 84],
+-  'fine-tune': [70, 88],
+-  'scale-trail': [70, 88],
+-}
+-
+-export const BALANCE_LEVELS: readonly BalanceLevel[] = BALANCE_WORLDS.flatMap((world) =>
+-  WORLD_SEEDS[world.id].map((seed, seedIndex): BalanceLevel => {
+-    const index = seedIndex + 1
+-    const isBoss = index === WORLD_SEEDS[world.id].length
+-    const [twoStar, threeStar] = WORLD_STAR_BARS[world.id]
+-    return {
+-      id: `w${world.index}-${index}`,
+-      worldId: world.id,
+-      index,
+-      number: (world.index - 1) * WORLD_SEEDS[world.id].length + index,
+-      name: seed.name,
+-      offsets: seed.offsets,
+-      goalSeconds: seed.goalSeconds,
+-      toleranceCents: seed.toleranceCents,
+-      twoStarPercent: seed.twoStarPercent ?? twoStar + (isBoss ? 3 : 0),
+-      threeStarPercent: seed.threeStarPercent ?? threeStar + (isBoss ? 2 : 0),
+-      isBoss,
+-    }
+-  }),
+-)
+-
+-export const BALANCE_LEVEL_COUNT = BALANCE_LEVELS.length
+-export const BALANCE_MAX_STARS = BALANCE_LEVEL_COUNT * 3
+-
+-export function getBalanceLevel(id: string): BalanceLevel | null {
+-  return BALANCE_LEVELS.find((level) => level.id === id) ?? null
+-}
+-
+-export function getBalanceWorld(id: BalanceWorldId): BalanceWorld {
+-  return BALANCE_WORLDS.find((world) => world.id === id) ?? BALANCE_WORLDS[0]!
+-}
+-
+-export function balanceLevelsForWorld(id: BalanceWorldId): BalanceLevel[] {
+-  return BALANCE_LEVELS.filter((level) => level.worldId === id)
+-}
+-
+-/**
+- * Written pitches for one level on one instrument.
+- *
+- * Offsets are measured from the note this instrument's method book starts on,
+- * then the *whole shape* is moved to fit the horn rather than each note being
+- * clamped individually. That distinction matters: a recorder cannot play a
+- * seventh below its bottom C, and clamping each note would have turned "hold
+- * C, E, G" into "hold C, C, C" — an exercise about intervals collapsed into
+- * one note repeated. Shifting the set keeps the interval that was being
+- * taught and simply plays it in a register the instrument owns.
+- *
+- * Only when the level's own span is wider than the instrument's entire range
+- * does anything get clamped, because then no transposition can save it.
+- */
+-export function balanceLevelWrittenMidi(
+-  level: BalanceLevel,
+-  instrument: BalanceInstrument,
+-): number[] {
+-  const raw = level.offsets.map((offset) => instrument.homeWrittenMidi + offset)
+-  const low = Math.min(...raw)
+-  const high = Math.max(...raw)
+-
+-  let shift = 0
+-  if (low < instrument.minWrittenMidi) shift = instrument.minWrittenMidi - low
+-  else if (high > instrument.maxWrittenMidi) shift = instrument.maxWrittenMidi - high
+-
+-  // Move by whole octaves where that is enough, so the exercise keeps the key
+-  // it was written in; fall back to a plain semitone shift only when an octave
+-  // would overshoot the other end of a narrow horn.
+-  if (shift !== 0) {
+-    const octaves = Math.sign(shift) * Math.ceil(Math.abs(shift) / 12) * 12
+-    const shiftedLow = low + octaves
+-    const shiftedHigh = high + octaves
+-    if (
+-      shiftedLow >= instrument.minWrittenMidi &&
+-      shiftedHigh <= instrument.maxWrittenMidi
+-    ) {
+-      shift = octaves
+-    }
+-  }
+-
+-  return raw.map((midi) => clampWrittenMidi(midi + shift, instrument))
+-}
+-
+-export function balanceLevelNoteLabels(level: BalanceLevel, instrumentId: string): string[] {
+-  const instrument = getBalanceInstrument(instrumentId)
+-  return balanceLevelWrittenMidi(level, instrument).map((midi) => midiToBalanceNoteName(midi))
+-}
+-
+-/** "Hold C4 for 5 seconds" — the line under the level name on the trail card. */
+-export function balanceLevelObjective(level: BalanceLevel, instrumentId: string): string {
+-  const labels = balanceLevelNoteLabels(level, instrumentId)
+-  const unique = [...new Set(labels)]
+-  const seconds = `${level.goalSeconds} second${level.goalSeconds === 1 ? '' : 's'}`
+-  if (labels.length === 1) return `Hold ${labels[0]} for ${seconds}`
+-  if (unique.length === 1) return `Hold ${unique[0]} for ${seconds}, ${labels.length} times`
+-  if (labels.length <= 3) return `Hold ${labels.join(', ')} for ${seconds} each`
+-  return `Hold ${labels.length} notes for ${seconds} each`
+-}
+-
+-export function balanceLevelLaunch(level: BalanceLevel, instrumentId: string): BalanceLaunch {
+-  const instrument = getBalanceInstrument(instrumentId)
+-  return {
+-    kind: 'level',
+-    id: level.id,
+-    title: level.name,
+-    subtitle: balanceLevelObjective(level, instrumentId),
+-    writtenMidi: balanceLevelWrittenMidi(level, instrument),
+-    goalSeconds: level.goalSeconds,
+-    toleranceCents: level.toleranceCents,
+-  }
+-}
+-
+-/**
+- * Stars for a finished run. Clearing every note earns one; the other two come
+- * from how much of the sounding time was actually inside the window, which is
+- * the thing long tones are meant to train.
++ * All that survives of the Sky Trail ladder. The levels themselves are gone —
++ * the game's shape is now Quick Play with a daily challenge beside it, and
++ * progress is carried by the streak and the trophy case rather than by stars
++ * on a map. The labels are unchanged, because they name the band the player
++ * picked in Options, not a rung on the removed ladder.
+  */
+-export function balanceStarsForRun(
+-  level: BalanceLevel,
+-  completed: boolean,
+-  centeredPercent: number,
+-): number {
+-  if (!completed) return 0
+-  if (centeredPercent >= level.threeStarPercent) return 3
+-  if (centeredPercent >= level.twoStarPercent) return 2
+-  return 1
+-}
+-
+-export function balanceLevelIsUnlocked(
+-  level: BalanceLevel,
+-  levels: Record<string, BalanceLevelProgress>,
+-): boolean {
+-  if (level.number === 1) return true
+-  const previous = BALANCE_LEVELS[level.number - 2]
+-  return previous ? (levels[previous.id]?.stars ?? 0) > 0 : true
+-}
+-
+-/** The level the trail should open on: the first one not yet cleared. */
+-export function balanceNextLevel(levels: Record<string, BalanceLevelProgress>): BalanceLevel {
+-  return (
+-    BALANCE_LEVELS.find((level) => (levels[level.id]?.stars ?? 0) === 0) ??
+-    BALANCE_LEVELS[BALANCE_LEVELS.length - 1]!
+-  )
+-}
+-
+-export function balanceTotalStars(levels: Record<string, BalanceLevelProgress>): number {
+-  return Object.values(levels).reduce((total, entry) => total + entry.stars, 0)
+-}
+-
+-export function balanceWorldStars(
+-  worldId: BalanceWorldId,
+-  levels: Record<string, BalanceLevelProgress>,
+-): { earned: number; possible: number } {
+-  const worldLevels = balanceLevelsForWorld(worldId)
+-  return {
+-    earned: worldLevels.reduce((total, level) => total + (levels[level.id]?.stars ?? 0), 0),
+-    possible: worldLevels.length * 3,
+-  }
+-}
+-
+ export function balanceDifficultyLabel(toleranceCents: number): string {
+   if (toleranceCents >= 14) return 'Easy'
+   if (toleranceCents >= 11) return 'Steady'
+diff --git a/src/labs/balance/balanceMusic.ts b/src/labs/balance/balanceMusic.ts
+index d9d12d1..34a4588 100644
+--- a/src/labs/balance/balanceMusic.ts
++++ b/src/labs/balance/balanceMusic.ts
+@@ -111,9 +111,9 @@ export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettin
+ }
+ 
+ /**
+- * Turn a written-pitch list into scored targets. Sky Trail levels and the
+- * daily challenge hand their notes straight to this rather than round-tripping
+- * through a saved custom routine.
++ * Turn a written-pitch list into scored targets. The daily challenge hands its
++ * notes straight to this rather than round-tripping through a saved custom
++ * routine.
+  */
+ export function buildBalanceTargetsFromWritten(
+   written: readonly number[],
+diff --git a/src/labs/balance/balanceStorage.ts b/src/labs/balance/balanceStorage.ts
+index 2aea904..364f54a 100644
+--- a/src/labs/balance/balanceStorage.ts
++++ b/src/labs/balance/balanceStorage.ts
+@@ -2,13 +2,11 @@ import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
+ import { resolveBalanceInstrumentId } from './balanceInstruments'
+ import { isBalanceCharacterId } from './balanceCharacters'
+ import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
+-import { balanceStarsForRun, getBalanceLevel } from './balanceLevels'
+ import { balanceCompleteDaily } from './balanceDaily'
+ import type {
+   BalanceCustomRoutine,
+   BalanceDailyProgress,
+   BalanceLaunch,
+-  BalanceLevelProgress,
+   BalanceNoteResult,
+   BalanceRoutineResult,
+   BalanceSettings,
+@@ -20,9 +18,17 @@ import type {
+ export const BALANCE_STORAGE_KEY = 'besttake:balance'
+ const MAX_ROUTINE_SUMMARIES = 30
+ 
++/**
++ * Quick Play, already set up.
++ *
++ * The instrument comes from the one chosen when the app was first opened, so
++ * the opening note is the one a method book starts that instrument on rather
++ * than a fixed C5 squeezed into whatever range happens to be nearby — a tuba
++ * player should not have to go into Options before their first note.
++ */
+ export function createDefaultBalanceSettings(instrumentId: string): BalanceSettings {
+   const instrument = getBalanceInstrument(instrumentId)
+-  const defaultMidi = clampWrittenMidi(72, instrument)
++  const defaultMidi = clampWrittenMidi(instrument.homeWrittenMidi, instrument)
+   return {
+     routineType: 'single',
+     instrumentId: instrument.id,
+@@ -69,28 +75,10 @@ function createEmptyData(instrumentId: string): BalanceStoredDataV3 {
+     routineSummaries: [],
+     trophies: {},
+     unlockedCharacterIds: ['balancer', 'trumpeter'],
+-    levels: {},
+     daily: { ...EMPTY_DAILY },
+   }
+ }
+ 
+-function normalizeLevels(value: unknown): Record<string, BalanceLevelProgress> {
+-  if (!value || typeof value !== 'object') return {}
+-  return Object.entries(value).reduce<Record<string, BalanceLevelProgress>>((result, [id, item]) => {
+-    if (!getBalanceLevel(id) || !item || typeof item !== 'object') return result
+-    const source = item as Partial<BalanceLevelProgress>
+-    const stars = Math.max(0, Math.min(3, Math.round(finiteNumber(source.stars, 0))))
+-    if (stars === 0) return result
+-    result[id] = {
+-      stars,
+-      bestCenteredPercent: Math.max(0, Math.min(100, finiteNumber(source.bestCenteredPercent, 0))),
+-      bestBalancedMs: Math.max(0, finiteNumber(source.bestBalancedMs, 0)),
+-      clearedAt: finiteNumber(source.clearedAt, Date.now()),
+-    }
+-    return result
+-  }, {})
+-}
+-
+ function normalizeDaily(value: unknown): BalanceDailyProgress {
+   if (!value || typeof value !== 'object') return { ...EMPTY_DAILY }
+   const source = value as Partial<BalanceDailyProgress>
+@@ -284,7 +272,6 @@ export function loadBalanceData(instrumentId: string): BalanceStoredDataV3 {
+       routineSummaries: summaries,
+       trophies: normalizeTrophies(parsed.trophies),
+       unlockedCharacterIds: [...unlockedCharacterIds],
+-      levels: normalizeLevels(parsed.levels),
+       daily: normalizeDaily(parsed.daily),
+     }
+     return awardBalanceTrophies(base).data
+@@ -313,50 +300,16 @@ export function personalBestKey(result: Pick<BalanceNoteResult, 'target' | 'tole
+   return `${result.target.instrumentId}:${result.target.writtenMidi}:${result.target.concertMidi}:${result.toleranceCents}`
+ }
+ 
+-/**
+- * Fold a finished run into the trail: stars for a level, a tick for the day's
+- * challenge. Stars only ever go up — replaying a level for a better score can
+- * never take away the three you already earned.
+- */
++/** Fold a finished run into the day's progress — a tick for the challenge. */
+ export function recordBalanceLaunch(
+   data: BalanceStoredDataV3,
+   launch: BalanceLaunch,
+   result: BalanceRoutineResult,
+-): { data: BalanceStoredDataV3; earnedStars: number; previousStars: number } {
+-  if (launch.kind === 'level' && launch.id) {
+-    const level = getBalanceLevel(launch.id)
+-    if (!level) return { data, earnedStars: 0, previousStars: 0 }
+-    const earnedStars = balanceStarsForRun(level, result.completed, result.centeredPercent)
+-    const previous = data.levels[launch.id]
+-    const previousStars = previous?.stars ?? 0
+-    if (earnedStars === 0) return { data, earnedStars, previousStars }
+-    return {
+-      data: {
+-        ...data,
+-        levels: {
+-          ...data.levels,
+-          [launch.id]: {
+-            stars: Math.max(previousStars, earnedStars),
+-            bestCenteredPercent: Math.max(previous?.bestCenteredPercent ?? 0, result.centeredPercent),
+-            bestBalancedMs: Math.max(previous?.bestBalancedMs ?? 0, result.totalBalancedMs),
+-            clearedAt: previous?.clearedAt ?? Date.now(),
+-          },
+-        },
+-      },
+-      earnedStars,
+-      previousStars,
+-    }
+-  }
+-
++): BalanceStoredDataV3 {
+   if (launch.kind === 'daily' && launch.id && result.completed) {
+-    return {
+-      data: { ...data, daily: balanceCompleteDaily(data.daily, launch.id) },
+-      earnedStars: 0,
+-      previousStars: 0,
+-    }
++    return { ...data, daily: balanceCompleteDaily(data.daily, launch.id) }
+   }
+-
+-  return { data, earnedStars: 0, previousStars: 0 }
++  return data
+ }
+ 
+ export function recordBalanceResult(
+diff --git a/src/labs/balance/balanceTrophies.ts b/src/labs/balance/balanceTrophies.ts
+index 53a5e51..a221e39 100644
+--- a/src/labs/balance/balanceTrophies.ts
++++ b/src/labs/balance/balanceTrophies.ts
+@@ -1,3 +1,4 @@
++import { characterUnlocked } from '../../utils/dailyChallenges'
+ import type { BalanceCharacterId } from './balanceCharacters'
+ import type {
+   BalanceRoutineResult,
+@@ -75,7 +76,7 @@ export function isBalanceCharacterUnlocked(
+   characterId: BalanceCharacterId,
+   unlockedCharacterIds: readonly BalanceCharacterId[],
+ ): boolean {
+-  return unlockedCharacterIds.includes(characterId)
++  return unlockedCharacterIds.includes(characterId) || characterUnlocked(characterId)
+ }
+ 
+ function earnedTrophyIds(summaries: readonly BalanceRoutineResult[]): Set<BalanceTrophyId> {
+diff --git a/src/labs/balance/balanceTypes.ts b/src/labs/balance/balanceTypes.ts
+index 72c3cf2..3205222 100644
+--- a/src/labs/balance/balanceTypes.ts
++++ b/src/labs/balance/balanceTypes.ts
+@@ -39,9 +39,10 @@ export interface BalanceInstrument {
+   minWrittenMidi: number
+   maxWrittenMidi: number
+   /**
+-   * The note a method book starts this instrument on. Sky Trail levels are
+-   * written as semitone offsets from here, so one ladder fits every player
+-   * instead of hard-coding a pitch a tuba could never reach.
++   * The note a method book starts this instrument on. The daily challenge and
++   * Quick Play's opening note are both semitone offsets from here, so one set
++   * of numbers fits every player instead of hard-coding a pitch a tuba could
++   * never reach.
+    */
+   homeWrittenMidi: number
+ }
+@@ -167,16 +168,18 @@ export interface BalanceState {
+   bestBalancedMs: number
+ }
+ 
+-export type BalanceLaunchKind = 'quick' | 'level' | 'daily'
++export type BalanceLaunchKind = 'quick' | 'daily'
+ 
+ /**
+- * What a single run is: the quick-play settings, one Sky Trail level, or the
+- * day's challenge. Everything the run needs that is *not* a player preference
+- * travels here, so the persisted settings are never overwritten by a level.
++ * What a single run is: the quick-play settings, or the day's challenge.
++ * Everything the run needs that is *not* a player preference travels here, so
++ * the persisted settings are never overwritten by the challenge.
+  */
+ export interface BalanceLaunch {
++  /** A daily launch can override the instrument without changing player preferences. */
++  instrumentId?: string
+   kind: BalanceLaunchKind
+-  /** Level id, or the daily's YYYY-MM-DD key. Null for quick play. */
++  /** The daily's YYYY-MM-DD key. Null for quick play. */
+   id: string | null
+   title: string
+   subtitle: string
+@@ -186,13 +189,6 @@ export interface BalanceLaunch {
+   toleranceCents: number | null
+ }
+ 
+-export interface BalanceLevelProgress {
+-  stars: number
+-  bestCenteredPercent: number
+-  bestBalancedMs: number
+-  clearedAt: number
+-}
+-
+ export interface BalanceDailyProgress {
+   /** YYYY-MM-DD of the most recently completed challenge. */
+   lastCompletedDate: string | null
+@@ -229,8 +225,6 @@ export interface BalanceStoredDataV3 {
+   routineSummaries: BalanceRoutineResult[]
+   trophies: Partial<Record<BalanceTrophyId, BalanceStoredTrophy>>
+   unlockedCharacterIds: BalanceCharacterId[]
+-  /** Star record per Sky Trail level id. */
+-  levels: Record<string, BalanceLevelProgress>
+   daily: BalanceDailyProgress
+ }
+ 
+diff --git a/src/labs/balance/useBalanceGame.ts b/src/labs/balance/useBalanceGame.ts
+index 4ddb7a5..e10260c 100644
+--- a/src/labs/balance/useBalanceGame.ts
++++ b/src/labs/balance/useBalanceGame.ts
+@@ -1,3 +1,5 @@
++import { GAME_TEST_INPUT } from '../gameTestInput'
++import { recordPlannedGame } from '../../utils/dailyChallengePlan'
+ import {
+   useCallback,
+   useEffect,
+@@ -67,6 +69,7 @@ function settingsForLaunch(settings: BalanceSettings, launch: BalanceLaunch): Ba
+   if (launch.kind === 'quick') return settings
+   return {
+     ...settings,
++    instrumentId: launch.instrumentId ?? settings.instrumentId,
+     goalMode: 'fixed',
+     goalSeconds: launch.goalSeconds ?? settings.goalSeconds,
+     tolerancePreset: 'custom',
+@@ -132,10 +135,8 @@ export interface UseBalanceGameResult {
+   toleranceCents: number
+   currentTarget: ReturnType<typeof buildBalanceTargets>[number] | null
+   routineResult: BalanceRoutineResult | null
+-  /** What the current (or most recent) run is: quick play, a level, or the daily. */
++  /** What the current (or most recent) run is: quick play or the daily. */
+   launch: BalanceLaunch
+-  /** Stars just earned on a level run, and what the level already held. */
+-  levelAward: { earnedStars: number; previousStars: number } | null
+   updateSettings: (patch: Partial<BalanceSettings>) => void
+   start: (launch?: BalanceLaunch) => void
+   reset: () => void
+@@ -177,7 +178,6 @@ export function useBalanceGame({
+   const [hud, setHud] = useState<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
+   const [newTrophyIds, setNewTrophyIds] = useState<BalanceTrophyId[]>([])
+   const [launch, setLaunch] = useState<BalanceLaunch>(QUICK_PLAY_LAUNCH)
+-  const [levelAward, setLevelAward] = useState<{ earnedStars: number; previousStars: number } | null>(null)
+   const launchRef = useRef(launch)
+   launchRef.current = launch
+   const suppressUntilRef = useRef(0)
+@@ -407,19 +407,14 @@ export function useBalanceGame({
+     resultPersistedRef.current = result.id
+     const previousTrophies = dataRef.current.trophies
+     const scored = recordBalanceResult(dataRef.current, result)
+-    const awarded = recordBalanceLaunch(scored, launchRef.current, result)
+-    const next = awarded.data
+-    setLevelAward(
+-      launchRef.current.kind === 'level'
+-        ? { earnedStars: awarded.earnedStars, previousStars: awarded.previousStars }
+-        : null,
+-    )
++    const next = recordBalanceLaunch(scored, launchRef.current, result)
+     setNewTrophyIds(
+       (Object.keys(next.trophies) as BalanceTrophyId[]).filter((id) => !previousTrophies[id]),
+     )
+     dataRef.current = next
+     setData(next)
+     saveBalanceData(next)
++    if (!GAME_TEST_INPUT) recordPlannedGame({ game: 'balance', instrumentId: state.settings.instrumentId, date: launchRef.current.kind === 'daily' ? launchRef.current.id : null, completed: result.completed })
+     dispatch({ type: 'SET_BEST', bestBalancedMs: getBalanceBestMs(next) })
+   }, [state])
+ 
+@@ -473,7 +468,6 @@ export function useBalanceGame({
+     (nextLaunch?: BalanceLaunch) => {
+       clearAttempt()
+       setNewTrophyIds([])
+-      setLevelAward(null)
+       resultPersistedRef.current = null
+       const activeLaunch = nextLaunch ?? launchRef.current
+       launchRef.current = activeLaunch
+@@ -498,7 +492,6 @@ export function useBalanceGame({
+   const reset = useCallback(() => {
+     stopTone()
+     clearAttempt()
+-    setLevelAward(null)
+     launchRef.current = QUICK_PLAY_LAUNCH
+     setLaunch(QUICK_PLAY_LAUNCH)
+     dispatch({ type: 'RESET', settings: dataRef.current.settings })
+@@ -566,7 +559,6 @@ export function useBalanceGame({
+     currentTarget,
+     routineResult,
+     launch,
+-    levelAward,
+     updateSettings,
+     start,
+     reset,
+diff --git a/src/labs/practiceGameCharacters.ts b/src/labs/practiceGameCharacters.ts
+index 7493af8..e615c9a 100644
+--- a/src/labs/practiceGameCharacters.ts
++++ b/src/labs/practiceGameCharacters.ts
+@@ -1,9 +1,10 @@
+-import astronautAsset from '../assets/practice-characters/astronaut.svg'
+-import birdAsset from '../assets/practice-characters/bird.svg'
+-import catAsset from '../assets/practice-characters/cat.svg'
+-import foxAsset from '../assets/practice-characters/fox.svg'
+-import robotAsset from '../assets/practice-characters/robot.svg'
+-import trumpeterAsset from '../assets/practice-characters/trumpeter.png'
++import { characterUnlocked } from '../utils/dailyChallenges'
++import astronautAsset from '../assets/practice-characters/ensemble/luna.svg'
++import birdAsset from '../assets/practice-characters/ensemble/pip.svg'
++import catAsset from '../assets/practice-characters/ensemble/cleo.svg'
++import foxAsset from '../assets/practice-characters/ensemble/reed.svg'
++import robotAsset from '../assets/practice-characters/ensemble/riff.svg'
++import trumpeterAsset from '../assets/practice-characters/ensemble/otto.svg'
+ 
+ export type PracticeGameCharacterId =
+   | 'trumpeter'
+@@ -16,18 +17,21 @@ export type PracticeGameCharacterId =
+ export interface PracticeGameCharacter {
+   id: PracticeGameCharacterId
+   name: string
++  instrument: string
++  personality: string
+   asset: string
+   /** Per-asset optical-size adjustment shared by game renderers. */
+   scale: number
+ }
+ 
++/** Storage IDs stay stable across the new artwork so saved players and trophies survive. */
+ export const PRACTICE_GAME_CHARACTERS: readonly PracticeGameCharacter[] = [
+-  { id: 'trumpeter', name: 'Trumpeter', asset: trumpeterAsset, scale: 1 },
+-  { id: 'cat', name: 'Cat', asset: catAsset, scale: 1.18 },
+-  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 1.18 },
+-  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 1.18 },
+-  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 1.18 },
+-  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 1.18 },
++  { id: 'trumpeter', name: 'Otto', instrument: 'Trumpet otter', personality: 'First to warm up. Last to lose heart.', asset: trumpeterAsset, scale: 1.18 },
++  { id: 'cat', name: 'Cleo', instrument: 'Violin cat', personality: 'Finds the sweet spot with eyes closed.', asset: catAsset, scale: 1.18 },
++  { id: 'robot', name: 'Riff', instrument: 'Drummer raccoon', personality: 'Makes a groove out of just about anything.', asset: robotAsset, scale: 1.18 },
++  { id: 'bird', name: 'Pip', instrument: 'Flute bird', personality: 'Small wings. Big breath. One more phrase.', asset: birdAsset, scale: 1.18 },
++  { id: 'fox', name: 'Reed', instrument: 'Saxophone fox', personality: 'Turns a wrong note into a new idea.', asset: foxAsset, scale: 1.18 },
++  { id: 'astronaut', name: 'Luna', instrument: 'Conductor owl', personality: 'Always has room for one more player.', asset: astronautAsset, scale: 1.18 },
+ ] as const
+ 
+ const CHARACTER_STORAGE_KEY = 'besttake.practiceGames.character'
+@@ -51,7 +55,7 @@ export function loadPracticeGameCharacter(): PracticeGameCharacterId {
+ }
+ 
+ export function savePracticeGameCharacter(id: PracticeGameCharacterId): void {
+-  if (typeof window === 'undefined') return
++  if (typeof window === 'undefined' || !characterUnlocked(id)) return
+   try {
+     window.localStorage.setItem(CHARACTER_STORAGE_KEY, id)
+   } catch {
+diff --git a/src/labs/staffJumper/StaffJumperGame.tsx b/src/labs/staffJumper/StaffJumperGame.tsx
+index 16b45f3..e7aa275 100644
+--- a/src/labs/staffJumper/StaffJumperGame.tsx
++++ b/src/labs/staffJumper/StaffJumperGame.tsx
+@@ -549,17 +549,19 @@ export default function StaffJumperGame({
+     return () => cancelAnimationFrame(raf)
+   }, [applyFrame])
+ 
++  // Only worth saying when there is something left to lose.
++  const livesSuffix = config.lives ? ` ${state.hearts} hearts left.` : ''
+   const feedbackAnnouncement =
+     state.feedback === 'perfect'
+       ? 'Perfect pitch.'
+       : state.feedback === 'good'
+         ? 'Landed.'
+         : state.feedback === 'timeout'
+-          ? `Time is up. ${state.hearts} hearts left.`
++          ? `Time is up.${livesSuffix}`
+           : state.feedback === 'missed-beat'
+-            ? `Missed the beat. ${state.hearts} hearts left.`
++            ? `Missed the beat.${livesSuffix}`
+             : state.feedback === 'wrong'
+-              ? `Wrong note. ${state.hearts} hearts left.`
++              ? `Wrong note.${livesSuffix}`
+               : ''
+   const targetAnnouncement = target.isRest
+     ? rhythmMode
+@@ -970,8 +972,14 @@ export default function StaffJumperGame({
+         <div className="sj-hud">
+           <div className="sj-hud-top">
+             <div className="sj-hud-statusbar">
+-              <Hearts count={state.hearts} />
+-              <span className="sj-hud-statusbar__rule" aria-hidden />
++              {/* Endless runs have nothing to lose, so the row that showed what
++                  was left of it goes; accuracy is the reading that matters. */}
++              {config.lives && (
++                <>
++                  <Hearts count={state.hearts} />
++                  <span className="sj-hud-statusbar__rule" aria-hidden />
++                </>
++              )}
+               <span className="sj-hud-mini-stat">
+                 <small>Score</small>
+                 <strong>{state.score}</strong>
+diff --git a/src/labs/staffJumper/StaffJumperScreen.tsx b/src/labs/staffJumper/StaffJumperScreen.tsx
+index 658ce2f..06be0d9 100644
+--- a/src/labs/staffJumper/StaffJumperScreen.tsx
++++ b/src/labs/staffJumper/StaffJumperScreen.tsx
+@@ -1,3 +1,5 @@
++import { getInstrumentProfile } from '../../utils/instrumentProfiles'
++import { recordPlannedGame, type DailyChallengePlan } from '../../utils/dailyChallengePlan'
+ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+ import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
+ import {
+@@ -89,6 +91,7 @@ function tempoPresetIndex(bpm: number): number {
+ }
+ 
+ interface StaffJumperScreenProps {
++  dailyChallenge?: DailyChallengePlan | null
+   streamRef: RefObject<MediaStream | null>
+   streamGeneration: number
+   tunerInstrument: TunerInstrument
+@@ -203,6 +206,7 @@ function formatRunTime(seconds: number): string {
+ }
+ 
+ export default function StaffJumperScreen({
++  dailyChallenge,
+   streamRef,
+   streamGeneration,
+   tunerInstrument,
+@@ -229,6 +233,12 @@ export default function StaffJumperScreen({
+   const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
+   const [draftMetronome, setDraftMetronome] = useState(true)
+   const [draftDrone, setDraftDrone] = useState(false)
++  /*
++   * Off by default: reading a page straight through, and being told how much
++   * of it was right, is what practice actually looks like. Lives are the
++   * arcade version, kept for players who want the pressure.
++   */
++  const [draftLives, setDraftLives] = useState(false)
+   const [showOptions, setShowOptions] = useState(false)
+   /**
+    * The preview shows one sample of a randomized exercise, so it needs its own
+@@ -296,6 +306,7 @@ export default function StaffJumperScreen({
+     onRequestMicStream()
+   }, [onRequestMicStream, streamGeneration])
+ 
++  const challengeTunerInstrument = dailyChallenge ? getInstrumentProfile(dailyChallenge.instrumentId)?.tunerInstrument ?? tunerInstrument : tunerInstrument
+   const pitchEnabled = true
+   /*
+    * Coming back from the background, the stream is usually dead while
+@@ -316,7 +327,7 @@ export default function StaffJumperScreen({
+     {
+       source: 'microphone',
+       micStreamRef: streamRef,
+-      tunerInstrument,
++      tunerInstrument: challengeTunerInstrument,
+       realtimeMode: true,
+       continuousScroll: false,
+       allowStandaloneMicFallback: true,
+@@ -361,12 +372,17 @@ export default function StaffJumperScreen({
+     completeFall,
+     pause,
+     resume,
++    endRun,
+     noteRemainingMs,
+     noteTimeoutMs,
+     beatInBar,
+     getTravelProgress,
+   } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
+ 
++  useEffect(() => {
++    if (!GAME_TEST_INPUT && state.config) recordPlannedGame({ game: 'staff-jumper', instrumentId: state.config.instrumentId ?? null, key: state.config.key, scaleMode: state.config.scaleMode, correctNotes: state.correctCount, startedAtMs: state.startedAtMs })
++  }, [state.correctCount, state.config, state.startedAtMs])
++
+   targetMidiRef.current =
+     state.config && state.phase === 'playing'
+       ? getTargetNoteAtStep(state.config, state.sequenceStep).midi
+@@ -386,11 +402,13 @@ export default function StaffJumperScreen({
+       tempoBpm: draftTempo,
+       metronome: draftMetronome,
+       drone: draftDrone,
++      lives: draftLives,
+     }),
+     [
+       draftClef,
+       draftDifficulty,
+       draftDrone,
++      draftLives,
+       draftInstrumentId,
+       draftKey,
+       draftMetronome,
+@@ -416,6 +434,24 @@ export default function StaffJumperScreen({
+     readout.frequencyHz > 0 &&
+     Boolean(readout.noteName && readout.noteName !== '—')
+ 
++  if (state.phase === 'setup' && dailyChallenge) {
++    const instrument = getStaffJumperInstrument(dailyChallenge.game.instrumentId)
++    return <BalanceArcadeShell title="Today’s challenge" hapticFeedback={hapticFeedback} onBack={onBack} backLabel="Back to Games">
++      <div className="challenge-game-ready">
++        <span>{dailyChallenge.instrumentLabel} · +1 trophy</span>
++        <h1>{dailyChallenge.game.title}</h1>
++        <p>{dailyChallenge.game.objective}</p>
++        <button className="balance-cta" disabled={!instrument} onClick={() => {
++          if (!instrument) return
++          onRequestMicStream()
++          start({ ...draftConfig, tunerInstrument: challengeTunerInstrument, instrumentId: instrument.id, clef: instrument.clef, transposition: instrument.transposition,
++            key: dailyChallenge.game.key, scaleMode: 'major', range: '1-octave', difficulty: 'easy', lives: false,
++            metronome: false, drone: false })
++        }}>Start challenge</button>
++        <small>Play at your own pace. Your normal game settings stay saved.</small>
++      </div>
++    </BalanceArcadeShell>
++  }
+   if (state.phase === 'setup') {
+     const writtenPitchChoice =
+       WRITTEN_PITCH_CHOICES.find((item) => item.id === draftTransposition) ??
+@@ -749,6 +785,24 @@ export default function StaffJumperScreen({
+             />
+           </div>
+ 
++          <Pressable
++            type="button"
++            intensity="soft"
++            hapticFeedback={hapticFeedback}
++            onClick={() => setDraftLives((on) => !on)}
++            className="sj-field sj-field--switch"
++            aria-pressed={draftLives}
++          >
++            <span className="sj-field__label">
++              Lives{' '}
++              <span>
++                Three misses and the run is over. Off, the run keeps going and
++                every note counts toward your accuracy — end it when you like.
++              </span>
++            </span>
++            <span className={`sj-switch ${draftLives ? 'sj-switch--on' : ''}`} aria-hidden />
++          </Pressable>
++
+           <Pressable
+             type="button"
+             intensity="soft"
+@@ -808,6 +862,11 @@ export default function StaffJumperScreen({
+               <Play aria-hidden /> Resume
+             </Pressable>
+             <div className="balance-award__next">
++              {/* Without lives nothing else can end the run, so this is how a
++                  player calls time on it and sees what they read. */}
++              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={endRun} className="balance-cta balance-cta--blue balance-cta--small">
++                Finish run
++              </Pressable>
+               <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="balance-cta balance-cta--blue balance-cta--small">
+                 Settings
+               </Pressable>
+diff --git a/src/labs/staffJumper/staffJumperMusicLogic.ts b/src/labs/staffJumper/staffJumperMusicLogic.ts
+index e17ca86..0650000 100644
+--- a/src/labs/staffJumper/staffJumperMusicLogic.ts
++++ b/src/labs/staffJumper/staffJumperMusicLogic.ts
+@@ -150,6 +150,15 @@ export interface StaffJumperConfig {
+   tempoBpm: number
+   metronome: boolean
+   drone: boolean
++  /**
++   * Three lives, and the run ends when they are gone.
++   *
++   * Off by default. Standard practice is endless: a wrong note is recorded
++   * against the accuracy and the reader carries on, the way it would with a
++   * teacher in the room. Nothing but the player ends the run. Turning this on
++   * is opting into the arcade version.
++   */
++  lives: boolean
+   sessionSeed?: number
+ }
+ 
+diff --git a/src/labs/staffJumper/useStaffJumperGame.ts b/src/labs/staffJumper/useStaffJumperGame.ts
+index fa6362d..a3eb200 100644
+--- a/src/labs/staffJumper/useStaffJumperGame.ts
++++ b/src/labs/staffJumper/useStaffJumperGame.ts
+@@ -14,6 +14,7 @@ import {
+   pitchClassesMatch,
+   saveBestScore,
+   type StaffJumperConfig,
++  type StaffJumperFeedback,
+   type StaffJumperState,
+   type StaffJumperTiming,
+ } from './staffJumperMusicLogic'
+@@ -41,10 +42,24 @@ import {
+ } from './staffJumperAudio'
+ import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
+ 
++/**
++ * `wrongMs` is how long one wrong pitch class has to keep sounding, steadily,
++ * before it is charged as a miss.
++ *
++ * These are generous on purpose. The front of a note is the least reliable
++ * part of it — a scoop, a cracked attack or a slow reed speaking can sit a
++ * semitone off for a good fraction of a second before the note settles where
++ * the player meant it. Judging that as a wrong note marked people wrong for
++ * notes they went on to play correctly, so the window is now wide enough that
++ * an attack has to lose its argument with the horn outright before it counts.
++ * The clock still restarts every time the sounding pitch class moves, so a
++ * wandering front never accumulates toward a miss — only a wrong note the
++ * player actually settles on does.
++ */
+ const DIFFICULTY_TIMING = {
+-  easy: { correctMs: 34, wrongMs: 620, cooldownMs: 12 },
+-  medium: { correctMs: 30, wrongMs: 440, cooldownMs: 12 },
+-  hard: { correctMs: 26, wrongMs: 300, cooldownMs: 12 },
++  easy: { correctMs: 34, wrongMs: 900, cooldownMs: 12 },
++  medium: { correctMs: 30, wrongMs: 680, cooldownMs: 12 },
++  hard: { correctMs: 26, wrongMs: 460, cooldownMs: 12 },
+ } as const
+ 
+ /**
+@@ -120,6 +135,8 @@ type Action =
+    */
+   | { type: 'RHYTHM_ADVANCE'; holdQuality: HoldQuality | null }
+   | { type: 'MISS'; reason: 'wrong' | 'timeout' | 'missed-beat' }
++  /** The player ended an endless run from the pause card. */
++  | { type: 'END_RUN' }
+   | { type: 'FALL_COMPLETE' }
+   | { type: 'PAUSE' }
+   | { type: 'RESUME' }
+@@ -170,6 +187,7 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
+         ...createInitialState(),
+         phase: 'playing',
+         config,
++        hearts: config.lives ? INITIAL_HEARTS : 0,
+         targetPitchClass: target.pitchClass,
+         bestScore: loadBestScore(),
+         startedAtMs: Date.now(),
+@@ -273,38 +291,53 @@ function reducer(state: StaffJumperState, action: Action): StaffJumperState {
+ 
+     case 'MISS': {
+       if (state.phase !== 'playing' || !state.config) return state
+-      const hearts = Math.max(0, state.hearts - 1)
+-      const feedback =
++      const feedback: StaffJumperFeedback =
+         action.reason === 'timeout'
+           ? 'timeout'
+           : action.reason === 'missed-beat'
+             ? 'missed-beat'
+             : 'wrong'
++      const missed: StaffJumperState = {
++        ...state,
++        streak: 0,
++        missCount: state.missCount + 1,
++        missToken: state.missToken + 1,
++        isSustaining: false,
++        feedback,
++        feedbackToken: state.feedbackToken + 1,
++      }
++
++      /*
++       * Standard practice: the miss goes on the accuracy and the reader keeps
++       * going. The character stumbles — the player is told — but nothing
++       * throws them off the staff, so a page can be read start to finish the
++       * way it would be in a lesson.
++       */
++      if (!state.config.lives) return missed
++
++      const hearts = Math.max(0, state.hearts - 1)
+       if (hearts <= 0) {
+-        const bestScore = saveBestScore(state.score)
+         return {
+-          ...state,
++          ...missed,
+           hearts: 0,
+-          streak: 0,
+-          missCount: state.missCount + 1,
+-          missToken: state.missToken + 1,
+           phase: 'playing',
+           isFalling: true,
+-          bestScore,
+-          feedback,
+-          feedbackToken: state.feedbackToken + 1,
++          bestScore: saveBestScore(state.score),
+           endedAtMs: Date.now(),
+         }
+       }
++      return { ...missed, hearts }
++    }
++
++    /** Endless runs end when the player says so, from the pause card. */
++    case 'END_RUN': {
++      if (state.phase !== 'playing' && state.phase !== 'paused') return state
+       return {
+         ...state,
+-        hearts,
+-        streak: 0,
+-        missCount: state.missCount + 1,
+-        missToken: state.missToken + 1,
+-        isSustaining: false,
+-        feedback,
+-        feedbackToken: state.feedbackToken + 1,
++        phase: 'gameover',
++        isFalling: false,
++        bestScore: saveBestScore(state.score),
++        endedAtMs: state.endedAtMs ?? Date.now(),
+       }
+     }
+ 
+@@ -594,6 +627,13 @@ export function useStaffJumperGame(
+     dispatch({ type: 'PAUSE' })
+   }, [captureNoteClock, stopAudio])
+ 
++  /** Endless runs have no failure state, so the player calls time on them. */
++  const endRun = useCallback(() => {
++    captureNoteClock()
++    stopAudio()
++    dispatch({ type: 'END_RUN' })
++  }, [captureNoteClock, stopAudio])
++
+   const resume = useCallback(() => {
+     actionLockUntilRef.current = performance.now() + 650
+     wrongPitchClassRef.current = null
+@@ -1186,6 +1226,7 @@ export function useStaffJumperGame(
+     completeFall,
+     pause,
+     resume,
++    endRun,
+     noteRemainingMs: Math.max(0, Math.min(configuredTimeoutMs, noteRemainingMsRef.current)),
+     noteTimeoutMs: configuredTimeoutMs,
+     /** Rhythm mode: the pulse of the bar the click is on, 0-based; null without a running run. */
+diff --git a/src/practiceTimeline/components/TimelineLibrarySheet.tsx b/src/practiceTimeline/components/TimelineLibrarySheet.tsx
+index 0869342..b10eef4 100644
+--- a/src/practiceTimeline/components/TimelineLibrarySheet.tsx
++++ b/src/practiceTimeline/components/TimelineLibrarySheet.tsx
+@@ -16,6 +16,13 @@ import { shareRoutineFile } from '../storage/routineShare'
+ import { useActionSheet } from '../../context/ActionSheetContext'
+ import type { PracticeTimeline } from '../types'
+ 
++/*
++ * The METRONOME PROGRAM library — bars, tempo ramps and section markers for the
++ * click. Not the app's practice routines, which are the ordered checklists of
++ * exercises in Practice Home; those have their own library and their own share
++ * format (`utils/practiceRoutineShare.ts`). This sheet used to be titled "Your
++ * Routines" too, which made a shared file's landing place a coin toss.
++ */
+ interface TimelineLibrarySheetProps {
+   open: boolean
+   activeTimelineId: string
+@@ -42,7 +49,7 @@ export default function TimelineLibrarySheet({
+ 
+   const handleNewRoutine = () => {
+     const count = saved.length + 1
+-    const created = saveTimeline(createEmptyTimeline(`My Practice ${count}`))
++    const created = saveTimeline(createEmptyTimeline(`My Program ${count}`))
+     onSelect(created)
+     onClose()
+   }
+@@ -58,7 +65,7 @@ export default function TimelineLibrarySheet({
+     void file.text().then((raw) => {
+       const result = importRoutineFromText(raw)
+       if (!result.ok) {
+-        void showAlert({ title: "Couldn't Open Routine", message: result.error, tone: 'error' })
++        void showAlert({ title: "Couldn't Open Program", message: result.error, tone: 'error' })
+         return
+       }
+       onSelect(result.routine)
+@@ -77,13 +84,13 @@ export default function TimelineLibrarySheet({
+     <AnimatedBottomSheet
+       isOpen={open}
+       onClose={onClose}
+-      ariaLabel="Practice Routines"
++      ariaLabel="Metronome Programs"
+       vaultTheme
+       elevated
+     >
+       <div className="px-1 pb-2 pt-1">
+         <h2 className="px-4 pb-2 text-lg font-bold text-[var(--audio-text-primary)]">
+-          Your Routines
++          Metronome Programs
+         </h2>
+         <div className="practice-timeline-library pointer-events-auto">
+           <Pressable
+@@ -93,12 +100,12 @@ export default function TimelineLibrarySheet({
+             onClick={handleNewRoutine}
+           >
+             <Plus size={16} className="mr-1 inline" />
+-            New Routine
++            New Program
+           </Pressable>
+ 
+           {saved.length === 0 ? (
+             <p className="px-5 py-3 text-sm text-[var(--audio-text-secondary)]">
+-              No saved routines yet. Create one to get started.
++              No saved programs yet. Create one to get started.
+             </p>
+           ) : (
+             saved.map((timeline) => (
+@@ -146,7 +153,7 @@ export default function TimelineLibrarySheet({
+                 <Pressable
+                   type="button"
+                   intensity="icon"
+-                  aria-label="Delete routine"
++                  aria-label="Delete program"
+                   onClick={() => {
+                     if (saved.length <= 1) return
+                     if (window.confirm(`Delete "${timeline.name}"?`)) {
+@@ -165,7 +172,7 @@ export default function TimelineLibrarySheet({
+                 <Pressable
+                   type="button"
+                   intensity="icon"
+-                  aria-label="Share routine"
++                  aria-label="Share program"
+                   onClick={() => handleShare(timeline)}
+                 >
+                   <Upload size={18} />
+@@ -180,7 +187,7 @@ export default function TimelineLibrarySheet({
+             className="mx-5 mt-4 w-[calc(100%-2.5rem)] rounded-xl border border-dashed border-[var(--audio-divider)] py-3 text-center text-sm font-semibold text-[var(--audio-text-secondary)]"
+             onClick={() => fileInputRef.current?.click()}
+           >
+-            Import routine
++            Import program
+           </Pressable>
+           <input
+             ref={fileInputRef}
+diff --git a/src/practiceTimeline/storage/routineFileOpen.ts b/src/practiceTimeline/storage/routineFileOpen.ts
+index 2b83ffd..a95716a 100644
+--- a/src/practiceTimeline/storage/routineFileOpen.ts
++++ b/src/practiceTimeline/storage/routineFileOpen.ts
+@@ -8,17 +8,29 @@ import {
+ } from '../../context/ActionSheetContext'
+ import { isRoutineFileName } from './routineFile'
+ import { importRoutineFromText } from './timelineStorage'
++import {
++  importPracticePlanFromText,
++  isPracticePlanFileName,
++} from '../../utils/practiceRoutineShare'
+ import type { PracticeTimeline } from '../types'
+ 
+ /**
+  * Opening a routine someone sent you.
+  *
+- * iOS copies a tapped `.btroutine` attachment into the app's Documents/Inbox
+- * and hands us the file URL through the standard `appUrlOpen` event, which
+- * Capacitor already forwards — AppDelegate falls through to the proxy once the
+- * URL isn't a Quick Tuner deep link, so no extra Swift is needed. A cold launch
+- * delivers the same URL via `getLaunchUrl()` instead, because the listener is
++ * iOS copies a tapped attachment into the app's Documents/Inbox and hands us
++ * the file URL through the standard `appUrlOpen` event, which Capacitor
++ * already forwards — AppDelegate falls through to the proxy once the URL isn't
++ * a Quick Tuner deep link, so no extra Swift is needed. A cold launch delivers
++ * the same URL via `getLaunchUrl()` instead, because the listener is
+  * registered after the event has already fired.
++ *
++ * Two different things arrive this way and must not be confused:
++ *   `.btplan`    — a practice routine: the ordered checklist of exercises the
++ *                  app is built around. This is what a teacher sends a student.
++ *   `.btroutine` — a metronome program: bars, tempo ramps and section markers
++ *                  for the practice timeline's click.
++ * The extension decides which importer runs, and each announces itself in its
++ * own words, so "Routine Added" always means the thing that was actually sent.
+  */
+ 
+ export type RoutineOpenEvent =
+@@ -38,15 +50,15 @@ function emit(event: RoutineOpenEvent): void {
+   announce(
+     event.status === 'imported'
+       ? {
+-          title: 'Routine Added',
+-          message: `"${event.routine.name}" is in your routines and ready to play.${
++          title: 'Program Added',
++          message: `"${event.routine.name}" is in your metronome programs and ready to play.${
+             event.warnings.length
+               ? `\n\nSome settings were adjusted to fit this version:\n${event.warnings.join('\n')}`
+               : ''
+           }`,
+           tone: 'success',
+         }
+-      : { title: "Couldn't Open Routine", message: event.error, tone: 'error' },
++      : { title: "Couldn't Open Program", message: event.error, tone: 'error' },
+   )
+ }
+ 
+@@ -116,9 +128,10 @@ async function handleIncomingUrl(url: string): Promise<void> {
+   if (!url || !looksLikeFileUrl(url) || handledUrls.has(url)) return
+ 
+   const name = fileNameFromUrl(url)
++  const isPracticePlan = isPracticePlanFileName(name)
+   /* Other file types can reach us through "Open With"; ignore them silently
+    * rather than showing an error for a file the user never meant for us. */
+-  if (!isRoutineFileName(name)) return
++  if (!isPracticePlan && !isRoutineFileName(name)) return
+ 
+   handledUrls.add(url)
+ 
+@@ -135,6 +148,21 @@ async function handleIncomingUrl(url: string): Promise<void> {
+     return
+   }
+ 
++  if (isPracticePlan) {
++    const plan = importPracticePlanFromText(text)
++    void discardInboxCopy(url)
++    announce(
++      plan.ok
++        ? {
++            title: 'Routine Added',
++            message: `"${plan.routine.name}" is in your routines. Open Practice Home to start it.`,
++            tone: 'success',
++          }
++        : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },
++    )
++    return
++  }
++
+   const result = importRoutineFromText(text)
+   void discardInboxCopy(url)
+ 
+diff --git a/src/styles/camera-mode-glass.css b/src/styles/camera-mode-glass.css
+index de6503e..181adff 100644
+--- a/src/styles/camera-mode-glass.css
++++ b/src/styles/camera-mode-glass.css
+@@ -1774,13 +1774,19 @@ button.compact-take-caption:active {
+   stroke-width: 1.8;
+ }
+ 
+-/* Unified Camera Mode capsule: Vault · Overlays · Record · Practice · Settings. */
++/* Unified Camera Mode capsule: Vault · Overlays · Record · Practice · Settings.
++ *
++ * The overlay above already reserves the home indicator, so this padding is
++ * only breathing room — it can be small, which is what puts the pill back down
++ * at the bottom of the glass where it used to sit. */
+ .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
+   display: flex !important;
+   width: 100% !important;
+   grid-template-columns: none !important;
++  flex-direction: column !important;
+   align-items: center !important;
+-  padding: 0 0 clamp(0.78rem, 2.2vh, 1.1rem) !important;
++  justify-content: flex-end !important;
++  padding: 0 0 clamp(0.3rem, 1vh, 0.5rem) !important;
+ }
+ 
+ .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-deck__main-row {
+@@ -1791,7 +1797,9 @@ button.compact-take-caption:active {
+   max-width: none !important;
+   align-items: center;
+   justify-content: center;
+-  transform: translateY(0.58rem);
++  /* No nudge down. The row used to be shoved 0.58rem lower to fake sitting at
++     the bottom, which parked it on top of the takes grabber underneath. The
++     deck's own padding places it now, so the two stack instead of overlapping. */
+ }
+ 
+ .camera-control-pill {
+@@ -2177,7 +2185,7 @@ button.compact-take-caption:active {
+ 
+ .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+   .control-deck.control-deck--camera.control-deck--timer-below {
+-  padding-bottom: calc(clamp(0.78rem, 2.2vh, 1.1rem) + 2rem) !important;
++  padding-bottom: calc(clamp(0.3rem, 1vh, 0.5rem) + 2rem) !important;
+ }
+ 
+ @media (prefers-reduced-motion: reduce) {
+@@ -2269,13 +2277,13 @@ button.compact-take-caption:active {
+   }
+ 
+   .app-ui-overlay:not(.app-ui-overlay--audio-mode) .control-deck.control-deck--camera {
+-    padding-bottom: 0.48rem !important;
++    padding-bottom: 0.28rem !important;
+   }
+ 
+   /* Short screens keep their tighter base padding; just add the timer strip. */
+   .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+     .control-deck.control-deck--camera.control-deck--timer-below {
+-    padding-bottom: calc(0.48rem + 2rem) !important;
++    padding-bottom: calc(0.28rem + 2rem) !important;
+   }
+ }
+ 
+diff --git a/src/styles/focus-practice.css b/src/styles/focus-practice.css
+index 7c10a0a..57ad172 100644
+--- a/src/styles/focus-practice.css
++++ b/src/styles/focus-practice.css
+@@ -167,8 +167,8 @@ html.app-dark-mode .practice-bench {
+   display: flex;
+   flex: 1;
+   min-width: 0;
+-  flex-direction: column;
+-  gap: 0.42rem;
++  align-items: center;
++  gap: 0.75rem;
+   padding: 0.75rem 0.25rem;
+   color: var(--focus-text);
+   text-align: left;
+@@ -182,6 +182,36 @@ html.app-dark-mode .practice-bench {
+   overflow-wrap: anywhere;
+ }
+ 
++.focus-reference-thumbnail {
++  position: relative;
++  display: grid;
++  place-items: center;
++  flex: 0 0 5.5rem;
++  aspect-ratio: 16 / 9;
++  overflow: hidden;
++  border-radius: 0.5rem;
++  background: var(--focus-edge);
++  color: var(--focus-secondary);
++}
++
++.focus-reference-thumbnail > svg {
++  width: 1.25rem;
++  height: 1.25rem;
++}
++
++.focus-reference-thumbnail > img {
++  position: absolute;
++  inset: 0;
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++}
++
++.focus-reference-description {
++  min-width: 0;
++  flex: 1;
++}
++
+ .focus-reference-result small {
+   display: block;
+   margin-top: 0.25rem;
+@@ -190,6 +220,8 @@ html.app-dark-mode .practice-bench {
+ }
+ 
+ .focus-reference-use {
++  display: block;
++  margin-top: 0.35rem;
+   color: var(--sm-blue, #1598ff);
+   font-size: var(--sm-text-caption, 0.7rem);
+   font-weight: var(--sm-weight-strong, 700);
+diff --git a/src/styles/interaction-polish.css b/src/styles/interaction-polish.css
+index 95c5305..ffb532f 100644
+--- a/src/styles/interaction-polish.css
++++ b/src/styles/interaction-polish.css
+@@ -142,14 +142,19 @@ html.app-dark-mode .native-bottom-sheet--audio-light textarea::placeholder {
+   color: rgba(192, 201, 215, 0.68);
+ }
+ 
++/* A grabber, not a signpost. 44px tall for the tap target, but the ink is one
++   flat oval — the deck reads as something you can pull up without a caption
++   saying so, and the row it used to need is given back to the graph above. */
+ .take-vault-handle {
+-  order: 20; display: flex; flex-direction: column; align-items: center;
+-  justify-content: center; gap: 5px; min-height: 44px; width: 140px;
+-  padding: 6px 12px; border: 0; background: transparent; color: inherit;
+-  touch-action: none; cursor: pointer; font-size: 10px; letter-spacing: .06em;
++  order: 20; display: flex; align-items: center; justify-content: center;
++  min-height: 26px; width: 96px; padding: 10px 12px 6px;
++  border: 0; background: transparent; color: inherit; cursor: pointer;
+ }
+-.take-vault-handle i { width: 32px; height: 3px; border-radius: 2px; background: currentColor; opacity: .5; }
+-.take-vault-handle span { opacity: .75; }
++.take-vault-handle i {
++  width: 40px; height: 5px; border-radius: 999px;
++  background: currentColor; opacity: .32;
++}
++.take-vault-handle:active i { opacity: .5; }
+ .pitch-living-canvas .pitch-living-tool-rail {
+   grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
+   border-top: 1px solid #1598ff25;
+diff --git a/src/styles/practice-system.css b/src/styles/practice-system.css
+index 5710788..7e8d51c 100644
+--- a/src/styles/practice-system.css
++++ b/src/styles/practice-system.css
+@@ -265,8 +265,16 @@ html.app-dark-mode
+   box-shadow: none;
+ }
+ 
+-.app-ui-overlay--audio-practice-tuner .control-deck__vault-btn,
+-.app-ui-overlay--audio-practice-tuner .control-deck__settings-btn {
++/* Only the standalone (pre-pill) chrome takes glass of its own. Inside the
++ * audio pill these two are transparent, square hit targets, and a
++ * backdrop-filter on a transparent square paints exactly that: a grey-white
++ * rectangle that ignores the pill's radius. It only showed once the tuner wash
++ * gave the backdrop a colour to blur, which is why it read as "discolouration
++ * when the colours light up". The pill above them is the one glass plane. */
++.app-ui-overlay--audio-practice-tuner
++  .control-deck__vault-btn:not(.audio-vault-button),
++.app-ui-overlay--audio-practice-tuner
++  .control-deck__settings-btn:not(.audio-control-deck__settings-btn) {
+   border: 1px solid rgba(21, 152, 255, 0.12) !important;
+   background: rgba(255, 255, 255, 0.84) !important;
+   color: #275f85 !important;
+@@ -280,7 +288,7 @@ html.app-dark-mode
+ }
+ 
+ .app-ui-overlay--audio-practice-tuner
+-  .control-deck__settings-btn[aria-expanded='true'] {
++  .control-deck__settings-btn:not(.audio-control-deck__settings-btn)[aria-expanded='true'] {
+   border-color: rgba(247, 166, 0, 0.58) !important;
+   background: rgba(255, 251, 242, 0.92) !important;
+   color: #a86d00 !important;
+@@ -2062,15 +2070,19 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
+   }
+ }
+ 
+-/* Audio Mode recording deck — Camera Mode's compact glass language. */
++/* Audio Mode recording deck — Camera Mode's compact glass language.
++ *
++ * `justify-content: flex-end` and a small bottom pad: the overlay already
++ * holds the home indicator back, so the pill sits as low as it can without
++ * touching it, matching Camera exactly. */
+ .app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
+   display: flex !important;
+   width: 100% !important;
+   grid-template-columns: none !important;
+   flex-direction: column !important;
+   align-items: center !important;
+-  justify-content: center !important;
+-  padding: 0 0 clamp(0.72rem, 2vh, 1rem) !important;
++  justify-content: flex-end !important;
++  padding: 0 0 clamp(0.3rem, 1vh, 0.5rem) !important;
+ }
+ 
+ .app-ui-overlay--audio-mode .audio-control-deck__main-row {
+@@ -2130,6 +2142,18 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
+   background: transparent;
+ }
+ 
++.app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
++.app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button,
++.app-ui-overlay--audio-mode .audio-control-pill .audio-pill-action,
++.app-ui-overlay--audio-mode
++  .audio-control-pill
++  .audio-control-deck__settings-btn {
++  /* The pill is the glass. A second backdrop-filter nested inside it samples
++     its own square box and paints a hard rectangle over the rounded chrome. */
++  backdrop-filter: none !important;
++  -webkit-backdrop-filter: none !important;
++}
++
+ .app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
+ .app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button,
+ .app-ui-overlay--audio-mode .audio-control-pill .audio-pill-action {
+diff --git a/src/styles/routine-guide.css b/src/styles/routine-guide.css
+index 051223e..8fdc49d 100644
+--- a/src/styles/routine-guide.css
++++ b/src/styles/routine-guide.css
+@@ -209,20 +209,44 @@ html.app-dark-mode .practice-menu-card.practice-menu-card--routine-guide {
+ .routine-guide-saved > h3 { margin: 0; }
+ .routine-guide-saved > p { margin: 0; padding: 18px 0; border-top: 1px solid var(--guide-line); color: var(--guide-muted); font-size: 13px; line-height: 1.6; }
+ .routine-guide-saved-list { overflow: hidden; border: 1px solid var(--guide-line); border-radius: 18px; background: var(--guide-panel); }
++/* The row carries the routine and its Share button side by side: the divider
++   moved out here so both halves sit above one line rather than each drawing
++   their own. */
++.routine-guide-saved-row {
++  display: flex;
++  align-items: center;
++  border-bottom: 1px solid var(--guide-line);
++}
++.routine-guide-saved-row:last-child { border-bottom: 0; }
++.routine-guide-saved-share {
++  display: grid;
++  flex: none;
++  width: 52px;
++  align-self: stretch;
++  min-height: 82px;
++  padding: 0;
++  border: 0;
++  border-left: 1px solid var(--guide-line);
++  background: transparent;
++  color: var(--guide-muted);
++  place-items: center;
++}
++.routine-guide-saved-share svg { width: 17px; height: 17px; }
++.routine-guide-saved-share:active { color: var(--guide-accent); }
++
+ .routine-guide-saved-routine {
+   display: flex;
+   width: 100%;
++  min-width: 0;
+   min-height: 82px;
+   align-items: center;
+   gap: 12px;
+   padding: 15px 16px;
+   border: 0;
+-  border-bottom: 1px solid var(--guide-line);
+   color: var(--guide-ink);
+   background: transparent;
+   text-align: left;
+ }
+-.routine-guide-saved-routine:last-child { border-bottom: 0; }
+ .routine-guide-saved-routine__copy { display: grid; min-width: 0; flex: 1; gap: 5px; }
+ .routine-guide-saved-routine__copy strong { overflow: hidden; font-size: 16px; font-weight: 650; letter-spacing: -.025em; text-overflow: ellipsis; white-space: nowrap; }
+ .routine-guide-saved-routine__copy small { overflow: hidden; color: var(--guide-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+diff --git a/src/utils/handsFreePhase.ts b/src/utils/handsFreePhase.ts
+index 67b213c..1ab030b 100644
+--- a/src/utils/handsFreePhase.ts
++++ b/src/utils/handsFreePhase.ts
+@@ -1,10 +1,12 @@
+-export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback'
++export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback' | 'saving' | 'countdown'
+ 
+ export interface HandsFreePhaseInput {
+   autoSoundRecording: boolean
+   isRecording: boolean
+   handsFreePlaybackPending: boolean
+   handsFreeListeningReady: boolean
++  playbackPlaying?: boolean
++  replayCountdown?: number | null
+   /** Drag-to-delete borrows the record slot — hands-free status must stand down. */
+   dragDeleteActive: boolean
+   /** Video takes show a "finishing" spinner that owns the same slot. */
+@@ -23,9 +25,13 @@ export function resolveHandsFreePhase({
+   handsFreeListeningReady,
+   dragDeleteActive,
+   finishingTake,
++  playbackPlaying,
++  replayCountdown,
+ }: HandsFreePhaseInput): HandsFreePhase | null {
+-  if (!autoSoundRecording || dragDeleteActive || finishingTake) return null
+-  if (handsFreePlaybackPending && !isRecording) return 'playback'
++  if (!autoSoundRecording || dragDeleteActive) return null
++  if (finishingTake) return 'saving'
++  if (handsFreePlaybackPending && !isRecording) return playbackPlaying === false ? 'saving' : 'playback'
++  if (isRecording && replayCountdown != null) return 'countdown'
+   if (isRecording) return 'recording'
+   return handsFreeListeningReady ? 'listening' : 'preparing'
+ }
+diff --git a/src/utils/playbackRouteCoordinator.ts b/src/utils/playbackRouteCoordinator.ts
+index 48598f0..d521db5 100644
+--- a/src/utils/playbackRouteCoordinator.ts
++++ b/src/utils/playbackRouteCoordinator.ts
+@@ -15,6 +15,16 @@ export interface PreparePlaybackRouteOptions {
+   suspendCamera?: boolean
+ }
+ 
++// Route changes mutate the same AVAudioSession. Complete each transition
++// before a new player starts or a previous player restores capture.
++let routeOperation: Promise<void> = Promise.resolve()
++function enqueueRoute(operation: () => Promise<void>): Promise<void> {
++  const result = routeOperation.then(operation, operation)
++  routeOperation = result.catch(() => {})
++  return result
++}
++
++let routeGeneration = 0
+ let playbackRouteActive = false
+ let cameraWasSuspendedForPlayback = false
+ let loudSessionAppliedForPlayback = false
+@@ -47,9 +57,11 @@ export function isPlaybackRouteHoldActive(): boolean {
+   return playbackRouteActive
+ }
+ 
+-export async function clearPlaybackRouteForLifecycle(
+-  reason = 'lifecycle',
+-): Promise<void> {
++export function clearPlaybackRouteForLifecycle(reason = 'lifecycle'): Promise<void> {
++  return enqueueRoute(() => clearPlaybackRouteForLifecycleImpl(reason))
++}
++
++async function clearPlaybackRouteForLifecycleImpl(reason: string): Promise<void> {
+   if (!isIosNative()) return
+ 
+   const hadRouteState =
+@@ -59,6 +71,7 @@ export async function clearPlaybackRouteForLifecycle(
+     coexistentSpeakerAppliedForPlayback ||
+     restoreInFlight !== null
+ 
++  routeGeneration += 1
+   playbackRouteActive = false
+   cameraWasSuspendedForPlayback = false
+   loudSessionAppliedForPlayback = false
+@@ -162,14 +175,17 @@ export async function releaseInlineTakeBoxPlaybackRoute(): Promise<void> {
+   await releaseStereoPlayback()
+ }
+ 
+-export async function preparePlaybackRoute(
+-  options: PreparePlaybackRouteOptions = {},
+-): Promise<void> {
++export function preparePlaybackRoute(options: PreparePlaybackRouteOptions = {}): Promise<void> {
++  return enqueueRoute(() => preparePlaybackRouteImpl(options))
++}
++
++async function preparePlaybackRouteImpl(options: PreparePlaybackRouteOptions): Promise<void> {
+   if (!isIosNative()) return
+   if (playbackRouteActive) return
+ 
+   const suspendCamera = options.suspendCamera === true
+ 
++  routeGeneration += 1
+   playbackRouteActive = true
+   cameraWasSuspendedForPlayback = false
+   loudSessionAppliedForPlayback = false
+@@ -179,9 +195,8 @@ export async function preparePlaybackRoute(
+     logRouteTransition(diagSessionId, 'preparePlaybackRoute-start', { suspendCamera })
+     void logAudioSessionSnapshot('preparePlaybackRoute-start', diagSessionId)
+   }
+-  await BestTakeAudioPlugin.setPlaybackRouteActive({ active: true })
+-
+   try {
++    await BestTakeAudioPlugin.setPlaybackRouteActive({ active: true })
+     if (suspendCamera) {
+       cameraWasSuspendedForPlayback = await ensureCameraSuspendedForPlayback()
+       const loud = await applyLoudPlaybackSessionIfSpeaker()
+@@ -242,11 +257,15 @@ export async function preparePlaybackRoute(
+  * which preparePlaybackRoute() no-ops on the stale flag and the metronome's
+  * Web Audio clicks render into a dead session (silent first-take count-in).
+  */
+-export async function reassertPlaybackRouteForCountIn(): Promise<void> {
++export function reassertPlaybackRouteForCountIn(): Promise<void> {
++  return enqueueRoute(reassertPlaybackRouteForCountInImpl)
++}
++
++async function reassertPlaybackRouteForCountInImpl(): Promise<void> {
+   if (!isIosNative()) return
+ 
+   if (!playbackRouteActive) {
+-    await preparePlaybackRoute({ suspendCamera: false })
++    await preparePlaybackRouteImpl({ suspendCamera: false })
+     return
+   }
+ 
+@@ -258,7 +277,11 @@ export async function reassertPlaybackRouteForCountIn(): Promise<void> {
+   coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
+ }
+ 
+-export async function completePlaybackRouteRestore(): Promise<void> {
++export function completePlaybackRouteRestore(): Promise<void> {
++  return enqueueRoute(completePlaybackRouteRestoreImpl)
++}
++
++async function completePlaybackRouteRestoreImpl(): Promise<void> {
+   if (!isIosNative()) return
+   if (!playbackRouteActive) return
+ 
+@@ -272,6 +295,7 @@ export async function completePlaybackRouteRestore(): Promise<void> {
+   const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
+ 
+   restoreInFlight = (async () => {
++    routeGeneration += 1
+     playbackRouteActive = false
+     cameraWasSuspendedForPlayback = false
+     loudSessionAppliedForPlayback = false
+@@ -316,8 +340,10 @@ export function installPlaybackRouteEndedListener(
+   playbackRouteListenerInstalled = true
+ 
+   void BestTakeAudioPlugin.addListener('playbackRouteEnded', () => {
+-    void (async () => {
+-      if (!playbackRouteActive) return
++    const endedGeneration = routeGeneration
++    void enqueueRoute(async () => {
++      if (!playbackRouteActive || endedGeneration !== routeGeneration) return
++      routeGeneration += 1
+ 
+       const shouldResumeCamera = cameraWasSuspendedForPlayback
+       const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
+@@ -336,7 +362,7 @@ export function installPlaybackRouteEndedListener(
+       if (shouldResumeCamera || shouldRefreshLivePreview) {
+         await onEnded()
+       }
+-    })()
++    }).catch(error => console.warn('[PlaybackRoute] end recovery failed', error))
+   })
+ }
+ 
+diff --git a/src/utils/tutorialContent.ts b/src/utils/tutorialContent.ts
+index 756fc58..9bd0194 100644
+--- a/src/utils/tutorialContent.ts
++++ b/src/utils/tutorialContent.ts
+@@ -383,8 +383,8 @@ export const HELP_TOPICS: HelpTopic[] = [
+     body: 'Record without video. Each take plays back the moment you stop.',
+     bullets: [
+       'Bottom pill: Practice Home, Workspace, Record, Camera, Settings',
+-      'Use Audio, Metronome, Tuner, and Games from the top tabs',
+-      'Open Program from Metronome to build a timed practice routine',
++      'Use Record, Tuner, Metronome, and Games from the top tabs',
++      'Open Practice Home for your routine, or Program in Metronome for tempo sequences',
+       'Tap Camera to return to video recording',
+       'Best Take and Current Take stay ready for quick comparison',
+     ],
+@@ -434,12 +434,12 @@ export const HELP_TOPICS: HelpTopic[] = [
+   {
+     id: 'practice-sessions',
+     title: 'Practice Routines',
+-    body: 'Open Program from the Metronome tab to build a passage or a whole program into timed sections you can run again.',
++    body: 'Open Practice Home and choose Build your routine.',
+     bullets: [
+-      'Add sections with bars, tempo, time signature, feel, and repeats',
+-      'Drag section cards to reorder the routine',
+-      'Use count-ins, looping, tempo changes, and meter patterns',
+-      'Enable recording before Start Practice to save the run as a take',
++      'Choose a preset or add your own exercises',
++      'Set each exercise’s tools and add an optional reference',
++      'Use Play or Pause to control your practice time',
++      'Tap Done & next to continue, or Finish routine on the last exercise',
+     ],
+   },
+   {

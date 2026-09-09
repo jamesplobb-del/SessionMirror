@@ -29,14 +29,13 @@ export function sectionProgressAt(
   totalMeasures: number,
   shape: TempoRampShape,
 ): number {
-  if (totalMeasures <= 1) return 0
   const barIndex = measure - 1
   if (shape === 'stepped') {
-    return barIndex / (totalMeasures - 1)
+    return totalMeasures <= 1 ? 0 : barIndex / (totalMeasures - 1)
   }
   const beatsPerSection = totalMeasures * pulseCount
   const beatIndex = barIndex * pulseCount + (beat - 1)
-  return beatIndex / (beatsPerSection - 1)
+  return beatsPerSection <= 1 ? 0 : beatIndex / (beatsPerSection - 1)
 }
 
 export function interpolateRampBpm(
@@ -87,7 +86,7 @@ export function resolveMasterBpmAt(
   ramp?: TempoRamp,
 ): number {
   const totalMeasures = effectiveBars(section)
-  if (!ramp?.enabled || totalMeasures <= 1) return section.bpm
+  if (!ramp?.enabled) return section.bpm
   const shape = ramp.shape ?? 'linear'
   const progress = sectionProgressAt(measure, beat, pulseCount, totalMeasures, shape)
   return interpolateRampBpm(section.bpm, ramp.endBpm, progress, shape)

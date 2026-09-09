@@ -33,7 +33,7 @@ function TunerTranspositionMenu({
     <section className="tuner-transposition-menu" aria-label="Tuner settings">
       <header className="tuner-transposition-menu__header">
         <div>
-          <h2>Tuner settings</h2>
+          <h2><span className="electric-tuning-old">Tuner settings</span><span className="electric-tuning-new">Tuning</span></h2>
           <span>Note names follow your part. Cents stay at concert pitch.</span>
         </div>
         <button type="button" onClick={onClose} aria-label="Close tuner settings">

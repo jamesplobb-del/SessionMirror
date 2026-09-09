@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useLayoutEffect, useRef, useState, useCallback, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
@@ -99,9 +99,13 @@ export default function AnimatedBottomSheet({
     }
   }, [isOpen])
 
+  const reduceMotion = useReducedMotion()
+  const electric = typeof document !== 'undefined' && document.documentElement.dataset.refinement === 'depth-electric'
+
   if (typeof document === 'undefined') return null
 
   const sheetTransition =
+    reduceMotion ? { duration:0.1 } : electric ? {type:'spring' as const,stiffness:440,damping:40,mass:.85} :
     motionPreset === 'default'
       ? iosSpringSheet
       : motionPreset === 'light'
@@ -113,7 +117,7 @@ export default function AnimatedBottomSheet({
       : motionPreset === 'light'
         ? { duration: 0.2, ease: 'easeOut' as const }
         : iosSheetBackdrop
-  const useScale = motionPreset !== 'light'
+  const useScale = !electric && !reduceMotion && motionPreset !== 'light'
 
   const handleSheetAnimationComplete = () => {
     if (!isOpen || enterNotifiedRef.current) return
@@ -169,9 +173,9 @@ export default function AnimatedBottomSheet({
               paddingBottom: 'env(safe-area-inset-bottom)',
               pointerEvents: 'auto',
             }}
-            initial={useScale ? { opacity: 0, y: slideDistance, scale: 0.965 } : { opacity: 0, y: slideDistance }}
+            initial={reduceMotion ? {opacity:0,y:0} : useScale ? { opacity: 0, y: slideDistance, scale: 0.965 } : { opacity: 0, y: slideDistance }}
             animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
-            exit={useScale ? { opacity: 0, y: slideDistance, scale: 0.98 } : { opacity: 0, y: slideDistance }}
+            exit={reduceMotion ? {opacity:0,y:0} : useScale ? { opacity: 0, y: slideDistance, scale: 0.98 } : { opacity: 0, y: slideDistance }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
             {...sheetDragProps}

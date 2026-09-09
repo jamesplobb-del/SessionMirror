@@ -142,14 +142,19 @@ html.app-dark-mode .native-bottom-sheet--audio-light textarea::placeholder {
   color: rgba(192, 201, 215, 0.68);
 }
 
+/* A grabber, not a signpost. 44px tall for the tap target, but the ink is one
+   flat oval — the deck reads as something you can pull up without a caption
+   saying so, and the row it used to need is given back to the graph above. */
 .take-vault-handle {
-  order: 20; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 5px; min-height: 44px; width: 140px;
-  padding: 6px 12px; border: 0; background: transparent; color: inherit;
-  touch-action: none; cursor: pointer; font-size: 10px; letter-spacing: .06em;
+  order: 20; display: flex; align-items: center; justify-content: center;
+  min-height: 26px; width: 96px; padding: 10px 12px 6px;
+  border: 0; background: transparent; color: inherit; cursor: pointer;
 }
-.take-vault-handle i { width: 32px; height: 3px; border-radius: 2px; background: currentColor; opacity: .5; }
-.take-vault-handle span { opacity: .75; }
+.take-vault-handle i {
+  width: 40px; height: 5px; border-radius: 999px;
+  background: currentColor; opacity: .32;
+}
+.take-vault-handle:active i { opacity: .5; }
 .pitch-living-canvas .pitch-living-tool-rail {
   grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0;
   border-top: 1px solid #1598ff25;

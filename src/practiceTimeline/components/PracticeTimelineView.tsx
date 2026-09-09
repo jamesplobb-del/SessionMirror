@@ -179,7 +179,7 @@ export default function PracticeTimelineView({
         disabled={Boolean(linkedProgramId)} onClick={() => setLibraryOpen(true)}
       >
         <BookOpen size={18} aria-hidden />
-        Routines
+        Saved Programs
       </Pressable>
       <Pressable
         type="button"
@@ -239,7 +239,7 @@ export default function PracticeTimelineView({
                     }}
                   >
                     <h1 className="practice-timeline__hero-title">
-                      {timeline.sections.length === 0 ? 'Create Your Practice' : timeline.name}
+                      {timeline.sections.length === 0 ? 'Create a Program' : timeline.name}
                     </h1>
                     <Pencil size={15} aria-hidden />
                   </Pressable>
@@ -252,16 +252,16 @@ export default function PracticeTimelineView({
               )}
               <p className="practice-timeline__hero-sub">
                 {timeline.sections.length === 0
-                  ? 'Build a routine one section at a time.'
+                  ? 'Set tempos and timing, one section at a time.'
                   : 'Drag to reorder. Tap Edit to change timing.'}
               </p>
             </header>
 
-            <section className="practice-timeline__builder" aria-label="Routine sections">
+            <section className="practice-timeline__builder" aria-label="Program sections">
               {timeline.sections.length > 0 ? (
                 <div className="practice-timeline__builder-heading">
                   <div>
-                    <h2>Routine sections</h2>
+                    <h2>Program sections</h2>
                     <p>They play from top to bottom.</p>
                   </div>
                 </div>

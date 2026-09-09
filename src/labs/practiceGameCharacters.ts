@@ -1,9 +1,10 @@
-import astronautAsset from '../assets/practice-characters/astronaut.svg'
-import birdAsset from '../assets/practice-characters/bird.svg'
-import catAsset from '../assets/practice-characters/cat.svg'
-import foxAsset from '../assets/practice-characters/fox.svg'
-import robotAsset from '../assets/practice-characters/robot.svg'
-import trumpeterAsset from '../assets/practice-characters/trumpeter.png'
+import { characterUnlocked } from '../utils/dailyChallenges'
+import astronautAsset from '../assets/practice-characters/ensemble/luna.svg'
+import birdAsset from '../assets/practice-characters/ensemble/pip.svg'
+import catAsset from '../assets/practice-characters/ensemble/cleo.svg'
+import foxAsset from '../assets/practice-characters/ensemble/reed.svg'
+import robotAsset from '../assets/practice-characters/ensemble/riff.svg'
+import trumpeterAsset from '../assets/practice-characters/ensemble/otto.svg'
 
 export type PracticeGameCharacterId =
   | 'trumpeter'
@@ -16,18 +17,21 @@ export type PracticeGameCharacterId =
 export interface PracticeGameCharacter {
   id: PracticeGameCharacterId
   name: string
+  instrument: string
+  personality: string
   asset: string
   /** Per-asset optical-size adjustment shared by game renderers. */
   scale: number
 }
 
+/** Storage IDs stay stable across the new artwork so saved players and trophies survive. */
 export const PRACTICE_GAME_CHARACTERS: readonly PracticeGameCharacter[] = [
-  { id: 'trumpeter', name: 'Trumpeter', asset: trumpeterAsset, scale: 1 },
-  { id: 'cat', name: 'Cat', asset: catAsset, scale: 1.18 },
-  { id: 'robot', name: 'Robot', asset: robotAsset, scale: 1.18 },
-  { id: 'bird', name: 'Bird', asset: birdAsset, scale: 1.18 },
-  { id: 'fox', name: 'Fox', asset: foxAsset, scale: 1.18 },
-  { id: 'astronaut', name: 'Astronaut', asset: astronautAsset, scale: 1.18 },
+  { id: 'trumpeter', name: 'Otto', instrument: 'Trumpet otter', personality: 'First to warm up. Last to lose heart.', asset: trumpeterAsset, scale: 1.18 },
+  { id: 'cat', name: 'Cleo', instrument: 'Violin cat', personality: 'Finds the sweet spot with eyes closed.', asset: catAsset, scale: 1.18 },
+  { id: 'robot', name: 'Riff', instrument: 'Drummer raccoon', personality: 'Makes a groove out of just about anything.', asset: robotAsset, scale: 1.18 },
+  { id: 'bird', name: 'Pip', instrument: 'Flute bird', personality: 'Small wings. Big breath. One more phrase.', asset: birdAsset, scale: 1.18 },
+  { id: 'fox', name: 'Reed', instrument: 'Saxophone fox', personality: 'Turns a wrong note into a new idea.', asset: foxAsset, scale: 1.18 },
+  { id: 'astronaut', name: 'Luna', instrument: 'Conductor owl', personality: 'Always has room for one more player.', asset: astronautAsset, scale: 1.18 },
 ] as const
 
 const CHARACTER_STORAGE_KEY = 'besttake.practiceGames.character'
@@ -51,7 +55,7 @@ export function loadPracticeGameCharacter(): PracticeGameCharacterId {
 }
 
 export function savePracticeGameCharacter(id: PracticeGameCharacterId): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined' || !characterUnlocked(id)) return
   try {
     window.localStorage.setItem(CHARACTER_STORAGE_KEY, id)
   } catch {

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BestTake · Design directions</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eef0f3;color:#172031;font:15px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}main{max-width:840px;margin:0 auto;padding:24px 8px}h1{font-size:25px;letter-spacing:-.025em;margin:0 0 10px}p{line-height:1.5;margin:8px 0;color:#516072}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 12px}button{font:inherit;padding:10px 14px;border:1px solid #b7c1ce;border-radius:10px;background:#fff;color:#243246;cursor:pointer;min-height:44px}button[aria-pressed=true]{background:#243e64;color:#fff;border-color:#243e64}.screens{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-top:22px}.screen{width:390px;max-width:100%}.screen h2{font-size:16px;margin:0 0 10px}iframe{display:block;border:1px solid #bdc6d1;width:390px;max-width:100%;height:844px;background:#0c1424;border-radius:12px}.detail{max-width:800px;min-height:48px}small{display:block;line-height:1.5;color:#59677a;margin-top:14px}a{color:#285b9c}.scope{padding:12px 0;border-top:1px solid #ccd3dd;margin-top:20px}@media(max-width:450px){main{padding:20px 12px}iframe{height:820px}.screens{gap:24px}}
+</style>
+</head>
+<body><main>
+<h1>Electric, refined.</h1>
+<p><a href="/launch-review.html">Review launch animations &amp; logo concepts →</a></p>
+<p>Compare Electric playback and the approved Arcade Pop games direction side by side.</p>
+<div class="controls" role="group" aria-label="Design direction">
+<button type="button" aria-pressed="true" data-style="depth-electric">Depth · Electric</button>
+<button type="button" aria-pressed="false" data-style="arcade-pop">Arcade Pop</button>
+<button type="button" aria-pressed="false" data-style="arcade-night">Midnight Arcade</button>
+<button type="button" aria-pressed="false" data-style="depth-prism">Depth · Prism</button>
+<button type="button" aria-pressed="false" data-style="fresh">Fresh · Original</button>
+<button type="button" aria-pressed="false" data-style="fresh-air">Fresh Air</button>
+<button type="button" aria-pressed="false" data-style="fresh-depth">Fresh Depth</button>
+<button type="button" aria-pressed="false" data-style="studio">1 · Studio</button>
+<button type="button" aria-pressed="false" data-style="playful">2 · Playful</button>
+<button type="button" aria-pressed="false" data-style="type">Font cleanup</button>
+<button type="button" aria-pressed="false" data-style="soft">Softer finish</button>
+<button type="button" aria-pressed="false" data-style="current">Current</button>
+</div>
+<p id="detail" class="detail" aria-live="polite">Selected direction: Electric. New control icons, cleaner type and smoother take cards; the top bar and Home layout stay as selected.</p>
+<div class="controls" role="group" aria-label="Compare the same screen">
+<button type="button" data-screen="playback">Playback</button><button type="button" data-screen="record">Record</button><button type="button" data-screen="camera">Camera</button><button type="button" data-screen="tuner">Tuner</button><button type="button" data-screen="metronome">Metronome</button><button type="button" data-screen="program">Program</button><button type="button" data-screen="home">Home</button><button type="button" data-screen="routines">Routines</button><button type="button" data-screen="games">Games home</button><button type="button" data-screen="balance-home">Balance</button><button type="button" data-screen="balance-options">Balance options</button><button type="button" data-screen="staff-jumper">Staff Jumper</button><button type="button" data-screen="staff-options">Staff options</button><button type="button" data-screen="vault">TakeVault</button><button type="button" data-screen="workspace">Workspace</button><button type="button" data-screen="settings">Settings</button><button type="button" data-screen="pitch-widget">Pitch widget</button><button type="button" data-screen="insights">Pitch Insights</button><button type="button" data-screen="drone">Drone</button><button type="button" data-screen="tuning">Tuning</button>
+</div><p id="screen-status" role="status">Choose a screen to open it in both previews.</p>
+<label style="display:block;margin:12px 0"><input id="tuner-colors" type="checkbox"> Show reactive tuner colors in previews</label>
+<p style="font-size:12px">Tuner colors start off in both panels; the checkbox restores them. Live pitch readings still work. Camera boxes and bottom bars keep the see-through treatment.</p>
+<div class="screens">
+<section class="screen"><h2>Current app</h2><iframe title="Current BestTake appearance" id="current" src="/?refinement=current"></iframe></section>
+<section class="screen"><h2 id="variant-heading">Depth · Electric</h2><iframe title="BestTake cosmetic concept" id="variant" src="/?refinement=depth-electric"></iframe></section>
+</div>
+<p class="scope">Playback uses generated sample video. Trim and iOS sharing still need device validation. The left panel compares the current styling using the same updated controls. Concept scope: Record, Camera, Tuner, Metronome, Games, Home, Routines and the bottom controls. Camera uses a synthetic preview, not your real camera. Empty takes and live tuner input reflect this separate preview; Insights has an optional labeled sample-data view for checking its populated layout. Games keeps its three doors, artwork, characters and gameplay. Layout choices here are proposals for your approval.</p>
+<small>Review copy only. These previews use synthetic camera/microphone input and their own local browser data. Changes here do not alter the installed app or its recordings. Fonts are rendered by this Mac; the final iPhone appearance still needs device review.</small>
+</main><script>
+const descriptions={'arcade-pop':'Arcade Pop: warm white cards, mint sky, crisp ink outlines and tactile gold buttons. A brighter, playful cabinet feel with familiar layouts.','arcade-night':'Midnight Arcade: deep navy, cyan light and gold rewards. Polished evening arcade chrome; music stays on a readable light page.','depth-electric':'Selected direction: Electric. New control icons, cleaner type and smoother take cards; the top bar and Home layout stay as selected.','depth-prism':'Blue-to-violet highlights with bright gold accents. More expressive, with the same Depth surfaces and layout.','fresh-air':'Brighter surfaces, crisp grouping and quieter shadows. Same blue and gold, same side-by-side Home layout.','fresh-depth':'More translucent controls, softly lifted cards and a blue selected tab. Same colors and Home layout, with greater depth.',fresh:'The original Fresh finish, now with Playful’s two starting tiles, icon row and grouped daily goals. Your blue and gold stay the same.',studio:'Crisp cards, restrained blue accents, slim borders and flatter controls across the main tabs. Compare against Playful’s rounded, tactile treatment.',playful:'Rounded blue-and-gold controls, clearer take cards, a framed tuner and a tactile metronome. Your familiar actions stay in place.',type:'Typography only: lighter take titles and tempo/pitch readouts. Layout and colors stay current; Games keeps its arcade lettering.',soft:'The font cleanup plus muted blue and gold accents and quieter shadows. A deliberately subtle alternative to Studio and Playful.',current:'Both panels show the captured current app.'};
+const names={'arcade-pop':'Arcade Pop','arcade-night':'Midnight Arcade','depth-electric':'Depth · Electric','depth-prism':'Depth · Prism','fresh-air':'Fresh Air','fresh-depth':'Fresh Depth',fresh:'Fresh',studio:'Studio',playful:'Playful',type:'Font cleanup',soft:'Softer finish',current:'Current app'};
+let selectedStyle='depth-electric';
+const variant=document.getElementById('variant');
+function applyStyle(){variant.contentWindow.postMessage({type:'besttake-refinement',style:selectedStyle.startsWith('arcade-')?'depth-electric':selectedStyle,arcadeStyle:selectedStyle},location.origin)}
+variant.addEventListener('load',applyStyle);
+const tunerColors=document.getElementById('tuner-colors');
+function applyTunerColors(){['current','variant'].forEach(id=>document.getElementById(id).contentWindow.postMessage({type:'preview-tuner-colors',enabled:tunerColors.checked},location.origin))}
+tunerColors.addEventListener('change',applyTunerColors);
+['current','variant'].forEach(id=>document.getElementById(id).addEventListener('load',applyTunerColors));
+document.querySelectorAll('[data-style]').forEach(button=>button.addEventListener('click',()=>{selectedStyle=button.dataset.style;document.querySelectorAll('[data-style]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));document.getElementById('detail').textContent=descriptions[selectedStyle];document.getElementById('variant-heading').textContent=names[selectedStyle];applyStyle()}));
+async function waitFor(get){for(let i=0;i<400;i++){const result=get();if(result)return result;await new Promise(resolve=>setTimeout(resolve,50))}throw new Error('The screen is still loading. Try its button again.')}
+async function openScreen(frame,screen){
+ if(screen==='playback') {frame.src='/playback-preview.html?refinement='+(frame.id==='current'?'current':'depth-electric');await waitFor(()=>frame.contentDocument?.querySelector('.review-overlay'));return;}
+ if(frame.src.includes('playback-preview.html')) {frame.src='/?refinement='+(frame.id==='current'?'current':'depth-electric');await waitFor(()=>frame.contentDocument?.querySelector('.practice-home-quick-start'));}
+
+ const doc=await waitFor(()=>frame.contentDocument?.querySelector('#root')&&frame.contentDocument);
+ if(['balance-home','balance-options','staff-jumper','staff-options'].includes(screen)){
+  await openScreen(frame,'games');
+  const isStaff=screen.startsWith('staff');
+  (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>(el.getAttribute('aria-label')||'').includes(isStaff?'Staff Jumper.':'Balance.')))).click();
+  await waitFor(()=>doc.querySelector('button[aria-label="Back to Practice Games"]'));
+  if(screen==='balance-options'){
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='Quick Play'))).click();
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='More options'))).click();
+   await waitFor(()=>doc.querySelector('.balance-setup-sheet'));
+  }
+  if(screen==='staff-options'){
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='More options'))).click();
+   await waitFor(()=>doc.querySelector('.sj-panel'));
+  }
+  return;
+ }
+ if(screen==='games'){
+  for(let n=0;n<4;n++){
+   const back=doc.querySelector('button[aria-label="Back to Practice Games"],button[aria-label="Back to Balance home"]');
+   if(!back)break;
+   back.click();await new Promise(resolve=>setTimeout(resolve,180));
+  }
+  if(doc.querySelector('.balance-arcade--hall'))return;
+ }
+ const closeVault=doc.querySelector('button[aria-label="Close vault"]');if(closeVault){closeVault.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close vault"]'))}
+ if(screen==='vault'){
+  await openScreen(frame,'record');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open TakeVault"]'))).click();
+  await waitFor(()=>doc.querySelector('.native-bottom-sheet--vault'));
+  return;
+ }
+ const closeInsights=doc.querySelector('.pitch-insights-screen__close');if(closeInsights){closeInsights.click();await waitFor(()=>!doc.querySelector('.pitch-insights-screen'))}
+ const closeSettings=doc.querySelector('button[aria-label="Close settings"]');if(closeSettings){closeSettings.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close settings"]'))}
+ const closeWorkspace=doc.querySelector('button[aria-label="Close workspace"]');if(closeWorkspace)closeWorkspace.click();
+ if(['workspace','settings','pitch-widget'].includes(screen)){
+  await openScreen(frame,'camera');
+  (await waitFor(()=>doc.querySelector('button[aria-label="'+(screen==='settings'?'Open settings':'Open workspace')+'"]:not(:disabled)'))).click();
+  if(screen==='pitch-widget'){
+   const pitch=await waitFor(()=>doc.querySelector('[data-tutorial="branch-pitch"]'));
+   if(pitch.getAttribute('aria-checked')!=='true')pitch.click();
+   const close=doc.querySelector('button[aria-label="Close workspace"]');if(close)close.click();
+   await waitFor(()=>doc.querySelector('.pitch-widget-draggable'));
+  }else await waitFor(()=>doc.querySelector(screen==='settings'?'.settings-sheet':'.settings-branch-tray'));
+  return;
+ }
+ if(screen==='program'){
+  await openScreen(frame,'metronome');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open practice program"]'))).click();
+  await waitFor(()=>doc.querySelector('.practice-timeline'));
+  return;
+ }
+ if(['insights','drone','tuning'].includes(screen)){
+  await openScreen(frame,'tuner');
+  const selector=screen==='insights'?'.pitch-living-insights-trigger':screen==='drone'?'.pitch-living-drone-trigger:not(.pitch-living-insights-trigger):not(.pitch-living-transposition-trigger)':'.pitch-living-transposition-trigger';
+  const trigger=await waitFor(()=>doc.querySelector(selector));
+  if(trigger.getAttribute('aria-expanded')!=='true')trigger.click();
+  await waitFor(()=>doc.querySelector(screen==='insights'?'.pitch-insights-screen':screen==='drone'?'.pitch-living-drone-panel':'.tuner-transposition-menu'));
+  return;
+ }
+ const closeGame=doc.querySelector('button[aria-label="Close Games"]');if(closeGame){closeGame.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close Games"]'))}
+ const closeRoutine=doc.querySelector('button[aria-label="Close routine builder"]');if(closeRoutine){closeRoutine.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close routine builder"]'))}
+ if(screen==='camera'){
+  if(doc.querySelector('.camera-control-pill') && !doc.querySelector('.practice-home-quick-start') && !doc.querySelector('.routine-guide'))return;
+  await openScreen(frame,'record');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open Camera"]'))).click();
+  await waitFor(()=>doc.querySelector('.app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill'));
+  return;
+ }
+ const tabName=screen==='record'?'audio':screen;
+ if(['record','tuner','metronome','games'].includes(screen) && !doc.querySelector('.practice-home-quick-start') && doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"]')){
+  doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"]').click();
+  await waitFor(()=>screen==='games'?doc.querySelector('.balance-arcade--hall'):doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"][aria-current="page"]'));
+  return;
+ }
+ if(!doc.querySelector('button[aria-label="Open Practice Home"]') && doc.querySelector('[data-tutorial="audio-tab-audio"]')){
+  doc.querySelector('[data-tutorial="audio-tab-audio"]').click();
+  await waitFor(()=>doc.querySelector('button[aria-label="Open Practice Home"]'));
+ }
+ if(!doc.querySelector('.practice-home-quick-start')){
+  const back=doc.querySelector('.practice-menu-card--home button[aria-label="Back"]');if(back)back.click();
+  else (await waitFor(()=>doc.querySelector('button[aria-label="Open Practice Home"]'))).click();
+ }
+ await waitFor(()=>doc.querySelector('.practice-home-quick-start'));
+ if(['record','tuner','metronome'].includes(screen)){
+  // Open the existing audio shell through its normal Games entry; no game is started.
+  Array.from(doc.querySelectorAll('.practice-menu-shortcut')).find(el=>el.textContent.includes('Games')).click();
+  (await waitFor(()=>doc.querySelector('button[aria-label="Close Games"]'))).click();
+  await waitFor(()=>!doc.querySelector('button[aria-label="Close Games"]'));
+  const tab=screen==='record'?'audio':screen;
+  (await waitFor(()=>doc.querySelector('[data-tutorial="audio-tab-'+tab+'"]'))).click();
+  await waitFor(()=>doc.querySelector('[data-tutorial="audio-tab-'+tab+'"][aria-current="page"]'));
+  return;
+ }
+
+ if(screen==='routines')doc.querySelector('.practice-home-build-routine').click();
+ if(screen==='games')Array.from(doc.querySelectorAll('.practice-menu-shortcut')).find(el=>el.textContent.includes('Games')).click();
+ if(screen==='routines')await waitFor(()=>doc.querySelector('.routine-guide'));
+ if(screen==='games')await waitFor(()=>doc.querySelector('.balance-arcade--hall'));
+}
+document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',async()=>{
+ const buttons=document.querySelectorAll('[data-screen]');buttons.forEach(b=>b.disabled=true);
+ document.getElementById('screen-status').textContent='Opening '+button.textContent+' in both previews…';
+ try {await Promise.all([openScreen(document.getElementById('current'),button.dataset.screen),openScreen(variant,button.dataset.screen)]);document.getElementById('screen-status').textContent=button.textContent+' in both previews. Switch directions above to compare.'}
+ catch(error){document.getElementById('screen-status').textContent=error.message}
+ finally{buttons.forEach(b=>b.disabled=false)}
+}));
+window.addEventListener('load',async()=>{try{await Promise.all(['current','variant'].map(id=>waitFor(()=>document.getElementById(id).contentDocument?.querySelector('.practice-home-quick-start'))));document.querySelector('[data-screen="games"]').click()}catch{document.getElementById('screen-status').textContent='Choose a tab above to begin the comparison.'}},{once:true});
+</script></body></html>

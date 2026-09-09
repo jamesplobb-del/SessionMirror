@@ -1,0 +1,69 @@
+/* Main-tab concepts only. Preserves the existing audio and game behavior. */
+html[data-refinement='playful'] .app-ui-overlay--audio-mode {
+ --audio-bg-top:var(--concept-bg); --audio-bg-mid:var(--concept-bg); --audio-bg-base:var(--concept-bg); --audio-bg-bottom:var(--concept-bg);
+ --audio-blue:#296cde; --audio-blue-soft:#296cde18; --audio-blue-border:#296cde55;
+ --audio-gold:#b77b14; --audio-gold-soft:#fff0ca; --audio-gold-border:#e7bf65;
+ --audio-text-primary:var(--concept-ink); --audio-text-secondary:var(--concept-muted); --audio-surface:var(--concept-panel);
+ --audio-radius-card:24px; --audio-radius-pill:12px;
+ --audio-shadow-card:0 4px 0 #c8d8ee,0 8px 18px #234f8220;
+ font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
+}
+/* The four familiar tabs, with clear symbols and a solid selected tile. */
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-top-tabs {
+ width:calc(100% - 24px); max-width:440px; margin:8px auto 12px; padding:5px; gap:5px;
+ border-radius:22px; background:var(--concept-panel); border:1px solid var(--concept-line); box-shadow:0 3px 0 #c8d8ee;
+}
+html[data-refinement='playful'] .audio-practice-top-tabs .audio-practice-top-tabs__btn {
+ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+ min-height:54px; padding:6px 2px; font-size:10px; font-weight:650; color:var(--concept-muted); border:0; border-radius:16px;
+}
+html[data-refinement='playful'] .audio-practice-top-tabs .audio-practice-top-tabs__btn::before { content:''; display:block; width:19px; height:19px; background:currentColor; mask:var(--tab-icon) center/contain no-repeat; }
+html[data-refinement='playful'] .audio-practice-top-tabs .audio-practice-top-tabs__btn--active { background:var(--concept-blue); color:#fff; box-shadow:0 2px 0 #184daa; }
+/* Record: equal comparison areas, gold Best and blue Current identities. */
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card {
+ border:1px solid var(--concept-line); border-bottom:4px solid #c6d7ef; border-radius:24px;
+ background:linear-gradient(180deg,#e3edff 0 58px,var(--concept-panel) 58px); box-shadow:0 5px 12px #24466e0c;
+}
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card--best {
+ border-color:#ecd49b; border-bottom-color:#e7c779;
+ background:linear-gradient(180deg,#fff0ca 0 58px,var(--concept-panel) 58px);
+}
+html[data-refinement='playful'] .audio-mode-take-card .audio-mode-take-card__chrome { min-height:42px; align-items:center; }
+html[data-refinement='playful'] .audio-mode-take-card .audio-mode-take-card__pill { background:transparent; color:#2255a7; font-size:13px; font-weight:750; padding:6px 8px; display:inline-flex; align-items:center; gap:7px; }
+html[data-refinement='playful'] .audio-mode-take-card--best .audio-mode-take-card__pill { background:transparent; color:#765315; }
+html[data-refinement='playful'] .audio-mode-take-card__pill::before { content:''; width:17px; height:17px; display:inline-block; background:currentColor; mask:var(--take-icon) center/contain no-repeat; }
+html[data-refinement='playful'] .audio-mode-take-card .audio-mode-take-card__mini-btn { border-radius:12px; background:var(--concept-panel); border:1px solid var(--concept-line); }
+html[data-refinement='playful'] .audio-mode-take-card .audio-mode-take-card__title-row h3 { color:var(--concept-ink); font-weight:650; letter-spacing:-.035em; }
+html[data-refinement='playful'] .audio-mode-take-card .audio-mode-take-card__play { border-radius:18px; background:#e5efff; color:#245cb7; box-shadow:0 3px 0 #cadcf6; }
+html[data-refinement='playful'] .audio-mode-take-card--best .audio-mode-take-card__play { background:#fff0ca; color:#825a12; box-shadow:0 3px 0 #e9cf94; }
+html[data-refinement='playful'] .audio-mode-take-card--recording { outline:2px solid #d34f4f; outline-offset:-2px; }
+/* Tuner: contain the live pitch canvas inside a rounded instrument panel. */
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-tuner-shell { padding:0 12px 10px; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-audio-stage { border:2px solid var(--concept-panel); border-bottom:4px solid #bfd5e9; border-radius:28px; box-shadow:0 7px 18px #254d7020; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-living-readout__status { padding:7px 13px; border-radius:12px; background:#ffffffed; box-shadow:0 3px 0 #ffffff55; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-living-tool-rail { gap:8px; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-living-tool-rail > button { min-height:48px; border-radius:15px; background:#fff; color:#204a7a; border:1px solid #d2e1ef; box-shadow:0 3px 0 #b7d0e4; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-living-tool-rail > button[aria-expanded='true'] { background:#e6efff; border-color:#3972cf; box-shadow:0 3px 0 #8caedd; }
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-living-drone-trigger--active { border-color:#d9ac4c; background:#fff0ca; }
+/* Metronome: a tempo card, tactile steppers and a grouped settings tray. */
+html[data-refinement='playful'] .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .audio-practice-metronome__tempo-card {
+ width:calc(100% - 24px); padding:10px 8px; margin:4px auto 8px; border:1px solid var(--concept-line); border-bottom:4px solid #c4d7f0; border-radius:26px; background:var(--concept-panel); box-shadow:0 6px 16px #274f7e0e;
+}
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn { border-radius:15px; background:#e5efff; border:1px solid #d2dff3; box-shadow:0 3px 0 #bad0ef; color:#235cb7; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .metronome-audio-stage__bpm-value { font-family:ui-rounded,'SF Pro Rounded',-apple-system,BlinkMacSystemFont,sans-serif; color:var(--concept-ink); font-weight:750; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-metronome__selectors { border:1px solid var(--concept-line); border-radius:22px; padding:6px; background:var(--concept-panel); box-shadow:0 3px 0 #c8d8ee; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .metronome-audio-select__trigger { border-radius:14px; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-metronome__play-btn { background:var(--concept-blue); color:#fff; border-radius:22px; border:0; box-shadow:0 4px 0 #174da9,0 8px 15px #225dba22; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-metronome__tap-btn { background:#fff0ca; color:#765315; border:1px solid #f0d99d; border-radius:20px; box-shadow:0 4px 0 #dec17c; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-metronome__program-btn { border-radius:18px; background:var(--concept-panel); border:1px solid var(--concept-line); box-shadow:0 3px 0 #c8d8ee; }
+html[data-refinement="playful"] [data-tutorial="audio-tab-audio"] { --tab-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2010v4M7%206v12M12%203v18M17%207v10M21%2010v4%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-refinement="playful"] [data-tutorial="audio-tab-tuner"] { --tab-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%203v8a4%204%200%200%200%208%200V3M12%2015v6%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-refinement="playful"] [data-tutorial="audio-tab-metronome"] { --tab-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203%2020%2021H4ZM12%2021l4-14%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-refinement="playful"] [data-tutorial="audio-tab-games"] { --tab-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%206%2011%203%2012-2%201-4-3-5-3H9c-1%200-3%204-5%203C1%2018%203%207%207%207ZM7%2010v5M4.5%2012.5h5M16%2011h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-refinement="playful"] .audio-mode-take-card { --take-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2010v4M7%206v12M12%203v18M17%207v10M21%2010v4%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-refinement="playful"] .audio-mode-take-card--best { --take-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m12%203%202.8%205.7%206.2.9-4.5%204.4%201.1%206.2-5.6-3-5.6%203%201.1-6.2L3%209.6l6.2-.9Z%22%2F%3E%3C%2Fsvg%3E"); }
+/* Lift the instrument panel above the existing screen-wide pitch veil.
+   Live note, trace, status and surrounding zone colors still respond. */
+html[data-refinement='playful'] .audio-practice-tuner-shell .pitch-audio-stage { position:relative; z-index:2; background:var(--concept-panel); }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .control-deck { border:1px solid var(--concept-line); border-radius:28px; background:var(--concept-panel); box-shadow:0 4px 0 #c5d7ee,0 8px 16px #28507b0c; }
+html[data-refinement='playful'] .app-ui-overlay--audio-mode .audio-practice-tuner-layer { position:relative; z-index:2; background:transparent; }

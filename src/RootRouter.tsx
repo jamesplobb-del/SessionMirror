@@ -1,4 +1,5 @@
 import { Component, lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react'
+import AppBootGate from './components/ui/AppBootGate'
 import QuickTunerScreen from './components/QuickTunerScreen'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import {
@@ -10,14 +11,7 @@ import {
 const FullBestTakeApp = lazy(() => import('./App'))
 const QuickMetronomeScreen = lazy(() => import('./components/QuickMetronomeScreen'))
 
-function AppLaunchFallback() {
-  return (
-    <main className="app-launch-fallback" role="status" aria-label="Opening BestTake">
-      <span className="app-launch-fallback__mark" aria-hidden />
-      <strong>BestTake</strong>
-    </main>
-  )
-}
+function AppLaunchFallback() { return <AppBootGate /> }
 
 interface QuickToolErrorBoundaryProps {
   requestId: string

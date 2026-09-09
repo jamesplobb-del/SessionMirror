@@ -15,6 +15,16 @@ export interface PreparePlaybackRouteOptions {
   suspendCamera?: boolean
 }
 
+// Route changes mutate the same AVAudioSession. Complete each transition
+// before a new player starts or a previous player restores capture.
+let routeOperation: Promise<void> = Promise.resolve()
+function enqueueRoute(operation: () => Promise<void>): Promise<void> {
+  const result = routeOperation.then(operation, operation)
+  routeOperation = result.catch(() => {})
+  return result
+}
+
+let routeGeneration = 0
 let playbackRouteActive = false
 let cameraWasSuspendedForPlayback = false
 let loudSessionAppliedForPlayback = false
@@ -47,9 +57,11 @@ export function isPlaybackRouteHoldActive(): boolean {
   return playbackRouteActive
 }
 
-export async function clearPlaybackRouteForLifecycle(
-  reason = 'lifecycle',
-): Promise<void> {
+export function clearPlaybackRouteForLifecycle(reason = 'lifecycle'): Promise<void> {
+  return enqueueRoute(() => clearPlaybackRouteForLifecycleImpl(reason))
+}
+
+async function clearPlaybackRouteForLifecycleImpl(reason: string): Promise<void> {
   if (!isIosNative()) return
 
   const hadRouteState =
@@ -59,6 +71,7 @@ export async function clearPlaybackRouteForLifecycle(
     coexistentSpeakerAppliedForPlayback ||
     restoreInFlight !== null
 
+  routeGeneration += 1
   playbackRouteActive = false
   cameraWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
@@ -162,14 +175,17 @@ export async function releaseInlineTakeBoxPlaybackRoute(): Promise<void> {
   await releaseStereoPlayback()
 }
 
-export async function preparePlaybackRoute(
-  options: PreparePlaybackRouteOptions = {},
-): Promise<void> {
+export function preparePlaybackRoute(options: PreparePlaybackRouteOptions = {}): Promise<void> {
+  return enqueueRoute(() => preparePlaybackRouteImpl(options))
+}
+
+async function preparePlaybackRouteImpl(options: PreparePlaybackRouteOptions): Promise<void> {
   if (!isIosNative()) return
   if (playbackRouteActive) return
 
   const suspendCamera = options.suspendCamera === true
 
+  routeGeneration += 1
   playbackRouteActive = true
   cameraWasSuspendedForPlayback = false
   loudSessionAppliedForPlayback = false
@@ -179,9 +195,8 @@ export async function preparePlaybackRoute(
     logRouteTransition(diagSessionId, 'preparePlaybackRoute-start', { suspendCamera })
     void logAudioSessionSnapshot('preparePlaybackRoute-start', diagSessionId)
   }
-  await BestTakeAudioPlugin.setPlaybackRouteActive({ active: true })
-
   try {
+    await BestTakeAudioPlugin.setPlaybackRouteActive({ active: true })
     if (suspendCamera) {
       cameraWasSuspendedForPlayback = await ensureCameraSuspendedForPlayback()
       const loud = await applyLoudPlaybackSessionIfSpeaker()
@@ -242,11 +257,15 @@ export async function preparePlaybackRoute(
  * which preparePlaybackRoute() no-ops on the stale flag and the metronome's
  * Web Audio clicks render into a dead session (silent first-take count-in).
  */
-export async function reassertPlaybackRouteForCountIn(): Promise<void> {
+export function reassertPlaybackRouteForCountIn(): Promise<void> {
+  return enqueueRoute(reassertPlaybackRouteForCountInImpl)
+}
+
+async function reassertPlaybackRouteForCountInImpl(): Promise<void> {
   if (!isIosNative()) return
 
   if (!playbackRouteActive) {
-    await preparePlaybackRoute({ suspendCamera: false })
+    await preparePlaybackRouteImpl({ suspendCamera: false })
     return
   }
 
@@ -258,7 +277,11 @@ export async function reassertPlaybackRouteForCountIn(): Promise<void> {
   coexistentSpeakerAppliedForPlayback = loud.applied && loud.coexistent
 }
 
-export async function completePlaybackRouteRestore(): Promise<void> {
+export function completePlaybackRouteRestore(): Promise<void> {
+  return enqueueRoute(completePlaybackRouteRestoreImpl)
+}
+
+async function completePlaybackRouteRestoreImpl(): Promise<void> {
   if (!isIosNative()) return
   if (!playbackRouteActive) return
 
@@ -272,6 +295,7 @@ export async function completePlaybackRouteRestore(): Promise<void> {
   const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
 
   restoreInFlight = (async () => {
+    routeGeneration += 1
     playbackRouteActive = false
     cameraWasSuspendedForPlayback = false
     loudSessionAppliedForPlayback = false
@@ -316,8 +340,10 @@ export function installPlaybackRouteEndedListener(
   playbackRouteListenerInstalled = true
 
   void BestTakeAudioPlugin.addListener('playbackRouteEnded', () => {
-    void (async () => {
-      if (!playbackRouteActive) return
+    const endedGeneration = routeGeneration
+    void enqueueRoute(async () => {
+      if (!playbackRouteActive || endedGeneration !== routeGeneration) return
+      routeGeneration += 1
 
       const shouldResumeCamera = cameraWasSuspendedForPlayback
       const shouldRefreshLivePreview = cameraHandlers?.hasLivePreview?.() ?? false
@@ -336,7 +362,7 @@ export function installPlaybackRouteEndedListener(
       if (shouldResumeCamera || shouldRefreshLivePreview) {
         await onEnded()
       }
-    })()
+    }).catch(error => console.warn('[PlaybackRoute] end recovery failed', error))
   })
 }
 

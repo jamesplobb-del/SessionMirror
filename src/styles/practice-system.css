@@ -265,8 +265,16 @@ html.app-dark-mode
   box-shadow: none;
 }
 
-.app-ui-overlay--audio-practice-tuner .control-deck__vault-btn,
-.app-ui-overlay--audio-practice-tuner .control-deck__settings-btn {
+/* Only the standalone (pre-pill) chrome takes glass of its own. Inside the
+ * audio pill these two are transparent, square hit targets, and a
+ * backdrop-filter on a transparent square paints exactly that: a grey-white
+ * rectangle that ignores the pill's radius. It only showed once the tuner wash
+ * gave the backdrop a colour to blur, which is why it read as "discolouration
+ * when the colours light up". The pill above them is the one glass plane. */
+.app-ui-overlay--audio-practice-tuner
+  .control-deck__vault-btn:not(.audio-vault-button),
+.app-ui-overlay--audio-practice-tuner
+  .control-deck__settings-btn:not(.audio-control-deck__settings-btn) {
   border: 1px solid rgba(21, 152, 255, 0.12) !important;
   background: rgba(255, 255, 255, 0.84) !important;
   color: #275f85 !important;
@@ -280,7 +288,7 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-practice-tuner
-  .control-deck__settings-btn[aria-expanded='true'] {
+  .control-deck__settings-btn:not(.audio-control-deck__settings-btn)[aria-expanded='true'] {
   border-color: rgba(247, 166, 0, 0.58) !important;
   background: rgba(255, 251, 242, 0.92) !important;
   color: #a86d00 !important;
@@ -2062,15 +2070,19 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
   }
 }
 
-/* Audio Mode recording deck — Camera Mode's compact glass language. */
+/* Audio Mode recording deck — Camera Mode's compact glass language.
+ *
+ * `justify-content: flex-end` and a small bottom pad: the overlay already
+ * holds the home indicator back, so the pill sits as low as it can without
+ * touching it, matching Camera exactly. */
 .app-ui-overlay--audio-mode .control-deck:not(.control-deck--camera) {
   display: flex !important;
   width: 100% !important;
   grid-template-columns: none !important;
   flex-direction: column !important;
   align-items: center !important;
-  justify-content: center !important;
-  padding: 0 0 clamp(0.72rem, 2vh, 1rem) !important;
+  justify-content: flex-end !important;
+  padding: 0 0 clamp(0.3rem, 1vh, 0.5rem) !important;
 }
 
 .app-ui-overlay--audio-mode .audio-control-deck__main-row {
@@ -2128,6 +2140,18 @@ html.app-dark-mode .pitch-living-drone-panel .harmonic-ribbon__power--active {
   right: 0;
   border-radius: 0 999px 999px 0;
   background: transparent;
+}
+
+.app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,
+.app-ui-overlay--audio-mode .audio-control-pill .audio-camera-button,
+.app-ui-overlay--audio-mode .audio-control-pill .audio-pill-action,
+.app-ui-overlay--audio-mode
+  .audio-control-pill
+  .audio-control-deck__settings-btn {
+  /* The pill is the glass. A second backdrop-filter nested inside it samples
+     its own square box and paints a hard rectangle over the rounded chrome. */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .app-ui-overlay--audio-mode .audio-control-pill .audio-vault-button,

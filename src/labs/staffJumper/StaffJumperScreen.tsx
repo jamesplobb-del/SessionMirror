@@ -1,3 +1,5 @@
+import { getInstrumentProfile } from '../../utils/instrumentProfiles'
+import { recordPlannedGame, type DailyChallengePlan } from '../../utils/dailyChallengePlan'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import {
@@ -21,6 +23,7 @@ import {
   DIFFICULTY_LABELS,
   DIFFICULTY_TIMEOUT_SECONDS,
   getConcertTonicPitchClass,
+  customNotePool,
   getScaleRangePreview,
   getTargetNoteAtStep,
   keysForScaleMode,
@@ -89,6 +92,7 @@ function tempoPresetIndex(bpm: number): number {
 }
 
 interface StaffJumperScreenProps {
+  dailyChallenge?: DailyChallengePlan | null
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
@@ -185,14 +189,14 @@ function Options<T extends string>({
   )
 }
 
-function OptionsPanel({ title, children }: { title: string; children: React.ReactNode }) {
+function OptionsPanel({ title, children, open, onToggle }: { title: string; children: React.ReactNode; open: boolean; onToggle: () => void }) {
   return (
-    <section className="sj-panel">
-      <div className="sj-panel__head">
+    <details className="sj-panel" open={open}>
+      <summary className="sj-panel__head" onClick={event => { event.preventDefault(); onToggle() }}>
         <strong>{title}</strong>
-      </div>
+      </summary>
       <div className="sj-group__body">{children}</div>
-    </section>
+    </details>
   )
 }
 
@@ -203,6 +207,7 @@ function formatRunTime(seconds: number): string {
 }
 
 export default function StaffJumperScreen({
+  dailyChallenge,
   streamRef,
   streamGeneration,
   tunerInstrument,
@@ -213,6 +218,9 @@ export default function StaffJumperScreen({
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [savedSetup] = useState(initialInstrumentSetup)
+  const [activeOptionsPanel, setActiveOptionsPanel] = useState<string | null>("Exercise")
+  const [customEnabled, setCustomEnabled] = useState(false)
+  const [customNotes, setCustomNotes] = useState<number[]>([0, 2, 4, 7, 9])
   const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>('major')
   const [draftKey, setDraftKey] = useState<StaffJumperKey>(savedSetup.key)
   const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
@@ -229,6 +237,12 @@ export default function StaffJumperScreen({
   const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
   const [draftMetronome, setDraftMetronome] = useState(true)
   const [draftDrone, setDraftDrone] = useState(false)
+  /*
+   * Off by default: reading a page straight through, and being told how much
+   * of it was right, is what practice actually looks like. Lives are the
+   * arcade version, kept for players who want the pressure.
+   */
+  const [draftLives, setDraftLives] = useState(false)
   const [showOptions, setShowOptions] = useState(false)
   /**
    * The preview shows one sample of a randomized exercise, so it needs its own
@@ -296,6 +310,7 @@ export default function StaffJumperScreen({
     onRequestMicStream()
   }, [onRequestMicStream, streamGeneration])
 
+  const challengeTunerInstrument = dailyChallenge ? getInstrumentProfile(dailyChallenge.instrumentId)?.tunerInstrument ?? tunerInstrument : tunerInstrument
   const pitchEnabled = true
   /*
    * Coming back from the background, the stream is usually dead while
@@ -316,7 +331,7 @@ export default function StaffJumperScreen({
     {
       source: 'microphone',
       micStreamRef: streamRef,
-      tunerInstrument,
+      tunerInstrument: challengeTunerInstrument,
       realtimeMode: true,
       continuousScroll: false,
       allowStandaloneMicFallback: true,
@@ -361,11 +376,16 @@ export default function StaffJumperScreen({
     completeFall,
     pause,
     resume,
+    endRun,
     noteRemainingMs,
     noteTimeoutMs,
     beatInBar,
     getTravelProgress,
   } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
+
+  useEffect(() => {
+    if (!GAME_TEST_INPUT && state.config) recordPlannedGame({ game: 'staff-jumper', instrumentId: state.config.instrumentId ?? null, key: state.config.key, scaleMode: state.config.scaleMode, correctNotes: state.correctCount, startedAtMs: state.startedAtMs })
+  }, [state.correctCount, state.config, state.startedAtMs])
 
   targetMidiRef.current =
     state.config && state.phase === 'playing'
@@ -373,7 +393,8 @@ export default function StaffJumperScreen({
       : null
   const draftConfig = useMemo(
     () => ({
-      key: draftKey,
+      customPitchClasses: customEnabled ? customNotes : undefined,
+      key: customEnabled ? "C" as const : draftKey,
       scaleMode: draftScaleMode,
       range: draftRange,
       difficulty: draftDifficulty,
@@ -386,11 +407,14 @@ export default function StaffJumperScreen({
       tempoBpm: draftTempo,
       metronome: draftMetronome,
       drone: draftDrone,
+      lives: draftLives,
     }),
     [
+      customEnabled, customNotes,
       draftClef,
       draftDifficulty,
       draftDrone,
+      draftLives,
       draftInstrumentId,
       draftKey,
       draftMetronome,
@@ -416,6 +440,24 @@ export default function StaffJumperScreen({
     readout.frequencyHz > 0 &&
     Boolean(readout.noteName && readout.noteName !== '—')
 
+  if (state.phase === 'setup' && dailyChallenge) {
+    const instrument = getStaffJumperInstrument(dailyChallenge.game.instrumentId)
+    return <BalanceArcadeShell title="Today’s challenge" hapticFeedback={hapticFeedback} onBack={onBack} backLabel="Back to Games">
+      <div className="challenge-game-ready">
+        <span>{dailyChallenge.instrumentLabel} · +1 trophy</span>
+        <h1>{dailyChallenge.game.title}</h1>
+        <p>{dailyChallenge.game.objective}</p>
+        <button className="balance-cta" disabled={!instrument} onClick={() => {
+          if (!instrument) return
+          onRequestMicStream()
+          start({ ...draftConfig, tunerInstrument: challengeTunerInstrument, instrumentId: instrument.id, clef: instrument.clef, transposition: instrument.transposition,
+            key: dailyChallenge.game.key, scaleMode: 'major', range: '1-octave', difficulty: 'easy', lives: false,
+            metronome: false, drone: false })
+        }}>Start challenge</button>
+        <small>Play at your own pace. Your normal game settings stay saved.</small>
+      </div>
+    </BalanceArcadeShell>
+  }
   if (state.phase === 'setup') {
     const writtenPitchChoice =
       WRITTEN_PITCH_CHOICES.find((item) => item.id === draftTransposition) ??
@@ -423,7 +465,7 @@ export default function StaffJumperScreen({
     const instrumentFact = selectedInstrument?.shortName ?? `${writtenPitchChoice.name} · custom`
     const difficultyIndex = STAFF_JUMPER_DIFFICULTIES.indexOf(draftDifficulty)
     const rangeIndex = STAFF_JUMPER_RANGES.indexOf(draftRange)
-    const openMore = () => setShowOptions(true)
+    const openMore = () => { setShowOptions(true); setActiveOptionsPanel("Exercise") }
 
     return (
       <BalanceArcadeShell
@@ -439,6 +481,7 @@ export default function StaffJumperScreen({
               type="button"
               haptic="medium"
               hapticFeedback={hapticFeedback}
+              disabled={customEnabled && customNotePool(draftConfig).length < 2}
               onClick={() => start(draftConfig)}
               className="balance-cta"
             >
@@ -461,7 +504,7 @@ export default function StaffJumperScreen({
       >
         <div>
           <h1 className="balance-display balance-display--page">
-            {scaleDisplayName(draftKey, draftScaleMode)}
+            {customEnabled ? "My scale" : scaleDisplayName(draftKey, draftScaleMode)}
           </h1>
           <p className="balance-subdisplay">
             {instrumentFact} · {rangePreview.lowLabel}–{rangePreview.highLabel}
@@ -479,9 +522,9 @@ export default function StaffJumperScreen({
                   hapticFeedback={hapticFeedback}
                   onClick={openMore}
                   className="sj-hero__edit"
-                  aria-label={`Change key, currently ${scaleDisplayName(draftKey, draftScaleMode)}`}
+                  aria-label={`Change key, currently ${customEnabled ? "My scale" : scaleDisplayName(draftKey, draftScaleMode)}`}
                 >
-                  {scaleDisplayName(draftKey, draftScaleMode)}
+                  {customEnabled ? "My scale" : scaleDisplayName(draftKey, draftScaleMode)}
                 </Pressable>
               </h2>
               <p>
@@ -491,7 +534,7 @@ export default function StaffJumperScreen({
                   type="button"
                   intensity="soft"
                   hapticFeedback={hapticFeedback}
-                  onClick={openMore}
+                  onClick={() => { setShowOptions(true); setActiveOptionsPanel("Tempo & sound") }}
                   className="sj-hero__edit sj-hero__edit--inline"
                   aria-label={`Change tempo, currently ${draftTempo} BPM`}
                 >
@@ -511,7 +554,7 @@ export default function StaffJumperScreen({
             </Pressable>
           </div>
 
-          <StaffPreview config={previewConfig} onEdit={openMore} />
+          <StaffPreview config={previewConfig} onEdit={target => { setShowOptions(true); setActiveOptionsPanel(target === "clef" ? "Instrument" : "Tempo & sound") }} />
 
           <p className="sj-hero__hint">Tap the clef, key or time signature to change it.</p>
         </section>
@@ -557,7 +600,17 @@ export default function StaffJumperScreen({
 
         {showOptions ? (
           <>
-        <OptionsPanel title="Exercise">
+        <OptionsPanel title="Exercise" open={activeOptionsPanel === "Exercise"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Exercise" ? null : "Exercise")}>
+          <div className="sj-custom-scale">
+            <label><input type="checkbox" checked={customEnabled} onChange={event => setCustomEnabled(event.target.checked)} /> Build my own scale</label>
+            {customEnabled && <>
+              <p>Choose at least two written notes. Your range setting controls the octaves.</p>
+              <div className="sj-custom-note-grid" role="group" aria-label="Custom scale notes">
+                {['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'].map((label, pc) => <button type="button" key={pc} aria-pressed={customNotes.includes(pc)} disabled={customNotes.includes(pc) && customNotes.length <= 2} onClick={() => setCustomNotes(notes => notes.includes(pc) ? notes.filter(n => n !== pc) : [...notes, pc].sort((a,b) => a-b))}>{label}</button>)}
+              </div>
+            </>}
+          </div>
+          {!customEnabled && <>
           <div className="sj-field">
             <p className="sj-field__label">Scale</p>
             <Options
@@ -591,6 +644,7 @@ export default function StaffJumperScreen({
             </div>
           </div>
 
+          </>}
           <div className="sj-field">
             <p className="sj-field__label">Range</p>
             <Options
@@ -625,7 +679,7 @@ export default function StaffJumperScreen({
           </div>
         </OptionsPanel>
 
-        <OptionsPanel title="Instrument">
+        <OptionsPanel title="Instrument" open={activeOptionsPanel === "Instrument"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Instrument" ? null : "Instrument")}>
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
               I play
@@ -692,7 +746,7 @@ export default function StaffJumperScreen({
 
         </OptionsPanel>
 
-        <OptionsPanel title="Tempo & sound">
+        <OptionsPanel title="Tempo & sound" open={activeOptionsPanel === "Tempo & sound"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Tempo & sound" ? null : "Tempo & sound")}>
           <div className="sj-field">
             <p className="sj-field__label">Tempo</p>
             <div className="sj-tempo" role="group" aria-label="Tempo">
@@ -753,6 +807,24 @@ export default function StaffJumperScreen({
             type="button"
             intensity="soft"
             hapticFeedback={hapticFeedback}
+            onClick={() => setDraftLives((on) => !on)}
+            className="sj-field sj-field--switch"
+            aria-pressed={draftLives}
+          >
+            <span className="sj-field__label">
+              Lives{' '}
+              <span>
+                Three misses and the run is over. Off, the run keeps going and
+                every note counts toward your accuracy — end it when you like.
+              </span>
+            </span>
+            <span className={`sj-switch ${draftLives ? 'sj-switch--on' : ''}`} aria-hidden />
+          </Pressable>
+
+          <Pressable
+            type="button"
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
             onClick={() => setDraftMetronome((on) => !on)}
             className="sj-field sj-field--switch"
             aria-pressed={draftMetronome}
@@ -808,6 +880,11 @@ export default function StaffJumperScreen({
               <Play aria-hidden /> Resume
             </Pressable>
             <div className="balance-award__next">
+              {/* Without lives nothing else can end the run, so this is how a
+                  player calls time on it and sees what they read. */}
+              <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={endRun} className="balance-cta balance-cta--blue balance-cta--small">
+                Finish run
+              </Pressable>
               <Pressable type="button" intensity="soft" hapticFeedback={hapticFeedback} onClick={backToSetup} className="balance-cta balance-cta--blue balance-cta--small">
                 Settings
               </Pressable>
@@ -824,7 +901,7 @@ export default function StaffJumperScreen({
 
   if (state.phase === 'gameover' && state.config) {
     const accuracy = computeAccuracy(state.correctCount, state.missCount)
-    const scaleName = scaleDisplayName(state.config.key, state.config.scaleMode)
+    const scaleName = state.config.customPitchClasses?.length ? "My scale" : scaleDisplayName(state.config.key, state.config.scaleMode)
     const endTime = state.endedAtMs ?? Date.now()
     const durationSeconds = state.startedAtMs
       ? Math.max(0, endTime - state.startedAtMs - state.pausedDurationMs) / 1000

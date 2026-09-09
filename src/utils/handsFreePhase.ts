@@ -1,10 +1,12 @@
-export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback'
+export type HandsFreePhase = 'preparing' | 'listening' | 'recording' | 'playback' | 'saving' | 'countdown'
 
 export interface HandsFreePhaseInput {
   autoSoundRecording: boolean
   isRecording: boolean
   handsFreePlaybackPending: boolean
   handsFreeListeningReady: boolean
+  playbackPlaying?: boolean
+  replayCountdown?: number | null
   /** Drag-to-delete borrows the record slot — hands-free status must stand down. */
   dragDeleteActive: boolean
   /** Video takes show a "finishing" spinner that owns the same slot. */
@@ -23,9 +25,13 @@ export function resolveHandsFreePhase({
   handsFreeListeningReady,
   dragDeleteActive,
   finishingTake,
+  playbackPlaying,
+  replayCountdown,
 }: HandsFreePhaseInput): HandsFreePhase | null {
-  if (!autoSoundRecording || dragDeleteActive || finishingTake) return null
-  if (handsFreePlaybackPending && !isRecording) return 'playback'
+  if (!autoSoundRecording || dragDeleteActive) return null
+  if (finishingTake) return 'saving'
+  if (handsFreePlaybackPending && !isRecording) return playbackPlaying === false ? 'saving' : 'playback'
+  if (isRecording && replayCountdown != null) return 'countdown'
   if (isRecording) return 'recording'
   return handsFreeListeningReady ? 'listening' : 'preparing'
 }

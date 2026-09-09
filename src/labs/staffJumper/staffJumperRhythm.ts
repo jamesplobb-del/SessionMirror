@@ -212,7 +212,7 @@ const COMPOUND_BARS: readonly BarTemplate[] = [
   bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH),
   bar('easy', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH),
   bar('easy', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
-  bar('easy', DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('medium', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, DOTTED_QUARTER),
   bar('easy', DOTTED_HALF),
 
   // ── The third eighth of a beat left silent ──
@@ -347,7 +347,7 @@ function measuresFor(
  * effect eighth notes pack tightly enough to fit more of the line on screen.
  */
 export function spacingUnitsForDuration(durationUnits: number): number {
-  return Math.pow(Math.max(durationUnits / DURATION_UNITS.quarter, 0.0625), 0.62)
+  return Math.max(0.75, Math.pow(Math.max(durationUnits / DURATION_UNITS.quarter, 0.0625), 0.62))
 }
 
 export interface RhythmSlot {
@@ -500,7 +500,10 @@ function appendMeasure(
   const closesPhrase = timeline.measureCount % phraseBars === phraseBars - 1
   const preferred = measures.filter((measure) => measure.closes === closesPhrase)
   const pool = preferred.length > 0 ? preferred : measures
-  const measure = pool[Math.floor(rng() * pool.length)]!
+  const phraseOffset = timeline.measureCount % phraseBars
+  const motifStart = (timeline.measureCount - phraseOffset) * meter.capacityUnits
+  const motif = phraseOffset === 2 ? timeline.slots.filter(slot => slot.unitPosition >= motifStart && slot.unitPosition < motifStart + meter.capacityUnits) : []
+  const measure = motif.length ? { events: motif, capacityUnits: meter.capacityUnits } : pool[Math.floor(rng() * pool.length)]!
   const firstNewIndex = timeline.slots.length
   const measureStartUnits = timeline.measureCount * meter.capacityUnits
   timeline.unitCursor = measureStartUnits

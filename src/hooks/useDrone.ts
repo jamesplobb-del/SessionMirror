@@ -58,6 +58,7 @@ let commandSequence = 0
 let restored = false
 let recoveryListenerAttached = false
 let pendingStopTimer: number | null = null
+let recoveryInFlight: Promise<void> | null = null
 
 function emit(): void {
   for (const listener of listeners) listener()
@@ -92,10 +93,14 @@ function getSnapshot(): DronePrefs {
   return prefs
 }
 
-async function syncFromNative(): Promise<void> {
-  if (!isDroneNativeAvailable()) return
-  const state = await droneGetState()
-  commit(fromNative(state))
+async function syncFromNative(sequence = commandSequence): Promise<void> {
+  if (!isDroneNativeAvailable() || sequence !== commandSequence) return
+  try {
+    const state = await droneGetState()
+    if (sequence === commandSequence) commit(fromNative(state))
+  } catch (error) {
+    console.warn('[Drone] state refresh failed', error)
+  }
 }
 
 function runNative<T extends DroneState>(
@@ -197,16 +202,22 @@ function attachRecoveryListener(): void {
   if (recoveryListenerAttached || typeof window === 'undefined') return
   recoveryListenerAttached = true
   window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, () => {
-    if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0) return
-    void droneStart()
-      .then(() => syncFromNative())
+    if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0 || recoveryInFlight) return
+    const sequence = commandSequence
+    const recovery = droneStart()
+      .then(() => syncFromNative(sequence))
       .catch(() => {})
+    recoveryInFlight = recovery
+    void recovery.then(() => {
+      if (recoveryInFlight === recovery) recoveryInFlight = null
+    })
   })
 }
 
 function restoreOnce(volume: number, waveform: DroneWaveform): void {
   if (restored || !isDroneNativeAvailable()) return
   restored = true
+  const sequence = ++commandSequence
   const saved = loadDronePrefs()
   void droneRestoreState({
     activeNotes: [],
@@ -214,7 +225,11 @@ function restoreOnce(volume: number, waveform: DroneWaveform): void {
     volume,
     waveform,
   }).then((state) => {
+    if (sequence !== commandSequence) return
     commit(fromNative(state, { ...prefs, lastPitchClass: saved.lastPitchClass }))
+  }).catch((error) => {
+    restored = false
+    console.warn('[Drone] initial restore failed', error)
   })
 }
 
@@ -239,9 +254,7 @@ function release(): void {
   pendingStopTimer = window.setTimeout(() => {
     pendingStopTimer = null
     if (subscriberCount > 0) return
-    void droneStop().then((state) => {
-      commit({ ...fromNative(state), activeNotes: [], enabled: false })
-    })
+    runNative({ ...prefs, activeNotes: [], enabled: false }, () => droneStop())
   }, 600)
 }
 

@@ -111,9 +111,9 @@ export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettin
 }
 
 /**
- * Turn a written-pitch list into scored targets. Sky Trail levels and the
- * daily challenge hand their notes straight to this rather than round-tripping
- * through a saved custom routine.
+ * Turn a written-pitch list into scored targets. The daily challenge hands its
+ * notes straight to this rather than round-tripping through a saved custom
+ * routine.
  */
 export function buildBalanceTargetsFromWritten(
   written: readonly number[],

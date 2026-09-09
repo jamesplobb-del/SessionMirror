@@ -1,3 +1,4 @@
+import VaultCount from './VaultCount'
 import {
   Bookmark,
   Camera,
@@ -37,6 +38,7 @@ interface ControlDeckProps {
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenHome: () => void
+  vaultRevision?: number
   onOpenVault?: () => void
   onOpenSettings: () => void
   expandViewActive?: boolean
@@ -70,6 +72,8 @@ interface ControlDeckProps {
   handsFreeRecording?: boolean
   handsFreeListeningReady?: boolean
   handsFreePlaybackPending?: boolean
+  handsFreePlaybackPlaying?: boolean
+  handsFreeReplayCountdown?: number | null
   autoSoundRecording?: boolean
   onAutoSoundRecordingChange?: (enabled: boolean) => void
   recordDropRef?: RefObject<HTMLDivElement | null>
@@ -138,6 +142,7 @@ function ControlDeck({
   onToggleRecord,
   onOpenHome,
   onOpenVault,
+  vaultRevision,
   onOpenSettings,
   expandViewActive = false,
   onToggleExpandView,
@@ -170,6 +175,8 @@ function ControlDeck({
   handsFreeRecording = false,
   handsFreeListeningReady = false,
   handsFreePlaybackPending = false,
+  handsFreePlaybackPlaying,
+  handsFreeReplayCountdown,
   autoSoundRecording = false,
   onAutoSoundRecordingChange,
   recordDropRef,
@@ -213,6 +220,8 @@ function ControlDeck({
     isRecording,
     handsFreePlaybackPending,
     handsFreeListeningReady,
+    playbackPlaying: handsFreePlaybackPlaying,
+    replayCountdown: handsFreeReplayCountdown,
     dragDeleteActive: showDeleteDrop,
     finishingTake: showFinishingTake,
   })
@@ -277,7 +286,7 @@ function ControlDeck({
     >
       <span className="ui-orient-spin flex items-center justify-center">
         <span className="flex items-center justify-center">
-          <Settings className="h-5 w-5" strokeWidth={1.9} />
+          <span className="electric-original-icon"><Settings className="h-5 w-5" strokeWidth={1.9} /></span><ElectricControlIcon kind="settings" />
         </span>
       </span>
     </Pressable>
@@ -376,7 +385,7 @@ function ControlDeck({
       }`}
     >
       {onOpenVault && !isRecording && !isStopping && !branchActive && !focusedPostTakeActive && (
-        <VaultHandle onOpen={onOpenVault} />
+        <VaultHandle onOpen={onOpenVault} revision={vaultRevision} />
       )}
       <SettingsBranchWheel
         open={branchOpen}
@@ -452,7 +461,7 @@ function ControlDeck({
           </Pressable>
 
           <div className="focus-strip-actions">
-            <Pressable
+            {onOpenFocusHistory && <Pressable
               type="button"
               intensity="soft"
               haptic="light"
@@ -465,7 +474,7 @@ function ControlDeck({
               {focusedAttemptCount > 0 && (
                 <em className="focus-strip-count">{focusedAttemptCount}</em>
               )}
-            </Pressable>
+            </Pressable>}
             <Pressable
               type="button"
               intensity="soft"
@@ -484,7 +493,7 @@ function ControlDeck({
               onClick={() => (branchActive ? closeBranch() : openBranch())}
             >
               <SlidersHorizontal aria-hidden />
-              <span>Desk</span>
+              <span>Tools</span>
             </Pressable>
           </div>
         </section>
@@ -571,7 +580,7 @@ function ControlDeck({
               aria-label="Open Practice Home"
             >
               <span className="ui-orient-spin camera-vault-button__icon-wrap">
-                <House aria-hidden strokeWidth={1.85} />
+                <span className="electric-original-icon"><House aria-hidden strokeWidth={1.85} /></span><ElectricControlIcon kind="home" />
               </span>
             </Pressable>
 
@@ -597,7 +606,7 @@ function ControlDeck({
               aria-haspopup="menu"
             >
               <span className="ui-orient-spin camera-pill-action__content">
-                <Layers3 aria-hidden className="camera-overlays-button__icon" />
+                <span className="electric-original-icon"><Layers3 aria-hidden className="camera-overlays-button__icon" /></span><ElectricControlIcon kind="workspace" />
                 <span>Workspace</span>
               </span>
             </Pressable>
@@ -620,7 +629,7 @@ function ControlDeck({
               aria-label="Open Tools"
             >
               <span className="ui-orient-spin camera-pill-action__content">
-                <PracticeWaveformIcon />
+                <span className="electric-original-icon"><PracticeWaveformIcon /></span><ElectricControlIcon kind="tools" />
                 <span>Tools</span>
               </span>
             </Pressable>
@@ -676,7 +685,7 @@ function ControlDeck({
               aria-label="Open Practice Home"
             >
               <span className="ui-orient-spin audio-vault-button__icon-wrap">
-                <House aria-hidden strokeWidth={1.85} />
+                <span className="electric-original-icon"><House aria-hidden strokeWidth={1.85} /></span><ElectricControlIcon kind="home" />
               </span>
             </Pressable>
 
@@ -702,7 +711,7 @@ function ControlDeck({
               aria-haspopup="menu"
             >
               <span className="ui-orient-spin audio-pill-action__content">
-                <Layers3 aria-hidden className="audio-overlays-button__icon" />
+                <span className="electric-original-icon"><Layers3 aria-hidden className="audio-overlays-button__icon" /></span><ElectricControlIcon kind="workspace" />
                 <span>Workspace</span>
               </span>
             </Pressable>
@@ -724,7 +733,7 @@ function ControlDeck({
               aria-label="Open Camera"
             >
               <span className="ui-orient-spin audio-camera-button__content">
-                <Camera aria-hidden strokeWidth={1.75} />
+                <span className="electric-original-icon"><Camera aria-hidden strokeWidth={1.75} /></span><ElectricControlIcon kind="camera" />
                 <span>Camera</span>
               </span>
             </Pressable>
@@ -737,27 +746,40 @@ function ControlDeck({
   )
 }
 
-function VaultHandle({ onOpen }: { onOpen: () => void }) {
-  const start = useRef<{ x: number; y: number } | null>(null)
-  const swiped = useRef(false)
-  return <button type="button" className="take-vault-handle" aria-label="Open takes. Swipe up or tap."
-    onPointerDown={event => {
-      start.current = { x: event.clientX, y: event.clientY }
-      swiped.current = false
-      event.currentTarget.setPointerCapture(event.pointerId)
-    }}
-    onPointerUp={event => {
-      const origin = start.current
-      start.current = null
-      if (origin && origin.y - event.clientY > 32 && Math.abs(origin.x - event.clientX) < 60) {
-        swiped.current = true
-        onOpen()
-      }
-    }}
-    onPointerCancel={() => { start.current = null; swiped.current = true }}
-    onClick={() => { if (!swiped.current) onOpen(); swiped.current = false }}>
-    <i aria-hidden /><span>Takes · swipe up</span>
-  </button>
+/**
+ * The takes grabber.
+ *
+ * Just the bar now — no label, no "swipe up". The strip of text was the tallest
+ * thing between the record button and the bottom of the screen, and it was
+ * explaining a gesture that the tap underneath it already covers. A grabber is
+ * the shape iOS uses for "there is a sheet under here", so it needs no words,
+ * and losing them lets the whole deck sit lower and gives the pitch graph
+ * above it the room back.
+ */
+function VaultHandle({ onOpen, revision }: { onOpen: () => void; revision?: number }) {
+  return (
+    <button
+      type="button"
+      className="take-vault-handle"
+      aria-label="Open TakeVault"
+      onClick={onOpen}
+    >
+      <i aria-hidden />
+      <span className="electric-vault-label"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="2"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/></svg>Vault<VaultCount revision={revision} /><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></span>
+    </button>
+  )
 }
 
 export default memo(ControlDeck)
+
+// Alternative icon artwork for the Electric review copy only.
+function ElectricControlIcon({ kind }: { kind: 'home' | 'workspace' | 'tools' | 'camera' | 'settings' }) {
+  return <svg className="electric-control-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {kind === 'home' && <><path d="M3 10.5 10.6 4a2.1 2.1 0 0 1 2.8 0l7.6 6.5M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" fill="currentColor" fillOpacity=".10"/><path d="M9 21v-7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7"/></>}
+    {kind === 'workspace' && <><path d="m3 8 8-4a2.2 2.2 0 0 1 2 0l8 4-9 4.5Z" fill="currentColor" fillOpacity=".18"/><path d="m3 12 9 4.5 9-4.5M3 16l9 4.5 9-4.5"/></>}
+    {kind === 'camera' && <><path d="M8 6 9.5 3.5h5L16 6h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" fill="currentColor" fillOpacity=".10"/><circle cx="12" cy="13" r="4"/><path d="M17.5 9h.01" strokeWidth="2.5"/></>}
+    {kind === 'tools' && <><path d="M14 4a6 6 0 0 0-7 7L3.5 16.5a2.8 2.8 0 0 0 4 4L13 15a6 6 0 0 0 7-7l-4 4-4-4 4-4Z" fill="currentColor" fillOpacity=".12"/><path d="m6 18 .01-.01" strokeWidth="2.5"/></>}
+    {kind === 'settings' && <><path d="m9.5 3-.6 2.2-1.5.9-2.2-.5L2.7 10l1.6 1.6v1.8L2.7 15l2.5 4.4 2.2-.5 1.5.9.6 2.2h5l.6-2.2 1.5-.9 2.2.5 2.5-4.4-1.6-1.6v-1.8l1.6-1.6-2.5-4.4-2.2.5-1.5-.9-.6-2.2Z" fill="currentColor" fillOpacity=".10" transform="translate(0 -0.5)"/><circle cx="12" cy="12" r="3.3"/></>}
+
+  </svg>
+}

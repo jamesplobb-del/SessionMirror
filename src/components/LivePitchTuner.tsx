@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { BarChart3, Music2, Settings } from 'lucide-react'
+import { BarChart3, Music2, Settings, SlidersHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
   useLivePitchTracker,
@@ -374,8 +374,8 @@ function LiveAudioTunerPane({
                   aria-label={`Open tuner settings. Written pitch ${transposition.shortLabel}`}
                   title={transpositionOpen ? 'Hide tuner settings' : `Tuner settings · ${transposition.shortLabel}`}
                 >
-                  <Settings aria-hidden />
-                  <span>Settings</span>
+                  <Settings className="electric-tuning-old" aria-hidden /><SlidersHorizontal className="electric-tuning-new" aria-hidden />
+                  <span className="electric-tuning-old">Settings</span><span className="electric-tuning-new">Tuning</span>
                   <small>{transposition.shortLabel}</small>
                 </button>
               ) : null}

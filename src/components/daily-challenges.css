@@ -1,0 +1,55 @@
+.daily-challenges { flex-shrink: 0; border-top: 1px solid var(--audio-divider, #ffffff20); padding-top: 14px; color: inherit; }
+.daily-challenges header, .daily-challenges__item, .daily-challenges__collection { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.daily-challenges header { margin-bottom: 6px; }
+.daily-challenges header > div, .daily-challenges__copy, .daily-challenges__collection > span { display: grid; gap: 4px; }
+.daily-challenges header button { display: flex; align-items: center; gap: 5px; color: var(--accent-active); min-width: 44px; min-height: 44px; background: none; border: 0; }
+.daily-challenges svg { width: 17px; height: 17px; flex-shrink: 0; }
+.daily-challenges__item { width: 100%; padding: 12px 0; border: 0; background: none; color: inherit; text-align: left; min-height: 64px; }
+.daily-challenges__copy { flex: 1; min-width: 0; }
+.daily-challenges strong { font-size: 13px; font-weight: 600; }
+.daily-challenges small, .daily-challenges p { font-size: 11px; opacity: .65; line-height: 1.5; }
+.daily-challenges__mark { font: 11px ui-monospace, monospace; opacity: .65; }
+.daily-challenges__mark.is-done { color: var(--accent-active); opacity: 1; }
+.daily-challenges__completion { display: block; font-size: 11px; opacity: .6; margin: 4px 0 8px; }
+.daily-challenges__collection { width: 100%; border: 0; border-top: 1px solid var(--audio-divider, #ffffff20); color: inherit; background: none; padding: 10px 0; text-align: left; min-height: 54px; }
+.daily-challenges__collection img { width: 32px; height: 38px; object-fit: contain; }
+.daily-challenges__collection > span { flex: 1; }
+.challenge-collection { position: fixed; inset: 0; width: 100%; height: 100%; max-width: 100%; max-height: 100%; margin: 0; padding: max(20px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom)); border: 0; color: #eef1f5; background: #090d13; overflow-y: auto; overscroll-behavior: contain; }
+.challenge-collection::backdrop { background: #090d13; }
+.challenge-collection header { display: flex; align-items: center; justify-content: space-between; }
+.challenge-collection header span { display: flex; align-items: center; gap: 8px; color: var(--accent-active); }
+.challenge-collection header button, .challenge-reward-notice button { background: none; color: inherit; border: 0; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.challenge-collection h2 { font-size: clamp(28px, 6vw, 42px); letter-spacing: -.04em; margin: 26px 0 10px; }
+.challenge-collection p { font-size: 14px; line-height: 1.6; max-width: 560px; opacity: .7; }
+.challenge-collection__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 24px auto; max-width: 700px; }
+.challenge-collection__grid button { display: grid; justify-items: center; gap: 12px; padding: 20px 10px; border: 1px solid #ffffff18; border-radius: 12px; background: #ffffff04; color: inherit; min-height: 180px; }
+.challenge-collection__grid button.is-selected { border-color: var(--accent-active); background: var(--accent-active-soft); }
+.challenge-collection__grid img { width: 80px; height: 88px; object-fit: contain; }
+.challenge-collection__grid button:disabled img { filter: grayscale(1); opacity: .45; }
+.challenge-collection__grid span { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.challenge-collection__grid svg { width: 14px; height: 14px; }
+.challenge-collection progress { width: 80%; height: 4px; accent-color: var(--accent-active); }
+.challenge-collection footer { font-size: 12px; line-height: 1.6; opacity: .6; padding-bottom: 20px; }
+.challenge-game-ready { display: grid; gap: 20px; width: min(100% - 40px, 440px); margin: auto; padding: 40px 0; text-align: center; }
+.challenge-game-ready > span, .challenge-game-ready small { font-size: 12px; opacity: .65; }
+.challenge-game-ready h1 { font-size: clamp(28px, 7vw, 42px); letter-spacing: -.04em; line-height: 1.1; }
+.challenge-game-ready p { font-size: 15px; line-height: 1.6; }
+.challenge-reward-notice { position: fixed; z-index: 260; top: max(14px, env(safe-area-inset-top)); left: 12px; right: 12px; max-width: 500px; margin: auto; display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 16px; border: 1px solid var(--accent-active-border); border-radius: 12px; background: #0b130bf5; color: #eef6ef; box-shadow: 0 12px 36px #0005; animation: challenge-reward-in .25s ease-out; }
+.challenge-reward-notice > svg { color: var(--accent-active); flex-shrink: 0; }
+.challenge-reward-notice > span { display: grid; gap: 5px; flex: 1; }
+.challenge-reward-notice strong { font-size: 13px; }
+.challenge-reward-notice small { font-size: 12px; line-height: 1.4; opacity: .75; }
+@keyframes challenge-reward-in { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .challenge-reward-notice { animation: none; } }
+@media (min-width: 700px) { .challenge-collection { padding-left: max(24px, calc((100vw - 700px) / 2)); padding-right: max(24px, calc((100vw - 700px) / 2)); } .challenge-collection__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Keep Home's primary actions generous while making room for two small goals. */
+.practice-menu-card.practice-menu-card--home:has(.daily-challenges) .practice-home-actions { min-height: 220px; grid-template-rows: minmax(120px, 1.2fr) minmax(96px, 1fr); }
+@media (max-height: 740px) {
+  .practice-menu-card.practice-menu-card--home:has(.daily-challenges) .practice-home-actions { min-height: 184px; grid-template-rows: minmax(96px, 1.1fr) minmax(84px, 1fr); }
+  .daily-challenges__item { min-height: 54px; padding-block: 8px; }
+}
+/* Use the same blue accent as the routine menus; locked players remain visible. */
+.daily-challenges, .challenge-collection, .challenge-reward-notice { --accent-active: var(--sm-blue, #65a5ff); --accent-active-soft: #659fff1a; --accent-active-border: #659fff55; }
+.challenge-collection__grid button:disabled { opacity: 1; }
+.challenge-collection__grid button:disabled img { filter: saturate(.75); opacity: .85; }

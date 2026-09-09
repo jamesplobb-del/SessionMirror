@@ -1,3 +1,5 @@
+import { GAME_TEST_INPUT } from '../gameTestInput'
+import { recordPlannedGame } from '../../utils/dailyChallengePlan'
 import {
   useCallback,
   useEffect,
@@ -67,6 +69,7 @@ function settingsForLaunch(settings: BalanceSettings, launch: BalanceLaunch): Ba
   if (launch.kind === 'quick') return settings
   return {
     ...settings,
+    instrumentId: launch.instrumentId ?? settings.instrumentId,
     goalMode: 'fixed',
     goalSeconds: launch.goalSeconds ?? settings.goalSeconds,
     tolerancePreset: 'custom',
@@ -132,10 +135,8 @@ export interface UseBalanceGameResult {
   toleranceCents: number
   currentTarget: ReturnType<typeof buildBalanceTargets>[number] | null
   routineResult: BalanceRoutineResult | null
-  /** What the current (or most recent) run is: quick play, a level, or the daily. */
+  /** What the current (or most recent) run is: quick play or the daily. */
   launch: BalanceLaunch
-  /** Stars just earned on a level run, and what the level already held. */
-  levelAward: { earnedStars: number; previousStars: number } | null
   updateSettings: (patch: Partial<BalanceSettings>) => void
   start: (launch?: BalanceLaunch) => void
   reset: () => void
@@ -177,7 +178,6 @@ export function useBalanceGame({
   const [hud, setHud] = useState<BalanceVisualSnapshot>({ ...EMPTY_VISUAL })
   const [newTrophyIds, setNewTrophyIds] = useState<BalanceTrophyId[]>([])
   const [launch, setLaunch] = useState<BalanceLaunch>(QUICK_PLAY_LAUNCH)
-  const [levelAward, setLevelAward] = useState<{ earnedStars: number; previousStars: number } | null>(null)
   const launchRef = useRef(launch)
   launchRef.current = launch
   const suppressUntilRef = useRef(0)
@@ -407,19 +407,14 @@ export function useBalanceGame({
     resultPersistedRef.current = result.id
     const previousTrophies = dataRef.current.trophies
     const scored = recordBalanceResult(dataRef.current, result)
-    const awarded = recordBalanceLaunch(scored, launchRef.current, result)
-    const next = awarded.data
-    setLevelAward(
-      launchRef.current.kind === 'level'
-        ? { earnedStars: awarded.earnedStars, previousStars: awarded.previousStars }
-        : null,
-    )
+    const next = recordBalanceLaunch(scored, launchRef.current, result)
     setNewTrophyIds(
       (Object.keys(next.trophies) as BalanceTrophyId[]).filter((id) => !previousTrophies[id]),
     )
     dataRef.current = next
     setData(next)
     saveBalanceData(next)
+    if (!GAME_TEST_INPUT) recordPlannedGame({ game: 'balance', instrumentId: state.settings.instrumentId, date: launchRef.current.kind === 'daily' ? launchRef.current.id : null, completed: result.completed })
     dispatch({ type: 'SET_BEST', bestBalancedMs: getBalanceBestMs(next) })
   }, [state])
 
@@ -473,7 +468,6 @@ export function useBalanceGame({
     (nextLaunch?: BalanceLaunch) => {
       clearAttempt()
       setNewTrophyIds([])
-      setLevelAward(null)
       resultPersistedRef.current = null
       const activeLaunch = nextLaunch ?? launchRef.current
       launchRef.current = activeLaunch
@@ -498,7 +492,6 @@ export function useBalanceGame({
   const reset = useCallback(() => {
     stopTone()
     clearAttempt()
-    setLevelAward(null)
     launchRef.current = QUICK_PLAY_LAUNCH
     setLaunch(QUICK_PLAY_LAUNCH)
     dispatch({ type: 'RESET', settings: dataRef.current.settings })
@@ -566,7 +559,6 @@ export function useBalanceGame({
     currentTarget,
     routineResult,
     launch,
-    levelAward,
     updateSettings,
     start,
     reset,

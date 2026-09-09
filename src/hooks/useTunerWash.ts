@@ -54,9 +54,10 @@ export function useTunerWash(
 
   useEffect(() => {
     if (!enabled) return
+    // Capture the owner before unmount clears the ref, so Record cannot retain the tint.
+    const stage = stageRef.current
+    const overlay = stage?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
     return () => {
-      const stage = stageRef.current
-      const overlay = stage?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
       clearWash(stage)
       clearWash(overlay ?? null)
       if (overlay) clearWash(document.documentElement)

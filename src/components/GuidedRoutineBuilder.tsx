@@ -2,7 +2,7 @@ import SwipeRoutineItem from './SwipeRoutineItem'
 import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { StepEditor, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
@@ -10,6 +10,7 @@ import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamil
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
+import { importPracticePlanFromText, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
 import '../styles/routine-guide.css'
 
 type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'detail' | 'library'
@@ -224,6 +225,31 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     try { storeLibraryRoutine(routine); props.onDelete() }
     catch { setError('Could not keep a copy of your routine. Please try again.') }
   }
+
+  /* ---- Passing a routine to someone else --------------------------------
+   *
+   * A teacher writes the week once and sends it; every student opens the
+   * attachment and has the same session, with the same tools set up on each
+   * item. What travels is the routine, not a metronome program — see
+   * `utils/practiceRoutineShare.ts` for why those are separate file types.
+   */
+  const shareRoutine = (item: Routine) => {
+    setError('')
+    void sharePracticeRoutine(item).then(result => {
+      if (!result.ok) setError(result.error)
+    })
+  }
+
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const importFile = (file: File) => {
+    setError('')
+    void file.text().then(text => {
+      const result = importPracticePlanFromText(text)
+      if (!result.ok) { setError(result.error); return }
+      setLibrary(loadRoutineLibrary())
+      openSavedRoutine(result.routine)
+    })
+  }
   const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds([]); setLineupReturn('goals'); move('lineup') }
     : screen === 'instrument' ? () => move(instrumentReturn)
     : screen === 'choose' ? configureNext
@@ -280,19 +306,53 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
                       : 'General'
                     const itemMinutes = item.steps.reduce((sum, step) => sum + step.minutes, 0)
                     const active = item.id === routine?.id
-                    return <button type="button" key={item.id} className="routine-guide-saved-routine" onClick={() => openSavedRoutine(item)}>
-                      <span className="routine-guide-saved-routine__copy">
-                        <strong>{item.name}</strong>
-                        <small>{itemInstrument} · {item.steps.length} {item.steps.length === 1 ? 'exercise' : 'exercises'} · {formatMinutes(itemMinutes)}</small>
-                      </span>
-                      {active ? <em>Today</em> : null}
-                      <ChevronRight aria-hidden />
-                    </button>
+                    return <div key={item.id} className="routine-guide-saved-row">
+                      <button type="button" className="routine-guide-saved-routine" onClick={() => openSavedRoutine(item)}>
+                        <span className="routine-guide-saved-routine__copy">
+                          <strong>{item.name}</strong>
+                          <small>{itemInstrument} · {item.steps.length} {item.steps.length === 1 ? 'exercise' : 'exercises'} · {formatMinutes(itemMinutes)}</small>
+                        </span>
+                        {active ? <em>Today</em> : null}
+                        <ChevronRight aria-hidden />
+                      </button>
+                      <Pressable type="button" intensity="icon" haptic="light" hapticFeedback={hapticFeedback}
+                        className="routine-guide-saved-share" onClick={() => shareRoutine(item)}
+                        aria-label={`Share ${item.name}`} title={`Share ${item.name}`}>
+                        <Share2 aria-hidden />
+                      </Pressable>
+                    </div>
                   })}
                 </div>
               ) : (
                 <p>Your saved practice plans will stay together on this page.</p>
               )}
+            </section>
+
+            {/* Receiving one. On device a shared routine usually arrives by
+              * tapping the attachment, which opens the app straight into it;
+              * this is the way in for a file already saved on the phone, and
+              * the only way in on the web build. */}
+            <section className="routine-guide-saved" aria-label="Open a shared routine">
+              <h3>Sent one by your teacher?</h3>
+              <button type="button" className="routine-guide-own" onClick={() => importInputRef.current?.click()}>
+                <Upload aria-hidden />
+                <span>
+                  <strong>Open a shared routine</strong>
+                  <small>Add a .{PRACTICE_PLAN_EXTENSION} routine someone sent you</small>
+                </span>
+                <ArrowRight aria-hidden />
+              </button>
+              <input
+                ref={importInputRef}
+                type="file"
+                accept={`.${PRACTICE_PLAN_EXTENSION},application/json`}
+                hidden
+                onChange={event => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) importFile(file)
+                }}
+              />
             </section>
           </div>}
           {screen === 'goals' && <>

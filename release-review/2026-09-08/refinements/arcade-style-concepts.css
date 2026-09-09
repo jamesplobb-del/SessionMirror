@@ -1,0 +1,50 @@
+/* Two review-only game skins, layered over the selected Electric layout. */
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] :is(.balance-arcade,.balance-screen--setup) {
+ --ink:#183755; --ink-soft:#48647a; --sky-top:#93e3e5; --sky-mid:#e5f9ef; --sky-low:#fff4d6;
+ background:radial-gradient(circle at 85% 8%,#fff4b7 0,transparent 32%),linear-gradient(155deg,#a3e9ed,#eaf8ee 54%,#fff1d2); color:#183755;
+}
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] :is(.balance-card,.balance-door,.balance-instrument-board,.sj-panel,.sj-hero,.balance-cycle-chip,.balance-setup-group,.electric-balance-controls) {
+ background:#fffdf5; border:2px solid #21465d; border-radius:20px; box-shadow:0 5px 0 #21465d,0 10px 22px #21465d12;
+}
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-door:nth-child(2) { background:#e5faf0; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-door:nth-child(3) { background:#f1eaff; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-door__name { border-top:2px solid #21465d; padding:12px 4px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] :is(.balance-cta,.balance-primary-button) { background:#ffc84b; color:#183755; border:2px solid #21465d; box-shadow:0 5px 0 #21465d; text-shadow:none; border-radius:16px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-textlink { background:#d8f3f0; color:#183755; border:1.5px solid #21465d; box-shadow:0 3px 0 #21465d; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-display { color:#183755; text-shadow:none; letter-spacing:-.045em; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-hall__floor { background:#f8ce65; border:2px solid #21465d; border-radius:18px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-pill { background:#ffcd50; color:#183755; border:1px solid #21465d; box-shadow:none; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-cta:active { transform:translateY(3px); box-shadow:0 2px 0 #21465d; }
+
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-arcade,.balance-screen--setup) {
+ --ink:#f1f4ff; --ink-soft:#b6c5e7; --ink-faint:#a1b2d3; --sky-top:#111b3b; --sky-mid:#10162b; --sky-low:#090f22; --card:#1b2747;
+ background:radial-gradient(ellipse at 5% 5%,#24567577,transparent 44%),radial-gradient(ellipse at 100% 45%,#6536ad55,transparent 50%),#0d142b; color:#f1f4ff;
+}
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-card,.balance-door,.balance-instrument-board,.sj-panel,.balance-cycle-chip,.balance-setup-group,.electric-balance-controls) {
+ background:linear-gradient(135deg,#223253,#18223e); border:1px solid #80caff55; border-radius:22px; box-shadow:inset 0 1px 0 #c0e6ff1a,0 8px 24px #03091866;
+ color:#edf5ff;
+}
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-display,.balance-card__title,.balance-door__name strong,.balance-instrument-board strong,.sj-panel__head strong,.electric-balance-controls strong) { color:#f3f7ff; text-shadow:none; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-subdisplay,.balance-card__line,.balance-door__name small,.balance-instrument-board small,.balance-ready__hint,.sj-field__label,.sj-field__note,.sj-custom-scale p) { color:#b8c9e7; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-door__name { padding:12px 4px; border-top:1px solid #7ddcff55; background:#16253e; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-cta,.balance-primary-button) { background:linear-gradient(120deg,#72eadf,#61bfff); color:#0b2036; border:1px solid #b0fff3; box-shadow:0 4px 0 #216a85,0 7px 23px #33b6e92a; text-shadow:none; border-radius:18px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-textlink { background:#263658; color:#d9e9ff; border:1px solid #809be34a; box-shadow:0 3px 0 #081126; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-pill { background:#f3c76a; color:#231d35; box-shadow:0 0 16px #f3c76a22; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-hall__floor { background:linear-gradient(180deg,#416392,#172d50); border:1px solid #89e3ed66; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-hall__roster :is(strong,small) { color:#d9e9ff; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-setup-sheet { background:transparent; }
+/* Music stays on a light page in both styles; no recoloring of notation. */
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .sj-hero { background:#f3f7fb; color:#17374b; border:1px solid #97ceff80; border-radius:22px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-ready__dock { background:#0e1936ee; border-top:1px solid #72dbe838; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-ready__dock p { color:#c4d5ef; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-setup-preview { border:1px solid #80caff55; border-radius:22px; overflow:hidden; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-preview-summary { background:#1a2948; color:#d3e3ff; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-preview-summary strong { color:#f4f8ff; }
+@media(prefers-reduced-motion:reduce) { html[data-arcade-style] .balance-cta:active { transform:none; } }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-arcade__sky { opacity:.08; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-cycle,.balance-round-button,.balance-arcade__bar-stat) { background:#213454; color:#ecf6ff; border:1px solid #8eddf74a; box-shadow:0 4px 0 #091327; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-cycle strong,.balance-arcade__bar-stat strong,.balance-round-button svg) { color:#ecf6ff; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-cycle small,.balance-arcade__bar-stat span) { color:#b8cde9; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-pop'] .balance-cycle { background:#fffdf5; border:1.5px solid #21465d; box-shadow:0 4px 0 #21465d; border-radius:16px; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] :is(.balance-streak,.balance-tile) { background:#213454; border:1px solid #8eddf74a; color:#c6d8f0; box-shadow:0 4px 0 #091327; }
+html[data-refinement='depth-electric'][data-arcade-style='arcade-night'] .balance-tile :is(strong,small) { color:#e7f2ff; }

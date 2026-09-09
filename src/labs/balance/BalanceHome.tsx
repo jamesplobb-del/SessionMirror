@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ChevronRight, CircleCheck, Flame, Map, Play, Trophy } from 'lucide-react'
+import { ChevronRight, CircleCheck, Flame, Play, Trophy } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import { getBalanceCharacter, type BalanceCharacterId } from './balanceCharacters'
@@ -9,21 +9,15 @@ import {
   balanceDailyIsComplete,
   balanceDayKey,
 } from './balanceDaily'
-import {
-  balanceNextLevel,
-  balanceTotalStars,
-  BALANCE_MAX_STARS,
-} from './balanceLevels'
 import { getBalanceInstrument } from './balanceInstruments'
 import { midiToBalanceNoteName } from './balanceMusic'
 import { formatBalanceDuration } from './balanceStorage'
-import type { BalanceDailyProgress, BalanceLevelProgress } from './balanceTypes'
+import type { BalanceDailyProgress } from './balanceTypes'
 import { BALANCE_TROPHIES } from './balanceTrophies'
 
 interface BalanceHomeProps {
   instrumentId: string
   characterId: BalanceCharacterId
-  levels: Record<string, BalanceLevelProgress>
   daily: BalanceDailyProgress
   trophyCount: number
   bestBalancedMs: number
@@ -31,20 +25,22 @@ interface BalanceHomeProps {
   onBack: () => void
   onStartDaily: () => void
   onQuickPlay: () => void
-  onTrail: () => void
   onTrophies: () => void
   onInstrument: () => void
 }
 
 /**
- * The landing screen: today's challenge, the streak it feeds, and the two ways
- * further in. A player who opens the game with two minutes to spare should be
- * able to press one button and be playing.
+ * The landing screen.
+ *
+ * Quick Play is the game — one enormous button, already set up for the
+ * instrument chosen when the app was first opened, so a player with two
+ * minutes can press once and be playing. Today's challenge sits under it as
+ * the reason to come back, and the streak and the trophy case are the whole of
+ * the progression now that the Sky Trail is gone.
  */
 export default function BalanceHome({
   instrumentId,
   characterId,
-  levels,
   daily,
   trophyCount,
   bestBalancedMs,
@@ -52,7 +48,6 @@ export default function BalanceHome({
   onBack,
   onStartDaily,
   onQuickPlay,
-  onTrail,
   onTrophies,
   onInstrument,
 }: BalanceHomeProps) {
@@ -63,8 +58,6 @@ export default function BalanceHome({
   )
   const streak = balanceCurrentStreak(daily, dayKey)
   const doneToday = balanceDailyIsComplete(daily, dayKey)
-  const nextLevel = balanceNextLevel(levels)
-  const totalStars = balanceTotalStars(levels)
   const character = getBalanceCharacter(characterId)
   const instrument = getBalanceInstrument(instrumentId)
 
@@ -81,7 +74,7 @@ export default function BalanceHome({
       stat={bestBalancedMs > 0 ? { label: 'Best', value: formatBalanceDuration(bestBalancedMs) } : null}
       className="balance-arcade--home"
     >
-      <h1 className="balance-display balance-display--page">Today&apos;s Challenge</h1>
+      <h1 className="balance-display balance-display--page">Balance</h1>
 
       {/*
         * The instrument sits above everything, because it decides every note
@@ -114,7 +107,24 @@ export default function BalanceHome({
         <b aria-hidden /><b aria-hidden /><b aria-hidden />
       </div>
 
+      {/* Quick Play first and biggest: it is the game, and it is already set
+        * up for the instrument above, so there is nothing to decide before
+        * playing. The challenge is the reason to come back tomorrow, not the
+        * thing standing between the player and a note. */}
       <section className="balance-card balance-home__challenge">
+        <Pressable
+          haptic="medium"
+          hapticFeedback={hapticFeedback}
+          className="balance-cta"
+          onClick={onQuickPlay}
+        >
+          <Play aria-hidden /> Quick Play
+        </Pressable>
+        <p className="balance-card__line">Hold your note. Reach the flag.</p>
+      </section>
+
+      <section className="balance-card balance-home__challenge">
+        <span className="balance-pill">Today&apos;s Challenge</span>
         <h2 className="balance-card__title">{challenge.name}</h2>
         <p className="balance-card__line">{challenge.objective}</p>
 
@@ -124,23 +134,14 @@ export default function BalanceHome({
           </p>
         ) : (
           <Pressable
-            haptic="medium"
+            intensity="soft"
             hapticFeedback={hapticFeedback}
-            className="balance-cta"
+            className="balance-cta balance-cta--blue balance-cta--small"
             onClick={onStartDaily}
           >
-            <Play aria-hidden /> Start Challenge
+            Start Challenge
           </Pressable>
         )}
-
-        <Pressable
-          intensity="soft"
-          hapticFeedback={hapticFeedback}
-          className="balance-textlink"
-          onClick={onQuickPlay}
-        >
-          Quick Play
-        </Pressable>
       </section>
 
       <p className={`balance-streak ${streak === 0 ? 'is-cold' : ''}`}>
@@ -158,18 +159,7 @@ export default function BalanceHome({
         </strong>
       </p>
 
-      <div className="balance-home__nav">
-        <Pressable
-          intensity="soft"
-          hapticFeedback={hapticFeedback}
-          className="balance-tile"
-          onClick={onTrail}
-        >
-          <span className="balance-tile__icon" aria-hidden><Map /></span>
-          <strong>Sky Trail</strong>
-          <small>Level {nextLevel.number} · {totalStars}/{BALANCE_MAX_STARS} ★</small>
-        </Pressable>
-
+      <div className="balance-home__nav balance-home__nav--single">
         <Pressable
           intensity="soft"
           hapticFeedback={hapticFeedback}

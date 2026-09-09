@@ -8,17 +8,29 @@ import {
 } from '../../context/ActionSheetContext'
 import { isRoutineFileName } from './routineFile'
 import { importRoutineFromText } from './timelineStorage'
+import {
+  importPracticePlanFromText,
+  isPracticePlanFileName,
+} from '../../utils/practiceRoutineShare'
 import type { PracticeTimeline } from '../types'
 
 /**
  * Opening a routine someone sent you.
  *
- * iOS copies a tapped `.btroutine` attachment into the app's Documents/Inbox
- * and hands us the file URL through the standard `appUrlOpen` event, which
- * Capacitor already forwards — AppDelegate falls through to the proxy once the
- * URL isn't a Quick Tuner deep link, so no extra Swift is needed. A cold launch
- * delivers the same URL via `getLaunchUrl()` instead, because the listener is
+ * iOS copies a tapped attachment into the app's Documents/Inbox and hands us
+ * the file URL through the standard `appUrlOpen` event, which Capacitor
+ * already forwards — AppDelegate falls through to the proxy once the URL isn't
+ * a Quick Tuner deep link, so no extra Swift is needed. A cold launch delivers
+ * the same URL via `getLaunchUrl()` instead, because the listener is
  * registered after the event has already fired.
+ *
+ * Two different things arrive this way and must not be confused:
+ *   `.btplan`    — a practice routine: the ordered checklist of exercises the
+ *                  app is built around. This is what a teacher sends a student.
+ *   `.btroutine` — a metronome program: bars, tempo ramps and section markers
+ *                  for the practice timeline's click.
+ * The extension decides which importer runs, and each announces itself in its
+ * own words, so "Routine Added" always means the thing that was actually sent.
  */
 
 export type RoutineOpenEvent =
@@ -38,15 +50,15 @@ function emit(event: RoutineOpenEvent): void {
   announce(
     event.status === 'imported'
       ? {
-          title: 'Routine Added',
-          message: `"${event.routine.name}" is in your routines and ready to play.${
+          title: 'Program Added',
+          message: `"${event.routine.name}" is in your metronome programs and ready to play.${
             event.warnings.length
               ? `\n\nSome settings were adjusted to fit this version:\n${event.warnings.join('\n')}`
               : ''
           }`,
           tone: 'success',
         }
-      : { title: "Couldn't Open Routine", message: event.error, tone: 'error' },
+      : { title: "Couldn't Open Program", message: event.error, tone: 'error' },
   )
 }
 
@@ -116,9 +128,10 @@ async function handleIncomingUrl(url: string): Promise<void> {
   if (!url || !looksLikeFileUrl(url) || handledUrls.has(url)) return
 
   const name = fileNameFromUrl(url)
+  const isPracticePlan = isPracticePlanFileName(name)
   /* Other file types can reach us through "Open With"; ignore them silently
    * rather than showing an error for a file the user never meant for us. */
-  if (!isRoutineFileName(name)) return
+  if (!isPracticePlan && !isRoutineFileName(name)) return
 
   handledUrls.add(url)
 
@@ -132,6 +145,21 @@ async function handleIncomingUrl(url: string): Promise<void> {
       status: 'failed',
       error: 'Could not open that routine file.',
     })
+    return
+  }
+
+  if (isPracticePlan) {
+    const plan = importPracticePlanFromText(text)
+    void discardInboxCopy(url)
+    announce(
+      plan.ok
+        ? {
+            title: 'Routine Added',
+            message: `"${plan.routine.name}" is in your routines. Open Practice Home to start it.`,
+            tone: 'success',
+          }
+        : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },
+    )
     return
   }
 

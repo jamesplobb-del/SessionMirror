@@ -24,6 +24,7 @@ import {
   type StaffJumperState,
 } from './staffJumperMusicLogic'
 import {
+  getStaffPositionForNote,
   BARLINE_THICKNESS,
   BEAM_THICKNESS,
   CLEF_ANCHOR_YPX,
@@ -52,12 +53,11 @@ import {
   TIME_SIGNATURE_WIDTH,
   TIME_SIGNATURE_YPX,
   NOTE_SPACING_PX,
-  type StemDirection,
 } from './staffNotationMap'
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import StaffRest from './StaffRest'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
-import { layoutRhythm } from './staffJumperNotationLayout'
+import { layoutRhythm, flagPath } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
 import { describeWrittenRhythm, formatBeats } from './staffJumperRhythmReading'
 import {
@@ -166,18 +166,6 @@ function glyphNameForAccidental(accidental: '#' | 'b') {
  * system music fonts this game falls back to, and a flag has to start exactly
  * at the stem tip to look attached.
  */
-function flagPath(x: number, y: number, direction: StemDirection): string {
-  const sign = direction === 'up' ? 1 : -1
-  const width = STAFF_SPACE_PX * 1.15
-  const drop = STAFF_SPACE_PX * 2.1 * sign
-  const belly = STAFF_SPACE_PX * 0.75 * sign
-  return [
-    `M ${x} ${y}`,
-    `C ${x + width * 0.95} ${y + belly * 0.55} ${x + width} ${y + drop * 0.5} ${x + width * 0.42} ${y + drop}`,
-    `C ${x + width * 1.05} ${y + drop * 0.52} ${x + width * 0.55} ${y + belly * 0.7} ${x} ${y + belly * 1.5}`,
-    'Z',
-  ].join(' ')
-}
 
 /**
  * The bar's beats as a row of dots, the current one lit.
@@ -353,8 +341,8 @@ export default function StaffJumperGame({
   )
 
   const keySignature = useMemo(
-    () => (showKeySignature() ? getKeySignatureMarkers(config.key, config.scaleMode, config.clef) : []),
-    [config.clef, config.difficulty, config.key, config.scaleMode],
+    () => (showKeySignature() ? (config.customPitchClasses?.length ? [] : getKeySignatureMarkers(config.key, config.scaleMode, config.clef)) : []),
+    [config.clef, config.difficulty, config.key, config.scaleMode, config.customPitchClasses],
   )
 
   const glyphMetrics = useMusicGlyphMetrics()
@@ -415,7 +403,6 @@ export default function StaffJumperGame({
     (viewport.width - PLAYER_ANCHOR_X_PX) /
     (NOTE_SPACING_PX * MIN_LOOKAHEAD_NOTES + NOTEHEAD_W)
   const scale = Math.max(0.5, Math.min(1.15, Math.min(heightScale, widthScale)))
-  const baseY = viewport.height * 0.47 - STAFF_MIDDLE_Y * scale
   const playerModel = getPracticeGameCharacter(config.playerModel)
 
   /**
@@ -431,10 +418,13 @@ export default function StaffJumperGame({
    * has to be counted when asking how tall the thing on screen actually is.
    */
   const playerBoxPx = STAFF_SPACE_PX * PLAYER_HEIGHT_SPACES * scale
+  const deepestInkY = Math.max(STAFF_BOTTOM_Y + STAFF_SPACE_PX, getStaffPositionForNote(getTargetNoteAtStep(config, 0).writtenLetter, getTargetNoteAtStep(config, 0).writtenOctave, config.clef).yPx + STAFF_SPACE_PX * 3.5)
+  const baseY = Math.min(viewport.height * 0.47 - STAFF_MIDDLE_Y * scale, (dockTopPx ?? viewport.height * 0.78) - 16 - playerBoxPx * playerModel.scale - (deepestInkY + STAFF_SPACE_PX * 0.35) * scale)
   const groundScreenY = groundLaneScreenY({
     baseY,
     scale,
     playerHeightPx: playerBoxPx * playerModel.scale,
+    deepestInkY: deepestInkY,
     dockTopPx: dockTopPx ?? viewport.height * 0.78,
   })
   const groundWorldY = (groundScreenY - baseY) / Math.max(scale, 0.1)
@@ -549,17 +539,19 @@ export default function StaffJumperGame({
     return () => cancelAnimationFrame(raf)
   }, [applyFrame])
 
+  // Only worth saying when there is something left to lose.
+  const livesSuffix = config.lives ? ` ${state.hearts} hearts left.` : ''
   const feedbackAnnouncement =
     state.feedback === 'perfect'
       ? 'Perfect pitch.'
       : state.feedback === 'good'
         ? 'Landed.'
         : state.feedback === 'timeout'
-          ? `Time is up. ${state.hearts} hearts left.`
+          ? `Time is up.${livesSuffix}`
           : state.feedback === 'missed-beat'
-            ? `Missed the beat. ${state.hearts} hearts left.`
+            ? `Missed the beat.${livesSuffix}`
             : state.feedback === 'wrong'
-              ? `Wrong note. ${state.hearts} hearts left.`
+              ? `Wrong note.${livesSuffix}`
               : ''
   const targetAnnouncement = target.isRest
     ? rhythmMode
@@ -775,14 +767,14 @@ export default function StaffJumperGame({
                 />
               ))}
 
-              {rhythmLayout.flags.map((flag) => (
+              {rhythmLayout.flags.flatMap((flag) => Array.from({ length: flag.count }, (_, level) => (
                 <path
-                  key={flag.key}
+                  key={`${flag.key}-${level}`}
                   className="sj-flag"
-                  d={flagPath(flag.x, flag.y, flag.direction)}
+                  d={flagPath(flag.x, flag.y + (flag.direction === 'up' ? 1 : -1) * level * STAFF_SPACE_PX * 0.75, flag.direction)}
                   opacity={flag.opacity}
                 />
-              ))}
+              )))}
             </svg>
 
             {/* Noteheads */}
@@ -816,6 +808,7 @@ export default function StaffJumperGame({
                       .join(' ')}
                     style={{ left: `${slot.xPx}px`, top: `${slot.note.yPx}px` }}
                   >
+                    {!slot.note.isRest && slot.note.customAccidental && <span className="sj-custom-accidental">{slot.note.customAccidental}</span>}
                     {/* A rest replaces the whole note: no head, ledgers or label. */}
                     {slot.note.isRest && (
                       <StaffRest value={slot.note.rhythm.value} opacity={inkOpacity} />
@@ -847,7 +840,7 @@ export default function StaffJumperGame({
                           width: `${NOTEHEAD_W}px`,
                           height: `${NOTEHEAD_H}px`,
                           opacity: inkOpacity,
-                          borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
+                          borderWidth: isHollowNotehead(slot.note.rhythm.value) ? `${NOTEHEAD_RING_THICKNESS}px` : 0,
                         }}
                         aria-hidden
                       />
@@ -970,8 +963,14 @@ export default function StaffJumperGame({
         <div className="sj-hud">
           <div className="sj-hud-top">
             <div className="sj-hud-statusbar">
-              <Hearts count={state.hearts} />
-              <span className="sj-hud-statusbar__rule" aria-hidden />
+              {/* Endless runs have nothing to lose, so the row that showed what
+                  was left of it goes; accuracy is the reading that matters. */}
+              {config.lives && (
+                <>
+                  <Hearts count={state.hearts} />
+                  <span className="sj-hud-statusbar__rule" aria-hidden />
+                </>
+              )}
               <span className="sj-hud-mini-stat">
                 <small>Score</small>
                 <strong>{state.score}</strong>

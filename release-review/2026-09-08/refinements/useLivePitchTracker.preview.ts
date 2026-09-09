@@ -1,0 +1,2949 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { PitchDetector } from 'pitchy'
+import {
+  getTunerProfile,
+  PITCH_SILENCE_FLOOR_CENTS,
+  type PitchCanvasTheme,
+  type PitchTunerProfile,
+  type TunerInstrument,
+} from '../utils/pitchConfig'
+import {
+  frequencyToPitchReadout,
+  getIntonationColor,
+  getTraceColor,
+  glowColorForCents,
+  isSilenceFloorSample,
+  isFrequencyInInstrumentRange,
+  isSignalAboveRmsGate,
+  movingAverage,
+  normalizeInstrumentFrequency,
+  quantizeDisplayCents,
+  smoothFrequency,
+  stabilizePitchReadout,
+  TUNING_GREEN_CENTS,
+  type PitchReadout,
+} from '../utils/pitchUtils'
+import {
+  getMusicRecordingAudioConstraints,
+  tuneMusicRecordingStream,
+} from '../utils/audioCapture'
+import {
+  getPlaybackAudioContext,
+  isSharedPlaybackContext,
+  resumePlaybackAudioContext,
+} from '../utils/playbackAudioContext'
+import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
+import {
+  getTakePlaybackSpeakerNodes,
+  registerTakePlaybackSpeakerRoute,
+  routeTakePlaybackToSpeaker,
+  updateTakePlaybackSpeakerGain,
+} from '../utils/takePlaybackSpeaker'
+import {
+  acquireNativeAudioTap,
+  releaseNativeAudioTap,
+  subscribeNativeAudioPitchFrames,
+} from '../utils/nativeAudioPitchTap'
+import {
+  isNativeCaptureSessionActive,
+  subscribeNativeCaptureSessionActive,
+} from '../utils/cameraSessionState'
+const HISTORY_LENGTH = 140
+const LIVING_TRACE_HISTORY_LENGTH = 110
+
+/**
+ * Tuner trace stroke, in CSS px — one width for every profile.
+ *
+ * Voice reads thinner than winds at the same stroke because it spends more of
+ * a phrase near the silence floor, where the trace is broken into short
+ * segments. Drawing it heavier keeps it a line there too.
+ */
+const LIVING_TRACE_CORE_WIDTH = 3.3
+const LIVING_TRACE_GLOW_WIDTH = 6.6
+const LIVING_TRACE_MAX_STEP_CENTS = 8
+const LIVING_TRACE_END_BLEND_MAX = 0.42
+
+/** Brief hold before glow begins (~220ms). */
+const IN_TUNE_GLOW_HOLD_MS = 220
+/** Initial ramp to visible glow (~450ms). */
+const IN_TUNE_GLOW_RAMP_MS = 450
+/** Extra brightness while holding in tune (up to ~5s). */
+const IN_TUNE_GLOW_SUSTAIN_MS = 5000
+/** Hysteresis: leave glow zone above this |cents|. */
+const IN_TUNE_GLOW_EXIT_CENTS = 8
+
+function lerpValue(a: number, b: number, t: number): number {
+  return a + (b - a) * t
+}
+
+function computeInTuneGlowTarget(heldMs: number): number {
+  if (heldMs < IN_TUNE_GLOW_HOLD_MS) return 0
+  const elapsed = heldMs - IN_TUNE_GLOW_HOLD_MS
+  const ramp = Math.min(0.78, elapsed / IN_TUNE_GLOW_RAMP_MS)
+  const sustain =
+    elapsed > IN_TUNE_GLOW_RAMP_MS
+      ? Math.min(0.82, (elapsed - IN_TUNE_GLOW_RAMP_MS) / IN_TUNE_GLOW_SUSTAIN_MS)
+      : 0
+  return ramp + sustain
+}
+
+function updateInTuneBandGlow(
+  glow: { current: number },
+  inTuneSince: { current: number },
+  now: number,
+  dtMs: number,
+  inTune: boolean,
+): void {
+  if (inTune) {
+    if (inTuneSince.current === 0) inTuneSince.current = now
+    const target = computeInTuneGlowTarget(now - inTuneSince.current)
+    const ease = Math.min(1, dtMs * 0.0055)
+    glow.current += (target - glow.current) * ease
+  } else {
+    inTuneSince.current = 0
+    const ease = Math.min(1, dtMs * 0.003)
+    glow.current += (0 - glow.current) * ease
+  }
+}
+
+function isInTuneForGlow(
+  readout: PitchReadout,
+  eligible: { current: boolean },
+): boolean {
+  if (readout.noteName === '—') {
+    eligible.current = false
+    return false
+  }
+  const abs = Math.abs(readout.cents)
+  if (abs <= TUNING_GREEN_CENTS) eligible.current = true
+  else if (abs >= IN_TUNE_GLOW_EXIT_CENTS) eligible.current = false
+  return eligible.current
+}
+
+function sampleInTuneBandGlow(
+  glow: { current: number },
+  inTuneSince: { current: number },
+  lastFrameAt: { current: number },
+  glowEligible: { current: boolean },
+  readout: PitchReadout,
+): number {
+  const now = performance.now()
+  const dtMs =
+    lastFrameAt.current > 0 ? Math.min(48, now - lastFrameAt.current) : 16
+  lastFrameAt.current = now
+  const inTune = isInTuneForGlow(readout, glowEligible)
+  updateInTuneBandGlow(glow, inTuneSince, now, dtMs, inTune)
+  return glow.current
+}
+
+function drawInTuneBandRegion(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  centsToY: (cents: number) => number,
+  inTuneHighlight: number,
+  lite = false,
+): void {
+  const yTop = centsToY(TUNING_GREEN_CENTS)
+  const yBottom = centsToY(-TUNING_GREEN_CENTS)
+  const bandTop = Math.min(yTop, yBottom)
+  const bandHeight = Math.abs(yBottom - yTop)
+  const t = Math.min(1, inTuneHighlight)
+  const boost = Math.max(0, inTuneHighlight)
+
+  if (lite) {
+    if (boost > 0.01) {
+      ctx.fillStyle = `rgba(34, 197, 94, ${0.05 + t * 0.14})`
+      ctx.fillRect(0, bandTop, width, bandHeight)
+    }
+
+    const centerY = centsToY(0)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([])
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    return
+  }
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.09)'
+  ctx.fillRect(0, bandTop, width, bandHeight)
+
+  if (boost > 0.01) {
+    ctx.fillStyle = `rgba(34, 197, 94, ${0.07 + t * 0.26})`
+    ctx.fillRect(0, bandTop, width, bandHeight)
+  }
+
+  const lineAlpha = lerpValue(0.38, 0.82, t)
+  const red = Math.round(lerpValue(255, 34, t))
+  const green = Math.round(lerpValue(255, 197, t))
+  const blue = Math.round(lerpValue(255, 94, t))
+
+  ctx.lineWidth = lerpValue(1.1, 1.65, t)
+  ctx.setLineDash([])
+
+  for (const cents of [TUNING_GREEN_CENTS, -TUNING_GREEN_CENTS]) {
+    const y = centsToY(cents)
+    if (!lite && boost > 0.12) {
+      ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + t * 0.55})`
+      ctx.shadowBlur = 2 + boost * 14
+    } else {
+      ctx.shadowBlur = 0
+    }
+    ctx.strokeStyle = `rgba(${red}, ${green}, ${blue}, ${lineAlpha})`
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.lineTo(width, y)
+    ctx.stroke()
+  }
+  ctx.shadowBlur = 0
+}
+
+/** Dispatched when an element-routed pitch graph is torn down (requires media remount). */
+export const PITCH_GRAPH_RELEASED_EVENT = 'pitchgraph-released'
+
+type PitchGraphMode = 'stream' | 'element'
+
+/** Speaker passthrough when Web Audio routes playback (element is already full scale). */
+const MEDIA_PLAYBACK_GAIN = 1
+
+/**
+ * When the pitch graph taps the shared speaker bus, the speaker module owns the
+ * (boosted) output gain — leave it alone. Only standalone stream passthroughs
+ * use the unity analysis gain.
+ */
+function applyPitchOutputGain(
+  media: HTMLMediaElement,
+  passthrough: GainNode | null,
+): void {
+  if (!passthrough) return
+  const speakerNodes = getTakePlaybackSpeakerNodes(media)
+  if (speakerNodes && speakerNodes.gain === passthrough) {
+    updateTakePlaybackSpeakerGain(media, 1, false)
+  } else {
+    passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+  }
+}
+
+interface PitchGraph {
+  context: AudioContext
+  source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode
+  analyser: AnalyserNode
+  passthrough: GainNode | null
+  detector: PitchDetector<Float32Array>
+  buffer: Float32Array
+  smoothed: number | null
+  media: HTMLMediaElement
+  mode: PitchGraphMode
+}
+
+const elementGraphs = new WeakMap<HTMLMediaElement, PitchGraph>()
+const activeMicPitchGraphs = new Set<MicPitchGraph>()
+
+/** PCM chunks pushed from the native AVCaptureSession audio tap. */
+interface NativeTapBinding {
+  /** Most recent 2048-sample mono chunk (latest-wins; the loop copies it each tick). */
+  latest: Float32Array | null
+  sampleRate: number
+  sequence: number
+  processedSequence: number
+  hasAnalyzedFrame: boolean
+  cachedSignalStrong: boolean
+  cachedRawPitch: number
+  cachedClarity: number
+  receivedAny: boolean
+  startedAt: number
+  lastFrameAt: number
+  disposed: boolean
+  dispose: () => void
+}
+interface MicPitchGraph {
+  /** WebKit microphone graphs own Web Audio resources; native PCM graphs do not need them. */
+  context: AudioContext | null
+  source: MediaStreamAudioSourceNode | null
+  analyser: AnalyserNode | null
+  detector: PitchDetector<Float32Array>
+  buffer: Float32Array
+  smoothed: number | null
+  stream: MediaStream
+  ownsStream: boolean
+  /** Present when samples come from the native capture-session tap instead of WebKit. */
+  nativeTap?: NativeTapBinding
+}
+
+type ActivePitchGraph = PitchGraph | MicPitchGraph
+
+function isMediaPitchGraph(graph: ActivePitchGraph): graph is PitchGraph {
+  return 'media' in graph
+}
+
+function nativeTapIsStale(binding: NativeTapBinding, now = performance.now()): boolean {
+  if (binding.disposed) return true
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  const lastDeliveryAt =
+    binding.receivedAny && binding.lastFrameAt > 0 ? binding.lastFrameAt : binding.startedAt
+  return lastDeliveryAt > 0 && now - lastDeliveryAt > NATIVE_TAP_STALE_MS
+}
+
+const MIC_PITCH_ATTACH_DEFER_MS = 400
+/** Economy mic tick (~14fps) for audio-mode HUD — keeps vault/settings responsive. */
+const MIC_ECONOMY_TICK_MS = 72
+/** Throttle React readout publishes in economy mode only. */
+const READOUT_PUBLISH_ECONOMY_MS = 100
+/** Canvas analysis remains display-rate; React labels do not need more than 30fps. */
+const READOUT_PUBLISH_REALTIME_MS = 32
+/** Realtime mode updates synchronously on every requestAnimationFrame for fluid 60fps/120fps pitch rendering. */
+const CANVAS_DRAW_REALTIME_MS = 0
+/** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
+const REALTIME_MIC_FRAME_SIZE = 2048
+/** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
+const NATIVE_TAP_STALE_MS = 2600
+
+export type PitchTrackerSource = 'media' | 'microphone'
+export type PitchSourceHealth = 'idle' | 'connecting' | 'healthy' | 'stalled'
+
+export interface AcceptedPitchFrame {
+  readout: PitchReadout
+  confidence: number
+  /** Unix epoch milliseconds. */
+  timestamp: number
+}
+
+export interface PitchTrackerOptions {
+  source?: PitchTrackerSource
+  micStreamRef?: RefObject<MediaStream | null>
+  /** Keep readout/history and redraw the canvas while paused (video widget). */
+  persistWhenPaused?: boolean
+  /** Live mic: keep trace scrolling on the chart floor during silence. */
+  continuousScroll?: boolean
+  /** Voice, strings, or winds detection profile. */
+  tunerInstrument?: TunerInstrument
+  /** Full-rate mic analysis + canvas (camera widget). Economy mode for audio HUD. */
+  realtimeMode?: boolean
+  /** Temporarily ignore mic analysis during local reference-tone touches. */
+  suppressUntilRef?: RefObject<number>
+  /** Last-resort live tuner fallback when the app-owned shared mic stream has not attached. */
+  allowStandaloneMicFallback?: boolean
+  /** Camera-mode widget only — pull PCM from the native AVCapture audio tap. */
+  preferNativeAudioTap?: boolean
+  /** Full-screen tuner only: retry native PCM after a degraded WebKit fallback. */
+  retryNativeTapOnInteractiveRecovery?: boolean
+  /** Reports source delivery health without treating musical silence as a failure. */
+  onSourceHealthChange?: (health: PitchSourceHealth) => void
+  /** Accepted detector frames for lightweight derived analytics such as Pitch Insights. */
+  onAcceptedPitchFrame?: (frame: AcceptedPitchFrame | null) => void
+}
+
+function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
+  return Boolean(
+    stream &&
+      stream.active &&
+      stream
+        .getAudioTracks()
+        .some((track) => track.readyState === 'live' && track.enabled && !track.muted),
+  )
+}
+
+function isMicrophonePermissionError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('name' in error)) return false
+  const name = String((error as { name?: unknown }).name ?? '')
+  return (
+    name === 'NotAllowedError' ||
+    name === 'PermissionDeniedError' ||
+    name === 'SecurityError' ||
+    name === 'NotFoundError' ||
+    name === 'DevicesNotFoundError'
+  )
+}
+
+function logPitchGetUserMediaEvent(
+  phase: string,
+  payload: Record<string, unknown> = {},
+): void {
+  console.info(`[WebRTCTrace] getUserMedia ${phase}`, {
+    caller: 'useLivePitchTracker.createMicPitchGraph',
+    ...payload,
+    stack: new Error().stack,
+  })
+}
+
+async function createMicPitchGraph(
+  profile: PitchTunerProfile,
+  existingStream?: MediaStream | null,
+  requireExistingStream = false,
+  frameSizeOverride?: number,
+): Promise<MicPitchGraph> {
+  let stream = micStreamIsLive(existingStream) ? existingStream! : null
+  let ownsStream = false
+
+  if (!stream) {
+    if (requireExistingStream) {
+      throw new Error('Shared mic stream not ready')
+    }
+
+    try {
+      const getUserMedia = navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices)
+      if (!getUserMedia) {
+        console.warn('navigator.mediaDevices.getUserMedia is unavailable for pitch tracking')
+        throw new Error('Microphone unavailable')
+      }
+
+      const constraints: MediaStreamConstraints = {
+        audio: getMusicRecordingAudioConstraints(),
+        video: false,
+      }
+      logPitchGetUserMediaEvent('before', { constraints })
+      stream = await getUserMedia(constraints)
+      logPitchGetUserMediaEvent('after', {
+        id: stream.id,
+        active: stream.active,
+        audioTracks: stream.getAudioTracks().map((track) => ({
+          id: track.id,
+          label: track.label,
+          enabled: track.enabled,
+          readyState: track.readyState,
+          settings: track.getSettings?.(),
+        })),
+      })
+    } catch (err) {
+      console.warn('Failed to acquire microphone for pitch tracking', err)
+      throw err
+    }
+    await tuneMusicRecordingStream(stream)
+    ownsStream = true
+  } else {
+    /* Shared session mic is already tuned in useCameraSession.acquireStream. */
+  }
+
+  const context = new AudioContext({ latencyHint: 'playback' })
+  await context.resume()
+
+  const micFrameSize = frameSizeOverride ?? profile.frameSizeMic
+
+  const analyser = context.createAnalyser()
+  analyser.fftSize = micFrameSize
+
+  const source = context.createMediaStreamSource(stream)
+  source.connect(analyser)
+
+  const detector = PitchDetector.forFloat32Array(micFrameSize)
+  detector.clarityThreshold = profile.clarityMinMic
+  detector.minVolumeDecibels = profile.rmsGateDbMic
+
+  return {
+    context,
+    source,
+    analyser,
+    detector,
+    buffer: new Float32Array(micFrameSize),
+    smoothed: null,
+    stream,
+    ownsStream,
+  }
+}
+
+/**
+ * Pitch source for camera mode on iOS: mono PCM streamed from the native
+ * AVCaptureSession's own audio tap. Same physical mic the recording uses, so
+ * there is no WebKit/native hardware contention — analysis works before,
+ * during, and after recording. No getUserMedia call is made at all.
+ */
+async function createNativeTapPitchGraph(
+  profile: PitchTunerProfile,
+  onFrame?: () => void,
+): Promise<MicPitchGraph> {
+  const frameSize = REALTIME_MIC_FRAME_SIZE
+
+  const detector = PitchDetector.forFloat32Array(frameSize)
+  detector.clarityThreshold = profile.clarityMinMic
+  detector.minVolumeDecibels = profile.rmsGateDbMic
+
+  const binding: NativeTapBinding = {
+    latest: null,
+    sampleRate: 48_000,
+    sequence: 0,
+    processedSequence: -1,
+    hasAnalyzedFrame: false,
+    cachedSignalStrong: false,
+    cachedRawPitch: 0,
+    cachedClarity: 0,
+    receivedAny: false,
+    startedAt: performance.now(),
+    lastFrameAt: 0,
+    disposed: false,
+    dispose: () => {},
+  }
+
+  await acquireNativeAudioTap()
+  const subscription = subscribeNativeAudioPitchFrames((chunk) => {
+    if (binding.disposed) return
+    binding.latest = chunk.samples
+    binding.sampleRate = chunk.sampleRate
+    binding.sequence += 1
+    binding.receivedAny = true
+    binding.lastFrameAt = performance.now()
+    onFrame?.()
+  })
+
+  let disposed = false
+  binding.dispose = () => {
+    if (disposed) return
+    disposed = true
+    binding.disposed = true
+    void subscription?.then((handle) => handle.remove()).catch(() => {})
+    void releaseNativeAudioTap()
+  }
+
+  return {
+    // Native PCM is copied straight into `buffer`; a silent AudioContext and
+    // disconnected AnalyserNode only consumed scarce iOS audio resources and
+    // accumulated during repeated metronome/tuner route recovery.
+    context: null,
+    source: null,
+    analyser: null,
+    detector,
+    buffer: new Float32Array(frameSize),
+    smoothed: null,
+    stream: new MediaStream(),
+    ownsStream: false,
+    nativeTap: binding,
+  }
+}
+
+function registerMicPitchGraph(graph: MicPitchGraph): void {
+  activeMicPitchGraphs.add(graph)
+}
+
+function unregisterMicPitchGraph(graph: MicPitchGraph): void {
+  activeMicPitchGraphs.delete(graph)
+}
+
+function safeDisposeMicGraph(graph: MicPitchGraph | null): void {
+  if (!graph) return
+  unregisterMicPitchGraph(graph)
+
+  graph.nativeTap?.dispose()
+
+  try {
+    graph.source?.disconnect()
+    graph.analyser?.disconnect()
+  } catch {
+    /* graph may already be disconnected */
+  }
+
+  if (graph.ownsStream) {
+    for (const track of graph.stream.getTracks()) {
+      track.stop()
+    }
+  }
+
+  void graph.context?.close().catch(() => {})
+}
+
+function safeDisposeActiveGraph(graph: ActivePitchGraph | null): void {
+  if (!graph) return
+  if (isMediaPitchGraph(graph)) {
+    safeDisposePitchGraph(graph)
+  } else {
+    safeDisposeMicGraph(graph)
+  }
+}
+
+type MediaWithCaptureStream = HTMLMediaElement & {
+  captureStream?: () => MediaStream
+  mozCaptureStream?: () => MediaStream
+}
+
+function getMediaCaptureStream(media: HTMLMediaElement): MediaStream | null {
+  const captureMedia = media as MediaWithCaptureStream
+
+  if (typeof captureMedia.captureStream === 'function') {
+    try {
+      return captureMedia.captureStream()
+    } catch {
+      /* try legacy / fallback below */
+    }
+  }
+
+  if (typeof captureMedia.mozCaptureStream === 'function') {
+    try {
+      return captureMedia.mozCaptureStream()
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return null
+}
+
+function streamHasAudio(stream: MediaStream): boolean {
+  return stream.getAudioTracks().some((track) => track.readyState !== 'ended')
+}
+
+function connectStreamSourceToAnalyserAndSpeakers(
+  context: AudioContext,
+  streamSource: MediaStreamAudioSourceNode,
+  analyser: AnalyserNode,
+): GainNode {
+  streamSource.connect(analyser)
+  const passthrough = context.createGain()
+  passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+  streamSource.connect(passthrough)
+  passthrough.connect(context.destination)
+  return passthrough
+}
+
+function attachStreamSourceToGraph(
+  graph: PitchGraph,
+  context: AudioContext,
+  analyser: AnalyserNode,
+  media: HTMLMediaElement,
+): boolean {
+  const stream = getMediaCaptureStream(media)
+  if (!stream || !streamHasAudio(stream)) return false
+
+  try {
+    try {
+      graph.passthrough?.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+
+    const streamSource = context.createMediaStreamSource(stream)
+    graph.passthrough = connectStreamSourceToAnalyserAndSpeakers(context, streamSource, analyser)
+    graph.source = streamSource
+    graph.mode = 'stream'
+    return true
+  } catch {
+    return false
+  }
+}
+
+function tryAttachStreamSource(
+  context: AudioContext,
+  analyser: AnalyserNode,
+  media: HTMLMediaElement,
+): { source: MediaStreamAudioSourceNode; passthrough: GainNode } | null {
+  const stream = getMediaCaptureStream(media)
+  if (!stream || !streamHasAudio(stream)) return null
+
+  try {
+    const streamSource = context.createMediaStreamSource(stream)
+    const passthrough = connectStreamSourceToAnalyserAndSpeakers(context, streamSource, analyser)
+    return { source: streamSource, passthrough }
+  } catch {
+    return null
+  }
+}
+
+function refreshMediaPitchStreamSource(graph: PitchGraph): boolean {
+  if (graph.context.state === 'closed') return false
+
+  try {
+    graph.source.disconnect()
+  } catch {
+    /* already disconnected */
+  }
+
+  return attachStreamSourceToGraph(graph, graph.context, graph.analyser, graph.media)
+}
+
+async function waitForMediaAudio(media: HTMLMediaElement, timeoutMs = 1500): Promise<void> {
+  if (media.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) return
+
+  await new Promise<void>((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      media.removeEventListener('loadeddata', finish)
+      media.removeEventListener('canplay', finish)
+      resolve()
+    }
+
+    media.addEventListener('loadeddata', finish, { once: true })
+    media.addEventListener('canplay', finish, { once: true })
+    window.setTimeout(finish, timeoutMs)
+  })
+}
+
+function notifyPitchGraphReleased(media: HTMLMediaElement, mode: PitchGraphMode): void {
+  if (mode !== 'element') return
+  media.dispatchEvent(new CustomEvent(PITCH_GRAPH_RELEASED_EVENT, { bubbles: true }))
+}
+
+async function createPitchGraph(
+  media: HTMLMediaElement,
+  profile: PitchTunerProfile,
+): Promise<PitchGraph> {
+  const existing = elementGraphs.get(media)
+  if (existing && existing.context.state !== 'closed') {
+    if (existing.analyser.fftSize === profile.frameSize) {
+      existing.detector.clarityThreshold = profile.clarityMin
+      existing.detector.minVolumeDecibels = profile.rmsGateDbMedia
+      applyPitchOutputGain(media, existing.passthrough)
+      resumePlaybackAudioContext()
+      return existing
+    }
+    safeDisposePitchGraph(existing)
+  }
+
+  if (existing && elementGraphs.get(media) === existing) {
+    elementGraphs.delete(media)
+  }
+
+  const context = await getPlaybackAudioContext()
+
+  const analyser = context.createAnalyser()
+  analyser.fftSize = profile.frameSize
+
+  await waitForMediaAudio(media)
+
+  let source: MediaElementAudioSourceNode | MediaStreamAudioSourceNode | null = null
+  let passthrough: GainNode | null = null
+  let mode: PitchGraphMode = 'element'
+
+  // Prefer element routing — full signal to speakers on iOS.
+  // captureStream taps analysis-only and skips native element output (very quiet).
+  try {
+    const elementSource = context.createMediaElementSource(media)
+    passthrough = context.createGain()
+    passthrough.gain.value = MEDIA_PLAYBACK_GAIN
+    elementSource.connect(analyser)
+    elementSource.connect(passthrough)
+    passthrough.connect(context.destination)
+    registerTakePlaybackSpeakerRoute(media, elementSource, passthrough)
+    applyPitchOutputGain(media, passthrough)
+    source = elementSource
+    mode = 'element'
+  } catch {
+    const speakerNodes = getTakePlaybackSpeakerNodes(media)
+    if (speakerNodes) {
+      try {
+        speakerNodes.source.connect(analyser)
+      } catch {
+        /* analyser may already be connected */
+      }
+      passthrough = speakerNodes.gain
+      applyPitchOutputGain(media, passthrough)
+      source = speakerNodes.source
+      mode = 'element'
+    } else {
+      const streamAttach = tryAttachStreamSource(context, analyser, media)
+      if (!streamAttach) {
+        throw new Error('Unable to attach pitch tracker to this playback source')
+      }
+      source = streamAttach.source
+      passthrough = streamAttach.passthrough
+      mode = 'stream'
+      media.muted = true
+    }
+  }
+
+  const detector = PitchDetector.forFloat32Array(profile.frameSize)
+  detector.clarityThreshold = profile.clarityMin
+  detector.minVolumeDecibels = profile.rmsGateDbMedia
+
+  const graph: PitchGraph = {
+    context,
+    source,
+    analyser,
+    passthrough,
+    detector,
+    buffer: new Float32Array(profile.frameSize),
+    smoothed: null,
+    media,
+    mode,
+  }
+
+  elementGraphs.set(media, graph)
+  return graph
+}
+
+function safeDisposePitchGraph(graph: PitchGraph | null): void {
+  if (!graph) return
+
+  const { media, mode } = graph
+  // An older async attachment may finish after a newer graph has replaced it.
+  // Never remove the newer graph's registry entry while disposing the stale one.
+  if (elementGraphs.get(media) === graph) {
+    elementGraphs.delete(media)
+  }
+
+  const speakerNodes = getTakePlaybackSpeakerNodes(media)
+  const onSharedSpeakerBus = Boolean(speakerNodes && graph.source === speakerNodes.source)
+
+  try {
+    if (onSharedSpeakerBus) {
+      // Pitch tapped the shared speaker bus — only remove the analyser tap.
+      graph.analyser.disconnect()
+    } else {
+      graph.source.disconnect()
+      graph.analyser.disconnect()
+      graph.passthrough?.disconnect()
+    }
+  } catch {
+    /* graph may already be disconnected */
+  }
+
+  const { context } = graph
+  if (!isSharedPlaybackContext(context)) {
+    void context.close().catch(() => {})
+  }
+  notifyPitchGraphReleased(media, mode)
+}
+
+function drawColoredTraceSegments(
+  ctx: CanvasRenderingContext2D,
+  points: Array<{ x: number; y: number; cents: number }>,
+  lineWidth: number,
+  alpha: number,
+  glow = false,
+): void {
+  if (points.length < 2) return
+
+  ctx.lineWidth = lineWidth
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.globalAlpha = alpha
+
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1]
+    const to = points[index]
+    const cents = to.cents
+    if (glow && !isSilenceFloorSample(cents)) {
+      ctx.strokeStyle = glowColorForCents(cents)
+    } else {
+      ctx.strokeStyle = getTraceColor(cents)
+    }
+    ctx.beginPath()
+    ctx.moveTo(from.x, from.y)
+    ctx.lineTo(to.x, to.y)
+    ctx.stroke()
+  }
+
+  ctx.globalAlpha = 1
+}
+
+interface TraceDisplayPoint {
+  x: number
+  y: number
+  cents: number
+}
+
+function shapeLivingTraceSilence(values: number[]): number[] {
+  const output = [...values]
+  const pitchedIndices: number[] = []
+
+  for (let index = 0; index < values.length; index += 1) {
+    if (!isSilenceFloorSample(values[index])) pitchedIndices.push(index)
+  }
+
+  if (pitchedIndices.length === 0) return output
+
+  const first = pitchedIndices[0]
+  const riseLength = Math.min(first, 6)
+  for (let index = Math.max(0, first - riseLength); index < first; index += 1) {
+    const t = (index - (first - riseLength) + 1) / (riseLength + 1)
+    const eased = t * t * (3 - 2 * t)
+    output[index] =
+      PITCH_SILENCE_FLOOR_CENTS +
+      (values[first] - PITCH_SILENCE_FLOOR_CENTS) * eased
+  }
+
+  for (let pitched = 1; pitched < pitchedIndices.length; pitched += 1) {
+    const startIndex = pitchedIndices[pitched - 1]
+    const endIndex = pitchedIndices[pitched]
+    const gapLength = endIndex - startIndex - 1
+    if (gapLength <= 0) continue
+
+    if (gapLength <= 5) {
+      for (let gap = 1; gap <= gapLength; gap += 1) {
+        const t = gap / (gapLength + 1)
+        output[startIndex + gap] =
+          values[startIndex] + (values[endIndex] - values[startIndex]) * t
+      }
+      continue
+    }
+
+    const edgeLength = Math.min(5, Math.floor(gapLength / 2))
+    for (let gap = 1; gap <= edgeLength; gap += 1) {
+      const t = gap / (edgeLength + 1)
+      const eased = t * t * (3 - 2 * t)
+      output[startIndex + gap] =
+        values[startIndex] +
+        (PITCH_SILENCE_FLOOR_CENTS - values[startIndex]) * eased
+      output[endIndex - gap] =
+        values[endIndex] +
+        (PITCH_SILENCE_FLOOR_CENTS - values[endIndex]) * eased
+    }
+  }
+
+  const last = pitchedIndices[pitchedIndices.length - 1]
+  const fallLength = Math.min(output.length - last - 1, 7)
+  for (let gap = 1; gap <= fallLength; gap += 1) {
+    const t = gap / (fallLength + 1)
+    const eased = t * t * (3 - 2 * t)
+    output[last + gap] =
+      values[last] + (PITCH_SILENCE_FLOOR_CENTS - values[last]) * eased
+  }
+
+  return output
+}
+
+function limitTraceStepCents(values: number[], maxStepCents: number): number[] {
+  const output = [...values]
+  let previous: number | null = null
+
+  for (let index = 0; index < output.length; index += 1) {
+    const current = output[index]
+    if (isSilenceFloorSample(current)) {
+      previous = null
+      continue
+    }
+
+    if (previous != null) {
+      const delta = current - previous
+      if (Math.abs(delta) > maxStepCents) {
+        output[index] = previous + Math.sign(delta) * maxStepCents
+      }
+    }
+    previous = output[index]
+  }
+
+  return output
+}
+
+function buildTraceDisplayPoints(
+  centsHistory: number[],
+  historyLength: number,
+  width: number,
+  centsToY: (cents: number) => number,
+  graphSmoothWindow: number,
+  traceEndBlend: number,
+  singlePassSmooth = false,
+  bridgeSilenceGaps = false,
+  maxDisplayStepCents: number | null = null,
+): TraceDisplayPoint[] {
+  if (centsHistory.length < 2) return []
+
+  const traceValues = bridgeSilenceGaps
+    ? shapeLivingTraceSilence(centsHistory)
+    : centsHistory
+
+  const pass1 = movingAverage(traceValues, graphSmoothWindow)
+  let smoothed =
+    singlePassSmooth || graphSmoothWindow < 4
+      ? pass1
+      : movingAverage(pass1, Math.max(2, Math.floor(graphSmoothWindow / 2)))
+
+  const rawLast = traceValues[traceValues.length - 1]
+  if (!isSilenceFloorSample(rawLast)) {
+    const lastIdx = smoothed.length - 1
+    smoothed[lastIdx] = smoothed[lastIdx] * (1 - traceEndBlend) + rawLast * traceEndBlend
+  }
+
+  if (maxDisplayStepCents != null) {
+    smoothed = limitTraceStepCents(smoothed, maxDisplayStepCents)
+  }
+
+  const historyStep = width / Math.max(historyLength - 1, 1)
+  const start = historyLength - smoothed.length
+
+  return smoothed.map((cents, index) => ({
+    x: (start + index) * historyStep,
+    y: centsToY(cents),
+    cents,
+  }))
+}
+
+function drawSmoothPitchTrace(
+  ctx: CanvasRenderingContext2D,
+  points: TraceDisplayPoint[],
+  theme: PitchCanvasTheme,
+  responsiveTrace = false,
+): void {
+  if (points.length < 2) return
+
+  if (theme === 'living-audio') {
+    drawColoredTraceSegments(ctx, points, LIVING_TRACE_GLOW_WIDTH, 0.14, true)
+    drawColoredTraceSegments(ctx, points, LIVING_TRACE_CORE_WIDTH, 0.98)
+    return
+  }
+
+  if ((theme === 'glass-legacy' || theme === 'glass-audio') && !responsiveTrace) {
+    drawColoredTraceSegments(ctx, points, 6.5, 0.26, true)
+    drawColoredTraceSegments(ctx, points, 4.35, 0.98)
+    return
+  }
+
+  if (theme === 'glass-widget' || theme === 'glass-legacy' || theme === 'glass-audio') {
+    drawColoredTraceSegments(ctx, points, 3.1, 0.96)
+    return
+  }
+
+  const latest = points[points.length - 1]
+  const gradient = ctx.createLinearGradient(points[0].x, 0, latest.x, 0)
+  gradient.addColorStop(0, 'rgba(148, 163, 184, 0.12)')
+  gradient.addColorStop(0.5, 'rgba(34, 197, 94, 0.38)')
+  gradient.addColorStop(1, getIntonationColor(latest.cents))
+
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.22)'
+  ctx.lineWidth = 8
+  ctx.globalAlpha = 0.85
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+  for (let index = 1; index < points.length; index += 1) {
+    ctx.lineTo(points[index].x, points[index].y)
+  }
+  ctx.stroke()
+
+  ctx.strokeStyle = gradient
+  ctx.lineWidth = 4.25
+  ctx.globalAlpha = 0.96
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+  for (let index = 1; index < points.length; index += 1) {
+    ctx.lineTo(points[index].x, points[index].y)
+  }
+  ctx.stroke()
+  ctx.globalAlpha = 1
+}
+
+function drawTraceEndpointDot(
+  ctx: CanvasRenderingContext2D,
+  point: TraceDisplayPoint,
+  theme: PitchCanvasTheme,
+  inTuneGlow = 0,
+): void {
+  if (isSilenceFloorSample(point.cents)) return
+
+  const dotColor = getIntonationColor(point.cents)
+  const isGreen = Math.abs(point.cents) <= TUNING_GREEN_CENTS
+  const glowBoost = isGreen ? Math.max(0, inTuneGlow) : 0
+  const isWidgetGlass = theme === 'glass-widget'
+  const isAudioGlass = theme === 'glass-audio' || theme === 'living-audio'
+  const isLivingAudio = theme === 'living-audio'
+  const isLegacyGlass = theme === 'glass-legacy' || isAudioGlass
+  const isGlassStyle = isWidgetGlass || isLegacyGlass
+  const radius = isLivingAudio
+    ? 4.4 + glowBoost * 0.8
+    : isLegacyGlass
+    ? 6.25 + glowBoost * 1.5
+    : isGlassStyle
+      ? 5 + glowBoost * 1.2
+      : 4.5
+  const glowRadius = isLivingAudio
+    ? 6.4 + glowBoost * 3.5
+    : isLegacyGlass
+    ? 10 + glowBoost * 6
+    : isGlassStyle
+      ? 7 + glowBoost * 5
+      : 6
+
+  if (glowBoost > 0.08 && !isWidgetGlass) {
+    ctx.shadowColor = `rgba(34, 197, 94, ${0.35 + Math.min(1, glowBoost) * 0.5})`
+    ctx.shadowBlur = 4 + glowBoost * 12
+  }
+
+  ctx.beginPath()
+  ctx.arc(point.x, point.y, glowRadius, 0, Math.PI * 2)
+  ctx.fillStyle = glowColorForCents(point.cents, 0.28 + Math.min(1, glowBoost) * 0.25)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(point.x, point.y, radius, 0, Math.PI * 2)
+  ctx.fillStyle = dotColor
+  ctx.fill()
+  ctx.strokeStyle = isLivingAudio
+    ? 'rgba(23, 26, 34, 0.14)'
+    : isAudioGlass
+      ? 'rgba(23, 26, 34, 0.14)'
+      : 'rgba(255,255,255,0.9)'
+  ctx.lineWidth = 1.75
+  ctx.stroke()
+  ctx.shadowBlur = 0
+}
+
+function drawHorizonCaret(
+  ctx: CanvasRenderingContext2D,
+  point: TraceDisplayPoint,
+  inTuneGlow: number,
+): void {
+  if (isSilenceFloorSample(point.cents)) return
+
+  const abs = Math.abs(point.cents)
+  const pull = Math.max(0, Math.min(1, (abs - TUNING_GREEN_CENTS) / 10))
+  const alpha = pull * (1 - Math.max(0, Math.min(1, inTuneGlow)))
+  if (alpha < 0.05) return
+
+  const towardHorizon = point.cents > 0 ? 1 : -1
+  const reach = 11 + pull * 6
+
+  ctx.save()
+  ctx.globalAlpha = alpha
+  ctx.fillStyle = getIntonationColor(point.cents)
+  ctx.beginPath()
+  ctx.moveTo(point.x, point.y + towardHorizon * reach)
+  ctx.lineTo(point.x - 6.5, point.y + towardHorizon * 5)
+  ctx.lineTo(point.x + 6.5, point.y + towardHorizon * 5)
+  ctx.closePath()
+  ctx.fill()
+  ctx.restore()
+}
+
+function getGlassLayoutMetrics(
+  height: number,
+  centerVertically = false,
+  bottomInset = 0,
+) {
+  const graphHeight = Math.max(1, height - bottomInset)
+  const pitchTop = graphHeight * 0.06
+  const pitchBottom = graphHeight * (centerVertically ? 0.94 : 0.96)
+  const pitchHeight = pitchBottom - pitchTop
+  const midPitchY = pitchTop + pitchHeight * 0.5
+  const centsToY = (cents: number) =>
+    midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
+  return { pitchTop, pitchBottom, pitchHeight, centsToY }
+}
+
+function drawGlassLegacyGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  pitchTop: number,
+  pitchBottom: number,
+  pitchHeight: number,
+  centsToY: (cents: number) => number,
+): void {
+  const labelPad = 36
+
+  const bg = ctx.createRadialGradient(
+    width * 0.5,
+    pitchTop + pitchHeight * 0.5,
+    0,
+    width * 0.5,
+    pitchTop + pitchHeight * 0.5,
+    Math.max(width, pitchHeight) * 0.72,
+  )
+  bg.addColorStop(0, 'rgba(22, 28, 42, 0.98)')
+  bg.addColorStop(1, 'rgba(8, 10, 18, 0.99)')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, width, height)
+
+  const vignette = ctx.createLinearGradient(0, pitchTop, 0, pitchBottom)
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0.12)')
+  vignette.addColorStop(0.45, 'transparent')
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.18)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, pitchTop, width, pitchBottom - pitchTop)
+
+  const bandTop = Math.min(centsToY(10), centsToY(-10))
+  const bandBottom = Math.max(centsToY(10), centsToY(-10))
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.07)'
+  ctx.fillRect(labelPad, bandTop, width - labelPad, bandBottom - bandTop)
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.028)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  const vStep = Math.max(28, Math.floor((width - labelPad) / 9))
+  for (let x = labelPad + vStep; x < width - 4; x += vStep) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, pitchTop)
+    ctx.lineTo(x + 0.5, pitchBottom)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.055)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([3, 7])
+  for (const cents of [50, 25, -25, -50]) {
+    const y = centsToY(cents)
+    ctx.beginPath()
+    ctx.moveTo(labelPad, y + 0.5)
+    ctx.lineTo(width, y + 0.5)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+
+  const centerY = centsToY(0)
+  const zeroGrad = ctx.createLinearGradient(labelPad, 0, width, 0)
+  zeroGrad.addColorStop(0, 'rgba(52, 211, 153, 0.12)')
+  zeroGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.2)')
+  zeroGrad.addColorStop(1, 'rgba(52, 211, 153, 0.06)')
+  ctx.strokeStyle = zeroGrad
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(labelPad, centerY + 0.5)
+  ctx.lineTo(width, centerY + 0.5)
+  ctx.stroke()
+
+  const labelX = 7
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+
+  ctx.font = '500 10px ui-sans-serif, system-ui, -apple-system, "SF Pro Text", sans-serif'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+  ctx.fillText('Sharp', labelX, centsToY(50) - 11)
+  ctx.fillText('Flat', labelX, centsToY(-50) + 11)
+
+  ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace'
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.24)'
+  ctx.fillText('+50', labelX, centsToY(50))
+  ctx.fillText('+25', labelX, centsToY(25))
+  ctx.fillText('0', labelX, centsToY(0))
+  ctx.fillText('-25', labelX, centsToY(-25))
+  ctx.fillText('-50', labelX, centsToY(-50))
+}
+
+function drawGlassAudioGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  pitchTop: number,
+  pitchBottom: number,
+  centsToY: (cents: number) => number,
+  dark: boolean,
+): void {
+  const labelPad = 48
+
+  ctx.fillStyle = dark ? '#07101f' : '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+
+  const bandTop = Math.min(centsToY(10), centsToY(-10))
+  const bandBottom = Math.max(centsToY(10), centsToY(-10))
+  ctx.fillStyle = dark ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.07)'
+  ctx.fillRect(labelPad, bandTop, width - labelPad, bandBottom - bandTop)
+
+  ctx.strokeStyle = dark ? 'rgba(226, 232, 240, 0.055)' : 'rgba(23, 26, 34, 0.05)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  const vStep = Math.max(28, Math.floor((width - labelPad) / 9))
+  for (let x = labelPad + vStep; x < width - 4; x += vStep) {
+    ctx.beginPath()
+    ctx.moveTo(x + 0.5, pitchTop)
+    ctx.lineTo(x + 0.5, pitchBottom)
+    ctx.stroke()
+  }
+
+  ctx.strokeStyle = dark ? 'rgba(226, 232, 240, 0.09)' : 'rgba(23, 26, 34, 0.07)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([3, 7])
+  for (const cents of [50, 25, -25, -50]) {
+    const y = centsToY(cents)
+    ctx.beginPath()
+    ctx.moveTo(labelPad, y + 0.5)
+    ctx.lineTo(width, y + 0.5)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+
+  const centerY = centsToY(0)
+  ctx.strokeStyle = dark ? 'rgba(74, 222, 128, 0.36)' : 'rgba(34, 197, 94, 0.28)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(labelPad, centerY + 0.5)
+  ctx.lineTo(width, centerY + 0.5)
+  ctx.stroke()
+
+  const labelX = 8
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+
+  const drawLabelPill = (text: string, y: number, widthPx: number, accent: string) => {
+    const x = labelX + widthPx / 2
+    const radius = 7
+    ctx.beginPath()
+    ctx.roundRect(labelX, y - 8, widthPx, 16, radius)
+    ctx.fillStyle = accent
+    ctx.fill()
+    ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.74)' : 'rgba(17, 24, 39, 0.66)'
+    ctx.font = '600 9px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
+    ctx.fillText(text, x, y + 0.25)
+  }
+
+  drawLabelPill(
+    'Sharp',
+    centsToY(50) - 13,
+    34,
+    dark ? 'rgba(59, 130, 246, 0.18)' : 'rgba(59, 130, 246, 0.08)',
+  )
+  drawLabelPill(
+    'Flat',
+    centsToY(-50) + 13,
+    28,
+    dark ? 'rgba(251, 146, 60, 0.18)' : 'rgba(251, 146, 60, 0.08)',
+  )
+
+  ctx.font = '600 8px -apple-system, BlinkMacSystemFont, "SF Pro Text", ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.55)' : 'rgba(17, 24, 39, 0.44)'
+  const numberX = labelX + 16
+  ctx.fillText('+50', numberX, centsToY(50))
+  ctx.fillText('+25', numberX, centsToY(25))
+  ctx.fillStyle = dark ? 'rgba(134, 239, 172, 0.82)' : 'rgba(22, 163, 74, 0.68)'
+  ctx.fillText('0', numberX, centsToY(0))
+  ctx.fillStyle = dark ? 'rgba(226, 232, 240, 0.55)' : 'rgba(17, 24, 39, 0.44)'
+  ctx.fillText('-25', numberX, centsToY(-25))
+  ctx.fillText('-50', numberX, centsToY(-50))
+}
+
+function drawLivingPitchSurface(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  centsToY: (cents: number) => number,
+  inTuneHighlight: number,
+): void {
+  const bandTop = Math.min(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
+  const bandBottom = Math.max(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
+  const glow = Math.min(1, Math.max(0, inTuneHighlight))
+
+  ctx.fillStyle = `rgba(34, 197, 94, ${0.15 + glow * 0.24})`
+  ctx.fillRect(0, bandTop, width, bandBottom - bandTop)
+
+  const centerY = centsToY(0)
+  ctx.strokeStyle = `rgba(21, 128, 61, ${0.62 + glow * 0.3})`
+  ctx.lineWidth = 1.4 + glow * 0.85
+  ctx.setLineDash([])
+  ctx.beginPath()
+  ctx.moveTo(0, centerY)
+  ctx.lineTo(width, centerY)
+  ctx.stroke()
+
+  if (glow > 0.05) {
+    ctx.save()
+    ctx.shadowColor = `rgba(34, 197, 94, ${0.38 + glow * 0.42})`
+    ctx.shadowBlur = 10 + glow * 24
+    ctx.strokeStyle = `rgba(21, 128, 61, ${0.34 + glow * 0.46})`
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    ctx.restore()
+  }
+}
+
+/** Bumped when static grid art changes — invalidates cached offscreen layers. */
+const GLASS_STATIC_GRID_VERSION = 10
+
+type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
+
+interface GlassStaticLayerCache {
+  width: number
+  height: number
+  dpr: number
+  version: number
+  variant: GlassStaticVariant
+  dark: boolean
+  cleanWidget: boolean
+  canvas: HTMLCanvasElement
+}
+
+const glassStaticLayerCache = new WeakMap<HTMLCanvasElement, GlassStaticLayerCache>()
+
+function isPitchCanvasDarkMode(): boolean {
+  return document.documentElement.classList.contains('app-dark-mode')
+}
+
+function drawGlassWidgetStaticContent(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  dark: boolean,
+): void {
+  ctx.clearRect(0, 0, width, height)
+  ctx.fillStyle = dark ? '#07101f' : '#f7f8fa'
+  ctx.fillRect(0, 0, width, height)
+}
+
+function blitGlassStaticLayer(
+  targetCtx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  width: number,
+  height: number,
+  dpr: number,
+  variant: GlassStaticVariant,
+): ReturnType<typeof getGlassLayoutMetrics> {
+  let cache = glassStaticLayerCache.get(canvas)
+  const dark = isPitchCanvasDarkMode()
+  const cleanWidget = document.documentElement.dataset.refinement === 'depth-electric' && Boolean(canvas.closest('.pitch-tuner--widget'))
+  if (
+    !cache ||
+    cache.width !== width ||
+    cache.height !== height ||
+    cache.dpr !== dpr ||
+    cache.version !== GLASS_STATIC_GRID_VERSION ||
+    cache.variant !== variant ||
+    cache.dark !== dark ||
+    cache.cleanWidget !== cleanWidget
+  ) {
+    const off = cache?.canvas ?? document.createElement('canvas')
+    off.width = Math.floor(width * dpr)
+    off.height = Math.floor(height * dpr)
+    const offCtx = off.getContext('2d')
+    if (!offCtx) return getGlassLayoutMetrics(height)
+    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    if (cleanWidget) {
+      drawGlassWidgetStaticContent(offCtx, width, height, dark)
+    } else if (variant === 'widget') {
+      drawGlassWidgetStaticContent(offCtx, width, height, dark)
+    } else if (variant === 'audio') {
+      const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height, true)
+      offCtx.clearRect(0, 0, width, height)
+      drawGlassAudioGrid(offCtx, width, height, pitchTop, pitchBottom, centsToY, dark)
+    } else {
+      const { pitchTop, pitchBottom, pitchHeight, centsToY } = getGlassLayoutMetrics(height)
+      offCtx.clearRect(0, 0, width, height)
+      drawGlassLegacyGrid(offCtx, width, height, pitchTop, pitchBottom, pitchHeight, centsToY)
+    }
+    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, dark, cleanWidget, canvas: off }
+    glassStaticLayerCache.set(canvas, cache)
+  }
+
+  targetCtx.drawImage(cache.canvas, 0, 0, width, height)
+  return getGlassLayoutMetrics(height, variant === 'audio')
+}
+
+function drawPitchCanvas(
+  canvas: HTMLCanvasElement,
+  timeDomain: Float32Array,
+  centsHistory: number[],
+  active: boolean,
+  theme: PitchCanvasTheme,
+  graphSmoothWindow: number,
+  traceEndBlend: number,
+  inTuneHighlight = 0,
+  responsiveTrace = false,
+): void {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const dpr = window.devicePixelRatio || 1
+  const width = canvas.clientWidth
+  const height = canvas.clientHeight
+  if (width <= 0 || height <= 0) return
+
+  if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+    canvas.width = Math.floor(width * dpr)
+    canvas.height = Math.floor(height * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  }
+
+  const isLivingAudio = theme === 'living-audio'
+  const isGlass =
+    theme === 'glass-widget' ||
+    theme === 'glass-legacy' ||
+    theme === 'glass-audio' ||
+    isLivingAudio
+  const isWidgetGlass = theme === 'glass-widget'
+  const isAudioGlass = theme === 'glass-audio'
+  const pitchTop = isGlass ? height * 0.12 : height * 0.04
+  const pitchBottom = isGlass ? height * 0.92 : height * 0.86
+  const pitchHeight = pitchBottom - pitchTop
+  const waveTop = height * 0.88
+  const waveHeight = height * 0.1
+  const midPitchY = pitchTop + pitchHeight * 0.5
+
+  ctx.clearRect(0, 0, width, height)
+
+  let centsToY: (cents: number) => number
+
+  if (isWidgetGlass) {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
+    centsToY = metrics.centsToY
+  } else if (isLivingAudio) {
+    // Compact tools chip (~48px + 10px inset) sits on the canvas; keep the
+    // high-refresh pitch trace clear of those three icon buttons.
+    const toolRowInset = canvas.classList.contains('pitch-spectrogram--tool-free')
+      ? 0
+      : Math.min(56, height * 0.18)
+    const metrics = getGlassLayoutMetrics(height, true, toolRowInset)
+    centsToY = metrics.centsToY
+    drawLivingPitchSurface(ctx, width, centsToY, inTuneHighlight)
+  } else if (isAudioGlass) {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'audio')
+    centsToY = metrics.centsToY
+  } else if (theme === 'glass-legacy') {
+    const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'legacy')
+    centsToY = metrics.centsToY
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, 0, height)
+    bg.addColorStop(0, '#0c1018')
+    bg.addColorStop(0.55, '#080b12')
+    bg.addColorStop(1, '#050608')
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, width, height)
+    centsToY = (cents: number) =>
+      midPitchY - (Math.max(-50, Math.min(50, cents)) / 50) * (pitchHeight * 0.46)
+  }
+
+  if (!isGlass) {
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.08)'
+    ctx.fillRect(0, centsToY(10), width, centsToY(-10) - centsToY(10))
+
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.05)'
+    ctx.fillRect(0, centsToY(25), width, centsToY(10) - centsToY(25))
+    ctx.fillRect(0, centsToY(-10), width, centsToY(-25) - centsToY(-10))
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+    ctx.lineWidth = 1
+    for (const cents of [-50, -25, -10, 0, 10, 25, 50]) {
+      const y = centsToY(cents)
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(width, y)
+      ctx.stroke()
+    }
+  }
+
+  if (isLivingAudio) {
+    /* The living surface draws its target band before the trace. */
+  } else if (theme === 'glass-legacy' || isAudioGlass) {
+    if (inTuneHighlight > 0.01) {
+      const yTop = centsToY(TUNING_GREEN_CENTS)
+      const yBottom = centsToY(-TUNING_GREEN_CENTS)
+      const bandTop = Math.min(yTop, yBottom)
+      const bandHeight = Math.abs(yBottom - yTop)
+      const t = Math.min(1, inTuneHighlight)
+      ctx.fillStyle = `rgba(34, 197, 94, ${0.05 + t * 0.16})`
+      ctx.fillRect(0, bandTop, width, bandHeight)
+    }
+  } else if (isWidgetGlass) {
+    drawInTuneBandRegion(ctx, width, centsToY, inTuneHighlight, true)
+  } else {
+    const centerY = centsToY(0)
+    ctx.strokeStyle = 'rgba(52, 211, 153, 0.35)'
+    ctx.setLineDash([4, 6])
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(0, centerY)
+    ctx.lineTo(width, centerY)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+
+  const traceHistoryLength = isLivingAudio ? LIVING_TRACE_HISTORY_LENGTH : HISTORY_LENGTH
+  const traceHistory = isLivingAudio
+    ? centsHistory.slice(-traceHistoryLength)
+    : centsHistory
+  // The newest sample always lands on the last x position, so mapping the
+  // history across the full width put the live head exactly on the right
+  // edge -- the dot, its glow and the horizon caret were all drawn half off
+  // screen. The head is the one part of the trace you actually watch while
+  // playing, so hold back enough room for its widest glow.
+  const traceHeadroom = Math.min(
+    width * 0.12,
+    isLivingAudio ? 11 : isAudioGlass || theme === 'glass-legacy' ? 17 : isWidgetGlass ? 13 : 8,
+  )
+  const tracePoints = buildTraceDisplayPoints(
+    traceHistory,
+    traceHistoryLength,
+    Math.max(1, width - traceHeadroom),
+    centsToY,
+    graphSmoothWindow,
+    isLivingAudio ? Math.min(traceEndBlend, LIVING_TRACE_END_BLEND_MAX) : traceEndBlend,
+    responsiveTrace,
+    isLivingAudio,
+    isLivingAudio ? LIVING_TRACE_MAX_STEP_CENTS : null,
+  )
+
+  if (tracePoints.length > 1) {
+    drawSmoothPitchTrace(ctx, tracePoints, theme, responsiveTrace)
+  }
+
+  if (active && tracePoints.length > 0) {
+    const livePoint = tracePoints[tracePoints.length - 1]
+    drawTraceEndpointDot(ctx, livePoint, theme, inTuneHighlight)
+    if (isLivingAudio) drawHorizonCaret(ctx, livePoint, inTuneHighlight)
+  }
+
+  if (isGlass) return
+
+  const waveMidY = waveTop + waveHeight * 0.5
+  const step = width / Math.max(timeDomain.length - 1, 1)
+
+  ctx.beginPath()
+  for (let index = 0; index < timeDomain.length; index += 3) {
+    const sample = timeDomain[index]
+    const x = index * step
+    const y = waveMidY - sample * waveHeight * 0.9
+    if (index === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  }
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)'
+  ctx.lineWidth = 1.25
+  ctx.stroke()
+
+  ctx.beginPath()
+  for (let index = 0; index < timeDomain.length; index += 3) {
+    const sample = timeDomain[index]
+    const x = index * step
+    const y = waveMidY + sample * waveHeight * 0.55
+    if (index === 0) ctx.moveTo(x, y)
+    else ctx.lineTo(x, y)
+  }
+  ctx.lineTo(width, height)
+  ctx.lineTo(0, height)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(14, 165, 233, 0.12)'
+  ctx.fill()
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+  ctx.beginPath()
+  ctx.moveTo(0, waveTop - 4)
+  ctx.lineTo(width, waveTop - 4)
+  ctx.stroke()
+}
+
+function drawPitchCanvasIfDue(
+  canvas: HTMLCanvasElement,
+  timeDomain: Float32Array,
+  centsHistory: number[],
+  active: boolean,
+  theme: PitchCanvasTheme,
+  graphSmoothWindow: number,
+  traceEndBlend: number,
+  inTuneHighlight: number,
+  responsiveTrace: boolean,
+): void {
+  drawPitchCanvas(
+    canvas,
+    timeDomain,
+    centsHistory,
+    active,
+    theme,
+    graphSmoothWindow,
+    traceEndBlend,
+    inTuneHighlight,
+    responsiveTrace,
+  )
+}
+
+export interface LivePitchTrackerState {
+  readout: PitchReadout
+  /** 0 = no glow, rises with sustained in-tune time (can exceed 1). */
+  inTuneGlow: number
+}
+
+export function useLivePitchTracker(
+  mediaRef: RefObject<HTMLMediaElement | null>,
+  enabled: boolean,
+  isPlaying: boolean,
+  mediaKey: string,
+  canvasRef?: RefObject<HTMLCanvasElement | null>,
+  canvasTheme: PitchCanvasTheme = 'solid',
+  options: PitchTrackerOptions = {},
+): LivePitchTrackerState {
+  const source = options.source ?? 'media'
+  const micStreamRef = options.micStreamRef
+  const persistWhenPaused = options.persistWhenPaused ?? false
+  const continuousScroll =
+    options.continuousScroll ?? source === 'microphone'
+  const realtimeMode = options.realtimeMode ?? false
+  const tunerInstrument = options.tunerInstrument ?? 'voice'
+  const suppressUntilRef = options.suppressUntilRef
+  const allowStandaloneMicFallback = options.allowStandaloneMicFallback ?? false
+  const preferNativeAudioTap = options.preferNativeAudioTap ?? false
+  const retryNativeTapOnInteractiveRecoveryRef = useRef(
+    options.retryNativeTapOnInteractiveRecovery ?? false,
+  )
+  retryNativeTapOnInteractiveRecoveryRef.current =
+    options.retryNativeTapOnInteractiveRecovery ?? false
+  const onSourceHealthChangeRef = useRef(options.onSourceHealthChange)
+  onSourceHealthChangeRef.current = options.onSourceHealthChange
+  const onAcceptedPitchFrameRef = useRef(options.onAcceptedPitchFrame)
+  onAcceptedPitchFrameRef.current = options.onAcceptedPitchFrame
+  const profile = getTunerProfile(tunerInstrument)
+  const profileRef = useRef(profile)
+  profileRef.current = profile
+
+  // This value participates in the analysis-loop effect dependencies. Keeping
+  // it referentially stable prevents every pitch-label render from cancelling
+  // and recreating the requestAnimationFrame loop.
+  const emptyReadout = useMemo(
+    () => frequencyToPitchReadout(0, profile.minHz, profile.maxHz),
+    [profile.maxHz, profile.minHz],
+  )
+  const [readout, setReadout] = useState<PitchReadout>(emptyReadout)
+  const [inTuneGlow, setInTuneGlow] = useState(0)
+  const graphRef = useRef<ActivePitchGraph | null>(null)
+  const tickRef = useRef<number | null>(null)
+  const readoutRef = useRef<PitchReadout>(emptyReadout)
+  const publishedReadoutRef = useRef<PitchReadout>(emptyReadout)
+  const lastPitchAtRef = useRef(0)
+  const historyRef = useRef<number[]>([])
+  const mountedRef = useRef(true)
+  const needleCentsRef = useRef<number | null>(null)
+  const readoutSmoothedHzRef = useRef<number | null>(null)
+  const lastNoteRef = useRef('—')
+  const goodFrameCountRef = useRef(0)
+  const lastStableCentsRef = useRef<number | null>(null)
+  const isAttaching = useRef(false)
+  const attachGenerationRef = useRef(0)
+  const sourceRef = useRef(source)
+  sourceRef.current = source
+  const realtimeModeRef = useRef(realtimeMode)
+  realtimeModeRef.current = realtimeMode
+  const micStreamRefStable = useRef(micStreamRef)
+  micStreamRefStable.current = micStreamRef
+  const preferNativeAudioTapRef = useRef(preferNativeAudioTap)
+  preferNativeAudioTapRef.current = preferNativeAudioTap
+  const mediaRefStable = useRef(mediaRef)
+  mediaRefStable.current = mediaRef
+  const framesSinceAttachAttemptRef = useRef(0)
+  const tryAttachRef = useRef<(() => Promise<void>) | null>(null)
+  /** Set after a failed tap attach, then cleared by native-session or interactive recovery. */
+  const nativeTapUnavailableRef = useRef(false)
+  const inTuneGlowRef = useRef(0)
+  const inTuneSinceRef = useRef(0)
+  const inTuneBandFrameRef = useRef(0)
+  const inTuneGlowEligibleRef = useRef(false)
+  const lastPublishedGlowRef = useRef(0)
+  const lastMicTickAtRef = useRef(0)
+  const lastCanvasDrawAtRef = useRef(0)
+  const lastReadoutPublishAtRef = useRef(0)
+  const sourceHealthRef = useRef<PitchSourceHealth>('idle')
+  const acceptedPitchActiveRef = useRef(false)
+
+  const endAcceptedPitchEvent = () => {
+    if (!acceptedPitchActiveRef.current) return
+    acceptedPitchActiveRef.current = false
+    onAcceptedPitchFrameRef.current?.(null)
+  }
+
+  const publishAcceptedPitchFrame = (
+    next: PitchReadout,
+    confidence: number,
+  ) => {
+    acceptedPitchActiveRef.current = true
+    onAcceptedPitchFrameRef.current?.({
+      readout: next,
+      confidence,
+      timestamp: Date.now(),
+    })
+  }
+
+  const publishSourceHealth = useCallback((health: PitchSourceHealth) => {
+    if (sourceHealthRef.current === health) return
+    sourceHealthRef.current = health
+    onSourceHealthChangeRef.current?.(health)
+  }, [])
+
+  const publishReadout = (next: PitchReadout, force = false) => {
+    const previouslyPublished = publishedReadoutRef.current
+    const noteChanged = next.noteName !== previouslyPublished.noteName
+    const centsChanged =
+      Math.abs(next.cents - previouslyPublished.cents) >=
+      profileRef.current.readoutCentsStep * 0.5
+    const frequencyChanged =
+      Math.abs(next.frequencyHz - previouslyPublished.frequencyHz) >= 0.1
+    const now = performance.now()
+    const publishInterval = realtimeModeRef.current
+      ? READOUT_PUBLISH_REALTIME_MS
+      : READOUT_PUBLISH_ECONOMY_MS
+
+    if (
+      !force &&
+      !noteChanged &&
+      (!centsChanged && !frequencyChanged ||
+        now - lastReadoutPublishAtRef.current < publishInterval)
+    ) {
+      return
+    }
+
+    readoutRef.current = next
+    publishedReadoutRef.current = next
+    lastReadoutPublishAtRef.current = now
+    if (mountedRef.current) setReadout(next)
+  }
+
+  const publishInTuneGlow = (value: number) => {
+    if (Math.abs(value - lastPublishedGlowRef.current) < 0.01) return
+    lastPublishedGlowRef.current = value
+    if (mountedRef.current) setInTuneGlow(value)
+  }
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (acceptedPitchActiveRef.current) {
+        acceptedPitchActiveRef.current = false
+        onAcceptedPitchFrameRef.current?.(null)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    endAcceptedPitchEvent()
+    historyRef.current = []
+    readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
+    goodFrameCountRef.current = 0
+    lastStableCentsRef.current = null
+    lastNoteRef.current = '—'
+    framesSinceAttachAttemptRef.current = 0
+    lastPitchAtRef.current = 0
+    lastCanvasDrawAtRef.current = 0
+    lastReadoutPublishAtRef.current = 0
+    inTuneGlowRef.current = 0
+    inTuneSinceRef.current = 0
+    inTuneBandFrameRef.current = 0
+    inTuneGlowEligibleRef.current = false
+    lastPublishedGlowRef.current = 0
+    nativeTapUnavailableRef.current = false
+    setInTuneGlow(0)
+  }, [mediaKey, tunerInstrument])
+
+  useEffect(() => {
+    if (source !== 'microphone') return
+    publishSourceHealth(enabled ? 'connecting' : 'idle')
+    return () => publishSourceHealth('idle')
+  }, [enabled, mediaKey, publishSourceHealth, source, tunerInstrument])
+
+  useEffect(() => {
+    return () => {
+      if (tickRef.current !== null) {
+        cancelAnimationFrame(tickRef.current)
+        tickRef.current = null
+      }
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+      }
+      graphRef.current = null
+    }
+  }, [mediaKey, tunerInstrument])
+
+  useEffect(() => {
+    if (source !== 'media' || !enabled) return
+
+    const media = mediaRef.current
+    if (!media) return
+
+    const onSeeked = () => {
+      historyRef.current = []
+      readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
+      goodFrameCountRef.current = 0
+      lastStableCentsRef.current = null
+      lastNoteRef.current = '—'
+      lastPitchAtRef.current = 0
+      const seekEmpty = frequencyToPitchReadout(0, profileRef.current.minHz, profileRef.current.maxHz)
+      readoutRef.current = seekEmpty
+      publishedReadoutRef.current = seekEmpty
+      if (mountedRef.current) setReadout(seekEmpty)
+
+      const graph = graphRef.current
+      if (graph && isMediaPitchGraph(graph)) {
+        graph.smoothed = null
+        if (graph.mode === 'stream' && !refreshMediaPitchStreamSource(graph)) {
+          if (elementGraphs.get(graph.media) === graph) {
+            elementGraphs.delete(graph.media)
+          }
+          graphRef.current = null
+          void tryAttachRef.current?.()
+        }
+      }
+    }
+
+    media.addEventListener('seeked', onSeeked)
+    return () => {
+      media.removeEventListener('seeked', onSeeked)
+    }
+  }, [enabled, mediaKey, mediaRef, source])
+
+  useEffect(() => {
+    const attachGeneration = ++attachGenerationRef.current
+    if (!enabled) {
+      endAcceptedPitchEvent()
+      if (tickRef.current !== null) {
+        cancelAnimationFrame(tickRef.current)
+        tickRef.current = null
+      }
+      historyRef.current = []
+      readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
+      goodFrameCountRef.current = 0
+      lastStableCentsRef.current = null
+      lastNoteRef.current = '—'
+      const disabledEmpty = frequencyToPitchReadout(
+        0,
+        profileRef.current.minHz,
+        profileRef.current.maxHz,
+      )
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        safeDisposeMicGraph(graph)
+      }
+      graphRef.current = null
+      if (mountedRef.current) {
+        readoutRef.current = disabledEmpty
+        publishedReadoutRef.current = disabledEmpty
+        setReadout(disabledEmpty)
+      }
+      return
+    }
+
+    let cancelled = false
+    let retryTimer: number | null = null
+    let initTimer: number | null = null
+    const nativeTapWatchdogs = new Set<number>()
+    let attachAttempt = 0
+    const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 120 : 36
+
+    /**
+     * Leaving a practice game tears the shared mic down and immediately starts
+     * rebuilding it, and an iOS re-acquire routinely takes a second or more.
+     * A flat 80ms poll across that window meant ~12 attach attempts a second,
+     * each walking the graph and touching the bridge, for the whole rebuild —
+     * which is the stall you feel on the way out of a game. Stay responsive
+     * for the first handful of tries (a warm stream really is back in ~100ms),
+     * then ease off rather than hammer.
+     */
+    const waitStep = (baseMs: number) => {
+      if (attachAttempt <= 3) return baseMs
+      return Math.min(600, Math.round(baseMs * 2 ** Math.min(4, attachAttempt - 3)))
+    }
+
+    const scheduleRetry = (delayMs: number) => {
+      if (cancelled || attachAttempt >= MAX_ATTACH_ATTEMPTS) return
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+      }
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null
+        void tryAttach()
+      }, delayMs)
+    }
+
+    const tryAttach = async () => {
+      if (cancelled || isAttaching.current) return
+
+      if (
+        graphRef.current &&
+        sourceRef.current === 'microphone' &&
+        !isMediaPitchGraph(graphRef.current)
+      ) {
+        const micGraph = graphRef.current
+        // Native-tap graphs have no WebKit stream to go stale — keep them as
+        // long as native PCM continues to arrive.
+        if (micGraph.nativeTap) {
+          if (!nativeTapIsStale(micGraph.nativeTap)) {
+            publishSourceHealth(micGraph.nativeTap.receivedAny ? 'healthy' : 'connecting')
+            return
+          }
+          endAcceptedPitchEvent()
+          publishSourceHealth('stalled')
+          safeDisposeMicGraph(micGraph)
+          graphRef.current = null
+        } else if (
+          preferNativeAudioTapRef.current &&
+          isNativeCaptureSessionActive() &&
+          micGraph.context?.state !== 'closed'
+        ) {
+          // WebKit mic was stopped for native capture — switch to the native tap.
+          endAcceptedPitchEvent()
+          safeDisposeMicGraph(micGraph)
+          graphRef.current = null
+        } else {
+          const sharedStream = micStreamRefStable.current?.current
+          const graphStreamLive = micStreamIsLive(micGraph.stream)
+          const graphMatchesShared =
+            !micStreamRefStable.current ||
+            !micStreamIsLive(sharedStream) ||
+            micGraph.stream === sharedStream
+
+          if (
+            graphStreamLive &&
+            graphMatchesShared &&
+            micGraph.context?.state !== 'closed'
+          ) {
+            publishSourceHealth('healthy')
+            return
+          }
+
+          endAcceptedPitchEvent()
+          publishSourceHealth('stalled')
+          safeDisposeMicGraph(micGraph)
+          graphRef.current = null
+        }
+      }
+
+      isAttaching.current = true
+      attachAttempt += 1
+      if (sourceRef.current === 'microphone') {
+        publishSourceHealth('connecting')
+      }
+
+      const source = sourceRef.current
+      const micStreamRef = micStreamRefStable.current
+      const mediaRef = mediaRefStable.current
+
+      try {
+        if (source === 'microphone') {
+          // Camera-mode iOS: while the native capture session is live, pull PCM
+          // from its audio tap instead of WebKit getUserMedia — the native
+          // session starves WebKit mic tracks, which is exactly why the old
+          // path went silent after the first take.
+          if (
+            !nativeTapUnavailableRef.current &&
+            preferNativeAudioTapRef.current &&
+            isNativeCaptureSessionActive()
+          ) {
+            const graph = await createNativeTapPitchGraph(profileRef.current, () => {
+              publishSourceHealth('healthy')
+            })
+            if (cancelled) {
+              safeDisposeMicGraph(graph)
+              return
+            }
+            safeDisposeActiveGraph(
+              graphRef.current && !isMediaPitchGraph(graphRef.current)
+                ? graphRef.current
+                : null,
+            )
+            graphRef.current = graph
+            registerMicPitchGraph(graph)
+            publishSourceHealth('connecting')
+            // Watchdog: if the tap never delivers, temporarily fall back to
+            // WebKit. Foreground and interactive recovery retry the native tap.
+            const watchdog = window.setTimeout(() => {
+              nativeTapWatchdogs.delete(watchdog)
+              if (cancelled || graphRef.current !== graph) return
+              if (graph.nativeTap?.receivedAny) return
+              endAcceptedPitchEvent()
+              console.warn('[PitchTracker] native audio tap silent; falling back to WebKit mic path')
+              publishSourceHealth('stalled')
+              nativeTapUnavailableRef.current = true
+              safeDisposeMicGraph(graph)
+              graphRef.current = null
+              scheduleRetry(50)
+            }, 2000)
+            nativeTapWatchdogs.add(watchdog)
+            return
+          }
+
+          const sharedStream = micStreamRef?.current
+          const sharedStreamLive = micStreamIsLive(sharedStream)
+          const requireSharedStream = Boolean(micStreamRef)
+          const canFallbackToStandaloneMic =
+            allowStandaloneMicFallback && attachAttempt >= 6
+
+          if (requireSharedStream && !sharedStreamLive && !canFallbackToStandaloneMic) {
+            scheduleRetry(waitStep(80))
+            return
+          }
+
+          if (requireSharedStream && !sharedStreamLive && canFallbackToStandaloneMic) {
+            console.info('[PitchTracker] Shared mic stream not ready; using standalone tuner mic fallback')
+          }
+
+          const graph = await createMicPitchGraph(
+            profileRef.current,
+            sharedStreamLive ? sharedStream : null,
+            requireSharedStream && sharedStreamLive,
+            realtimeModeRef.current ? REALTIME_MIC_FRAME_SIZE : undefined,
+          )
+          if (cancelled) {
+            safeDisposeMicGraph(graph)
+            return
+          }
+          safeDisposeActiveGraph(
+            graphRef.current && !isMediaPitchGraph(graphRef.current)
+              ? graphRef.current
+              : null,
+          )
+          graphRef.current = graph
+          registerMicPitchGraph(graph)
+          publishSourceHealth(
+            preferNativeAudioTapRef.current && isNativeCaptureSessionActive()
+              ? 'stalled'
+              : 'healthy',
+          )
+          return
+        }
+
+        const media = mediaRef.current
+        if (!media) {
+          scheduleRetry(50)
+          return
+        }
+
+        const existing = elementGraphs.get(media)
+        if (existing && existing.context.state !== 'closed') {
+          graphRef.current = existing
+          return
+        }
+
+        const graph = await createPitchGraph(media, profileRef.current)
+        if (cancelled) {
+          // createPitchGraph connects nodes and registers the graph before its
+          // promise resolves. A tab/mode switch during that await must release
+          // those resources instead of leaving a detached analysis route alive.
+          safeDisposePitchGraph(graph)
+          return
+        }
+        safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
+        graphRef.current = graph
+      } catch (error) {
+        if (sourceRef.current === 'microphone' && isMicrophonePermissionError(error)) {
+          // Permission cannot change during a timer loop. Retrying here every
+          // 120ms only burns CPU and floods the bridge/log while the user is
+          // moving between tuner and game screens. A later user interaction
+          // or foreground recovery still gives the microphone a fresh attempt.
+          publishSourceHealth('stalled')
+          return
+        }
+        if (sourceRef.current === 'microphone' && attachAttempt >= 6) {
+          publishSourceHealth('stalled')
+        }
+        scheduleRetry(waitStep(sourceRef.current === 'microphone' ? 120 : 80))
+      } finally {
+        // A previous media-key generation may finish after a new attachment
+        // has started. It must not clear the new generation's in-flight guard.
+        if (attachGenerationRef.current === attachGeneration) {
+          isAttaching.current = false
+        }
+      }
+    }
+
+    const beginAttach = () => {
+      if (cancelled || isAttaching.current) return
+      void tryAttach()
+    }
+
+    if (sourceRef.current === 'microphone') {
+      initTimer = window.setTimeout(
+        beginAttach,
+        realtimeModeRef.current ? 0 : MIC_PITCH_ATTACH_DEFER_MS,
+      )
+    } else {
+      beginAttach()
+    }
+
+    tryAttachRef.current = tryAttach
+
+    const reattachForNativeCapture = () => {
+      if (cancelled || sourceRef.current !== 'microphone' || !enabled) return
+      if (!preferNativeAudioTapRef.current) return
+      if (isNativeCaptureSessionActive()) {
+        nativeTapUnavailableRef.current = false
+      }
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph) && graph.nativeTap) return
+      if (
+        graph &&
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        micStreamIsLive(graph.stream) &&
+        !isNativeCaptureSessionActive()
+      ) {
+        return
+      }
+      if (graph && !isMediaPitchGraph(graph)) {
+        endAcceptedPitchEvent()
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+      }
+      if (!isAttaching.current) {
+        void tryAttach()
+      }
+    }
+
+    pitchGraphReattachListeners.add(reattachForNativeCapture)
+    const unsubscribeNativeCapture = subscribeNativeCaptureSessionActive(reattachForNativeCapture)
+
+    const recoverMicGraph = () => {
+      if (cancelled || sourceRef.current !== 'microphone' || !enabled) return
+
+      const graph = graphRef.current
+      if (graph && isMediaPitchGraph(graph)) return
+
+      if (
+        retryNativeTapOnInteractiveRecoveryRef.current &&
+        preferNativeAudioTapRef.current &&
+        isNativeCaptureSessionActive() &&
+        (!graph || (graph && !isMediaPitchGraph(graph) && !graph.nativeTap))
+      ) {
+        nativeTapUnavailableRef.current = false
+        if (graph && !isMediaPitchGraph(graph)) {
+          endAcceptedPitchEvent()
+          safeDisposeMicGraph(graph)
+          graphRef.current = null
+        }
+        publishSourceHealth('connecting')
+        if (!isAttaching.current) {
+          void tryAttach()
+        }
+        return
+      }
+
+      if (graph && !isMediaPitchGraph(graph) && graph.nativeTap) {
+        // Native-tap graphs pull PCM via manual buffer copy from the plugin and
+        // intentionally own no Web Audio context. Health is delivery-based.
+        if (!nativeTapIsStale(graph.nativeTap)) return
+        if (nativeTapIsStale(graph.nativeTap)) {
+          console.warn('[PitchTracker] native audio tap stale during recovery; rebuilding')
+          publishSourceHealth('stalled')
+        }
+        endAcceptedPitchEvent()
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttach()
+        }
+        return
+      }
+
+      if (graph && !isMediaPitchGraph(graph)) {
+        void (async () => {
+          const context = graph.context
+          if (!context) return
+          if (context.state === 'suspended') {
+            // iOS frequently resolves resume() without error yet leaves the
+            // context stuck 'suspended' when it's called outside a direct
+            // user-gesture callback (visibilitychange/appStateChange are not
+            // gestures). Previously this fire-and-forget resume() was never
+            // awaited, so the very next line's "!== 'closed'" check always
+            // passed for a still-suspended context and recovery silently
+            // gave up — the exact "tuner stops working after backgrounding"
+            // symptom. Now we wait for the attempt and verify it actually
+            // reached 'running' before treating the graph as healthy. This
+            // WebKit getUserMedia path genuinely does need 'running' — unlike
+            // the native-tap path above, its analyser IS fed by a real
+            // MediaStreamAudioSourceNode in the standard WebAudio graph.
+            await context.resume().catch(() => {})
+          }
+          if (cancelled || graphRef.current !== graph) return
+
+          const isHealthy = context.state === 'running'
+          const sharedStream = micStreamRefStable.current?.current
+          const graphStreamLive = micStreamIsLive(graph.stream)
+          const graphMatchesShared =
+            !micStreamRefStable.current ||
+            !micStreamIsLive(sharedStream) ||
+            graph.stream === sharedStream
+
+          if (isHealthy && graphStreamLive && graphMatchesShared) {
+            return
+          }
+
+          endAcceptedPitchEvent()
+          safeDisposeMicGraph(graph)
+          graphRef.current = null
+
+          if (!isAttaching.current) {
+            void tryAttach()
+          }
+        })()
+        return
+      }
+
+      if (!isAttaching.current) {
+        void tryAttach()
+      }
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        recoverMicGraph()
+      } else {
+        endAcceptedPitchEvent()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', recoverMicGraph)
+    window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverMicGraph)
+    document.addEventListener('pointerdown', recoverMicGraph)
+    document.addEventListener('touchstart', recoverMicGraph)
+
+    let removeAppListener: (() => void) | undefined
+    let appListenerDisposed = false
+    if (typeof window !== 'undefined') {
+      void (async () => {
+        try {
+          const { Capacitor } = await import('@capacitor/core')
+          if (!Capacitor.isNativePlatform() || appListenerDisposed) return
+          const { App } = await import('@capacitor/app')
+          if (appListenerDisposed) return
+          const sub = await App.addListener('appStateChange', ({ isActive }) => {
+            if (isActive) recoverMicGraph()
+            else endAcceptedPitchEvent()
+          })
+          if (appListenerDisposed) {
+            await sub.remove()
+            return
+          }
+          removeAppListener = () => {
+            void sub.remove()
+          }
+        } catch (error) {
+          if (!appListenerDisposed) {
+            console.warn('[PitchTracker] app lifecycle listener unavailable', error)
+          }
+        }
+      })()
+    }
+
+    return () => {
+      cancelled = true
+      appListenerDisposed = true
+      tryAttachRef.current = null
+      pitchGraphReattachListeners.delete(reattachForNativeCapture)
+      unsubscribeNativeCapture()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', recoverMicGraph)
+      window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverMicGraph)
+      document.removeEventListener('pointerdown', recoverMicGraph)
+      document.removeEventListener('touchstart', recoverMicGraph)
+      removeAppListener?.()
+      if (initTimer !== null) {
+        window.clearTimeout(initTimer)
+      }
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+      }
+      for (const watchdog of nativeTapWatchdogs) {
+        window.clearTimeout(watchdog)
+      }
+      nativeTapWatchdogs.clear()
+      const graph = graphRef.current
+      if (graph && !isMediaPitchGraph(graph)) {
+        endAcceptedPitchEvent()
+        safeDisposeMicGraph(graph)
+      }
+      graphRef.current = null
+      if (attachGenerationRef.current === attachGeneration) {
+        isAttaching.current = false
+      }
+    }
+  }, [enabled, mediaKey, tunerInstrument])
+
+  useEffect(() => {
+    const shouldTick = enabled && (isPlaying || persistWhenPaused)
+
+    if (!shouldTick) {
+      if (tickRef.current !== null) {
+        cancelAnimationFrame(tickRef.current)
+        window.clearTimeout(tickRef.current)
+        tickRef.current = null
+      }
+      if (!isPlaying && !persistWhenPaused) {
+        endAcceptedPitchEvent()
+        if (graphRef.current && isMediaPitchGraph(graphRef.current)) {
+          graphRef.current.smoothed = null
+        } else if (graphRef.current && !isMediaPitchGraph(graphRef.current)) {
+          graphRef.current.smoothed = null
+        }
+        historyRef.current = []
+        readoutSmoothedHzRef.current = null
+    needleCentsRef.current = null
+        goodFrameCountRef.current = 0
+        lastStableCentsRef.current = null
+        lastNoteRef.current = '—'
+        if (mountedRef.current) {
+          readoutRef.current = emptyReadout
+          publishedReadoutRef.current = emptyReadout
+          setReadout(emptyReadout)
+        }
+        lastPitchAtRef.current = 0
+        inTuneGlowRef.current = 0
+        inTuneSinceRef.current = 0
+        inTuneBandFrameRef.current = 0
+        inTuneGlowEligibleRef.current = false
+        lastPublishedGlowRef.current = 0
+        setInTuneGlow(0)
+      }
+      return
+    }
+
+    const tickStats = { frames: 0 }
+
+    const tick = () => {
+      const frameNow = performance.now()
+      if (
+        sourceRef.current === 'microphone' &&
+        continuousScroll &&
+        !realtimeModeRef.current
+      ) {
+        if (frameNow - lastMicTickAtRef.current < MIC_ECONOMY_TICK_MS) {
+          tickRef.current = requestAnimationFrame(tick)
+          return
+        }
+        lastMicTickAtRef.current = frameNow
+      }
+
+      const canvasForThisFrame = (): HTMLCanvasElement | null => {
+        const canvas = canvasRef?.current ?? null
+        if (!canvas) return null
+        const interval = realtimeModeRef.current
+          ? CANVAS_DRAW_REALTIME_MS
+          : MIC_ECONOMY_TICK_MS
+        if (frameNow - lastCanvasDrawAtRef.current < interval) return null
+        lastCanvasDrawAtRef.current = frameNow
+        return canvas
+      }
+
+      const activeProfile = profileRef.current
+      const shouldSuppressMicAnalysis =
+        sourceRef.current === 'microphone' &&
+        suppressUntilRef?.current != null &&
+        performance.now() < suppressUntilRef.current
+      const snappyWidgetTrace =
+        realtimeModeRef.current && !activeProfile.widgetSmoothTrace
+      const responsiveTrace = snappyWidgetTrace
+      const traceBlend = snappyWidgetTrace
+        ? Math.max(activeProfile.traceEndBlend, 0.92)
+        : activeProfile.traceEndBlend
+      const traceWindow = snappyWidgetTrace
+        ? Math.min(activeProfile.graphSmoothWindow, 3)
+        : activeProfile.graphSmoothWindow
+      const traceSpikeCap = snappyWidgetTrace
+        ? activeProfile.traceSpikeCapCents * 1.75
+        : activeProfile.traceSpikeCapCents
+      const traceNoteJumpCap = snappyWidgetTrace
+        ? activeProfile.traceNoteJumpCapCents * 1.5
+        : activeProfile.traceNoteJumpCapCents
+      const freqSmoothAlpha = snappyWidgetTrace
+        ? Math.max(activeProfile.smoothAlpha, 0.62)
+        : activeProfile.smoothAlpha
+      framesSinceAttachAttemptRef.current += 1
+      tickStats.frames += 1
+      let graph = graphRef.current
+
+      if (shouldSuppressMicAnalysis) {
+        endAcceptedPitchEvent()
+        historyRef.current = []
+        readoutSmoothedHzRef.current = null
+        needleCentsRef.current = null
+        goodFrameCountRef.current = 0
+        lastStableCentsRef.current = null
+        lastNoteRef.current = '—'
+        lastPitchAtRef.current = 0
+        if (graph) graph.smoothed = null
+        publishReadout(emptyReadout, true)
+
+        const canvas = canvasForThisFrame()
+        if (canvas) {
+          drawPitchCanvasIfDue(
+            canvas,
+            new Float32Array(activeProfile.frameSize),
+            historyRef.current,
+            false,
+            canvasTheme,
+            traceWindow,
+            traceBlend,
+            0,
+            responsiveTrace,
+          )
+        }
+
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      if (graph && isMediaPitchGraph(graph) && elementGraphs.get(graph.media) !== graph) {
+        endAcceptedPitchEvent()
+        graphRef.current = null
+        graph = null
+      }
+
+      if (!graph) {
+        endAcceptedPitchEvent()
+        if (source === 'microphone') {
+          if (
+            enabled &&
+            (isPlaying || persistWhenPaused) &&
+            framesSinceAttachAttemptRef.current % 12 === 0
+          ) {
+            void tryAttachRef.current?.()
+          }
+          // Avoid heavy canvas work while waiting for mic graph attach.
+          tickRef.current = realtimeModeRef.current
+            ? requestAnimationFrame(tick)
+            : (window.setTimeout(tick, 100) as unknown as number)
+          return
+        }
+
+        if (
+          enabled &&
+          (isPlaying || persistWhenPaused) &&
+          framesSinceAttachAttemptRef.current % 12 === 0
+        ) {
+          void tryAttachRef.current?.()
+        }
+
+        if (continuousScroll && persistWhenPaused && enabled) {
+          const history = historyRef.current
+          history.push(PITCH_SILENCE_FLOOR_CENTS)
+          if (history.length > HISTORY_LENGTH) {
+            history.splice(0, history.length - HISTORY_LENGTH)
+          }
+        }
+
+        const canvas = canvasForThisFrame()
+        if (canvas) {
+          const bandGlow = sampleInTuneBandGlow(
+            inTuneGlowRef,
+            inTuneSinceRef,
+            inTuneBandFrameRef,
+            inTuneGlowEligibleRef,
+            readoutRef.current,
+          )
+          publishInTuneGlow(bandGlow)
+          drawPitchCanvasIfDue(
+            canvas,
+            new Float32Array(activeProfile.frameSize),
+            historyRef.current,
+            readoutRef.current.noteName !== '—',
+            canvasTheme,
+            traceWindow,
+            traceBlend,
+            bandGlow,
+            responsiveTrace,
+          )
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      if (graph.context?.state === 'closed') {
+        endAcceptedPitchEvent()
+        if (sourceRef.current === 'microphone') {
+          publishSourceHealth('stalled')
+        }
+        if (isMediaPitchGraph(graph)) {
+          if (elementGraphs.get(graph.media) === graph) {
+            elementGraphs.delete(graph.media)
+          }
+        }
+        graphRef.current = null
+        if (framesSinceAttachAttemptRef.current % 12 === 0) {
+          void tryAttachRef.current?.()
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      if (graph.context?.state === 'suspended') {
+        void graph.context.resume()
+      }
+
+      if (
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        !micStreamIsLive(graph.stream)
+      ) {
+        endAcceptedPitchEvent()
+        console.info('[PitchTracker] WebKit mic source unavailable; reacquiring')
+        publishSourceHealth('stalled')
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttachRef.current?.()
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      if (
+        !isMediaPitchGraph(graph) &&
+        !graph.nativeTap &&
+        preferNativeAudioTapRef.current &&
+        isNativeCaptureSessionActive() &&
+        !micStreamIsLive(graph.stream)
+      ) {
+        console.info('[PitchTracker] WebKit mic ended during native capture; switching to native tap')
+        safeDisposeMicGraph(graph)
+        graphRef.current = null
+        if (!isAttaching.current) {
+          void tryAttachRef.current?.()
+        }
+        tickRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      let analysisSampleRate = graph.context?.sampleRate ?? 48_000
+      let nativeFrameFresh = true
+
+      if (!isMediaPitchGraph(graph) && graph.nativeTap) {
+        const nativeTap = graph.nativeTap
+        if (nativeTapIsStale(nativeTap, frameNow)) {
+          endAcceptedPitchEvent()
+          console.warn('[PitchTracker] native audio tap stale; reacquiring')
+          publishSourceHealth('stalled')
+          safeDisposeMicGraph(graph)
+          graphRef.current = null
+          historyRef.current = []
+          readoutSmoothedHzRef.current = null
+          needleCentsRef.current = null
+          goodFrameCountRef.current = 0
+          lastStableCentsRef.current = null
+          lastNoteRef.current = '—'
+          lastPitchAtRef.current = 0
+          publishReadout(emptyReadout, true)
+          if (!isAttaching.current) {
+            void tryAttachRef.current?.()
+          }
+          tickRef.current = requestAnimationFrame(tick)
+          return
+        }
+
+        // Native capture-session tap: copy the latest PCM chunk. Before the
+        // first chunk arrives the buffer stays zeroed — the RMS gate below
+        // treats that as silence, which renders as an idle (not broken) tuner.
+        const latest = nativeTap.latest
+        nativeFrameFresh = Boolean(
+          latest && nativeTap.processedSequence !== nativeTap.sequence,
+        )
+        // Keep analysis and canvas motion on the display's animation cadence.
+        // Native PCM arrives in larger chunks, but reusing the latest complete
+        // chunk between deliveries prevents the trace from dropping to the
+        // audio chunk rate (roughly 23fps at 48kHz).
+        if (latest && nativeFrameFresh) {
+          nativeTap.processedSequence = nativeTap.sequence
+          publishSourceHealth('healthy')
+          if (latest.length === graph.buffer.length) {
+            graph.buffer.set(latest)
+          } else {
+            graph.buffer.fill(0)
+            graph.buffer.set(latest.subarray(0, Math.min(latest.length, graph.buffer.length)))
+          }
+        }
+        analysisSampleRate = nativeTap.sampleRate
+      } else {
+        graph.analyser?.getFloatTimeDomainData(graph.buffer)
+      }
+
+      const now = performance.now()
+      let active = false
+      let pushedHistoryThisFrame = false
+
+      const pushHistorySample = (cents: number) => {
+        const history = historyRef.current
+        history.push(cents)
+        if (history.length > HISTORY_LENGTH) {
+          history.splice(0, history.length - HISTORY_LENGTH)
+        }
+        pushedHistoryThisFrame = true
+      }
+
+      const pushTraceSample = (targetCents: number, noteChanged: boolean) => {
+        const history = historyRef.current
+        const last = history[history.length - 1]
+        let sample = targetCents
+
+        if (
+          last != null &&
+          !isSilenceFloorSample(last) &&
+          !isSilenceFloorSample(targetCents)
+        ) {
+          const cap = noteChanged ? traceNoteJumpCap : traceSpikeCap
+          const jump = Math.abs(targetCents - last)
+          if (jump > cap) {
+            sample = last + Math.sign(targetCents - last) * cap
+          }
+        }
+
+        pushHistorySample(sample)
+      }
+
+      const clearReadoutAfterSilence = () => {
+        endAcceptedPitchEvent()
+        publishReadout(emptyReadout, true)
+        graph.smoothed = null
+        readoutSmoothedHzRef.current = null
+        needleCentsRef.current = null
+        lastStableCentsRef.current = null
+        lastNoteRef.current = '—'
+        active = false
+      }
+
+      if (isPlaying) {
+        const clarityMin =
+          source === 'microphone' ? activeProfile.clarityMinMic : activeProfile.clarityMin
+        const rmsGate =
+          source === 'microphone' ? activeProfile.rmsGateDbMic : activeProfile.rmsGateDbMedia
+        const holdMs = source === 'microphone' ? activeProfile.holdMsMic : activeProfile.holdMs
+        const nativeTap = !isMediaPitchGraph(graph) ? graph.nativeTap : undefined
+        let signalStrong: boolean
+        let rawPitch = 0
+        let clarity = 0
+
+        if (nativeTap && !nativeFrameFresh && nativeTap.hasAnalyzedFrame) {
+          signalStrong = nativeTap.cachedSignalStrong
+          rawPitch = nativeTap.cachedRawPitch
+          clarity = nativeTap.cachedClarity
+        } else {
+          signalStrong = isSignalAboveRmsGate(graph.buffer, rmsGate)
+          if (signalStrong) {
+            const detected = graph.detector.findPitch(
+              graph.buffer,
+              analysisSampleRate,
+            )
+            rawPitch = detected[0]
+            clarity = detected[1]
+          }
+          if (nativeTap) {
+            nativeTap.hasAnalyzedFrame = true
+            nativeTap.cachedSignalStrong = signalStrong
+            nativeTap.cachedRawPitch = rawPitch
+            nativeTap.cachedClarity = clarity
+          }
+        }
+
+        if (!signalStrong) {
+          goodFrameCountRef.current = 0
+          if (
+            lastPitchAtRef.current > 0 &&
+            now - lastPitchAtRef.current > holdMs
+          ) {
+            clearReadoutAfterSilence()
+          } else if (readoutRef.current.noteName !== '—') {
+            active = true
+          }
+        } else {
+          const pitch = normalizeInstrumentFrequency(
+            rawPitch,
+            activeProfile.minHz,
+            activeProfile.maxHz,
+          )
+
+          if (
+            clarity >= clarityMin &&
+            isFrequencyInInstrumentRange(pitch, activeProfile.minHz, activeProfile.maxHz)
+          ) {
+            graph.smoothed = smoothFrequency(
+              graph.smoothed,
+              pitch,
+              freqSmoothAlpha,
+            )
+            readoutSmoothedHzRef.current = smoothFrequency(
+              readoutSmoothedHzRef.current,
+              pitch,
+              activeProfile.readoutFreqAlpha,
+            )
+            const readoutHz = readoutSmoothedHzRef.current ?? pitch
+            const preferMidi =
+              readoutRef.current.noteName !== '—' ? readoutRef.current.midi : null
+            let next = frequencyToPitchReadout(
+              readoutHz,
+              activeProfile.minHz,
+              activeProfile.maxHz,
+              preferMidi,
+            )
+            next = stabilizePitchReadout(
+              readoutRef.current.noteName !== '—' ? readoutRef.current : null,
+              next,
+              activeProfile.noteHysteresisCents,
+            )
+
+            if (next.noteName !== '—') {
+              const noteChanged =
+                lastNoteRef.current !== '—' && lastNoteRef.current !== next.noteName
+              const wasIdle = readoutRef.current.noteName === '—'
+
+              let acceptFrame = true
+              if (
+                !noteChanged &&
+                !wasIdle &&
+                lastStableCentsRef.current != null &&
+                Math.abs(next.cents - lastStableCentsRef.current) > activeProfile.outlierCents &&
+                clarity < clarityMin + 0.05
+              ) {
+                acceptFrame = false
+              }
+
+              if (acceptFrame) {
+                goodFrameCountRef.current += 1
+              } else {
+                goodFrameCountRef.current = Math.max(0, goodFrameCountRef.current - 1)
+              }
+
+              const attackSatisfied =
+                noteChanged || goodFrameCountRef.current >= activeProfile.attackFrames
+
+              if (acceptFrame && attackSatisfied) {
+                lastNoteRef.current = next.noteName
+
+                const rawCents = Math.max(-50, Math.min(50, next.cents))
+                const needleAlpha = noteChanged
+                  ? activeProfile.noteChangeSmoothAlpha
+                  : activeProfile.needleSmoothAlpha
+                const prevNeedle = needleCentsRef.current
+                const smoothedNeedle =
+                  prevNeedle == null
+                    ? rawCents
+                    : prevNeedle + (rawCents - prevNeedle) * needleAlpha
+
+                needleCentsRef.current = smoothedNeedle
+                const deadband = activeProfile.readoutDeadbandCents ?? 0
+                const centeredCents =
+                  deadband > 0 && Math.abs(smoothedNeedle) <= deadband ? 0 : smoothedNeedle
+                const displayCents = quantizeDisplayCents(
+                  centeredCents,
+                  activeProfile.readoutCentsStep,
+                )
+                const displayReadout: PitchReadout = {
+                  ...next,
+                  cents: displayCents,
+                }
+
+                publishAcceptedPitchFrame(
+                  {
+                    ...next,
+                    cents: smoothedNeedle,
+                  },
+                  clarity,
+                )
+
+                readoutRef.current = displayReadout
+                publishReadout(displayReadout)
+
+                lastPitchAtRef.current = now
+                lastStableCentsRef.current = smoothedNeedle
+                active = true
+                pushTraceSample(smoothedNeedle, noteChanged)
+              }
+            } else {
+              goodFrameCountRef.current = 0
+            }
+          } else {
+            goodFrameCountRef.current = Math.max(0, goodFrameCountRef.current - 1)
+            if (
+              lastPitchAtRef.current > 0 &&
+              now - lastPitchAtRef.current > holdMs
+            ) {
+              clearReadoutAfterSilence()
+            } else if (readoutRef.current.noteName !== '—') {
+              active = true
+            }
+          }
+        }
+
+        if (continuousScroll && !pushedHistoryThisFrame) {
+          pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
+        }
+      } else if (continuousScroll && persistWhenPaused) {
+        if (!pushedHistoryThisFrame) {
+          pushHistorySample(PITCH_SILENCE_FLOOR_CENTS)
+        }
+        if (readoutRef.current.noteName !== '—') {
+          active = true
+        }
+      } else if (readoutRef.current.noteName !== '—') {
+        active = true
+      }
+
+      const canvas = canvasForThisFrame()
+      if (canvas) {
+        const bandGlow = sampleInTuneBandGlow(
+          inTuneGlowRef,
+          inTuneSinceRef,
+          inTuneBandFrameRef,
+          inTuneGlowEligibleRef,
+          readoutRef.current,
+        )
+        publishInTuneGlow(bandGlow)
+        drawPitchCanvasIfDue(
+          canvas,
+          graph.buffer,
+          historyRef.current,
+          active,
+          canvasTheme,
+          traceWindow,
+          traceBlend,
+          bandGlow,
+          responsiveTrace,
+        )
+      }
+
+      tickRef.current = requestAnimationFrame(tick)
+    }
+
+    tickRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      if (tickRef.current !== null) {
+        cancelAnimationFrame(tickRef.current)
+        window.clearTimeout(tickRef.current)
+        tickRef.current = null
+      }
+    }
+  }, [
+    canvasRef,
+    canvasTheme,
+    continuousScroll,
+    emptyReadout,
+    enabled,
+    isPlaying,
+    mediaKey,
+    persistWhenPaused,
+    realtimeMode,
+    source,
+    suppressUntilRef,
+    tunerInstrument,
+    allowStandaloneMicFallback,
+    preferNativeAudioTap,
+  ])
+
+  return { readout, inTuneGlow }
+}
+
+const pitchGraphReattachListeners = new Set<() => void>()
+
+/** Ask all live mic pitch trackers to rebuild (e.g. after native capture handoff). */
+export function requestPitchGraphReattach(): void {
+  for (const listener of pitchGraphReattachListeners) {
+    listener()
+  }
+}
+
+/** Tear down all live mic pitch graphs (e.g. when backgrounding the app). */
+export function releaseAllLiveMicPitchGraphs(): void {
+  for (const graph of [...activeMicPitchGraphs]) {
+    safeDisposeMicGraph(graph)
+  }
+  activeMicPitchGraphs.clear()
+}
+
+/** Resume speaker routing for pitch graphs attached to playback media. */
+export function resumePitchGraphsForMedia(
+  ...media: Array<HTMLMediaElement | null | undefined>
+): void {
+  void resumePlaybackAudioContext()
+
+  for (const element of media) {
+    if (!element) continue
+    const graph = elementGraphs.get(element)
+    if (!graph) continue
+
+    applyPitchOutputGain(element, graph.passthrough)
+
+    if (graph.mode === 'element' && getTakePlaybackSpeakerNodes(element)) {
+      routeTakePlaybackToSpeaker(element, element.volume || 1, false)
+    } else if (graph.mode === 'stream' && graph.context.state !== 'closed') {
+      refreshMediaPitchStreamSource(graph)
+    }
+  }
+}
+
+/** Pause pitch graphs for review teardown without blocking the UI thread. */
+export function pausePitchGraphsForMedia(...media: Array<HTMLMediaElement | null | undefined>): void {
+  for (const element of media) {
+    if (!element) continue
+    try {
+      element.pause()
+    } catch {
+      /* ignore */
+    }
+    const graph = elementGraphs.get(element)
+    if (graph) {
+      safeDisposePitchGraph(graph)
+    }
+  }
+}

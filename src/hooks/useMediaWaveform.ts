@@ -22,6 +22,11 @@ interface UseMediaWaveformOptions {
  */
 const MAX_JS_DECODE_BYTES = 48 * 1024 * 1024
 const waveformCache = new Map<string, number[]>()
+const waveformRevisions = new Map<string, number>()
+export function invalidateMediaWaveform(source: string): void {
+  waveformRevisions.set(source, (waveformRevisions.get(source) ?? 0) + 1)
+  for (const key of waveformCache.keys()) if (key.startsWith(`${source}|`)) waveformCache.delete(key)
+}
 const waveformRequests = new Map<string, Promise<number[] | null>>()
 let nativeExtractionQueue: Promise<unknown> = Promise.resolve()
 
@@ -91,7 +96,7 @@ export function useMediaWaveform({
 
     let cancelled = false
     let audioContext: AudioContext | null = null
-    const sourceKey = `${filePath || resolvedSrc}|${barCount}`
+    const sourceKey = `${filePath || resolvedSrc}|${barCount}|${waveformRevisions.get(filePath || resolvedSrc) ?? 0}`
     const cached = waveformCache.get(sourceKey)
     if (cached) {
       setPeaks(cached)

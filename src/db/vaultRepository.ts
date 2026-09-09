@@ -198,6 +198,10 @@ export async function updateVaultTake(takeId: string, updates: VaultTakeUpdate):
   const fields: string[] = []
   const values: unknown[] = []
 
+  if (updates.duration !== undefined) {
+    fields.push('duration = ?')
+    values.push(updates.duration)
+  }
   if (updates.name !== undefined) {
     fields.push('name = ?')
     values.push(updates.name)

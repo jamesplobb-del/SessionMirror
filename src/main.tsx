@@ -24,6 +24,9 @@ import { initCrashReporting } from './utils/crashReporting'
 import { initializeRoutineFileOpen } from './practiceTimeline/storage/routineFileOpen'
 import { installFakeMediaDevices } from './utils/fakeMediaDevices'
 
+document.documentElement.dataset.refinement = 'depth-electric'
+document.documentElement.dataset.arcadeStyle = 'arcade-pop'
+
 async function bootstrap() {
   // Before anything can touch mediaDevices. No-op unless VITE_FAKE_MEDIA=1.
   installFakeMediaDevices()
@@ -58,3 +61,16 @@ async function bootstrap() {
 }
 
 void bootstrap()
+
+// Approved Electric design and Arcade Pop game presentation.
+import './styles/refinement-concepts.css'
+import './styles/direction-concepts.css'
+import './styles/playful-main-tabs.css'
+import './styles/alternate-main-tabs.css'
+import './styles/fresh-concept.css'
+import './styles/fresh-family.css'
+import './styles/vibrant-depth.css'
+import './styles/camera-transparent-concepts.css'
+import './styles/electric-refinement.css'
+import './styles/arcade-style-concepts.css'
+import './styles/signal-launch.css'

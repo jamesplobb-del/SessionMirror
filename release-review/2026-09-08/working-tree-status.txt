@@ -1,0 +1,62 @@
+ M LAUNCH_READINESS.md
+ M ios/App/App/Info.plist
+ M scripts/verify-practice-routines.mjs
+ M src/App.tsx
+ M src/components/ControlDeck.tsx
+ M src/components/GuidedRoutineBuilder.tsx
+ M src/components/HandsFreeSettingsCard.tsx
+ M src/components/HandsFreeStage.tsx
+ M src/components/PracticeHub.tsx
+ M src/components/PracticeReferenceBrowser.tsx
+ M src/components/RoutineBar.tsx
+ M src/components/labs/LabsMenu.tsx
+ M src/components/labs/LabsOverlay.tsx
+ M src/hooks/useAutoSoundRecording.ts
+ M src/hooks/useDrone.ts
+ M src/hooks/useLivePitchTracker.ts
+ M src/index.css
+ M src/labs/balance/BalanceHome.tsx
+ D src/labs/balance/BalanceLevelResults.tsx
+ M src/labs/balance/BalanceScreen.tsx
+ D src/labs/balance/BalanceStars.tsx
+D  src/labs/balance/BalanceTrail.tsx
+ M src/labs/balance/balance-arcade.css
+ M src/labs/balance/balanceEngine.ts
+ M src/labs/balance/balanceLevels.ts
+ M src/labs/balance/balanceMusic.ts
+ M src/labs/balance/balanceStorage.ts
+ M src/labs/balance/balanceTrophies.ts
+ M src/labs/balance/balanceTypes.ts
+ M src/labs/balance/useBalanceGame.ts
+ M src/labs/practiceGameCharacters.ts
+ M src/labs/staffJumper/StaffJumperGame.tsx
+ M src/labs/staffJumper/StaffJumperScreen.tsx
+ M src/labs/staffJumper/staffJumperMusicLogic.ts
+ M src/labs/staffJumper/useStaffJumperGame.ts
+ M src/practiceTimeline/components/TimelineLibrarySheet.tsx
+ M src/practiceTimeline/storage/routineFileOpen.ts
+ M src/styles/camera-mode-glass.css
+ M src/styles/focus-practice.css
+ M src/styles/interaction-polish.css
+ M src/styles/practice-system.css
+ M src/styles/routine-guide.css
+ M src/utils/handsFreePhase.ts
+ M src/utils/playbackRouteCoordinator.ts
+ M src/utils/tutorialContent.ts
+?? BESTTAKE_RELEASE_AUDIT.md
+?? DAILY_CHALLENGES.md
+?? release-review/
+?? scripts/verify-daily-challenge-plan.mjs
+?? scripts/verify-daily-challenges.mjs
+?? scripts/verify-drone-transitions.mjs
+?? scripts/verify-handsfree-cycle.mjs
+?? scripts/verify-playback-route.mjs
+?? src/assets/practice-characters/ensemble/
+?? src/components/ChallengeRewardNotice.tsx
+?? src/components/DailyChallenges.tsx
+?? src/components/daily-challenges.css
+?? src/labs/balance/BalanceDailyResults.tsx
+?? src/utils/dailyChallengePlan.ts
+?? src/utils/dailyChallenges.ts
+?? src/utils/handsFreeSilence.ts
+?? src/utils/practiceRoutineShare.ts

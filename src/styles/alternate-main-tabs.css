@@ -1,0 +1,46 @@
+/* Approval-only main-tab alternatives. Each selector is isolated by direction. */
+html[data-refinement='studio'] .app-ui-overlay--audio-mode {
+ --audio-bg-base:var(--concept-bg); --audio-bg-top:var(--concept-bg); --audio-bg-mid:var(--concept-bg); --audio-bg-bottom:var(--concept-bg);
+ --audio-surface:var(--concept-panel); --audio-text-primary:var(--concept-ink); --audio-text-secondary:var(--concept-muted);
+ --audio-blue:#2164d9; --audio-blue-soft:#2164d914; --audio-gold:#9c6b17; --audio-gold-soft:#f7ecd2;
+ --audio-radius-card:16px; --audio-shadow-card:0 5px 18px #1d3b6410;
+}
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-top-tabs { border:1px solid var(--concept-line); border-radius:14px; padding:4px; gap:3px; box-shadow:none; background:var(--concept-panel); }
+html[data-refinement='studio'] .audio-practice-top-tabs .audio-practice-top-tabs__btn { min-height:42px; border:0; border-radius:10px; font-size:12px; color:var(--concept-muted); }
+html[data-refinement='studio'] .audio-practice-top-tabs .audio-practice-top-tabs__btn--active { background:#e5eeff; color:#2159b5; box-shadow:inset 0 -3px #2164d9; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card { border:1px solid var(--concept-line); border-left:4px solid #2164d9; border-radius:16px; background:var(--concept-panel); box-shadow:0 5px 18px #1d3b6410; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card--best { border-left-color:#d4a54c; }
+html[data-refinement='studio'] .audio-mode-take-card .audio-mode-take-card__chrome { padding-bottom:10px; border-bottom:1px solid var(--concept-line); }
+html[data-refinement='studio'] .audio-mode-take-card .audio-mode-take-card__pill { color:#2459aa; background:#e9f0fc; border-radius:7px; font-size:11px; font-weight:600; }
+html[data-refinement='studio'] .audio-mode-take-card--best .audio-mode-take-card__pill { color:#815c1c; background:#f8eed7; }
+html[data-refinement='studio'] .audio-mode-take-card .audio-mode-take-card__title-row h3 { font-weight:550; letter-spacing:-.025em; }
+html[data-refinement='studio'] .audio-mode-take-card .audio-mode-take-card__play { border-radius:12px; box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-tuner-layer { position:relative; z-index:2; background:transparent; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-tuner-shell { padding:0 14px 12px; }
+html[data-refinement='studio'] .audio-practice-tuner-shell .pitch-audio-stage { position:relative; z-index:2; border:1px solid var(--concept-line); border-radius:16px; background:var(--concept-panel); box-shadow:0 5px 18px #1d3b6410; }
+html[data-refinement='studio'] .audio-practice-tuner-shell .pitch-living-readout__note { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-weight:550; }
+html[data-refinement='studio'] .audio-practice-tuner-shell .pitch-living-readout__status { border-radius:7px; box-shadow:none; }
+html[data-refinement='studio'] .audio-practice-tuner-shell .pitch-living-tool-rail > button { min-height:44px; border:1px solid var(--concept-line); border-radius:10px; background:var(--concept-panel); color:var(--concept-ink); box-shadow:none; }
+html[data-refinement='studio'] .audio-practice-tuner-shell .pitch-living-tool-rail > button[aria-expanded='true'] { background:#e5eeff; border-color:#2164d9; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .audio-practice-metronome__tempo-card { width:calc(100% - 28px); padding:12px 8px; margin:4px auto 8px; border:1px solid var(--concept-line); border-radius:16px; background:var(--concept-panel); box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn { border:1px solid var(--concept-line); border-radius:10px; background:var(--concept-panel); color:#2164d9; box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-stage__bpm-value { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-weight:550; letter-spacing:-.045em; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-metronome__selectors { border:1px solid var(--concept-line); border-radius:12px; background:var(--concept-panel); box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .audio-practice-metronome__play-btn { background:#2164d9; color:#fff; border:0; border-radius:14px; box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode :is(.audio-practice-metronome__tap-btn,.audio-practice-metronome__program-btn) { border:1px solid var(--concept-line); border-radius:12px; background:var(--concept-panel); color:var(--concept-ink); box-shadow:none; }
+html[data-refinement='studio'] .app-ui-overlay--audio-mode .control-deck { border:1px solid var(--concept-line); border-radius:18px; background:var(--concept-panel); box-shadow:0 5px 18px #1d3b6410; }
+/* Typography-only retains layouts and surfaces. Softer finish builds on it. */
+html:is([data-refinement='type'],[data-refinement='soft']) .audio-mode-take-card .audio-mode-take-card__title-row h3 { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-weight:550; letter-spacing:-.02em; }
+html:is([data-refinement='type'],[data-refinement='soft']) .audio-practice-top-tabs .audio-practice-top-tabs__btn { font-weight:500; letter-spacing:0; }
+html:is([data-refinement='type'],[data-refinement='soft']) .audio-practice-tuner-shell .pitch-living-readout__note { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-weight:550; }
+html:is([data-refinement='type'],[data-refinement='soft']) .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-stage__bpm-value { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; font-weight:550; letter-spacing:-.04em; }
+html[data-refinement='soft'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card { border-color:#d6e0ed; box-shadow:0 5px 15px #21395b0b; background:#fbfcfe; }
+html[data-refinement='soft'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card--best { border-color:#e9d7b1; }
+html[data-refinement='soft'] .audio-mode-take-card .audio-mode-take-card__pill { background:#e2ecfb; color:#37619a; }
+html[data-refinement='soft'] .audio-mode-take-card--best .audio-mode-take-card__pill { background:#f6e9ce; color:#80602c; }
+html[data-refinement='soft'] .audio-practice-top-tabs .audio-practice-top-tabs__btn--active { color:#37619a; border-color:#a8bddb; background:#eaf0f9; }
+html[data-refinement='soft'] .audio-practice-tuner-shell .pitch-living-readout__status { box-shadow:none; background:#fffffff0; }
+html[data-refinement='soft'] .audio-practice-tuner-shell .pitch-living-tool-rail > button { background:#f5f8fc; color:#37619a; box-shadow:0 3px 9px #21395b0a; }
+html[data-refinement='soft'] .app-ui-overlay--audio-mode .audio-practice-metronome__step-btn { background:#eaf0f9; color:#37619a; box-shadow:none; }
+html[data-refinement='soft'] .app-ui-overlay--audio-mode .audio-practice-metronome__play-btn { background:#487ac3; color:#fff; border-color:#487ac3; box-shadow:0 4px 12px #21395b15; }
+html[data-refinement='soft'] .app-ui-overlay--audio-mode .audio-practice-metronome__tap-btn { background:#f6e9ce; color:#80602c; box-shadow:none; }

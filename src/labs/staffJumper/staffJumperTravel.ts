@@ -18,7 +18,7 @@ import { NOTEHEAD_H, NOTEHEAD_W, STAFF_BOTTOM_Y, STAFF_SPACE_PX } from './staffN
 export const DEEPEST_INK_Y = STAFF_BOTTOM_Y + STAFF_SPACE_PX + NOTEHEAD_H / 2
 
 /** The character stands this many staff spaces tall — scenery scale. */
-export const PLAYER_HEIGHT_SPACES = 1.55
+export const PLAYER_HEIGHT_SPACES = 2.0
 
 /** World-px thickness of a walkway plank. */
 export const PLANK_HEIGHT_PX = Math.round(STAFF_SPACE_PX * 0.2)
@@ -50,10 +50,11 @@ export function groundLaneScreenY(input: {
   scale: number
   playerHeightPx: number
   dockTopPx: number
+  deepestInkY?: number
 }): number {
   const clearOfInk =
     input.baseY +
-    (DEEPEST_INK_Y + LANE_CLEARANCE_PX) * input.scale +
+    (Math.max(DEEPEST_INK_Y, input.deepestInkY ?? DEEPEST_INK_Y) + LANE_CLEARANCE_PX) * input.scale +
     input.playerHeightPx
   const aboveDock = input.dockTopPx - LANE_TO_DOCK_GAP_PX
   // A short screen leaves no room for both; the notation wins, and the

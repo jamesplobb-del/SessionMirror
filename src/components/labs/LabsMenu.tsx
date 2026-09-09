@@ -1,3 +1,4 @@
+import { characterUnlocked, CHARACTER_COSTS } from '../../utils/dailyChallenges'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import balanceShot from '../../assets/games/balance.jpg'
@@ -126,6 +127,7 @@ export default function LabsMenu({
   const range = `${midiToBalanceNoteName(instrument.minWrittenMidi)}–${midiToBalanceNoteName(instrument.maxWrittenMidi)}`
 
   const selectCharacter = (id: PracticeGameCharacterId) => {
+    if (!characterUnlocked(id)) return
     setCharacterId(id)
     savePracticeGameCharacter(id)
     setPage('plaza')
@@ -221,6 +223,7 @@ export default function LabsMenu({
         <div className="balance-plaza__characters" role="radiogroup" aria-label="Game character">
           {PRACTICE_GAME_CHARACTERS.map((option) => {
             const selected = option.id === characterId
+            const unlocked = characterUnlocked(option.id)
             return (
               <Pressable
                 key={option.id}
@@ -230,7 +233,8 @@ export default function LabsMenu({
                 className={`balance-plaza__character ${selected ? 'is-selected' : ''}`}
                 role="radio"
                 aria-checked={selected}
-                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
+                disabled={!unlocked}
+                aria-label={unlocked ? `Use ${option.name} in Staff Jumper and Balance` : `${option.name}: unlock at ${CHARACTER_COSTS[option.id]} trophies`}
                 onClick={() => selectCharacter(option.id)}
               >
                 <span className="balance-plaza__character-art" aria-hidden>
@@ -238,6 +242,8 @@ export default function LabsMenu({
                   {selected ? <Check /> : null}
                 </span>
                 <strong>{option.name}</strong>
+                <small>{option.instrument}</small>
+                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
               </Pressable>
             )
           })}
@@ -372,6 +378,7 @@ export default function LabsMenu({
         <div className="balance-hall__roster" role="radiogroup" aria-label="Game character">
           {PRACTICE_GAME_CHARACTERS.map((option) => {
             const selected = option.id === characterId
+            const unlocked = characterUnlocked(option.id)
             return (
               <Pressable
                 key={option.id}
@@ -381,7 +388,8 @@ export default function LabsMenu({
                 className={`balance-hall__roster-pick ${selected ? 'is-selected' : ''}`}
                 role="radio"
                 aria-checked={selected}
-                aria-label={`Use ${option.name} in Staff Jumper and Balance`}
+                disabled={!unlocked}
+                aria-label={unlocked ? `Use ${option.name} in Staff Jumper and Balance` : `${option.name}: unlock at ${CHARACTER_COSTS[option.id]} trophies`}
                 onClick={() => selectCharacter(option.id)}
               >
                 <span aria-hidden>
@@ -389,6 +397,8 @@ export default function LabsMenu({
                   {selected ? <Check /> : null}
                 </span>
                 <strong>{option.name}</strong>
+                <small>{option.instrument}</small>
+                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
               </Pressable>
             )
           })}

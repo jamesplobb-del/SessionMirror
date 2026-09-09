@@ -1,0 +1,33 @@
+/* Vibrant palette alternatives built on the existing Depth concept. */
+html[data-refinement='depth-electric'] { --v-blue:#0066ff; --v-second:#00a8ed; --v-gold:#ffbc00; --v-ink:#003da5; --v-soft:#e4efff; --v-bg:#edf5ff; --v-glass:rgba(239,248,255,.82); }
+html[data-refinement='depth-prism'] { --v-blue:#315aff; --v-second:#8251ed; --v-gold:#ffc02e; --v-ink:#4530a3; --v-soft:#eee8ff; --v-bg:#f0edff; --v-glass:rgba(246,242,255,.82); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) { --sm-blue:var(--v-blue); --sm-gold:var(--v-gold); --fresh-glass:var(--v-glass); --fresh-shadow:0 12px 28px color-mix(in srgb,var(--v-blue) 14%,transparent),inset 0 1px 0 #fff; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode { --audio-blue:var(--v-blue); --audio-blue-soft:var(--v-soft); --audio-blue-border:color-mix(in srgb,var(--v-blue) 35%,transparent); --audio-gold:var(--v-gold); --audio-gold-soft:#fff0ba; --audio-gold-border:#ffbc0080; --audio-bg-base:var(--v-bg); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-layer .practice-menu-card--home { background:radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--v-second) 12%,transparent),transparent 65%),var(--v-bg); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-layer .practice-menu-card--home .practice-home-quick-start { background:linear-gradient(140deg,var(--v-blue),var(--v-second)); box-shadow:0 10px 26px color-mix(in srgb,var(--v-blue) 26%,transparent),inset 0 1px 0 #ffffff80; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-layer .practice-menu-card--home .practice-home-build-routine { border-top:3px solid var(--v-gold); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-card--home .practice-home-build-routine::before { background-color:var(--v-gold); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-card--home .practice-menu-shortcut svg { background:var(--v-soft); color:var(--v-ink); border-color:#ffffffc0; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-card--home .practice-menu-shortcut:first-child svg { background:var(--v-gold); color:#654800; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .practice-menu-card--home .daily-challenges { border-top:3px solid var(--v-gold); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .daily-challenges__mark { color:var(--v-blue); opacity:1; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card { border-top:3px solid var(--v-blue); background:radial-gradient(ellipse at 100% 0%,var(--v-soft),transparent 60%),var(--audio-surface); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card--best { border-top-color:var(--v-gold); background:radial-gradient(ellipse at 100% 0%,#fff0ba,transparent 60%),var(--audio-surface); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .audio-mode-take-card .audio-mode-take-card__pill { background:var(--v-blue); color:#fff; border:0; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .audio-mode-take-card--best .audio-mode-take-card__pill { background:var(--v-gold); color:#654800; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .audio-practice-top-tabs .audio-practice-top-tabs__btn--active { background:linear-gradient(140deg,var(--v-blue),var(--v-second)); color:#fff; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode .audio-practice-metronome__tempo-card .metronome-audio-stage__bpm-value { color:var(--v-ink); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode .audio-practice-metronome__play-btn { background:linear-gradient(140deg,var(--v-blue),var(--v-second)); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .app-ui-overlay--audio-mode .audio-practice-metronome__tap-btn { background:var(--v-gold); color:#654800; }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .routine-guide { background:var(--v-bg); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .routine-guide-new-routine { border-top:3px solid var(--v-gold); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .routine-guide-new-routine > span { background:linear-gradient(140deg,var(--v-blue),var(--v-second)); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .balance-arcade--hall { --gold:var(--v-gold); --blue-mid:var(--v-blue); }
+html:is([data-refinement='depth-electric'],[data-refinement='depth-prism']) .balance-arcade--hall .balance-door.is-open { box-shadow:0 0 0 2px var(--v-gold),0 10px 24px color-mix(in srgb,var(--v-blue) 20%,transparent); }
+/* Optional preview-wide neutral tuner. Live note, cents and status text remain. */
+html[data-preview-tuner-colors='off'] { --tuner-ui-strength:0% !important; --tuner-ui-feather-strength:0% !important; --tuner-ui-dark-strength:0% !important; --tuner-center-strength:0% !important; --tuner-rim-strength:0% !important; --tuner-rim-glow-strength:0% !important; }
+html[data-preview-tuner-colors='off'] .app-ui-overlay--audio-practice-tuner::after { background:transparent !important; box-shadow:none !important; }
+html[data-preview-tuner-colors='off'] .audio-practice-tuner-shell .pitch-living-canvas::before { opacity:0 !important; }
+html[data-preview-tuner-colors='off'] .audio-practice-tuner-shell .pitch-living-canvas canvas { filter:grayscale(1); }
+html[data-preview-tuner-colors='off'] .audio-practice-tuner-shell :is(.pitch-living-readout__note,.pitch-living-readout__status,.pitch-living-readout__detail) { color:var(--audio-text-primary,#171a22); text-shadow:none; }
+html[data-preview-tuner-colors='off'] .audio-practice-tuner-shell .pitch-living-readout__status > span { background:#8793a2; box-shadow:none; animation:none; }

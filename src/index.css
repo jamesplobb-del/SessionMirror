@@ -9979,3 +9979,47 @@ html.app-dark-mode .hands-free-card__stepper {
 .app-shell--audio-mode .metronome-widget .pitch-widget-close svg {
   color: var(--audio-text-secondary, #6c7077);
 }
+
+/* Hands-free actions remain reachable above camera and workspace content. */
+.hands-free-stage__action {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  background: rgba(12, 16, 24, .78);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.hands-free-stage--countdown { --hands-free-accent: 125, 211, 252; }
+.hands-free-stage--saving { --hands-free-accent: 180, 190, 205; }
+.hands-free-stage--chip .hands-free-stage__action { margin-left: 8px; padding: 6px 10px; }
+.hands-free-stage__action:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.hands-free-stage--chip .hands-free-stage__center {
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  border-radius: 16px;
+}
+.hands-free-stage--chip .hands-free-stage__detail {
+  flex-basis: 100%;
+  order: 3;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.routine-bar--simple {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 80px);
+  left: 12px;
+  right: 12px;
+  width: auto;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 10px;
+}
+.routine-bar--simple .routine-bar__line { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; }
+.routine-bar--simple .routine-bar__actions { margin-top: 8px; }
+.routine-bar--simple .routine-bar__actions button { min-height: 44px; }

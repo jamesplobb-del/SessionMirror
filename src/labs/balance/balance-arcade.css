@@ -1,7 +1,7 @@
 /*
  * Balance — arcade shell.
  *
- * The Home / Sky Trail / Quick Play screens that wrap the game. The play scene
+ * The Home / Quick Play / Trophies screens that wrap the game. The play scene
  * itself still lives in balance.css; this file is only the chrome around it.
  *
  * Everything here is built from four repeated devices, which is what makes a
@@ -1590,101 +1590,6 @@
     0 0.45rem 1rem rgba(176, 70, 48, 0.16);
 }
 
-/* --------------------------------------------------------------- trail ---- */
-
-.balance-trail__scroll {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 0.5rem;
-  overflow-y: auto;
-  padding: 0 0.25rem 1.4rem;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
-.balance-trail__world {
-  position: relative;
-  padding: 0.35rem 0 1.1rem;
-}
-
-.balance-trail__banner {
-  position: sticky;
-  z-index: 3;
-  top: 0.15rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.55rem 0.9rem;
-  border-radius: 1rem;
-  color: #fff;
-  background: linear-gradient(180deg, var(--world-accent), var(--world-accent-dark));
-  box-shadow: 0 0.22rem 0 rgba(0, 0, 0, 0.16), 0 0.5rem 1rem rgba(30, 84, 138, 0.2);
-}
-
-.balance-trail__banner strong {
-  font-family: var(--display-font);
-  font-size: 0.98rem;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  text-shadow: 0 0.08rem 0 rgba(0, 0, 0, 0.2);
-}
-
-.balance-trail__banner span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
-  padding: 0.16rem 0.5rem;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.18);
-  font-size: 0.74rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
-.balance-trail__banner span svg { width: 0.8rem; height: 0.8rem; fill: #ffd66b; stroke: none; }
-
-/* The path: nodes zig-zag, joined by a rope drawn behind them. */
-.balance-trail__path {
-  position: relative;
-  width: min(100%, 22rem);
-  margin: 0.4rem auto 0;
-}
-
-.balance-trail__rope {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.balance-trail__rope path {
-  fill: none;
-  stroke: #f0b24d;
-  stroke-width: 7;
-  stroke-linecap: round;
-}
-
-.balance-trail__rope path.is-shadow { stroke: rgba(151, 96, 26, 0.28); stroke-width: 11; }
-.balance-trail__rope path.is-locked { stroke: #cfdae4; }
-
-/*
- * Nodes are placed absolutely in the same 0-100 space the rope path uses, so
- * the two can never disagree about where a level sits.
- */
-.balance-trail__path > .balance-node {
-  position: absolute;
-  z-index: 1;
-  transform: translate(-50%, -50%);
-}
-
 /* --------------------------------------------------------------- node ---- */
 
 .balance-node {
@@ -1800,22 +1705,6 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-/* The bottom sheet on the trail: the selected level and its Play button. */
-.balance-trail__dock {
-  position: relative;
-  z-index: 4;
-  display: grid;
-  gap: 0.65rem;
-  padding: 0.85rem 0.9rem max(0.9rem, env(safe-area-inset-bottom, 0px));
-  border-radius: 1.5rem 1.5rem 0 0;
-  background: var(--card);
-  box-shadow: 0 -0.5rem 1.4rem rgba(30, 84, 138, 0.18);
-}
-
-.balance-trail__dock header { display: grid; justify-items: center; gap: 0.28rem; }
-.balance-trail__dock h2 { margin: 0; font-family: var(--display-font); font-size: 1.2rem; font-weight: 900; }
-.balance-trail__dock p { margin: 0; color: var(--ink-soft); font-size: 0.86rem; font-weight: 600; text-align: center; }
-
 /* ------------------------------------------------------------ results ---- */
 
 .balance-award { display: grid; justify-items: center; gap: 0.55rem; }
@@ -1870,7 +1759,6 @@
 .balance-award__stats dd { margin: 0; font-family: var(--display-font); font-size: 1.02rem; font-weight: 900; font-variant-numeric: tabular-nums; }
 
 .balance-award__actions { display: grid; width: 100%; gap: 0.5rem; }
-.balance-award__next { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 
 .balance-award__unlocks {
   display: grid;

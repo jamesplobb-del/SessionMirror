@@ -16,21 +16,23 @@ interface HandsFreeStageProps {
   phase: HandsFreePhase | null
   /** Seconds elapsed in the current take — shown while recording. */
   elapsed: number
+  replayCountdown?: number | null
+  onFinishTake?: () => void
+  onNextTake?: () => void
   /** Audio mode paints a light backdrop; camera mode is dark behind the copy. */
   onLightBackground?: boolean
   placement?: HandsFreeStagePlacement
-  /**
-   * Opens the quiet-gap / start-level card. Only offered while listening —
-   * during recording and playback the overlay stays exactly as it was.
-   */
+  /** Opens quiet-gap / start-level settings before recording. */
   onTapForSettings?: () => void
 }
 
 const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
-  recording: { title: 'Recording', detail: 'Take in progress' },
-  playback: { title: 'Playing back', detail: 'Listen, then play again' },
-  preparing: { title: 'Getting ready', detail: 'Connecting microphone' },
-  listening: { title: 'Listening', detail: 'Play when you’re ready' },
+  recording: { title: 'Recording', detail: 'Pause your playing to hear this take' },
+  countdown: { title: 'Ready to listen', detail: 'Keep playing to continue the take' },
+  saving: { title: 'Preparing your take', detail: 'Playback starts when your take is ready' },
+  playback: { title: 'Listen back', detail: 'We’ll listen for your next take afterward' },
+  preparing: { title: 'Getting ready', detail: 'Give the microphone a quiet moment' },
+  listening: { title: 'Your turn', detail: 'Start playing — recording begins automatically' },
 }
 
 function formatElapsed(seconds: number): string {
@@ -42,20 +44,21 @@ function formatElapsed(seconds: number): string {
 /**
  * Full-screen hands-free presence layer.
  *
- * Deliberately `pointer-events: none` end to end and only lightly tinted: the
- * tuner, metronome and camera behind it stay both readable and usable while
- * hands-free is running. Everything here is decoration plus a live status
- * reading — never a control.
+ * Status is transparent to workspace gestures. Only explicit settings,
+ * finish, and next-take buttons intercept touches.
  */
 function HandsFreeStage({
   phase,
   elapsed,
+  replayCountdown,
+  onFinishTake,
+  onNextTake,
   onLightBackground = false,
   placement = 'center',
   onTapForSettings,
 }: HandsFreeStageProps) {
   const copy = phase ? PHASE_COPY[phase] : null
-  const settingsTappable = phase === 'listening' && Boolean(onTapForSettings)
+  const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
 
   return (
     <div
@@ -77,12 +80,18 @@ function HandsFreeStage({
 
       <div className="hands-free-stage__center">
         <span className="hands-free-stage__pulse" aria-hidden />
-        <strong className="hands-free-stage__title">{copy?.title ?? ''}</strong>
+        <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
         <small className="hands-free-stage__detail">{copy?.detail ?? ''}</small>
-        {phase === 'recording' && (
+        {(phase === 'recording' || phase === 'countdown') && (
           <span className="hands-free-stage__elapsed tabular-nums">
             {formatElapsed(elapsed)}
           </span>
+        )}
+        {(phase === 'recording' || phase === 'countdown') && onFinishTake && (
+          <button type="button" className="hands-free-stage__action" onClick={onFinishTake}>Finish & listen</button>
+        )}
+        {phase === 'playback' && onNextTake && (
+          <button type="button" className="hands-free-stage__action" onClick={onNextTake}>Next take</button>
         )}
         {/* The centre treatment has room for the words; the compact pill on the
           * dense Tools tabs takes a glyph instead, so the status copy is never

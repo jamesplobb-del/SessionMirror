@@ -2,7 +2,7 @@ import { motion, useMotionValue } from 'framer-motion'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
-import { getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
+import { clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
 import { iosDragRelease } from '../utils/motionPresets'
 
 type TunerProps = Omit<
@@ -157,6 +157,26 @@ export default function DraggablePitchWidget({
 
     return () => window.cancelAnimationFrame(retryFrame)
   }, [boundaryRef, dragX, dragY, isAudioMode, resolvedPositionId])
+
+  // Reconcile restored coordinates with the actual layout on mount and resize.
+  useLayoutEffect(() => {
+    if (isAudioMode) return
+    const bounds = boundaryRef.current
+    const widget = widgetRef.current
+    if (!bounds || !widget) return
+    const fit = () => {
+      const next = clampWidgetPosition(bounds.clientWidth, bounds.clientHeight,
+        widget.offsetWidth, widget.offsetHeight, dragX.get(), dragY.get())
+      dragX.set(next.x)
+      dragY.set(layoutRegion === 'review' ? Math.min(Math.max(next.y, 100), Math.max(0, bounds.clientHeight - widget.offsetHeight - 12)) : next.y)
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(bounds)
+    observer.observe(widget)
+    window.visualViewport?.addEventListener('resize', fit)
+    return () => { observer.disconnect(); window.visualViewport?.removeEventListener('resize', fit) }
+  }, [boundaryRef, dragX, dragY, isAudioMode, layoutRegion])
 
   const persistPosition = useCallback(() => {
     if (isAudioMode) return

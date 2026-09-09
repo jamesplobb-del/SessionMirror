@@ -1,3 +1,4 @@
+import VaultPracticeOverview from './VaultPracticeOverview'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { CheckSquare, Download, Search, Star, Trash2, X } from 'lucide-react'
 import TakeCard from './TakeCard'
@@ -358,7 +359,7 @@ export default function TakeVaultDrawer({
         <div className="native-sheet-header vault-sheet-header sticky top-0 z-20 flex shrink-0 flex-col gap-3 border-b px-5 pb-4 pt-5" data-tutorial="vault-sheet">
           <div className="vault-header-main flex items-start justify-between gap-4 pr-0.5">
             <div className="native-sheet-title-block min-w-0 flex-1">
-              <h2 className="native-sheet-title">Take Vault</h2>
+              <h2 className="native-sheet-title"><span className="electric-tuning-old">Take Vault</span><span className="electric-tuning-new">TakeVault</span></h2>
               <p className="native-sheet-subtitle">
                 {selectionMode
                   ? `${selectedCount} selected`
@@ -451,6 +452,13 @@ export default function TakeVaultDrawer({
             <VaultDrawerSkeleton />
           ) : (
             <div className="vault-library-shell space-y-4">
+          <VaultSectionTabs
+            value={vaultSection}
+            onChange={setVaultSection}
+            takesCount={takes.length}
+            libraryCount={libraryItems.length}
+          />
+          {vaultSection !== 'practice' && (
           <ProjectSessionBar
             className="vault-session-bar"
             projects={projects}
@@ -459,13 +467,10 @@ export default function TakeVaultDrawer({
             onCreateProject={onCreateProject}
             onDeleteProject={onDeleteProject}
           />
-          <VaultSectionTabs
-            value={vaultSection}
-            onChange={setVaultSection}
-            takesCount={takes.length}
-            libraryCount={libraryItems.length}
-          />
-          {vaultSection === 'library' ? (
+          )}
+          {vaultSection === 'practice' ? (
+            <VaultPracticeOverview projects={projects} onOpenProject={id => { onSelectProject(id); setVaultSection('takes') }} />
+          ) : vaultSection === 'library' ? (
             <LibraryTab
               items={libraryItems}
               benchmarkBinding={benchmarkBinding}

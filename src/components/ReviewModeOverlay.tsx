@@ -8,15 +8,18 @@ import {
   Ellipsis,
   Eye,
   EyeOff,
-  Heart,
+  Pin,
   Info,
   Pencil,
   Repeat2,
   Share2,
-  Star,
   Trash2,
 } from 'lucide-react'
 import ReviewTimeline from './ReviewTimeline'
+import { trimmedTakeMetadata } from '../utils/trimTakeMetadata'
+import { captureAndPersistTakeThumbnail } from '../utils/generateThumbnail'
+import { deleteCachedTakeThumbnail } from '../utils/takeThumbnailCache'
+import { invalidateMediaWaveform } from '../hooks/useMediaWaveform'
 import ReviewSectionMarkers from './ReviewSectionMarkers'
 import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
@@ -34,7 +37,7 @@ import { pausePitchGraphsForMedia, PITCH_GRAPH_RELEASED_EVENT } from '../hooks/u
 import { finalizeInlineTakeBoxPlaybackCleanup } from '../utils/takePlaybackAudio'
 import { toggleInlineTakePlayback } from '../utils/takeInlinePlayback'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
-import { loadTakeMarkers } from '../practiceTimeline/recording/timelineMarkers'
+import { loadTakeMarkers, saveTakeMarkers } from '../practiceTimeline/recording/timelineMarkers'
 import { describeSaveTakeResult, shareTakeToSystem, shareTakeVideo } from '../utils/shareTakeVideo'
 import { triggerBestTakeHaptic, triggerLightHaptic, triggerWarningHaptic } from '../utils/haptics'
 import { trimTakeMediaInPlace } from '../utils/trimTakeMedia'
@@ -291,6 +294,7 @@ export default function ReviewModeOverlay({
   const [showPitchComparison, setShowPitchComparison] = useState(false)
   const [blindMode, setBlindMode] = useState(false)
   const [blindSwapped, setBlindSwapped] = useState(false)
+  const [blindRevealed, setBlindRevealed] = useState(false)
   const [loopStartSeconds, setLoopStartSeconds] = useState<number | null>(
     initialLoopStartSeconds,
   )
@@ -459,7 +463,7 @@ export default function ReviewModeOverlay({
     const timer = window.setInterval(() => rememberPositionRef.current(), 5000)
     return () => { window.clearInterval(timer) }
   }, [isOpen, passageSource, practiceProjectId])
-  const trimAvailable = Boolean(activeTake?.filePath) && displayDuration >= 0.1
+  const trimAvailable = Boolean(activeTake?.filePath || activeTake?.videoUrl) && displayDuration >= 0.1
   const safeTrimStart = Math.max(0, Math.min(trimRange.start, displayDuration || trimRange.start))
   const safeTrimEnd = Math.max(safeTrimStart, Math.min(trimRange.end, displayDuration || trimRange.end))
 
@@ -481,7 +485,7 @@ export default function ReviewModeOverlay({
 
   const practiceMarkers = useMemo(
     () => (activeTake?.id ? loadTakeMarkers(activeTake.id) : []),
-    [activeTake?.id],
+    [activeTake?.id, mediaRevision],
   )
 
   const pauseAllReviewVideos = useCallback(() => {
@@ -506,7 +510,7 @@ export default function ReviewModeOverlay({
 
   const switchComparisonSlot = useCallback(
     (nextSlot: ReviewSlot) => {
-      if (isVault || nextSlot === activeSlot) return
+      if (trimApplying || isVault || nextSlot === activeSlot) return
       const media = getActiveVideo()
       const rawTime = media?.currentTime ?? displayCurrentTime
       rememberReviewPosition(Math.max(0, rawTime - activeOffsetSeconds))
@@ -518,6 +522,7 @@ export default function ReviewModeOverlay({
       }
       onSlotChange(nextSlot)
     }, [
+      trimApplying,
       activeAudioPlaybackItem,
       activeOffsetSeconds,
       activeSlot,
@@ -531,17 +536,19 @@ export default function ReviewModeOverlay({
   )
 
   const toggleBlindMode = useCallback(() => {
-    if (isVault) return
+    if (isVault || trimApplying) return
     if (blindMode) {
+      setBlindRevealed(true)
       setBlindMode(false)
       return
     }
+    setBlindRevealed(false)
     const swapped = Math.random() < 0.5
     setBlindSwapped(swapped)
     setBlindMode(true)
     pendingComparisonTimeRef.current = 0
     onSlotChange(swapped ? 'challenger' : 'benchmark')
-  }, [blindMode, isVault, onSlotChange])
+  }, [blindMode, isVault, onSlotChange, trimApplying])
 
   const cycleLoopRange = useCallback(() => {
     if (loopStartSeconds === null) {
@@ -848,7 +855,7 @@ export default function ReviewModeOverlay({
     if (!activeTake) return
     setActionMenuOpen(false)
     triggerLightHaptic()
-    void shareTakeToSystem(activeTake).then((result) => {
+    void shareTakeToSystem(activeTake).catch(() => ({ ok: false, reason: 'share_failed' } as const)).then((result) => {
       if (result.ok) return
       void showAlert({
         title: 'Unable to Share',
@@ -940,6 +947,7 @@ export default function ReviewModeOverlay({
       setShowPitch(false)
       setShowPitchComparison(false)
       setBlindMode(false)
+      setBlindRevealed(false)
       setActionMenuOpen(false)
     }
   }, [isOpen])
@@ -1215,6 +1223,7 @@ export default function ReviewModeOverlay({
       if (!Number.isFinite(durationForTrim) || durationForTrim <= 0) return
       const nextStart = Math.max(0, Math.min(start, durationForTrim))
       const nextEnd = Math.max(nextStart, Math.min(end, durationForTrim))
+      trimRangeRef.current = { start: nextStart, end: nextEnd }
       setTrimRange({ start: nextStart, end: nextEnd })
 
       const previewTime = handle === 'start' ? nextStart : nextEnd
@@ -1266,6 +1275,21 @@ export default function ReviewModeOverlay({
 
       try {
         const result = await trimTakeMediaInPlace(activeTake, start, end)
+        const updates = trimmedTakeMetadata(activeTake, start, result.duration)
+        try {
+          const rebasedMarkers = loadTakeMarkers(activeTake.id)
+            .filter(marker => marker.timeSeconds >= start && marker.timeSeconds <= start + result.duration)
+            .map(marker => ({ ...marker, timeSeconds: marker.timeSeconds - start }))
+          saveTakeMarkers(activeTake.id, rebasedMarkers)
+        } catch (error) { console.warn('[TakeTrim] section marker refresh failed', error) }
+        onUpdateTake?.(activeTake.id, updates)
+        invalidateMediaWaveform(activeTake.filePath || activeTake.videoUrl)
+        if (activeTake.mediaType !== 'audio') {
+          void deleteCachedTakeThumbnail(activeTake.id)
+            .then(() => captureAndPersistTakeThumbnail(activeTake))
+            .then(thumbnailUrl => { if (thumbnailUrl) onUpdateTake?.(activeTake.id, { thumbnailUrl }) })
+            .catch(error => console.warn('[TakeTrim] thumbnail refresh deferred', error))
+        }
         setMediaRevision((revision) => revision + 1)
         setCurrentTime(0)
         setDuration(result.duration)
@@ -1298,6 +1322,7 @@ export default function ReviewModeOverlay({
     audioPlayback,
     displayDuration,
     handleCancelTrim,
+    onUpdateTake,
     pauseAllReviewVideosSafe,
     revealPlayOverlay,
     showAlert,
@@ -1500,6 +1525,7 @@ export default function ReviewModeOverlay({
           </div>
         )}
         <div ref={reviewBoundsRef} className="relative h-full w-full">
+        {trimApplying && <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/30 text-white" role="status">Saving trim…</div>}
       <AnimatePresence>
         {showPlayOverlay && (
           <motion.div
@@ -1517,6 +1543,7 @@ export default function ReviewModeOverlay({
                 onClick={handleCloseClick}
                 className="review-nav-button"
                 aria-label="Back"
+                disabled={trimApplying}
               >
                 <ChevronLeft className="h-7 w-7" strokeWidth={2.4} />
               </Pressable>
@@ -1527,7 +1554,7 @@ export default function ReviewModeOverlay({
                 </p>
                 <p className="mt-0.5 truncate text-[12px] font-medium leading-tight text-[#6c7077]">
                   {blindMode && !isVault
-                    ? 'Identity hidden until Blind Compare is turned off'
+                    ? 'Listen to A and B, then reveal'
                     : activeTime
                       ? `${activeDate} · ${activeTime}`
                       : activeDate}
@@ -1546,7 +1573,7 @@ export default function ReviewModeOverlay({
                   className="review-nav-button"
                   aria-label="More actions"
                   aria-expanded={actionMenuOpen}
-                  disabled={blindMode && !isVault}
+                  disabled={trimApplying || (blindMode && !isVault)}
                 >
                   <Ellipsis className="h-6 w-6" strokeWidth={2.4} />
                 </Pressable>
@@ -1588,7 +1615,7 @@ export default function ReviewModeOverlay({
             {isOpen && !isVault && (canSwipeLeft || canSwipeRight) && (
               <div className="review-swipe-hint pointer-events-none flex justify-center">
                 <p className="rounded-full border border-[rgba(23,26,34,0.08)] bg-white/90 px-3 py-1 text-[10px] text-[#6c7077] shadow-sm backdrop-blur-sm">
-                  {canSwipeLeft && canSwipeRight
+                  {blindMode ? 'Swipe between A and B' : canSwipeLeft && canSwipeRight
                     ? 'Swipe to compare takes'
                     : canSwipeLeft
                       ? `Swipe left for ${dynamicTakeLabel}`
@@ -1737,9 +1764,10 @@ export default function ReviewModeOverlay({
               transition={iosEaseOut}
             >
               <div className="ui-orient-spin pointer-events-auto">
-                <div className="review-controls-cluster">
+                <div className="review-controls-cluster" inert={trimApplying || undefined} aria-busy={trimApplying}>
                   {!isVault && hasBenchmark && hasChallenger && (
                     <>
+                    <div className="review-compare-caption" role="status">{blindMode ? "Blind comparison · identity hidden" : blindRevealed ? `Revealed · A is ${blindSwapped ? "Current" : "Best"} · B is ${blindSwapped ? "Best" : "Current"}` : "Compare takes"}</div>
                     <div className="focused-review-strip">
                       <div className="focused-review-switch" aria-label="Switch comparison take">
                         <button
@@ -1753,7 +1781,7 @@ export default function ReviewModeOverlay({
                             )
                           }
                         >
-                          {blindMode ? 'Take A' : 'Best'}
+                          {blindMode ? 'A' : 'Best'}
                         </button>
                         <button
                           type="button"
@@ -1766,7 +1794,7 @@ export default function ReviewModeOverlay({
                             )
                           }
                         >
-                          {blindMode ? 'Take B' : 'Current'}
+                          {blindMode ? 'B' : 'Current'}
                         </button>
                       </div>
                       {focusedPractice && (
@@ -1793,7 +1821,7 @@ export default function ReviewModeOverlay({
                         aria-pressed={blindMode}
                       >
                         {blindMode ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
-                        <span>{blindMode ? 'Reveal' : 'Blind'}</span>
+                        <span>{blindMode ? 'Reveal takes' : blindRevealed ? 'Try again' : 'Blind test'}</span>
                       </button>
                       {showPitchPanel && (
                         <button
@@ -1816,7 +1844,7 @@ export default function ReviewModeOverlay({
                           haptic="success"
                           onClick={() => onFavoriteTake(challengerTake.id)}
                         >
-                          <Star aria-hidden />
+                          <Pin aria-hidden />
                           Make Current Personal Best
                         </Pressable>
                       </div>
@@ -1833,7 +1861,7 @@ export default function ReviewModeOverlay({
                         haptic="success"
                         onClick={() => onFavoriteTake(challengerTake.id)}
                       >
-                        <Star aria-hidden />
+                        <Pin aria-hidden />
                         Make This Personal Best
                       </Pressable>
                     </div>
@@ -1855,6 +1883,7 @@ export default function ReviewModeOverlay({
                   )}
 
                   <ReviewTimeline
+                    key={`timeline-${activeTake?.id}-${mediaRevision}`}
                     trackRef={timelineTrackRef}
                     currentTime={displayCurrentTime}
                     duration={displayDuration}
@@ -1894,8 +1923,8 @@ export default function ReviewModeOverlay({
                       <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleShareActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Share">
                         <Share2 className="h-5 w-5" />
                       </Pressable>
-                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake || (blindMode && !isVault)} aria-label="Mark as Personal Best">
-                        <Heart className="h-5 w-5" />
+                      <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleFavoriteActiveTake} disabled={!activeTake || !onFavoriteTake || (blindMode && !isVault)} aria-label="Pin as Best Take">
+                        <Pin className="h-5 w-5" />
                       </Pressable>
                       <Pressable type="button" intensity="icon" haptic="light" className="review-toolbar-button" onClick={handleInfoActiveTake} disabled={!activeTake || (blindMode && !isVault)} aria-label="Info">
                         <Info className="h-5 w-5" />

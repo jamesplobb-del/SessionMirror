@@ -9,6 +9,7 @@
 import type { PlatformSlot } from './staffJumperMusicLogic'
 import { beamCountForValue, hasStem, isBeamable } from './staffJumperRhythm'
 import {
+  STAFF_SPACE_PX,
   BEAM_MAX_SLANT,
   BEAM_SPACING,
   NOTE_SPACING_PX,
@@ -162,18 +163,35 @@ export function layoutRhythm(slots: PlatformSlot[]): RhythmLayout {
     const beamCount = Math.max(...group.map((item) => beamCountForValue(item.note.rhythm.value)))
     for (let level = 0; level < beamCount; level += 1) {
       const offset = (direction === 'up' ? 1 : -1) * level * BEAM_SPACING
-      beams.push({
-        key: `beam-${group[0]!.step}-${level}`,
-        x1: first.x,
-        y1: beamY(first.x) + offset,
-        x2: last.x,
-        y2: beamY(last.x) + offset,
-        opacity,
-      })
+      // Secondary beams only join notes which actually have that beam level.
+      // An isolated sixteenth gets a short hook, never a full beam over eighths.
+      let start = 0
+      while (start < group.length) {
+        if (beamCountForValue(group[start]!.note.rhythm.value) <= level) { start += 1; continue }
+        let finish = start
+        while (finish + 1 < group.length && beamCountForValue(group[finish + 1]!.note.rhythm.value) > level) finish += 1
+        const x1 = points[start]!.x
+        const x2 = finish > start ? points[finish]!.x : x1 + (start === group.length - 1 ? -1 : 1) * Math.min(14, Math.abs(points[start === group.length - 1 ? start - 1 : start + 1]!.x - x1) * 0.3)
+        beams.push({ key: `beam-${group[start]!.step}-${level}`, x1, y1: beamY(x1) + offset, x2, y2: beamY(x2) + offset, opacity })
+        start = finish + 1
+      }
     }
 
     index = end + 1
   }
 
   return { stems, beams, flags, barlineXs }
+}
+
+export function flagPath(x: number, y: number, direction: StemDirection): string {
+  const sign = direction === 'up' ? 1 : -1
+  const width = STAFF_SPACE_PX * 1.15
+  const drop = STAFF_SPACE_PX * 2.1 * sign
+  const belly = STAFF_SPACE_PX * 0.75 * sign
+  return [
+    `M ${x} ${y}`,
+    `C ${x + width * 0.95} ${y + belly * 0.55} ${x + width} ${y + drop * 0.5} ${x + width * 0.42} ${y + drop}`,
+    `C ${x + width * 1.05} ${y + drop * 0.52} ${x + width * 0.55} ${y + belly * 0.7} ${x} ${y + belly * 1.5}`,
+    'Z',
+  ].join(' ')
 }

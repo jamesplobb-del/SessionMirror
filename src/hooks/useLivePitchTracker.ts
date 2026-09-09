@@ -50,6 +50,16 @@ import {
 } from '../utils/cameraSessionState'
 const HISTORY_LENGTH = 140
 const LIVING_TRACE_HISTORY_LENGTH = 110
+
+/**
+ * Tuner trace stroke, in CSS px — one width for every profile.
+ *
+ * Voice reads thinner than winds at the same stroke because it spends more of
+ * a phrase near the silence floor, where the trace is broken into short
+ * segments. Drawing it heavier keeps it a line there too.
+ */
+const LIVING_TRACE_CORE_WIDTH = 3.3
+const LIVING_TRACE_GLOW_WIDTH = 6.6
 const LIVING_TRACE_MAX_STEP_CENTS = 8
 const LIVING_TRACE_END_BLEND_MAX = 0.42
 
@@ -957,8 +967,8 @@ function drawSmoothPitchTrace(
   if (points.length < 2) return
 
   if (theme === 'living-audio') {
-    drawColoredTraceSegments(ctx, points, 5.5, 0.14, true)
-    drawColoredTraceSegments(ctx, points, 2.65, 0.98)
+    drawColoredTraceSegments(ctx, points, LIVING_TRACE_GLOW_WIDTH, 0.14, true)
+    drawColoredTraceSegments(ctx, points, LIVING_TRACE_CORE_WIDTH, 0.98)
     return
   }
 
@@ -1327,6 +1337,7 @@ interface GlassStaticLayerCache {
   version: number
   variant: GlassStaticVariant
   dark: boolean
+  cleanWidget: boolean
   canvas: HTMLCanvasElement
 }
 
@@ -1357,6 +1368,7 @@ function blitGlassStaticLayer(
 ): ReturnType<typeof getGlassLayoutMetrics> {
   let cache = glassStaticLayerCache.get(canvas)
   const dark = isPitchCanvasDarkMode()
+  const cleanWidget = document.documentElement.dataset.refinement === 'depth-electric' && Boolean(canvas.closest('.pitch-tuner--widget'))
   if (
     !cache ||
     cache.width !== width ||
@@ -1364,7 +1376,8 @@ function blitGlassStaticLayer(
     cache.dpr !== dpr ||
     cache.version !== GLASS_STATIC_GRID_VERSION ||
     cache.variant !== variant ||
-    cache.dark !== dark
+    cache.dark !== dark ||
+    cache.cleanWidget !== cleanWidget
   ) {
     const off = cache?.canvas ?? document.createElement('canvas')
     off.width = Math.floor(width * dpr)
@@ -1372,7 +1385,9 @@ function blitGlassStaticLayer(
     const offCtx = off.getContext('2d')
     if (!offCtx) return getGlassLayoutMetrics(height)
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    if (variant === 'widget') {
+    if (cleanWidget) {
+      drawGlassWidgetStaticContent(offCtx, width, height, dark)
+    } else if (variant === 'widget') {
       drawGlassWidgetStaticContent(offCtx, width, height, dark)
     } else if (variant === 'audio') {
       const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height, true)
@@ -1383,7 +1398,7 @@ function blitGlassStaticLayer(
       offCtx.clearRect(0, 0, width, height)
       drawGlassLegacyGrid(offCtx, width, height, pitchTop, pitchBottom, pitchHeight, centsToY)
     }
-    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, dark, canvas: off }
+    cache = { width, height, dpr, version: GLASS_STATIC_GRID_VERSION, variant, dark, cleanWidget, canvas: off }
     glassStaticLayerCache.set(canvas, cache)
   }
 

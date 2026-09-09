@@ -61,7 +61,7 @@ export interface Take {
 
 export type SortMode = 'newest' | 'highest-rated'
 
-export type TakeUpdate = Partial<Pick<Take, 'name' | 'rating' | 'notes'>>
+export type TakeUpdate = Partial<Pick<Take, 'name' | 'rating' | 'notes' | 'duration' | 'pitchSeries' | 'timelineOffsetMs' | 'performanceStartSeconds' | 'thumbnailUrl'>>
 
 export type ReviewSlot = 'benchmark' | 'challenger'
 

@@ -64,7 +64,7 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
       }
       return {
         ...state,
-        // The run's own settings, not the stored ones: a Sky Trail level sets
+        // The run's own settings, not the stored ones: the daily challenge sets
         // its own duration and tolerance without ever writing them back over
         // what the player picked in Quick Play.
         settings: action.settings,

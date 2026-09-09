@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, type ReactNode } from 'react'
-import { motion, type HTMLMotionProps } from 'framer-motion'
+import { motion, useReducedMotion, type HTMLMotionProps } from 'framer-motion'
 import {
   triggerErrorHaptic,
   triggerLightHaptic,
@@ -77,6 +77,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
   },
   ref,
 ) {
+  const reduceMotion = useReducedMotion()
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       if (haptic && !event.currentTarget.disabled) {
@@ -108,7 +109,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
       ref={ref}
       type={type}
       className={`${squishClass} ${className}`.trim()}
-      whileTap={tapMotion}
+      whileTap={reduceMotion ? undefined : tapMotion}
       transition={transition ?? iosPressTransition}
       onPointerDown={handlePointerDown}
       onClick={handleClick}

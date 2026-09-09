@@ -1,3 +1,4 @@
+import { characterUnlocked } from '../../utils/dailyChallenges'
 import type { BalanceCharacterId } from './balanceCharacters'
 import type {
   BalanceRoutineResult,
@@ -75,7 +76,7 @@ export function isBalanceCharacterUnlocked(
   characterId: BalanceCharacterId,
   unlockedCharacterIds: readonly BalanceCharacterId[],
 ): boolean {
-  return unlockedCharacterIds.includes(characterId)
+  return unlockedCharacterIds.includes(characterId) || characterUnlocked(characterId)
 }
 
 function earnedTrophyIds(summaries: readonly BalanceRoutineResult[]): Set<BalanceTrophyId> {

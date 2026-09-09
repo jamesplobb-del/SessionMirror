@@ -84,7 +84,7 @@ export default function HandsFreeSettingsCard({
             <header className="hands-free-card__header">
               <div>
                 <span className="hands-free-card__eyebrow">Hands-free</span>
-                <h2 id="hands-free-card-title">While listening</h2>
+                <h2 id="hands-free-card-title">Play. Listen. Repeat.</h2>
               </div>
               <Pressable
                 type="button"
@@ -101,8 +101,8 @@ export default function HandsFreeSettingsCard({
 
             <div className="hands-free-card__row">
               <div className="hands-free-card__label">
-                <strong>Quiet gap before stop</strong>
-                <small>A rest longer than this ends the take</small>
+                <strong>Pause before playback</strong>
+                <small>Stay quiet this long to finish and hear your take</small>
               </div>
               <div className="hands-free-card__stepper" role="group" aria-label="Quiet gap">
                 <Pressable
@@ -167,7 +167,7 @@ export default function HandsFreeSettingsCard({
               </div>
             </div>
 
-            <p className="hands-free-card__hint">Long-press Record to turn hands-free off.</p>
+            <p className="hands-free-card__hint">Start playing to record. Pause to listen back. After playback, wait for “Your turn” and play again. Use Finish & listen to end a take yourself. Long-press Record to turn hands-free off.</p>
           </motion.section>
         </div>
       )}

@@ -35,7 +35,7 @@ import {
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import StaffRest from './StaffRest'
 import { keySignatureStepPx, layoutMusicGlyph } from './staffGlyphMetrics'
-import { barlineXForSlot, layoutRhythm } from './staffJumperNotationLayout'
+import { barlineXForSlot, layoutRhythm, flagPath } from './staffJumperNotationLayout'
 import { isHollowNotehead, METERS } from './staffJumperRhythm'
 
 interface StaffPreviewProps {
@@ -74,8 +74,8 @@ export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewP
   }, [])
 
   const keySignature = useMemo(
-    () => getKeySignatureMarkers(config.key, config.scaleMode, config.clef),
-    [config.clef, config.key, config.scaleMode],
+    () => (config.customPitchClasses?.length ? [] : getKeySignatureMarkers(config.key, config.scaleMode, config.clef)),
+    [config.clef, config.key, config.scaleMode, config.customPitchClasses],
   )
 
   const head = useMemo(() => {
@@ -306,6 +306,7 @@ export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewP
                 height={Math.abs(stem.yEnd - stem.yStart)}
               />
             ))}
+            {rhythm.flags.flatMap(flag => Array.from({ length: flag.count }, (_, level) => <path key={`${flag.key}-${level}`} className="sj-flag" d={flagPath(flag.x, flag.y + (flag.direction === 'up' ? 1 : -1) * level * STAFF_SPACE_PX * 0.75, flag.direction)} />))}
             {rhythm.beams.map((beam) => (
               <line
                 key={beam.key}
@@ -327,6 +328,7 @@ export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewP
               }`}
               style={{ left: `${slot.xPx}px`, top: `${slot.note.yPx}px` }}
             >
+              {!slot.note.isRest && slot.note.customAccidental && <span className="sj-custom-accidental">{slot.note.customAccidental}</span>}
               {slot.note.isRest ? (
                 <StaffRest value={slot.note.rhythm.value} />
               ) : (
@@ -349,7 +351,7 @@ export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewP
                     style={{
                       width: `${NOTEHEAD_W}px`,
                       height: `${NOTEHEAD_H}px`,
-                      borderWidth: `${NOTEHEAD_RING_THICKNESS}px`,
+                      borderWidth: isHollowNotehead(slot.note.rhythm.value) ? `${NOTEHEAD_RING_THICKNESS}px` : 0,
                     }}
                   />
                   {slot.note.rhythm.dotted && (

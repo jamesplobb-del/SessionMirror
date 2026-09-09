@@ -121,5 +121,6 @@ export type VaultTakeUpdate = Partial<
     | 'focusArea'
     | 'pitchSeries'
     | 'performanceStartSeconds'
+    | 'duration'
   >
 >

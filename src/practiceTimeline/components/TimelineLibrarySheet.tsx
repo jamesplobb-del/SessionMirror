@@ -16,6 +16,13 @@ import { shareRoutineFile } from '../storage/routineShare'
 import { useActionSheet } from '../../context/ActionSheetContext'
 import type { PracticeTimeline } from '../types'
 
+/*
+ * The METRONOME PROGRAM library — bars, tempo ramps and section markers for the
+ * click. Not the app's practice routines, which are the ordered checklists of
+ * exercises in Practice Home; those have their own library and their own share
+ * format (`utils/practiceRoutineShare.ts`). This sheet used to be titled "Your
+ * Routines" too, which made a shared file's landing place a coin toss.
+ */
 interface TimelineLibrarySheetProps {
   open: boolean
   activeTimelineId: string
@@ -42,7 +49,7 @@ export default function TimelineLibrarySheet({
 
   const handleNewRoutine = () => {
     const count = saved.length + 1
-    const created = saveTimeline(createEmptyTimeline(`My Practice ${count}`))
+    const created = saveTimeline(createEmptyTimeline(`My Program ${count}`))
     onSelect(created)
     onClose()
   }
@@ -58,7 +65,7 @@ export default function TimelineLibrarySheet({
     void file.text().then((raw) => {
       const result = importRoutineFromText(raw)
       if (!result.ok) {
-        void showAlert({ title: "Couldn't Open Routine", message: result.error, tone: 'error' })
+        void showAlert({ title: "Couldn't Open Program", message: result.error, tone: 'error' })
         return
       }
       onSelect(result.routine)
@@ -77,13 +84,13 @@ export default function TimelineLibrarySheet({
     <AnimatedBottomSheet
       isOpen={open}
       onClose={onClose}
-      ariaLabel="Practice Routines"
+      ariaLabel="Saved Programs"
       vaultTheme
       elevated
     >
       <div className="px-1 pb-2 pt-1">
         <h2 className="px-4 pb-2 text-lg font-bold text-[var(--audio-text-primary)]">
-          Your Routines
+          Saved Programs
         </h2>
         <div className="practice-timeline-library pointer-events-auto">
           <Pressable
@@ -93,12 +100,12 @@ export default function TimelineLibrarySheet({
             onClick={handleNewRoutine}
           >
             <Plus size={16} className="mr-1 inline" />
-            New Routine
+            New Program
           </Pressable>
 
           {saved.length === 0 ? (
             <p className="px-5 py-3 text-sm text-[var(--audio-text-secondary)]">
-              No saved routines yet. Create one to get started.
+              No saved programs yet. Create one to get started.
             </p>
           ) : (
             saved.map((timeline) => (
@@ -146,7 +153,7 @@ export default function TimelineLibrarySheet({
                 <Pressable
                   type="button"
                   intensity="icon"
-                  aria-label="Delete routine"
+                  aria-label="Delete program"
                   onClick={() => {
                     if (saved.length <= 1) return
                     if (window.confirm(`Delete "${timeline.name}"?`)) {
@@ -165,7 +172,7 @@ export default function TimelineLibrarySheet({
                 <Pressable
                   type="button"
                   intensity="icon"
-                  aria-label="Share routine"
+                  aria-label="Share program"
                   onClick={() => handleShare(timeline)}
                 >
                   <Upload size={18} />
@@ -180,7 +187,7 @@ export default function TimelineLibrarySheet({
             className="mx-5 mt-4 w-[calc(100%-2.5rem)] rounded-xl border border-dashed border-[var(--audio-divider)] py-3 text-center text-sm font-semibold text-[var(--audio-text-secondary)]"
             onClick={() => fileInputRef.current?.click()}
           >
-            Import routine
+            Import program
           </Pressable>
           <input
             ref={fileInputRef}

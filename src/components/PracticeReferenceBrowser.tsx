@@ -1,5 +1,5 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react'
-import { Search, Trash2 } from 'lucide-react'
+import { Play, Search, Trash2 } from 'lucide-react'
 import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
 import { loadReferenceLibrary, removePracticeReference, savePracticeReference, searchPracticeReferences, type PracticeReference } from '../utils/practiceReferences'
 import { buildYoutubeProxyUrl, parseYoutubeVideoId } from '../utils/youtubeEmbed'
@@ -69,11 +69,17 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
   const row = (item: PracticeReference, removable = false) => (
     <article key={item.videoId}>
       <button type="button" className="focus-reference-result" onClick={() => choose(item)}>
-        <span>
+        <span className="focus-reference-thumbnail" aria-hidden="true">
+          <Play />
+          <img src={`https://i.ytimg.com/vi/${item.videoId}/mqdefault.jpg`} alt=""
+            loading="lazy" decoding="async" referrerPolicy="no-referrer"
+            onError={event => { event.currentTarget.hidden = true }} />
+        </span>
+        <span className="focus-reference-description">
           <strong>{decode(item.title)}</strong>
           <small>{item.channel || 'YouTube'}{savedForThis(item.videoId) ? ' · Saved for this item' : ''}</small>
+          <span className="focus-reference-use">Use reference</span>
         </span>
-        <span className="focus-reference-use">Use</span>
       </button>
       {removable && <button type="button" className="focus-icon-button" aria-label={`Remove ${item.title} from saved references`} onClick={() => {
         try { removePracticeReference(item.videoId); setSaved(loadReferenceLibrary().items) }

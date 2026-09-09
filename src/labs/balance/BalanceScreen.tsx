@@ -1,3 +1,4 @@
+import type { DailyChallengePlan } from '../../utils/dailyChallengePlan'
 import {
   useCallback,
   useEffect,
@@ -17,13 +18,12 @@ import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceHome from './BalanceHome'
 import BalanceInstrumentPicker from './BalanceInstrumentPicker'
-import BalanceLevelResults from './BalanceLevelResults'
+import BalanceDailyResults from './BalanceDailyResults'
 import BalanceQuickPlay from './BalanceQuickPlay'
 import BalanceResults from './BalanceResults'
 import BalanceScene from './BalanceScene'
 import BalanceStaffNote from './BalanceStaffNote'
 import BalanceSetup from './BalanceSetup'
-import BalanceTrail from './BalanceTrail'
 import BalanceTrophyCase from './BalanceTrophyCase'
 import {
   buildBalanceTargets,
@@ -37,12 +37,6 @@ import {
   balanceDailyChallenge,
   balanceDailyLaunch,
 } from './balanceDaily'
-import {
-  balanceLevelLaunch,
-  getBalanceLevel,
-  BALANCE_LEVELS,
-  type BalanceLevel,
-} from './balanceLevels'
 import { centsFromConcertTarget } from './balanceScoring'
 import { formatBalanceDuration } from './balanceStorage'
 import { balanceInstrumentSettings, QUICK_PLAY_LAUNCH, useBalanceGame } from './useBalanceGame'
@@ -50,9 +44,10 @@ import './balance.css'
 import './balance-arcade.css'
 
 /** Where the player is when no run is in progress. */
-type BalanceRoute = 'home' | 'trail' | 'quick' | 'options' | 'trophies' | 'instrument'
+type BalanceRoute = 'home' | 'quick' | 'options' | 'trophies' | 'instrument'
 
 interface BalanceScreenProps {
+  dailyChallenge?: DailyChallengePlan | null
   streamRef: RefObject<MediaStream | null>
   streamGeneration: number
   tunerInstrument: TunerInstrument
@@ -65,6 +60,7 @@ interface BalanceScreenProps {
 }
 
 export default function BalanceScreen({
+  dailyChallenge,
   streamRef,
   streamGeneration,
   tunerInstrument,
@@ -94,7 +90,7 @@ export default function BalanceScreen({
   })
   const selectedInstrument = balanceInstrumentSettings(game.state.settings.instrumentId)
   /*
-   * Home, the trail and the trophy case have nothing to listen for, so the
+   * Home and the trophy case have nothing to listen for, so the
    * microphone only comes up on the two screens that show a live readout and
    * for the run itself. Holding it open across the whole menu tree drained the
    * battery for nothing.
@@ -195,14 +191,6 @@ export default function BalanceScreen({
     [game.customRoutines, game.state.settings],
   )
 
-  const startLevel = useCallback(
-    (level: BalanceLevel) => {
-      onRequestMicStream()
-      gameRef.current.start(balanceLevelLaunch(level, gameRef.current.state.settings.instrumentId))
-    },
-    [onRequestMicStream],
-  )
-
   const startDaily = useCallback(() => {
     onRequestMicStream()
     const settings = gameRef.current.state.settings
@@ -220,13 +208,23 @@ export default function BalanceScreen({
     setRoute(next)
   }, [])
 
+  if (game.state.phase === 'setup' && dailyChallenge) {
+    return <BalanceArcadeShell title="Today’s challenge" hapticFeedback={hapticFeedback} onBack={onBack} backLabel="Back to Games">
+      <div className="challenge-game-ready">
+        <span>{dailyChallenge.instrumentLabel} · +1 trophy</span>
+        <h1>{dailyChallenge.game.title}</h1>
+        <p>{dailyChallenge.game.objective}</p>
+        <button className="balance-cta" onClick={() => { onRequestMicStream(); game.start({ ...dailyChallenge.game.balance, instrumentId: dailyChallenge.game.instrumentId }) }}>Start challenge</button>
+        <small>Your normal game settings stay saved.</small>
+      </div>
+    </BalanceArcadeShell>
+  }
   if (game.state.phase === 'setup') {
     if (route === 'home') {
       return (
         <BalanceHome
           instrumentId={game.state.settings.instrumentId}
           characterId={game.state.settings.characterId}
-          levels={game.data.levels}
           daily={game.data.daily}
           trophyCount={Object.keys(game.data.trophies).length}
           bestBalancedMs={game.state.bestBalancedMs}
@@ -234,21 +232,8 @@ export default function BalanceScreen({
           onBack={onBack}
           onStartDaily={startDaily}
           onQuickPlay={() => setRoute('quick')}
-          onTrail={() => setRoute('trail')}
           onTrophies={() => setRoute('trophies')}
           onInstrument={() => setRoute('instrument')}
-        />
-      )
-    }
-
-    if (route === 'trail') {
-      return (
-        <BalanceTrail
-          instrumentId={game.state.settings.instrumentId}
-          levels={game.data.levels}
-          hapticFeedback={hapticFeedback}
-          onBack={() => setRoute('home')}
-          onPlayLevel={startLevel}
         />
       )
     }
@@ -341,22 +326,14 @@ export default function BalanceScreen({
 
   if (game.state.phase === 'routineResults' && game.routineResult) {
     if (game.launch.kind !== 'quick') {
-      const level = game.launch.id ? getBalanceLevel(game.launch.id) : null
-      const nextLevel = level ? BALANCE_LEVELS[level.number] ?? null : null
       return (
-        <BalanceLevelResults
+        <BalanceDailyResults
           launch={game.launch}
-          level={level}
           result={game.routineResult}
-          earnedStars={game.levelAward?.earnedStars ?? 0}
-          previousStars={game.levelAward?.previousStars ?? 0}
           newTrophyIds={game.newTrophyIds}
           streak={balanceCurrentStreak(game.data.daily)}
-          nextLevel={nextLevel}
           hapticFeedback={hapticFeedback}
           onReplay={() => game.start()}
-          onNextLevel={() => nextLevel && startLevel(nextLevel)}
-          onTrail={() => goTo('trail')}
           onHome={() => goTo('home')}
         />
       )
@@ -377,18 +354,12 @@ export default function BalanceScreen({
   const staffClef = getBalanceInstrument(game.state.settings.instrumentId).clef
 
   /** What the run is, for the bars and cards shown while it is in progress. */
-  const runTitle =
-    game.launch.kind === 'level'
-      ? `Level ${getBalanceLevel(game.launch.id ?? '')?.number ?? ''} · ${game.launch.title}`
-      : game.launch.kind === 'daily'
-        ? game.launch.title
-        : 'Balance'
+  const runTitle = game.launch.kind === 'daily' ? game.launch.title : 'Balance'
 
   /*
    * Pause / stopped / error share one card. `game.reset` returns to the setup
    * phase, and `route` is still whichever screen launched the run, so "Quit"
-   * lands the player back on the trail or on Quick Play without extra
-   * bookkeeping.
+   * lands the player back on Home or on Quick Play without extra bookkeeping.
    */
   if (game.state.phase === 'paused' || game.state.phase === 'stopped' || game.state.phase === 'error') {
     const paused = game.state.phase === 'paused'

@@ -1,3 +1,5 @@
+import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
+import DailyChallenges from './DailyChallenges'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
@@ -97,6 +99,8 @@ interface PracticeHubProps {
   onResumeFocusedPractice: (projectId: string) => void | Promise<void>
   onCreatePracticeItem: (name: string) => Promise<Project>
   onOpenGames: () => void
+  onDailyPractice: (plan: DailyChallengePlan) => void
+  onDailyGame: (plan: DailyChallengePlan) => void
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
@@ -148,6 +152,8 @@ export default function PracticeHub({
   onResumeFocusedPractice,
   onCreatePracticeItem,
   onOpenGames,
+  onDailyPractice,
+  onDailyGame,
   onOpenVault,
   onOpenTuner,
   onOpenMetronome,
@@ -639,6 +645,8 @@ export default function PracticeHub({
                         </Pressable>
                       </div>
 
+                      <DailyChallenges routine={routine} day={routineDay} instrumentId={instrumentId}
+                        onPractice={onDailyPractice} onGame={onDailyGame} />
                       {routine && routine.steps.length > 0 ? (
                         <RoutineHomeDisclosure
                           routine={routine}

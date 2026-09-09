@@ -1,0 +1,24 @@
+/* Owner direction: keep the camera visible through both boxes and bottom controls. */
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill {
+ background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(12,18,28,.27));
+ border:1px solid rgba(255,255,255,.23); box-shadow:0 8px 24px #00000020,inset 0 1px 0 #ffffff16;
+ backdrop-filter:blur(10px) saturate(1.12); -webkit-backdrop-filter:blur(10px) saturate(1.12);
+}
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot {
+ background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(12,18,28,.23));
+ border:1px solid rgba(255,255,255,.22); box-shadow:0 6px 18px #00000016,inset 0 1px 0 #ffffff0f;
+ backdrop-filter:blur(8px) saturate(1.08); -webkit-backdrop-filter:blur(8px) saturate(1.08);
+}
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) :is(.camera-pill-action,.camera-vault-button,.camera-control-deck__settings-btn,.camera-pill-action__content,.camera-vault-button__icon-wrap,.camera-control-deck__settings-btn svg,.compact-take-caption__name) { color:#f5f8ff; text-shadow:0 1px 3px #0008; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-caption__detail { color:#ffffffb8; text-shadow:0 1px 3px #0008; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-overlays-button__icon { color:#ffc64c; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-practice-button svg { color:#68bfff; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) :is(.camera-vault-button,.camera-control-deck__settings-btn) { border:1px solid #ffffff18; border-radius:50%; background:#ffffff06; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-pill-action { border:1px solid transparent; min-height:44px; border-radius:18px; }
+html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-pill-action[aria-expanded='true'] { background:#1598ff16; border-color:#68bfff70; box-shadow:none; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill { border-radius:25px; border-color:#68bfff5c; box-shadow:0 8px 24px #0003,inset 0 1px 0 #ffffff22; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-pill-action { border-radius:13px; border-color:#ffffff10; }
+html[data-refinement='depth-prism'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill { border-radius:999px; border-color:#b89aff66; box-shadow:0 8px 24px #0003,inset 0 1px 0 #d5c6ff45; }
+html[data-refinement='depth-prism'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-practice-button svg { color:#bca1ff; }
+/* Respect reduced transparency when the system requests it. */
+@media(prefers-reduced-transparency:reduce) { html:is([data-refinement^='fresh'],[data-refinement^='depth-']) .app-ui-overlay:not(.app-ui-overlay--audio-mode) :is(.camera-control-pill,.app-pip-row--compact > .compact-take-slot) { background:#141e2b; } }

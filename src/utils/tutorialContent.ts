@@ -383,8 +383,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Record without video. Each take plays back the moment you stop.',
     bullets: [
       'Bottom pill: Practice Home, Workspace, Record, Camera, Settings',
-      'Use Audio, Metronome, Tuner, and Games from the top tabs',
-      'Open Program from Metronome to build a timed practice routine',
+      'Use Record, Tuner, Metronome, and Games from the top tabs',
+      'Open Practice Home for your routine, or Program in Metronome for tempo sequences',
       'Tap Camera to return to video recording',
       'Best Take and Current Take stay ready for quick comparison',
     ],
@@ -434,12 +434,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'practice-sessions',
     title: 'Practice Routines',
-    body: 'Open Program from the Metronome tab to build a passage or a whole program into timed sections you can run again.',
+    body: 'Open Practice Home and choose Build your routine.',
     bullets: [
-      'Add sections with bars, tempo, time signature, feel, and repeats',
-      'Drag section cards to reorder the routine',
-      'Use count-ins, looping, tempo changes, and meter patterns',
-      'Enable recording before Start Practice to save the run as a take',
+      'Choose a preset or add your own exercises',
+      'Set each exercise’s tools and add an optional reference',
+      'Use Play or Pause to control your practice time',
+      'Tap Done & next to continue, or Finish routine on the last exercise',
     ],
   },
   {

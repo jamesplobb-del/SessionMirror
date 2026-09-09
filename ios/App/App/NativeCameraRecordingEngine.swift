@@ -157,6 +157,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// connection actually goes dark.
     private var recordingDiagnosticsTimer: DispatchSourceTimer?
     private var lastAudioTapSampleTime: CFTimeInterval = 0
+    private var stopProcessingStartedAt: CFTimeInterval = 0
+    private func logStopStage(_ stage: String) {
+        guard stopProcessingStartedAt > 0 else { return }
+        print("[RecordingTiming] \(stage) elapsedMs=\(Int((CACurrentMediaTime() - stopProcessingStartedAt) * 1000))")
+    }
     private var recordingDiagnosticsStartTime: CFTimeInterval = 0
     // Written from the same AVCaptureAudioDataOutput that powers live pitch.
     // If AVCaptureMovieFileOutput finalizes a long take without an audio track,
@@ -1556,6 +1561,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 }
                 return
             }
+            self.stopProcessingStartedAt = CACurrentMediaTime()
+            self.logStopStage("stop-requested")
             movieOutput.stopRecording()
         }
     }
@@ -1615,6 +1622,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
 
             self.isRecording = false
             self.isStarting = false
+            self.logStopStage("writer-finished")
             self.stopRecordingDiagnosticsTimer()
             if self.isBridgePreviewActive || self.isFrameBridgeExternallyRequested {
                 self.enableFrameBridge()
@@ -1672,6 +1680,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         completion: ((Result<[String: Any], Error>) -> Void)?
     ) {
         let muxFallbackAndFinalize: () -> Void = {
+            self.logStopStage("trim-finished-or-skipped")
             self.muxFallbackAudioIfNeeded(
                 into: outputFileURL,
                 fallbackAudioURL: fallbackAudioURL,
@@ -1681,6 +1690,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                     if case .failure(let muxError) = muxResult {
                         print("[NativeCameraTest] fallback audio mux failed: \(muxError.localizedDescription). Keeping original video.")
                     }
+                    self.logStopStage("audio-recovery-finished-or-skipped")
                     self.finalizeStopResult(for: outputFileURL, completion: completion)
                 }
             }
@@ -2029,8 +2039,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     private func finalizeStopResult(for fileURL: URL, completion: ((Result<[String: Any], Error>) -> Void)?) {
+        defer { stopProcessingStartedAt = 0 }
         do {
             let info = try self.buildStopResult(for: fileURL)
+            self.logStopStage("stop-result-ready")
             print("[NativeCameraTest] recording stopped")
             print("[NativeCameraTest] file saved")
             for (key, value) in info.sorted(by: { $0.key < $1.key }) {
@@ -2099,6 +2111,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             logMovieAudioConnection(context: "recordStop", movieOutput: movieOutput)
         }
 
+        logStopStage("levels-start")
         if let levels = NativeCameraTestAudio.measureLevels(fileURL: fileURL) {
             NativeCameraTestAudio.logFileLevels(levels)
             for (key, value) in NativeCameraTestAudio.levelsPayload(levels) {
@@ -2110,6 +2123,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             print("[NativeCameraTest] measureLevels failed — audio track present but unreadable")
         }
 
+        logStopStage("levels-finished")
         let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: activeAudioProfile)
         for (key, value) in sessionInfo {
             result[key] = value
