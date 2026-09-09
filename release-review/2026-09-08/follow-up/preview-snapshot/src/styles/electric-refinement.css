@@ -1,0 +1,317 @@
+/* Refine the selected Electric concept only. Home layout/appearance is retained. */
+.electric-control-icon { display:none !important; }
+.electric-original-icon { display:contents; }
+html[data-refinement='depth-electric'] .electric-original-icon { display:none !important; }
+html[data-refinement='depth-electric'] .app-ui-overlay .electric-control-icon { display:block !important; width:25px; height:25px; flex-shrink:0; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon { color:#0066ff; }
+html[data-refinement='depth-electric'] .app-ui-overlay .audio-overlays-button .electric-control-icon { color:#a56b00; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .electric-control-icon { color:#c6e7ff; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-overlays-button .electric-control-icon { color:#ffd05a; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-practice-button .electric-control-icon { color:#68c9ff; }
+html[data-refinement='depth-electric'] .app-ui-overlay :is(.audio-control-pill,.camera-control-pill) :is(button,span) { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; letter-spacing:-.01em; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-mode-take-card__title-row h3 { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; font-weight:550; letter-spacing:-.03em; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-practice-top-tabs__btn { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; font-weight:600; letter-spacing:0; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-mode-take-card__pill { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; font-weight:600; letter-spacing:0; }
+/* Remove the colored top edges. Bring the top-bar energy into the labels instead. */
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card { border:1px solid #ffffffd9; background:radial-gradient(ellipse at 100% 0%,#e4efff,transparent 58%),var(--audio-surface); box-shadow:0 10px 26px #0066ff0d; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-mode-home--inplace .audio-mode-take-card--best { border:1px solid #ffffffd9; background:radial-gradient(ellipse at 100% 0%,#fff3d4,transparent 58%),var(--audio-surface); box-shadow:0 10px 26px #775d100a; }
+html[data-refinement='depth-electric'] .audio-mode-take-card .audio-mode-take-card__pill { background:linear-gradient(140deg,#0066ff,#00a8ed); color:#fff; border:0; box-shadow:inset 0 1px 0 #ffffff60,0 3px 9px #0066ff14; }
+html[data-refinement='depth-electric'] .audio-mode-take-card--best .audio-mode-take-card__pill { background:linear-gradient(140deg,#ffbc00,#ffdb63); color:#594000; box-shadow:inset 0 1px 0 #ffffff80,0 3px 9px #ffbc0018; }
+/* Match the current app: plain inline tuner tools, no individual pills. */
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail { grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; border-top:1px solid #1598ff25; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail > button,
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail > button[aria-expanded='true'] { display:flex; justify-content:center; align-items:center; gap:6px; width:100%; min-height:44px; padding:8px 4px; border:0; border-radius:0; box-shadow:none; background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail > button span { font-size:12px; font-weight:550; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail > button svg { width:16px; height:16px; }
+
+/* Neutral record surfaces restored from the existing app. */
+/* Record never inherits the tuner's whole-screen wash, including when colors are enabled. */
+html[data-refinement='depth-electric']:has(.app-ui-overlay--audio-practice-record) { --tuner-ui-strength:0% !important; --tuner-ui-dark-strength:0% !important; --tuner-rim-strength:0% !important; --tuner-rim-glow-strength:0% !important; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-practice-record { box-shadow:none !important; }
+html[data-preview-tuner-colors='off'] :is(.pitch-widget-living,.pitch-audio-stage) { --tuner-center-strength:0% !important; --tuner-ui-strength:0% !important; --tuner-ui-feather-strength:0% !important; }
+html[data-preview-tuner-colors='off'] :is(.pitch-widget-living,.pitch-audio-stage) .pitch-living-canvas::before { opacity:0 !important; }
+/* Fill the hall vertically so the floor and character sit at its foot. */
+html[data-refinement='depth-electric'] .balance-arcade--hall .balance-hall { flex:1 1 auto; }
+html[data-refinement='depth-electric'] .balance-arcade--hall .balance-hall__doors { flex:1 1 auto; min-height:250px; max-height:none; }
+html[data-refinement='depth-electric'] .balance-hall__player.is-idle { left:50% !important; }
+html[data-refinement='depth-electric'] .balance-arcade--hall .balance-hall__roster { grid-template-columns:repeat(6,minmax(0,1fr)); gap:4px; overflow:visible; padding:4px 0 8px; }
+html[data-refinement='depth-electric'] .balance-hall__roster-pick { min-height:88px; padding:5px 2px; border-radius:16px; }
+html[data-refinement='depth-electric'] .balance-hall__roster-pick small { font-size:8px; }
+/* Workspace keeps its compact tool grid with Electric's clean glass and accents. */
+html[data-refinement='depth-electric'] .settings-branch-tray { background:linear-gradient(145deg,rgba(247,252,255,.95),rgba(229,241,255,.91)); border:1px solid #ffffffb0; border-radius:28px; box-shadow:0 14px 44px #00356930,inset 0 1px 0 #fff; backdrop-filter:blur(22px); color:#182b44; }
+html[data-refinement='depth-electric'] .settings-branch-tray__title { font-family:-apple-system,system-ui,sans-serif; font-size:18px; font-weight:600; letter-spacing:-.03em; color:#17324f; }
+html[data-refinement='depth-electric'] .settings-branch-tray__item { border-radius:20px; background:#ffffff80; border:1px solid #ffffffa0; box-shadow:none; color:#34465a; }
+html[data-refinement='depth-electric'] .settings-branch-tray__item--active { background:linear-gradient(145deg,#0066ff,#00a8ed); color:white; border-color:#ffffff80; }
+html[data-refinement='depth-electric'] .settings-branch-tray__label { font-family:-apple-system,system-ui,sans-serif; font-weight:550; letter-spacing:0; }
+html[data-refinement='depth-electric'] .settings-branch-tray__icon svg { stroke-width:1.7; }
+html[data-refinement='depth-electric'] .settings-branch-tray__save-trigger { color:#0066ff; }
+/* Settings: grouped white rows and the same blue/cyan selected navigation. */
+html[data-refinement='depth-electric'] .settings-sheet { --set-accent:#0066ff; --set-surface:#ffffff; --set-label:#182b44; --set-group-shadow:0 5px 18px #0053aa08; background:#edf5ff; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .settings-sheet .native-sheet-header { background:linear-gradient(140deg,#f9fcff,#deeeff); border-bottom:1px solid #ffffff; }
+html[data-refinement='depth-electric'] .settings-sheet .native-sheet-title { font-weight:600; letter-spacing:-.04em; }
+html[data-refinement='depth-electric'] .settings-sheet .set-list { border-radius:22px; }
+html[data-refinement='depth-electric'] .settings-sheet .set-row__label { font-weight:500; letter-spacing:-.015em; }
+html[data-refinement='depth-electric'] .settings-sheet .set-nav__button[aria-current='page'] { background:linear-gradient(140deg,#0066ff,#00a8ed); color:white; border-radius:18px; }
+/* Pitch widget shares the tuner's large readout and quieter chart surround. */
+html[data-refinement='depth-electric'] .pitch-tuner--widget .pitch-glass-panel { background:linear-gradient(145deg,rgba(247,252,255,.88),rgba(226,240,255,.80)); border:1px solid #ffffffb0; border-radius:28px; box-shadow:0 10px 30px #001c4133,inset 0 1px 0 #fff; backdrop-filter:blur(20px); }
+html[data-refinement='depth-electric'] .pitch-widget-living .pitch-living-readout__note { font-family:-apple-system,system-ui,sans-serif; font-weight:500; letter-spacing:-.05em; color:#182b44; text-shadow:none; }
+html[data-refinement='depth-electric'] .pitch-widget-living :is(.pitch-living-readout__detail,.pitch-living-readout__status,.pitch-living-canvas__direction) { color:#41556d; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .settings-branch-tray__item:not(.settings-branch-tray__item--active) :is(.settings-branch-tray__label,.settings-branch-tray__icon) { color:#34465a !important; }
+html[data-refinement='depth-electric'] .settings-branch-tray__item--active :is(.settings-branch-tray__label,.settings-branch-tray__icon) { color:white !important; }
+html[data-refinement='depth-electric'] .settings-branch-tray__icon { background:#0066ff0d; }
+html[data-refinement='depth-electric'] .pitch-widget-living .pitch-living-readout__detail strong { color:#182b44; }
+html[data-preview-tuner-colors='off'] .pitch-widget-living canvas { filter:grayscale(1); }
+
+/* Carry the selected direction through routine setup and the active controller. */
+html[data-refinement='depth-electric'] :is(.routine-guide,.routine-program-setup,.routine-reference-setup) { --guide-bg:#edf5ff; --guide-panel:#fff; --guide-ink:#182b44; --guide-muted:#576a80; --guide-accent:#0066ff; --guide-line:#d8e6f6; --guide-selected:#e2eeff; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .routine-guide :is(h2,h3,strong) { letter-spacing:-.025em; }
+html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise,.practice-menu-section,.routine-guide-item,.routine-guide-summary) { border-radius:22px; background:#ffffffd9; border-color:#fff; box-shadow:0 5px 18px #0053aa08; }
+html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise)[aria-pressed='true'] { background:#e2eeff; border-color:#0066ff; }
+html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-footer,.routine-guide-nav) { background:#edf5ffeb; backdrop-filter:blur(18px); }
+html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-primary,.routine-guide-progress i.is-on) { background:linear-gradient(140deg,#0066ff,#00a8ed); }
+html[data-refinement='depth-electric'] .routine-guide :is(input,select,textarea) { font-family:inherit; border-radius:14px; }
+/* Simple controller has no drag coordinates: anchor it explicitly within the viewport. */
+.routine-bar--simple { inset:auto 12px max(100px,env(safe-area-inset-bottom)) 12px; width:min(420px,calc(100% - 24px)); margin-inline:auto; max-height:calc(100dvh - 180px); overflow-y:auto; padding:12px; touch-action:auto; }
+html[data-refinement='depth-electric'] .routine-bar { border-radius:24px; font-weight:500; }
+html[data-refinement='depth-electric'] .routine-bar--audio { background:#f6faffee; border-color:#fff; box-shadow:0 10px 28px #00356920; backdrop-filter:blur(20px); }
+html[data-refinement='depth-electric'] .routine-bar__actions button.is-primary { background:linear-gradient(140deg,#0066ff,#00a8ed); color:#fff; border:0; border-radius:16px; }
+/* Tuner-specific options are visually distinct from app Settings. */
+.electric-tuning-new { display:none !important; }
+html[data-refinement='depth-electric'] .electric-tuning-old { display:none !important; }
+html[data-refinement='depth-electric'] .electric-tuning-new { display:inline-block !important; }
+html[data-refinement='depth-electric'] :is(.pitch-living-drone-panel,.pitch-living-transposition-panel,.tuner-transposition-menu) { background:#f6fafff2; color:#182b44; border:1px solid #fff; border-radius:24px; box-shadow:0 10px 28px #00356918; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .tuner-transposition-menu__option--selected { background:#e2eeff; color:#0059dc; }
+html[data-refinement='depth-electric'] .drone-sound-wheel { font-family:-apple-system,system-ui,sans-serif; --drone-accent:#0066ff; }
+html[data-refinement='depth-electric'] .drone-sound-wheel__note--active { color:#0066ff; }
+html[data-refinement='depth-electric'] .drone-widget { border-radius:24px; border-color:#ffffff80; box-shadow:0 10px 28px #00356920; }
+/* Pitch Insights shares the tuner's typography, spacing and Electric blue. */
+html[data-refinement='depth-electric'] .pitch-insights-screen { background:#edf5ff; color:#182b44; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .pitch-insights-screen__topbar { background:linear-gradient(140deg,#f9fcff,#deeeff); border-bottom:1px solid #fff; }
+html[data-refinement='depth-electric'] .pitch-insights-screen :is(h2,h3,.pitch-insights-hero__status,.pitch-insights-row__note) { font-family:inherit; font-weight:600; letter-spacing:-.03em; }
+html[data-refinement='depth-electric'] :is(.pitch-insights-hero,.pitch-insights-list,.pitch-insights-state--empty,.pitch-insights-detail__hero,.pitch-insights-days) { background:#ffffffdb; border:1px solid #fff; border-radius:24px; box-shadow:0 5px 18px #0053aa08; }
+html[data-refinement='depth-electric'] .pitch-insights-day-strip__cell.is-active { background:linear-gradient(140deg,#0066ff,#00a8ed); color:#fff; border-radius:16px; }
+html[data-refinement='depth-electric'] .pitch-insights-instrument-filter__pill.is-active { background:#e2eeff; color:#0059dc; }
+html[data-refinement='depth-electric'] .routine-guide-continue { background:linear-gradient(140deg,#0066ff,#00a8ed); color:white; border-radius:20px; box-shadow:0 6px 18px #0066ff25; }
+html[data-refinement='depth-electric'] .pitch-insights-screen { --pi-bg:#edf5ff; --pi-surface:#fff; --pi-accent:#0066ff; --pi-accent-soft:#e2eeff; }
+/* Shared sheets extend the typography and surface system to secondary flows. */
+html[data-refinement='depth-electric'] .native-bottom-sheet--audio-light { font-family:-apple-system,system-ui,sans-serif; background:#f3f8ff; border:1px solid #ffffffc0; border-radius:30px 30px 0 0; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--audio-light .native-sheet-title { font-weight:600; letter-spacing:-.035em; }
+html[data-refinement='depth-electric'] .pitch-insights-state--empty { padding:24px; }
+
+/* Brighter tool-deck artwork without recoloring the neutral record control. */
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon { color:#187bdd !important; stroke-width:1.55; filter:none; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-overlays-button .electric-control-icon { color:#db9200 !important; filter:drop-shadow(0 1px 2px #ffbd0033); }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon [fill='currentColor'] { fill-opacity:.06; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode :is(.audio-pill-action__content,.audio-camera-button__content) > span:last-child { color:#194b88; }
+/* Each pill owns its fill and centers its contents in normal layout. */
+html[data-refinement='depth-electric'] :is(.pitch-insights-instrument-filter__pill,.pitch-insights-day-strip__cell) { position:relative; isolation:isolate; box-sizing:border-box; height:auto; min-height:44px; line-height:1.25; font-weight:550; text-indent:0; transform:none; }
+html[data-refinement='depth-electric'] .pitch-insights-instrument-filter__pill { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:9px 14px; white-space:nowrap; }
+html[data-refinement='depth-electric'] .pitch-insights-day-strip__cell { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:10px 14px; }
+html[data-refinement='depth-electric'] .pitch-insights-day-strip__cell.is-active :is(small,strong,span) { color:white; }
+html[data-refinement='depth-electric'] :is(.pitch-insights-instrument-filter__pill,.pitch-insights-day-strip__cell)::before,
+html[data-refinement='depth-electric'] :is(.pitch-insights-instrument-filter__pill,.pitch-insights-day-strip__cell)::after { content:none; }
+html[data-refinement='depth-electric'] :is(.pitch-insights-hero,.pitch-insights-detail__hero,.pitch-insights-list,.pitch-insights-days) { padding:18px; }
+.insights-preview-toggle { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 16px; padding:10px 12px; border:1px dashed #7796b5; border-radius:12px; font:12px/1.4 -apple-system,system-ui,sans-serif; color:#42566c; }
+.insights-preview-toggle small { flex-basis:100%; }
+/* Best Take: gold/cyan reflected edge and light tint over transparent camera glass. */
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot--best { background:linear-gradient(135deg,#ffbf001c,transparent 55%,#008cff14),linear-gradient(145deg,#ffffff0e,#0c121c3b); border:1px solid #ffce577d; box-shadow:0 5px 18px #0003,inset 1px 1px 0 #ffe8a34d,inset -1px -1px 0 #59caff26; backdrop-filter:blur(8px) saturate(1.2); }
+html[data-refinement='depth-electric'] .compact-take-slot--best .compact-take-caption__name { color:#ffd35e !important; font-weight:600; text-shadow:0 1px 4px #0009; }
+/* Home content must grow/scroll rather than compressing the launch tiles. */
+html[data-refinement='depth-electric'] .practice-menu-card--home .practice-menu-focus-flow { min-height:0; height:auto; flex:0 0 auto; }
+html[data-refinement='depth-electric'] .practice-menu-card--home .practice-menu-focus-flow > * { flex-shrink:0; }
+html[data-refinement='depth-electric'] .practice-menu-card.practice-menu-card--home .practice-home-actions { order:0; flex:0 0 auto; grid-template-rows:minmax(225px,auto); }
+html[data-refinement='depth-electric'] .practice-menu-layer .practice-menu-card--home :is(.practice-home-quick-start,.practice-home-build-routine) { height:auto; }
+html[data-refinement='depth-electric'] .practice-menu-card--home .practice-home-disclosure { order:4; position:relative; margin:0; width:100%; }
+html[data-refinement='depth-electric'] .practice-menu-card--home .practice-home-more { order:5; }
+html[data-refinement='depth-electric'] .practice-menu-card--home .practice-home-quick-start .practice-home-action-icon > svg { display:none; }
+html[data-refinement='depth-electric'] .practice-home-quick-start .practice-home-action-icon::before { content:''; display:block; width:26px; height:26px; background:currentColor; mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='3'/%3E%3Cpath d='M7 13v7M12 13v7M17 13v7'/%3E%3Cpath d='M6 4v8h2V4M11 4v8h2V4M16 4v8h2V4' fill='black'/%3E%3C/svg%3E") center/contain no-repeat; }
+/* Discoverable vault entry: visible text, archive mark and upward affordance. */
+.electric-vault-label { display:none; }
+html[data-refinement='depth-electric'] .take-vault-handle { width:auto; min-width:148px; min-height:44px; margin:5px auto 0; padding:0 16px; border-radius:999px; border:1px solid #ffffff65; background:linear-gradient(145deg,#ffffff18,#10233c38); box-shadow:0 4px 14px #0002,inset 0 1px 0 #ffffff25; color:#edf7ff; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+html[data-refinement='depth-electric'] .take-vault-handle > i { display:none; }
+html[data-refinement='depth-electric'] .electric-vault-label { display:flex; align-items:center; justify-content:center; gap:8px; font:600 13px/1 -apple-system,system-ui,sans-serif; letter-spacing:-.015em; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .take-vault-handle { background:linear-gradient(145deg,#ffffffed,#e1efffe0); color:#0057d9; border-color:#fff; box-shadow:0 4px 14px #0066ff12,inset 0 1px 0 #fff; }
+html[data-refinement='depth-electric'] .routine-bar--simple { bottom:max(124px,env(safe-area-inset-bottom)); }
+/* Vault theme covers the library, filters, populated rows, search and selection. */
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault { --audio-bg-base:#edf5ff; --audio-blue:#0066ff; --audio-blue-soft:#e2eeff; --audio-blue-border:#0066ff45; --audio-gold:#ffbc00; --audio-gold-soft:#fff1c7; --audio-text-primary:#182b44; --audio-text-secondary:#596a80; --audio-shadow-card:0 6px 20px #004baa0c; --audio-shadow-fab:0 3px 10px #004baa0a; border-radius:30px 30px 0 0; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-sheet-header { background:linear-gradient(140deg,#f9fcff,#deeeff) !important; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .native-sheet-title { font-weight:600; letter-spacing:-.035em; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault :is(.vault-section-tabs,.vault-media-segment) { padding:4px; border:1px solid #fff; background:#ffffff80; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-section-tabs [role='tab'][aria-selected='true'] { background:linear-gradient(140deg,#0066ff,#00a8ed) !important; color:white !important; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-section-tabs [role='tab'][aria-selected='true'] span { color:#ffffffd9; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault :is(.vault-take-row,.vault-empty-state) { border-radius:24px; border:1px solid #fff; background:#ffffffdf; box-shadow:var(--audio-shadow-card); }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-take-row--benchmark { background:linear-gradient(140deg,#fff9e6,#ffffff); border-color:#ffe39a; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault :is(.vault-header-icon-btn,.vault-import-btn) { color:#0066ff; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-search-input { border-radius:16px; box-shadow:none; padding:12px 14px; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-take-row__play-btn { background:linear-gradient(140deg,#0066ff,#00a8ed); color:white; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-take-row--benchmark .vault-take-row__play-btn { background:linear-gradient(140deg,#ffbc00,#ffdc72); color:#654800; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-bulk-bar { background:#edf5fff2; backdrop-filter:blur(18px); }
+html[data-refinement='depth-electric'] .take-vault-handle { pointer-events:auto; position:relative; z-index:2; }
+/* Compact visible pill; retain a 44px touch target through its transparent border. */
+html[data-refinement='depth-electric'] .take-vault-handle { min-width:0; min-height:44px; height:44px; margin:0 auto; padding:0 12px; border:7px solid transparent; background-clip:padding-box; box-shadow:none; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .take-vault-handle { border-color:transparent; box-shadow:none; }
+html[data-refinement='depth-electric'] .electric-vault-label { gap:6px; font-size:12px; }
+html[data-refinement='depth-electric'] .electric-vault-label > svg:last-child { display:none; }
+html[data-refinement='depth-electric'] .electric-vault-count { display:inline-flex; min-width:20px; height:20px; padding:0 5px; align-items:center; justify-content:center; border-radius:999px; background:#0066ff; color:white; font-size:10px; font-variant-numeric:tabular-nums; }
+.vault-practice-overview { display:grid; gap:12px; color:#182b44; }
+.vault-practice-overview h3 { margin:0; font-size:22px; font-weight:600; letter-spacing:-.035em; }
+.vault-practice-overview p { margin:6px 0 0; font-size:12px; line-height:1.5; color:#596a80; }
+.vault-practice-overview h4 { display:flex; align-items:center; gap:8px; margin:10px 0 0; font-size:13px; font-weight:600; }
+.vault-routine-group,.vault-practice-empty,.vault-practice-folders { background:#ffffffde; border:1px solid white; border-radius:22px; overflow:hidden; }
+.vault-practice-empty { padding:18px; color:#596a80; font-size:13px; line-height:1.5; }
+.vault-routine-group summary { display:flex; align-items:center; justify-content:space-between; padding:18px; list-style:none; cursor:pointer; }
+.vault-routine-group summary::-webkit-details-marker { display:none; }
+.vault-routine-group summary small,.vault-exercise-link small { display:block; margin-top:4px; font-size:11px; color:#596a80; }
+.vault-exercise-link { display:flex; align-items:center; gap:10px; padding:14px 18px; border-top:1px solid #e8eff8; font-size:12px; }
+.vault-exercise-link > span { flex:1; min-width:0; }
+.vault-exercise-link button { display:flex; align-items:center; gap:3px; border:0; background:#e2eeff; color:#0057d9; padding:10px; border-radius:12px; }
+.vault-practice-folders button { display:flex; align-items:center; gap:12px; width:100%; min-height:54px; padding:14px 18px; border:0; border-bottom:1px solid #e8eff8; background:transparent; color:#182b44; text-align:left; }
+.vault-practice-folders button span { flex:1; }
+.vault-practice-folders button > svg:first-child { color:#0066ff; }
+.vault-naming-concept { padding:16px; border:1px dashed #99b6d9; border-radius:18px; }
+.vault-naming-concept small { display:block; color:#596a80; font-size:9px; letter-spacing:.08em; margin-bottom:8px; }
+/* Everyday navigation first; reveal destructive commands only during selection. */
+html[data-refinement='depth-electric'] .vault-header-command-row:not(:has(.vault-header-action-btn[aria-pressed='true'])) .vault-header-action-btn--danger { display:none; }
+html[data-refinement='depth-electric'] .native-bottom-sheet--vault .vault-session-bar { padding:12px; border:1px solid #fff; border-radius:18px; background:#ffffff80; }
+/* Slim visible capsule; the surrounding transparent area remains easy to tap. */
+html[data-refinement='depth-electric'] .app-ui-overlay .take-vault-handle { height:40px; min-height:40px; border:0; padding:6px 0; background:transparent; box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none; }
+html[data-refinement='depth-electric'] .electric-vault-label { min-height:25px; padding:3px 10px; box-sizing:border-box; border-radius:999px; border:1px solid #ffffffb3; background:linear-gradient(145deg,#ffffffe6,#dfedffcc); box-shadow:0 2px 8px #0057d90d; }
+html[data-refinement='depth-electric'] .electric-vault-count { height:17px; min-width:17px; padding:0 4px; font-size:9px; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .electric-vault-label { color:#e2f6ff; background:linear-gradient(140deg,#0066ff55,#082949b3); border-color:#58c8ffb3; box-shadow:0 0 9px #009dff2e,inset 0 1px 0 #aff0ff40; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .electric-vault-count { background:#65ceff; color:#073a60; }
+/* Quiet the camera Vault treatment. */
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .electric-vault-label { background:linear-gradient(145deg,#ffffff12,#0c1a2b80); border-color:#a4c2d947; box-shadow:inset 0 1px 0 #ffffff12; color:#d8e5ef; }
+html[data-refinement='depth-electric'] .app-ui-overlay:not(.app-ui-overlay--audio-mode) .electric-vault-count { background:#a8cbe133; color:#deeffb; }
+/* One timing language, restricted to transform/opacity and small control surfaces. */
+html[data-refinement='depth-electric'] { --electric-settle:cubic-bezier(.22,1,.36,1); }
+html[data-refinement='depth-electric'] .audio-practice-top-tabs { position:relative; isolation:isolate; gap:0; }
+html[data-refinement='depth-electric'] .audio-practice-top-tabs::after { content:''; position:absolute; z-index:0; pointer-events:none; top:5px; bottom:5px; left:5px; width:calc((100% - 10px)/4); border-radius:26px; background:linear-gradient(140deg,#0066ff,#00a8ed); box-shadow:inset 0 1px 0 #ffffff55,0 3px 9px #0066ff15; transform:translateX(calc(var(--electric-tab-index,0)*100%)); transition:transform 280ms var(--electric-settle); }
+html[data-refinement='depth-electric'] .audio-practice-top-tabs .audio-practice-top-tabs__btn { position:relative; z-index:1; transition:color 150ms ease; }
+html[data-refinement='depth-electric'] .audio-practice-top-tabs .audio-practice-top-tabs__btn--active { background:transparent; box-shadow:none; }
+html[data-refinement='depth-electric'] :is(.electric-control-icon,.electric-vault-label) { transition:scale 200ms var(--electric-settle),opacity 140ms ease; }
+html[data-refinement='depth-electric'] button:not(:disabled):active > :is(.electric-control-icon,.electric-vault-label),
+html[data-refinement='depth-electric'] button:not(:disabled):active .electric-control-icon { scale:.92; }
+html[data-refinement='depth-electric'] :is(.routine-guide-choice,.routine-guide-exercise,.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill,.vault-practice-folders button) { transition:scale 200ms var(--electric-settle),background-color 160ms ease,border-color 160ms ease; }
+html[data-refinement='depth-electric'] :is(.routine-guide-choice,.routine-guide-exercise,.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill,.vault-practice-folders button):not(:disabled):active { scale:.975; }
+html[data-refinement='depth-electric'] :is(.pitch-living-drone-panel,.pitch-living-transposition-panel,.vault-practice-overview) { animation:electric-content-in 220ms var(--electric-settle) both; }
+html[data-refinement='depth-electric'] .electric-vault-count { animation:electric-count-in 220ms var(--electric-settle) both; }
+@keyframes electric-content-in { from { opacity:0; } to { opacity:1; } }
+@keyframes electric-count-in { from { opacity:.3; scale:.8; } to { opacity:1; scale:1; } }
+@media(prefers-reduced-motion:reduce) {
+ html[data-refinement='depth-electric'] *,html[data-refinement='depth-electric'] *::before,html[data-refinement='depth-electric'] *::after { animation:none !important; transition-duration:0ms !important; }
+ html[data-refinement='depth-electric'] button:active :is(.electric-control-icon,.electric-vault-label),html[data-refinement='depth-electric'] :is(.routine-guide-choice,.routine-guide-exercise,.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill,.vault-practice-folders button):active { scale:1; }
+}
+/* Placement concept: Vault sits above the centered Record control. */
+html[data-refinement='depth-electric'] .app-ui-overlay .take-vault-handle { order:-1; margin:0 auto 2px; }
+
+/* Metronome Program: the same Electric materials, from builder to playback. */
+html[data-refinement='depth-electric'] :is(.practice-timeline,.practice-timeline-editor,.practice-timeline-playback,.practice-timeline-library) {
+ font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif; letter-spacing:-.015em;
+ --audio-blue:#0066ff;
+}
+html[data-refinement='depth-electric'] :is(.practice-timeline__hero,.practice-timeline-editor__header) {
+ background:linear-gradient(115deg,#dceaffdd,#f5fbffdd 65%,#fff1ccbb); border:1px solid #ffffffcc; border-radius:22px; padding:18px; box-shadow:inset 0 1px 0 #fff,0 8px 24px #0066ff0a;
+}
+html[data-refinement='depth-electric'] :is(.practice-timeline__hero-title,.practice-timeline-editor__title) { font-weight:650; letter-spacing:-.035em; }
+html[data-refinement='depth-electric'] :is(.practice-timeline__section-card,.practice-timeline-editor__group,.practice-timeline__setup,.practice-timeline__summary,.practice-timeline__track-settings,.practice-timeline-editor__tempo-depth) {
+ border:1px solid #ffffffdd; border-radius:22px; background:linear-gradient(135deg,#ffffffed,#edf5ffcc); box-shadow:inset 0 1px 0 #fff,0 7px 22px #0066ff0b;
+}
+html[data-refinement='depth-electric'] .practice-timeline__section-bar-fill { background:linear-gradient(90deg,#0066ff,#22bcff); border-radius:999px; }
+html[data-refinement='depth-electric'] :is(.practice-timeline__section-meta span,.practice-timeline__section-count) { background:#0066ff0d; color:#0754b4; border:0; }
+html[data-refinement='depth-electric'] :is(.practice-timeline-editor__input,.practice-timeline-editor .metronome-audio-select__control) { background:#ffffffbb; border:1px solid #85b8f538; border-radius:13px; }
+html[data-refinement='depth-electric'] .practice-timeline-editor__stepper-btn { background:#0066ff0c; border:1px solid #0066ff17; color:#0066ff; border-radius:12px; min-width:36px; min-height:36px; }
+html[data-refinement='depth-electric'] .practice-timeline__footer-btn { min-height:46px; border-radius:18px; font-weight:600; font-size:13px; }
+html[data-refinement='depth-electric'] .practice-timeline__footer-btn--primary { background:linear-gradient(125deg,#0066ff,#079eea); color:white; box-shadow:inset 0 1px 0 #ffffff66,0 6px 16px #0066ff23; }
+html[data-refinement='depth-electric'] .practice-timeline__footer-btn--secondary { background:#ffffffc4; border:1px solid #0066ff20; color:#0066ff; }
+html[data-refinement='depth-electric'] .practice-timeline-library__row { border-radius:18px; background:linear-gradient(130deg,#ffffffd9,#e9f3ffbb); border:1px solid #ffffffcc; margin-bottom:8px; box-shadow:0 4px 14px #0066ff08; }
+html[data-refinement='depth-electric'] .practice-timeline-playback__stat-value { color:#0066ff; font-variant-numeric:tabular-nums; }
+html[data-refinement='depth-electric'] .practice-timeline-editor__tempo-marker-row { border-radius:14px; background:#0066ff07; }
+
+/* Compact settings capsule: the label/value stack sits centrally in its material. */
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+ padding:3px 8px; border-radius:24px; min-height:0; height:auto;
+}
+html[data-refinement='depth-electric'] .audio-practice-metronome__selectors .metronome-audio-select__label { top:9px; }
+html[data-refinement='depth-electric'] .audio-practice-metronome__selectors .metronome-audio-select__control {
+ min-height:50px; height:50px; padding-top:23px; padding-bottom:8px; align-items:center;
+}
+
+/* Game review: readable engraving and compact arcade settings. */
+.sj-note--target .sj-note__head--hollow,
+.sj-note--crack .sj-note__head--hollow { background:transparent !important; border-color:#146da8; box-shadow:0 0 0 3px #168bff22; }
+.sj-note--crack .sj-note__head--hollow::after { display:none; }
+.sj-note--target .sj-note__head { animation:none; }
+.sj-custom-accidental { position:absolute; right:24px; top:0; transform:translateY(-50%); font:38px/1 'Times New Roman',serif; color:#1c1917; }
+.sj-player--hop { animation:sj-review-hop 190ms cubic-bezier(.22,.8,.32,1); }
+@keyframes sj-review-hop { 0%,100% { transform:translateX(-50%) scale(var(--sj-player-scale,1)); } 45% { transform:translateX(-50%) translateY(-7px) scale(var(--sj-player-scale,1)); } }
+html[data-refinement='depth-electric'] .sj-panel { border:1px solid #ffffffd9; border-radius:20px; background:linear-gradient(130deg,#ffffffed,#eaf3ffdc); box-shadow:0 6px 20px #0066ff0b; margin:8px 0; }
+.sj-panel > summary { cursor:pointer; list-style:none; }
+.sj-panel > summary::after { content:'+'; margin-left:auto; color:#0066ff; }
+.sj-panel[open] > summary::after { content:'−'; }
+html[data-refinement='depth-electric'] .sj-group__body { padding:12px 16px; gap:14px; }
+.sj-custom-scale { display:grid; gap:10px; padding:12px 0; }
+.sj-custom-scale > label { display:flex; gap:9px; align-items:center; font-weight:650; }
+.sj-custom-scale p { font-size:12px; color:#576579; margin:0; }
+.sj-custom-note-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:7px; }
+.sj-custom-note-grid button { min-height:44px; border-radius:12px; background:#ffffff; border:1px solid #0066ff25; color:#334155; }
+.sj-custom-note-grid button[aria-pressed='true'] { background:linear-gradient(135deg,#0066ff,#18a9ee); color:white; border-color:transparent; }
+html[data-refinement='depth-electric'] .balance-award__actions { display:grid; gap:10px; margin-top:16px; }
+html[data-refinement='depth-electric'] .balance-award__next { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+html[data-refinement='depth-electric'] .balance-arcade__spacer:has(+ h1) { flex:0; height:12px; }
+.electric-balance-controls { display:none; }
+html[data-refinement='depth-electric'] .electric-balance-controls { display:grid; gap:14px; padding:18px; margin:10px 0; border-radius:22px; background:linear-gradient(130deg,#e2efff,#ffffffed 65%,#fff2d2); border:1px solid #ffffffde; box-shadow:0 7px 24px #0066ff10; }
+.electric-balance-controls label { display:grid; gap:7px; font-size:13px; font-weight:600; }
+.electric-balance-controls label > span { display:flex; justify-content:space-between; gap:12px; }
+.electric-balance-controls strong { color:#0066ff; font-variant-numeric:tabular-nums; }
+.electric-balance-controls input { width:100%; height:30px; accent-color:#0066ff; }
+html[data-refinement='depth-electric'] :is(.balance-preview-distance-control,.balance-preview-rope-control,.balance-preview-pitch-control) { display:none; }
+html[data-refinement='depth-electric'] :is(.balance-setup-group,.balance-setup-sheet) { border-radius:20px; }
+@media (prefers-reduced-motion:reduce) { .sj-player--hop { animation:none; } }
+
+.sj-note__head:not(.sj-note__head--hollow) { background:#1c1917 !important; border:0; }
+.sj-note--target .sj-note__head:not(.sj-note__head--hollow) { background:#146da8 !important; }
+
+/* Fullscreen review: clear video edges, Electric controls kept on their own surface. */
+html[data-refinement='depth-electric'] .review-overlay { font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] .review-overlay--camera .review-video-stage { background:#05080d; }
+html[data-refinement='depth-electric'] .review-overlay :is(.review-overlay-header,.review-bottom-ui) { background:none!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
+html[data-refinement='depth-electric'] .review-overlay-header::before,
+html[data-refinement='depth-electric'] .review-overlay-header::after { display:none; }
+html[data-refinement='depth-electric'] .review-native-nav p { color:#fff!important; text-shadow:0 1px 5px #000,0 0 12px #0008; }
+html[data-refinement='depth-electric'] .review-nav-button { background:#102239b3; color:#e6f6ff; border:1px solid #a3dfff45; box-shadow:0 4px 14px #0003; }
+html[data-refinement='depth-electric'] .review-controls-cluster { color:#ecf7ff; background:linear-gradient(145deg,#172d47e8,#091523ed); border:1px solid #89caff50; box-shadow:0 12px 38px #0004,inset 0 1px #d9f4ff24; border-radius:24px; }
+html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-controls span,.review-trim-actions span) { color:#b9d1e7; }
+html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-button,.review-toolbar-button) { color:#bfe9ff; }
+html[data-refinement='depth-electric'] .review-playback-button svg { fill:currentColor; }
+html[data-refinement='depth-electric'] .review-toolbar-button--active { color:#75dcff; background:#199aff30; }
+html[data-refinement='depth-electric'] .review-toolbar-button--destructive { color:#ff9d9d; }
+html[data-refinement='depth-electric'] .review-toolbar-button:disabled { opacity:.35; }
+html[data-refinement='depth-electric'] .review-native-toolbar { border-color:#b4d8ff20; padding:3px 8px 5px; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__bar { background:#7fa3c459; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__bar--played { background:#63d5ff; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__playhead,
+html[data-refinement='depth-electric'] .review-timeline-waveform__playhead span { background:#f6c55d; }
+.review-trim-entry { display:flex; align-items:center; justify-content:center; gap:6px; margin:0 auto 6px; min-height:36px; padding:0 16px; border-radius:12px; font-size:12px; font-weight:600; }
+html[data-refinement='depth-electric'] .review-trim-entry { color:#bfe9ff; background:#78bfff18; }
+html[data-refinement='depth-electric'] .review-trim-action--cancel { color:#d3e6f5; }
+html[data-refinement='depth-electric'] .review-trim-action--done { background:#79daff; color:#10283f; }
+.review-compare-caption { padding:12px 14px 7px; font-size:11px; font-weight:600; }
+html[data-refinement='depth-electric'] .review-compare-caption { color:#afcde5; }
+html[data-refinement='depth-electric'] .focused-review-strip { margin:0; padding:0 10px 6px; flex-wrap:wrap; }
+html[data-refinement='depth-electric'] .focused-review-switch { background:#08132180; border-color:#aad7ff26; border-radius:14px; min-width:130px; }
+html[data-refinement='depth-electric'] .focused-review-switch button { min-height:40px; color:#b8cee1; font-size:13px; border-radius:11px; }
+html[data-refinement='depth-electric'] .focused-review-switch button[aria-pressed='true'] { background:linear-gradient(140deg,#44bfff,#2776e5); color:white; box-shadow:0 2px 10px #1598ff40; }
+html[data-refinement='depth-electric'] :is(.focused-review-blind,.focused-review-pitch,.focused-review-loop) { min-height:44px; color:#d5edff; background:#477fab26; border-color:#8cccff30; font-size:11px; }
+html[data-refinement='depth-electric'] .focused-review-blind span { display:inline; }
+html[data-refinement='depth-electric'] .focused-review-blind--active { color:#ffe1a1; border-color:#f5bd5466; background:#c28c191c; }
+html[data-refinement='depth-electric'] .review-overlay .pitch-widget-living { border:1px solid #82cbff66; box-shadow:0 10px 34px #0003; }
+html[data-refinement='depth-electric'] .review-overlay :is(.pitch-compare-panel,.pitch-compare-empty) { color:#bad3e8; background:#122a41; border:1px solid #77c8ff30; border-radius:16px; margin:4px 10px; }
+html[data-refinement='depth-electric'] .review-overlay .pitch-compare-grid { display:none; }
+@media(prefers-reduced-motion:reduce) { .review-overlay * { scroll-behavior:auto; } }
+html[data-refinement='depth-electric'] .review-overlay--sheet { background:#10283f; }
+html[data-refinement='depth-electric'] .review-sheet-handle-bar { background:#a7cee680; }
+html[data-refinement='depth-electric'] .review-trim-handle { background:#f6c55d; box-shadow:0 0 0 2px #19283a; }
+html[data-refinement='depth-electric'] .review-trim-handle:focus-visible { outline:2px solid #fff; outline-offset:4px; }
+html[data-refinement='depth-electric'] .review-swipe-hint p { background:#14283c9e; color:#d0e8fa; border-color:#a5d9ff30; box-shadow:none; backdrop-filter:none; }
+
+.review-quick-fullscreen{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#c5e7ff;min-height:32px}.quick-take-demo{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:20px}.quick-take-demo button{display:flex;flex-direction:column;background:#17324e;color:#e9f6ff;border:1px solid #7fc8ff60;border-radius:22px;overflow:hidden;min-height:200px;padding:0 0 15px;gap:10px}.quick-take-demo video{width:100%;height:150px;object-fit:cover}.quick-take-demo small{font-size:11px}.review-overlay--sheet .review-overlay-header{padding-top:12px!important}

@@ -1944,6 +1944,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               // replaced mid-stream froze the decoder and aborted playback
               // back to record. Wait for the replay to finish first; the take
               // plays with the live enhancer in the meantime.
+              const bakeParams = buildNativeEnhancerParams(audioEnhancerSettingsRef.current)
               const bakeHoldStartedAt = performance.now()
               while (
                 (handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) &&
@@ -1951,12 +1952,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               ) {
                 await waitMs(250)
               }
+              // Never replace the media beneath a long-running hands-free replay.
+              if (handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) return
               const fileUri = await resolveNativeFileUri(resolvedFilePath)
-              if (!fileUri) return
+              if (!fileUri || handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) return
               await BestTakeAudioPlugin.enhanceTakeAudio({
                 url: fileUri,
                 mediaType: mediaType === 'audio' ? 'audio' : 'video',
-                params: buildNativeEnhancerParams(audioEnhancerSettingsRef.current),
+                params: bakeParams,
               })
               await setTakeEnhancerBaked(takeId, true)
               setTakes((current) =>

@@ -99,9 +99,9 @@ html[data-refinement='depth-electric'] .native-bottom-sheet--audio-light .native
 html[data-refinement='depth-electric'] .pitch-insights-state--empty { padding:24px; }
 
 /* Brighter tool-deck artwork without recoloring the neutral record control. */
-html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon { color:#005cff !important; stroke-width:1.9; filter:drop-shadow(0 1px 2px #007aff25); }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon { color:#187bdd !important; stroke-width:1.55; filter:none; }
 html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .audio-overlays-button .electric-control-icon { color:#db9200 !important; filter:drop-shadow(0 1px 2px #ffbd0033); }
-html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon [fill='currentColor'] { fill-opacity:.28; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode .electric-control-icon [fill='currentColor'] { fill-opacity:.06; }
 html[data-refinement='depth-electric'] .app-ui-overlay--audio-mode :is(.audio-pill-action__content,.audio-camera-button__content) > span:last-child { color:#194b88; }
 /* Each pill owns its fill and centers its contents in normal layout. */
 html[data-refinement='depth-electric'] :is(.pitch-insights-instrument-filter__pill,.pitch-insights-day-strip__cell) { position:relative; isolation:isolate; box-sizing:border-box; height:auto; min-height:44px; line-height:1.25; font-weight:550; text-indent:0; transform:none; }
@@ -278,36 +278,52 @@ html[data-refinement='depth-electric'] .review-overlay :is(.review-overlay-heade
 html[data-refinement='depth-electric'] .review-overlay-header::before,
 html[data-refinement='depth-electric'] .review-overlay-header::after { display:none; }
 html[data-refinement='depth-electric'] .review-native-nav p { color:#fff!important; text-shadow:0 1px 5px #000,0 0 12px #0008; }
-html[data-refinement='depth-electric'] .review-nav-button { background:#102239b3; color:#e6f6ff; border:1px solid #a3dfff45; box-shadow:0 4px 14px #0003; }
-html[data-refinement='depth-electric'] .review-controls-cluster { color:#ecf7ff; background:linear-gradient(145deg,#172d47e8,#091523ed); border:1px solid #89caff50; box-shadow:0 12px 38px #0004,inset 0 1px #d9f4ff24; border-radius:24px; }
-html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-controls span,.review-trim-actions span) { color:#b9d1e7; }
-html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-button,.review-toolbar-button) { color:#bfe9ff; }
+html[data-refinement='depth-electric'] .review-nav-button { background:#f5faffeb; color:#194b78; border:1px solid #ffffffb8; box-shadow:0 3px 12px #102f5120; }
+html[data-refinement='depth-electric'] .review-controls-cluster { color:#173753; background:linear-gradient(145deg,#f8fcfff2,#e8f3fcf2); border:1px solid #ffffffbd; box-shadow:0 8px 28px #123a5626,inset 0 1px #fff; border-radius:24px; }
+html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-controls span,.review-trim-actions span) { color:#47647f; }
+html[data-refinement='depth-electric'] .review-controls-cluster :is(.review-playback-button,.review-toolbar-button) { color:#195b91; }
 html[data-refinement='depth-electric'] .review-playback-button svg { fill:currentColor; }
-html[data-refinement='depth-electric'] .review-toolbar-button--active { color:#75dcff; background:#199aff30; }
-html[data-refinement='depth-electric'] .review-toolbar-button--destructive { color:#ff9d9d; }
+html[data-refinement='depth-electric'] .review-toolbar-button--active { color:#0066bd; background:#199aff1c; }
+html[data-refinement='depth-electric'] .review-toolbar-button--destructive { color:#b52b3f; }
 html[data-refinement='depth-electric'] .review-toolbar-button:disabled { opacity:.35; }
-html[data-refinement='depth-electric'] .review-native-toolbar { border-color:#b4d8ff20; padding:3px 8px 5px; }
-html[data-refinement='depth-electric'] .review-timeline-waveform__bar { background:#7fa3c459; }
-html[data-refinement='depth-electric'] .review-timeline-waveform__bar--played { background:#63d5ff; }
+html[data-refinement='depth-electric'] .review-native-toolbar { border-color:#30649924; padding:3px 8px 5px; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__bar { background:#467a9f40; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__bar--played { background:#168cda; }
 html[data-refinement='depth-electric'] .review-timeline-waveform__playhead,
-html[data-refinement='depth-electric'] .review-timeline-waveform__playhead span { background:#f6c55d; }
+html[data-refinement='depth-electric'] .review-timeline-waveform__playhead span { background:#cc8d17; }
 .review-trim-entry { display:flex; align-items:center; justify-content:center; gap:6px; margin:0 auto 6px; min-height:36px; padding:0 16px; border-radius:12px; font-size:12px; font-weight:600; }
-html[data-refinement='depth-electric'] .review-trim-entry { color:#bfe9ff; background:#78bfff18; }
-html[data-refinement='depth-electric'] .review-trim-action--cancel { color:#d3e6f5; }
-html[data-refinement='depth-electric'] .review-trim-action--done { background:#79daff; color:#10283f; }
+html[data-refinement='depth-electric'] .review-trim-entry { color:#195b91; background:#78bfff18; }
+html[data-refinement='depth-electric'] .review-trim-action--cancel { color:#365975; }
+html[data-refinement='depth-electric'] .review-trim-action--done { background:#1685d6; color:#fff; }
 .review-compare-caption { padding:12px 14px 7px; font-size:11px; font-weight:600; }
-html[data-refinement='depth-electric'] .review-compare-caption { color:#afcde5; }
+html[data-refinement='depth-electric'] .review-compare-caption { color:#48677f; }
 html[data-refinement='depth-electric'] .focused-review-strip { margin:0; padding:0 10px 6px; flex-wrap:wrap; }
-html[data-refinement='depth-electric'] .focused-review-switch { background:#08132180; border-color:#aad7ff26; border-radius:14px; min-width:130px; }
-html[data-refinement='depth-electric'] .focused-review-switch button { min-height:40px; color:#b8cee1; font-size:13px; border-radius:11px; }
+html[data-refinement='depth-electric'] .focused-review-switch { background:#dfeefa; border-color:#2d78b424; border-radius:14px; min-width:130px; }
+html[data-refinement='depth-electric'] .focused-review-switch button { min-height:40px; color:#365975; font-size:13px; border-radius:11px; }
 html[data-refinement='depth-electric'] .focused-review-switch button[aria-pressed='true'] { background:linear-gradient(140deg,#44bfff,#2776e5); color:white; box-shadow:0 2px 10px #1598ff40; }
-html[data-refinement='depth-electric'] :is(.focused-review-blind,.focused-review-pitch,.focused-review-loop) { min-height:44px; color:#d5edff; background:#477fab26; border-color:#8cccff30; font-size:11px; }
+html[data-refinement='depth-electric'] :is(.focused-review-blind,.focused-review-pitch,.focused-review-loop) { min-height:44px; color:#315d80; background:#ffffffb3; border-color:#448bbc2b; font-size:11px; }
 html[data-refinement='depth-electric'] .focused-review-blind span { display:inline; }
-html[data-refinement='depth-electric'] .focused-review-blind--active { color:#ffe1a1; border-color:#f5bd5466; background:#c28c191c; }
+html[data-refinement='depth-electric'] .focused-review-blind--active { color:#805916; border-color:#c9963d55; background:#fff1ce; }
 html[data-refinement='depth-electric'] .review-overlay .pitch-widget-living { border:1px solid #82cbff66; box-shadow:0 10px 34px #0003; }
-html[data-refinement='depth-electric'] .review-overlay :is(.pitch-compare-panel,.pitch-compare-empty) { color:#bad3e8; background:#122a41; border:1px solid #77c8ff30; border-radius:16px; margin:4px 10px; }
+html[data-refinement='depth-electric'] .review-overlay :is(.pitch-compare-panel,.pitch-compare-empty) { color:#365975; background:#f4faff; border:1px solid #77b3df40; border-radius:16px; margin:4px 10px; }
 html[data-refinement='depth-electric'] .review-overlay .pitch-compare-grid { display:none; }
 @media(prefers-reduced-motion:reduce) { .review-overlay * { scroll-behavior:auto; } }
-html[data-refinement='depth-electric'] .review-trim-handle { background:#f6c55d; box-shadow:0 0 0 2px #19283a; }
+html[data-refinement='depth-electric'] .review-trim-handle { background:#cc8d17; box-shadow:0 0 0 2px #fff; }
 html[data-refinement='depth-electric'] .review-trim-handle:focus-visible { outline:2px solid #fff; outline-offset:4px; }
-html[data-refinement='depth-electric'] .review-swipe-hint p { background:#14283c9e; color:#d0e8fa; border-color:#a5d9ff30; box-shadow:none; backdrop-filter:none; }
+html[data-refinement='depth-electric'] .review-swipe-hint p { background:#f3faffeb; color:#365975; border-color:#ffffff80; box-shadow:none; backdrop-filter:none; }
+
+/* Expanded take-card preview, using the approved Electric playback finish. */
+html[data-refinement='depth-electric'] .review-overlay--sheet { background:#edf6fe; }
+html[data-refinement='depth-electric'] .review-sheet-handle-bar { background:#57799566; }
+.review-quick-fullscreen { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#17669f; min-height:44px; }
+.review-quick-fullscreen:disabled { opacity:.4; }
+.review-overlay--sheet .review-overlay-header { padding-top:12px!important; }
+
+html[data-refinement='depth-electric'] .review-overlay--audio .review-native-nav p { color:#173753!important; text-shadow:none; }
+html[data-refinement='depth-electric'] .review-quick-fullscreen { padding:0 10px; border-radius:12px; background:#f3faffeb; }
+
+/* Fullscreen owns the viewport; safe-area padding belongs to its controls. */
+.review-overlay--immersive { position:fixed; inset:0!important; width:100%; height:100%; height:100dvh; max-width:none; max-height:none; border-radius:0; }
+
+html[data-refinement='depth-electric'] .review-overlay { color-scheme:light; --audio-text-primary:#173753; --audio-text-secondary:#47647f; --audio-bg-base:#f3f9fe; --audio-surface:#f6fbff; }
+html[data-refinement='depth-electric'] .review-action-menu { background:#f6fbfff5; color:#173753; border-color:#bcd9ef; }

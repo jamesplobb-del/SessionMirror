@@ -1474,7 +1474,7 @@ html.app-dark-mode .focused-cue-card textarea {
   box-shadow: 0 -12px 40px rgba(23, 26, 34, 0.22);
 }
 
-html.app-dark-mode .review-overlay--sheet {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--sheet {
   background: var(--audio-surface, rgba(15, 23, 42, 0.96));
 }
 
@@ -1489,7 +1489,7 @@ html.app-dark-mode .review-overlay--sheet {
   background: rgba(108, 112, 119, 0.35);
 }
 
-html.app-dark-mode .review-sheet-handle-bar {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-sheet-handle-bar {
   background: rgba(226, 232, 240, 0.3);
 }
 

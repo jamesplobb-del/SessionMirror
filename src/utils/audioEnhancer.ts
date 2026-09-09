@@ -247,7 +247,7 @@ export function applyAudioEnhancerSettings(
 
   const comp = clampPercent(settings.compression) / 100
   setParam(nodes.compressor.threshold, -12 - comp * 24, ctx, immediate)
-  setParam(nodes.compressor.ratio, 1.5 + comp * 6.5, ctx, immediate)
+  setParam(nodes.compressor.ratio, comp === 0 ? 1 : 1.5 + comp * 6.5, ctx, immediate)
   setParam(nodes.compressor.attack, 0.004 + (1 - comp) * 0.014, ctx, immediate)
   setParam(nodes.compressor.release, 0.09 + comp * 0.2, ctx, immediate)
   setParam(nodes.compressor.knee, 20, ctx, immediate)
@@ -380,7 +380,7 @@ export function buildNativeEnhancerParams(
     highHz: tuning.highHz,
     highGainDb: clampDb(settings.eq.high),
     thresholdDb: -12 - comp * 24,
-    ratio: 1.5 + comp * 6.5,
+    ratio: comp === 0 ? 1 : 1.5 + comp * 6.5,
     attackSec: 0.004 + (1 - comp) * 0.014,
     releaseSec: 0.09 + comp * 0.2,
     makeupDb: tuning.makeupDb + comp * 2.4,

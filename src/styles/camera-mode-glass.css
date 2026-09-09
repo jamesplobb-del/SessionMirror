@@ -612,7 +612,7 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode) .hud-header_
   border-color: var(--sm-gold-border);
 }
 
-html.app-dark-mode .review-overlay-header {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay-header {
   background: linear-gradient(
     to bottom,
     rgba(2, 6, 23, 0.9) 0%,
@@ -621,7 +621,7 @@ html.app-dark-mode .review-overlay-header {
   );
 }
 
-html.app-dark-mode .review-nav-button {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-nav-button {
   border-color: rgba(226, 232, 240, 0.14);
   background: rgba(15, 23, 42, 0.72);
   color: rgba(248, 250, 252, 0.94);
@@ -1140,29 +1140,29 @@ html.app-dark-mode .app-ui-overlay:not(.app-ui-overlay--audio-mode)
     inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
 }
 
-html.app-dark-mode .review-overlay--camera.review-overlay--immersive {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera.review-overlay--immersive {
   background: #020617 !important;
   color: rgba(248, 250, 252, 0.96);
 }
 
-html.app-dark-mode .review-overlay--camera .review-video-stage {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera .review-video-stage {
   background:
     radial-gradient(ellipse 130% 88% at 50% 44%, rgba(21, 152, 255, 0.1) 0%, rgba(15, 23, 42, 0.94) 42%, #020617 100%) !important;
 }
 
-html.app-dark-mode .review-overlay--camera .review-overlay-header {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera .review-overlay-header {
   background: linear-gradient(to bottom, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.58) 58%, rgba(2, 6, 23, 0) 100%) !important;
 }
 
-html.app-dark-mode .review-overlay--camera .review-native-nav p:first-child {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera .review-native-nav p:first-child {
   color: rgba(248, 250, 252, 0.96) !important;
 }
 
-html.app-dark-mode .review-overlay--camera .review-native-nav p:last-child {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera .review-native-nav p:last-child {
   color: rgba(170, 179, 194, 0.94) !important;
 }
 
-html.app-dark-mode .review-overlay--camera .review-nav-button {
+html.app-dark-mode:not([data-refinement='depth-electric']) .review-overlay--camera .review-nav-button {
   border-color: rgba(226, 232, 240, 0.12) !important;
   background: rgba(15, 23, 42, 0.82) !important;
   color: rgba(248, 250, 252, 0.96) !important;

@@ -1,6 +1,7 @@
 import { loadPracticePassage, savePracticePassage } from '../utils/practicePassages'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import {
   Activity,
   ChevronLeft,
@@ -10,6 +11,7 @@ import {
   EyeOff,
   Pin,
   Info,
+  Maximize2,
   Pencil,
   Repeat2,
   Share2,
@@ -25,7 +27,7 @@ import TakeVideoPlayer from './TakeVideoPlayer'
 import DraggablePitchWidget from './DraggablePitchWidget'
 import PitchComparisonGraph from './PitchComparisonGraph'
 import Pressable from './ui/Pressable'
-import { iosEaseOut, iosFade, iosScreenEnter, iosScreenExit, iosSpringSheet, motionGpuLayer } from '../utils/motionPresets'
+import { iosEaseOut, iosFade, iosScreenEnter, iosScreenExit, iosSpringSheet } from '../utils/motionPresets'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../hooks/useSheetDragDismiss'
 import { resetVideoPlayback, pauseVideoElement } from '../utils/videoPlayback'
 import { getPlayableDuration } from '../utils/videoDuration'
@@ -218,6 +220,8 @@ interface ReviewModeOverlayProps {
   onPlaybackActiveChange?: (playing: boolean) => void
   practiceProjectId?: string
   benchmarkLibraryId?: string
+  quickPreview?: boolean
+  onRequestFullscreen?: () => void
   focusedPractice?: boolean
   initialLoopStartSeconds?: number | null
   initialLoopEndSeconds?: number | null
@@ -257,6 +261,8 @@ export default function ReviewModeOverlay({
   onDeleteTake,
   onFavoriteTake,
   onPlaybackActiveChange,
+  quickPreview = false,
+  onRequestFullscreen,
   focusedPractice = false,
   practiceProjectId,
   benchmarkLibraryId,
@@ -1450,9 +1456,11 @@ export default function ReviewModeOverlay({
     setSwipeOffset(0)
   }
 
-  // The focused-practice "just recorded, check it" moment stays a sheet over
-  // the recorder — Vault's full-screen browsing is untouched.
-  const sheetMode = !isVault && focusedPractice
+  // Playback is fullscreen by default, including focused-practice and Vault.
+  // Only an explicitly requested quick preview uses the sheet presentation.
+  const [previewExpanded, setPreviewExpanded] = useState(false)
+  useEffect(() => { if (!isOpen) setPreviewExpanded(false) }, [isOpen])
+  const sheetMode = !isVault && !previewExpanded && quickPreview
   const [sheetSlideDistance] = useState(readSheetSlideDistance)
   const { sheetDragProps, dragHandleProps, backdropOpacity: sheetBackdropOpacity } =
     useSheetDragDismiss({
@@ -1465,7 +1473,7 @@ export default function ReviewModeOverlay({
     return null
   }
 
-  return (
+  return createPortal(
     <>
       {sheetMode && (
         <motion.button
@@ -1481,10 +1489,10 @@ export default function ReviewModeOverlay({
         />
       )}
       <motion.div
-        className={`review-overlay fixed z-[60] flex w-full flex-col overflow-hidden transform-gpu ${
+        className={`review-overlay fixed z-[60] flex w-full flex-col overflow-hidden ${activeIsAudio ? 'review-overlay--audio' : 'review-overlay--camera'} ${
           sheetMode
             ? 'review-overlay--sheet inset-x-0 bottom-0 h-[80dvh] rounded-t-[1.75rem]'
-            : `review-overlay--immersive inset-0 h-full ${activeIsAudio ? 'review-overlay--audio' : 'review-overlay--camera'}`
+            : 'review-overlay--immersive inset-0 h-full'
         }`}
         variants={
           sheetMode
@@ -1494,17 +1502,13 @@ export default function ReviewModeOverlay({
                 exit: { y: '100%', transition: iosSpringSheet },
               }
             : {
-                initial: { opacity: 0, scale: 0.96, y: 10 },
+                initial: { opacity: 0 },
                 animate: {
                   opacity: 1,
-                  scale: 1,
-                  y: 0,
                   transition: iosScreenEnter,
                 },
                 exit: {
                   opacity: 0,
-                  scale: 0.98,
-                  y: 6,
                   transition: iosScreenExit,
                 },
               }
@@ -1513,7 +1517,7 @@ export default function ReviewModeOverlay({
         animate="animate"
         exit="exit"
         style={{
-          ...motionGpuLayer,
+          willChange: sheetMode ? 'transform' : 'opacity',
           pointerEvents: isOpen ? 'auto' : 'none',
         }}
         aria-hidden={!isOpen}
@@ -1524,7 +1528,7 @@ export default function ReviewModeOverlay({
             <div className="review-sheet-handle-bar" />
           </div>
         )}
-        <div ref={reviewBoundsRef} className="relative h-full w-full">
+        <div ref={reviewBoundsRef} className="relative min-h-0 w-full flex-1">
         {trimApplying && <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/30 text-white" role="status">Saving trim…</div>}
       <AnimatePresence>
         {showPlayOverlay && (
@@ -1549,6 +1553,17 @@ export default function ReviewModeOverlay({
               </Pressable>
 
               <div className="min-w-0 text-center">
+                {quickPreview && !previewExpanded && (
+                  <button
+                    type="button"
+                    className="review-quick-fullscreen"
+                    disabled={trimApplying}
+                    onClick={() => { setPreviewExpanded(true); onRequestFullscreen?.() }}
+                    aria-label="Open full screen"
+                  >
+                    <Maximize2 size={14} />Full screen
+                  </button>
+                )}
                 <p className="truncate text-[17px] font-semibold leading-tight text-[#171a22]">
                   {activeName || activeLabel}
                 </p>
@@ -1963,6 +1978,7 @@ export default function ReviewModeOverlay({
         </AnimatePresence>
       </div>
       </motion.div>
-    </>
+    </>,
+    document.body,
   )
 }

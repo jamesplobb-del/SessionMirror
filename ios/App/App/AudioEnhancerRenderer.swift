@@ -294,6 +294,10 @@ final class AudioEnhancerRenderer {
         // Compressor mapping from the WebAudio DynamicsCompressor semantics.
         // Note: attack/release are already seconds on both sides. The AudioUnit
         // has no ratio/knee params — ratio is approximated via HeadRoom.
+        let bypassCompression = params.ratio <= 1
+        compressor.bypass = bypassCompression
+        // The profile gain remains independent of the compression control.
+        postCompressor.outputVolume = bypassCompression ? powf(10, params.makeupDb / 20) : 1
         let compUnit = compressor.audioUnit
         setParam(compUnit, kDynamicsProcessorParam_Threshold, params.thresholdDb)
         let headRoom = max(0.1, min(40, abs(params.thresholdDb) / max(1, params.ratio)))

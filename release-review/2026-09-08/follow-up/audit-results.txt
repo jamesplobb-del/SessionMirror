@@ -1,0 +1,7 @@
+PASS: normal mixer/trim/section persistence and deleted-take lookup
+PASS: mixer and trim reach native export request (mock bridge, not media render)
+FINDING: section window reaches export: false
+FINDING: restored invalid volume/BPM: 99 -20
+FINDING: compression at 0 has ratio: 1.5
+PASS: zero reverb disables wet feed
+PASS: preset edits do not mutate shared defaults

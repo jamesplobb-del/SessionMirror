@@ -940,7 +940,7 @@ export default function SettingsDrawer({
                 <SwitchRow
                   icon={Sparkles}
                   tint={TINT.orange}
-                  label="Audio Enhancer"
+                  label="Tone Studio"
                   checked={hudQuickSettings.audioEnhancerEnabled}
                   onChange={onAudioEnhancerChange}
                 />

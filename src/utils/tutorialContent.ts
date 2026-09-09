@@ -405,7 +405,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Workspace',
     body: 'Tap the stacked-layers icon beside Record in Camera or Audio Mode to arrange the recorder and open related views.',
     bullets: [
-      'Camera: Pitch Analysis, Take Cards, Metronome, Audio Enhancer, Hands-free, Expand View, and Multitrack',
+      'Camera: Pitch Analysis, Take Cards, Metronome, Tone Studio, Hands-free, Expand View, and Multitrack',
       'Audio and tool tabs show the controls that fit the current workspace',
       'Tap a control to show, hide, or open it without visiting Settings',
       'Use the cog at the right end of the pill for full settings',

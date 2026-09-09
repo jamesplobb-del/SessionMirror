@@ -321,7 +321,7 @@ export default function SettingsBranchWheel({
 
     items.push({
       id: 'audio-enhancer',
-      label: 'Audio Enhancer',
+      label: 'Tone Studio',
       icon: 'enhancer',
       active: audioEnhancerEnabled,
       onSelect: () => onAudioEnhancerChange(!audioEnhancerEnabled),
