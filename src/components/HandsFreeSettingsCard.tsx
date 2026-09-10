@@ -3,7 +3,7 @@ import { Minus, Plus, X } from 'lucide-react'
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Pressable from './ui/Pressable'
-import { iosFade, iosSpringSnappy } from '../utils/motionPresets'
+import { iosFade, iosSpringSnappy, motionExitHide, motionGpuLayer } from '../utils/motionPresets'
 
 interface HandsFreeSettingsCardProps {
   open: boolean
@@ -60,15 +60,19 @@ export default function HandsFreeSettingsCard({
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="hands-free-card-layer">
-          <motion.button
+        <motion.div
+          key="hands-free-card"
+          className="hands-free-card-layer"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transitionEnd: motionExitHide }}
+          transition={iosFade}
+          style={motionGpuLayer}
+        >
+          <button
             type="button"
             className="hands-free-card-backdrop"
             aria-label="Close hands-free settings"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={iosFade}
             onClick={onClose}
           />
           <motion.section
@@ -76,9 +80,9 @@ export default function HandsFreeSettingsCard({
             role="dialog"
             aria-modal="true"
             aria-labelledby="hands-free-card-title"
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 8 }}
+            initial={{ scale: 0.96, y: 10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.97, y: 8 }}
             transition={iosSpringSnappy}
           >
             <header className="hands-free-card__header">
@@ -169,7 +173,7 @@ export default function HandsFreeSettingsCard({
 
             <p className="hands-free-card__hint">Start playing to record. Pause to listen back. After playback, wait for “Your turn” and play again. Use Finish & listen to end a take yourself. Long-press Record to turn hands-free off.</p>
           </motion.section>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

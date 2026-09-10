@@ -7,6 +7,7 @@ import {
   iosSheetBackdrop,
   iosSheetPremium,
   iosSpringSheet,
+  motionExitHide,
   motionGpuLayer,
 } from '../../utils/motionPresets'
 import { PHYSICAL_UI_ROOT_ID } from '../../utils/physicalUiPortal'
@@ -129,7 +130,7 @@ export default function AnimatedBottomSheet({
     ? 'native-bottom-sheet--audio-light native-bottom-sheet--vault'
     : elevatedLight
       ? 'native-bottom-sheet--audio-light'
-      : 'border border-white/70 bg-white/90 shadow-2xl backdrop-blur-2xl'
+      : 'border border-white/70 shadow-2xl'
 
   const backdropClass = transparentBackdrop
     ? ''
@@ -137,7 +138,7 @@ export default function AnimatedBottomSheet({
       ? 'native-sheet-backdrop--audio-light'
       : elevatedLight
         ? 'native-sheet-backdrop--audio-light'
-        : 'bg-black/70 backdrop-blur-[10px]'
+        : 'bg-black/70'
 
   const portalTarget = elevated
     ? document.body
@@ -148,12 +149,13 @@ export default function AnimatedBottomSheet({
       {isOpen && (
         <>
           <motion.button
+            key="sheet-backdrop"
             type="button"
             className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${backdropClass} ${zClass ? zClass.backdrop : elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transitionEnd: motionExitHide }}
             transition={backdropTransition}
             style={{
               ...motionGpuLayer,
@@ -163,6 +165,7 @@ export default function AnimatedBottomSheet({
           />
 
           <motion.div
+            key="sheet-surface"
             ref={sheetRef}
             className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] transform-gpu ${sheetSurfaceClass} ${zClass ? zClass.sheet : elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             role="dialog"
@@ -175,7 +178,7 @@ export default function AnimatedBottomSheet({
             }}
             initial={reduceMotion ? {opacity:0,y:0} : useScale ? { opacity: 0, y: slideDistance, scale: 0.965 } : { opacity: 0, y: slideDistance }}
             animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
-            exit={reduceMotion ? {opacity:0,y:0} : useScale ? { opacity: 0, y: slideDistance, scale: 0.98 } : { opacity: 0, y: slideDistance }}
+            exit={reduceMotion ? {opacity:0,y:0, transitionEnd: motionExitHide} : useScale ? { opacity: 0, y: slideDistance, scale: 0.98, transitionEnd: motionExitHide } : { opacity: 0, y: slideDistance, transitionEnd: motionExitHide }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
             {...sheetDragProps}

@@ -360,9 +360,93 @@ html.app-dark-mode .practice-menu-layer .practice-menu-card.practice-menu-card--
 .practice-menu-card--home :is(.practice-menu-eyebrow, .practice-home-row small) { color: var(--guide-muted); }
 
 .routine-guide-editor .practice-menu-section { border: 1px solid var(--guide-line); background: var(--guide-panel); color: var(--guide-ink); border-radius: 20px; padding: 20px; }
+/* Hub grouping chrome is itself a rounded card. Inside the editor section
+ * that became a second pill sitting behind Metronome / Drone / Pitch graph. */
+.routine-guide-editor .practice-menu-form {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .routine-guide-editor :is(.routine-tools-lead__intro, .routine-tool__hint, .practice-menu-note) { color: var(--guide-muted); font-size: 12px; line-height: 1.5; }
-.routine-guide-editor :is(input, select, .routine-kind, .routine-pitch, .routine-segment) { background: var(--guide-bg); color: var(--guide-ink); border: 1px solid var(--guide-line); border-radius: 12px; font-family: inherit; }
+.routine-guide-editor :is(.practice-menu-field input, .routine-kind, .routine-pitch) { background: var(--guide-bg); color: var(--guide-ink); border: 1px solid var(--guide-line); border-radius: 12px; font-family: inherit; }
 .routine-guide-editor :is(.routine-kind.is-on, .routine-pitch.is-on), .routine-guide .routine-segment button:is([aria-checked='true'], [aria-pressed='true']) { color: var(--guide-accent); background: var(--guide-selected); border-color: var(--guide-accent); }
+.routine-guide-editor .routine-program-setup {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--guide-line);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+}
+.routine-guide-editor .routine-program-setup .practice-menu-eyebrow {
+  margin: 0;
+}
+.routine-program-setup__pill {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0.4rem 2.2rem 0.4rem 0.85rem;
+  text-align: left;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.routine-program-setup__pill:focus-within {
+  outline: 3px solid var(--guide-accent);
+  outline-offset: 4px;
+}
+.routine-program-setup__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.routine-program-setup__pill::after {
+  content: '';
+  position: absolute;
+  right: 0.85rem;
+  top: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.45;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+/* Same overlay as `.routine-instrument`: visible CSS pill, native wheel on top. */
+.routine-program-setup__pill select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  opacity: 0;
+  font-size: 16px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  outline: none;
+}
+html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pill select {
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+.routine-guide-editor .routine-program-setup .routine-tool__hint {
+  margin: 0;
+}
 .routine-guide-editor .routine-tool__toggle { color: var(--guide-ink); }
 .routine-guide-editor .routine-tool__toggle[aria-checked='true'] i { background: var(--guide-accent); }
 .routine-guide-editor .routine-tool { border-color: var(--guide-line); padding-block: 12px; }

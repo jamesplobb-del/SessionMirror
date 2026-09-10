@@ -19,7 +19,7 @@ import {
   triggerMetronomeTapHaptic,
   triggerMetronomeToggleHaptic,
 } from '../utils/haptics'
-import { iosDragRelease } from '../utils/motionPresets'
+import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 import { usePinchResize } from '../hooks/usePinchResize'
 import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import MetronomeAudioSelect from './audioPractice/MetronomeAudioSelect'
@@ -480,7 +480,7 @@ export default function DraggableMetronomeWidget({
       className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.94 }}
+      exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
       style={{
         x: dragX,

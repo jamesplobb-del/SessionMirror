@@ -14,8 +14,8 @@ import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
-import { motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
-import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
+import { motionExitHide, motionGpuLayer, nativeGlideEase } from '../utils/motionPresets'
+import { NATIVE_SQUISH } from '../utils/interactiveUx'
 import { triggerLightHaptic } from '../utils/haptics'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { MAX_WORKSPACE_DESKS, type WorkspaceDesk } from '../utils/workspaceDesks'
@@ -420,23 +420,26 @@ export default function SettingsBranchWheel({
   return createPortal(
     <AnimatePresence onExitComplete={handleExitComplete}>
       {open && anchor && trayGeometry && (
-        <>
-          <motion.button
+        <motion.div
+          key="workspace-tray"
+          className="settings-branch-layer"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transitionEnd: motionExitHide }}
+          transition={BRANCH_MOTION}
+          style={motionGpuLayer}
+        >
+          <button
             type="button"
             data-tutorial="branch-backdrop"
-            className="settings-branch-backdrop fixed inset-0 z-[200] cursor-default touch-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={BRANCH_MOTION}
-            style={motionGpuLayer}
+            className="settings-branch-backdrop cursor-default touch-none"
             aria-label="Close workspace"
             onPointerDown={(event) => event.preventDefault()}
             onClick={onClose}
           />
 
           <div
-            className="settings-branch-tray-anchor pointer-events-none fixed z-[201]"
+            className="settings-branch-tray-anchor pointer-events-none"
             style={{
               left: trayGeometry.centerX,
               top: savingDesk ? `calc(${anchor.viewportTop}px + max(20px, env(safe-area-inset-top)))` : trayGeometry.top,
@@ -444,19 +447,11 @@ export default function SettingsBranchWheel({
               transform: savingDesk ? 'translateX(-50%)' : 'translate(-50%, -100%)',
             }}
           >
-            <motion.div
+            <div
               className={`settings-branch-tray settings-branch-tray--${layoutMode} pointer-events-auto relative`}
               role="menu"
               aria-label="Workspace"
-              initial={{ opacity: 0, y: layoutMode === 'camera' ? 6 : 0 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: layoutMode === 'camera' ? 6 : 0 }}
-              transition={BRANCH_MOTION}
-              style={{
-                ...motionGpuLayer,
-                ...(savingDesk ? { maxHeight: Math.max(100, anchor.viewportHeight - 100), overflowY: 'auto' as const } : {}),
-                transformOrigin: `${trayGeometry.arrowX}px 100%`,
-              }}
+              style={savingDesk ? { maxHeight: Math.max(100, anchor.viewportHeight - 100), overflowY: 'auto' } : undefined}
             >
               <div className="settings-branch-tray__header">
                 <span className="settings-branch-tray__title">Workspace</span>
@@ -549,7 +544,7 @@ export default function SettingsBranchWheel({
                         : undefined
 
                   return (
-                    <motion.button
+                    <button
                       key={item.id}
                       type="button"
                       role={item.kind === 'action' ? 'menuitem' : 'menuitemcheckbox'}
@@ -557,11 +552,6 @@ export default function SettingsBranchWheel({
                       className={`settings-branch-tray__item ${NATIVE_SQUISH} ${
                         item.active ? 'settings-branch-tray__item--active' : ''
                       }`}
-                      initial={nativeGlideIn}
-                      animate={nativeGlideShown}
-                      exit={nativeGlideIn}
-                      transition={BRANCH_MOTION}
-                      style={motionGpuLayer}
                       disabled={item.disabled}
                       title={item.disabled ? 'Stop the take to change hands-free' : undefined}
                       aria-label={item.label}
@@ -595,7 +585,7 @@ export default function SettingsBranchWheel({
                         </span>
                         <span className="settings-branch-tray__label">{item.label}</span>
                       </span>
-                    </motion.button>
+                    </button>
                   )
                 })}
               </div>
@@ -620,9 +610,9 @@ export default function SettingsBranchWheel({
                 style={{ left: trayGeometry.arrowX }}
                 aria-hidden="true"
               />}
-            </motion.div>
+            </div>
           </div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

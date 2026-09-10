@@ -882,10 +882,9 @@ export function StepEditor({
             )}
           </div>
           <p className="practice-menu-note">{summarizeDesk(desk, tunerTransposition)}</p>
+          <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />
         </section>
       )}
-
-      {kindNeedsDesk(step.kind) && <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />}
 
 
       </>}

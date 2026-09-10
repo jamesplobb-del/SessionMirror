@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict'
+import { build } from 'esbuild'
+const bundle = await build({ entryPoints: ['src/utils/cameraDoubleTap.ts'], bundle: true, write: false, format: 'esm', platform: 'node' })
+const { createCameraDoubleTapGesture } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`)
+let time = 0
+const g = createCameraDoubleTapGesture(() => time)
+const event = (x = 100, y = 100, id = 1, primary = true) => ({ pointerId:id, clientX:x, clientY:y, isPrimary:primary, button:0 })
+function tap(x=100,y=100) { g.down(event(x,y)); time+=45; const flip=g.up(event(x,y)); g.leave(); time+=65; return flip }
+assert.equal(tap(),false)
+assert.equal(tap(),true, 'Touch pointerleave after finger-up must not erase the first tap')
+assert.equal(tap(),false, 'Triple tap must not flip twice')
+g.cancel();assert.equal(tap(),false);time+=500;assert.equal(tap(),false)
+g.cancel();tap();assert.equal(tap(200),false, 'Distant taps do not combine')
+g.cancel();g.down(event());g.move(event(140));g.move(event());time+=45;assert.equal(g.up(event()),false);assert.equal(tap(),false)
+g.cancel();g.down(event());g.down(event(140,100,2,false));time+=45;assert.equal(g.up(event()),false);assert.equal(tap(),false)
+g.cancel();g.down(event());time+=400;assert.equal(g.up(event()),false);assert.equal(tap(),false)
+g.cancel();tap();g.cancel();assert.equal(tap(),false, 'Opening a sheet cancels the gesture')
+g.cancel();g.down(event());g.leave();assert.equal(g.up(event()),false)
+const constraintsBundle = await build({ entryPoints:['src/utils/videoCapture.ts'], bundle:true, write:false, format:'esm', platform:'node' })
+const c=await import(`data:text/javascript;base64,${Buffer.from(constraintsBundle.outputFiles[0].text).toString('base64')}`)
+assert.equal(c.getPortraitVideoCaptureConstraints().facingMode,'user')
+c.setCameraFacingFront(false)
+assert.equal(c.getPortraitVideoCaptureConstraints().facingMode,'environment')
+assert.equal(c.getLandscapeVideoCaptureConstraints().facingMode,'environment')
+c.setCameraFacingFront(true)
+assert.equal(c.getPortraitVideoCaptureConstraints().facingMode,'user')
+console.log('PASS: double taps, touch release, triple taps, timing, distance, drag, pinch, long press, cancellation, and persistent lens constraints.')

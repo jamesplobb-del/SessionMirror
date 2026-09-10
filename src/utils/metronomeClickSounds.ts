@@ -2,10 +2,23 @@ import type { MetronomeClickTier } from './metronomeConfig'
 
 export type MetronomeSoundId = 'classic' | 'woodblock' | 'soft' | 'electronic'
 
-// Match BestTakeClickSound in MetronomeEngine.swift. All paths use the same
-// voices and envelope, including the native multitrack count-in.
-export const CLICK_ATTACK_SEC = 0.0008
-export const CLICK_OUTPUT_GAIN = 0.85
+const CLICK_ATTACK_SEC = 0.0015
+
+/*
+ * Electronic was the only voice that cut through, because it was the only one
+ * pitched high enough — 1800 Hz against 220–1000 Hz for the other three, which
+ * sat right where a loud instrument masks them completely. So the other three
+ * are lifted into Electronic's register (1.7–2.4 kHz, the band the ear is most
+ * sensitive to) and Electronic itself moves only slightly, staying the
+ * brightest of the set and recognisably itself.
+ *
+ * Decays are short across the board so every click reads as a transient rather
+ * than a pitched tone, and the three tiers stay far enough apart in level that
+ * the downbeat is unmistakable.
+ */
+
+/* Each voice steps down in both pitch and level across the four tiers, so the
+ * hierarchy downbeat > accent > beat > offbeat is audible without counting. */
 
 const TIER_CLASSIC: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {
   downbeat: { hz: 2150, peak: 1.0, decaySec: 0.03 },
@@ -21,6 +34,8 @@ const TIER_WOODBLOCK: Record<MetronomeClickTier, { hz: number; peak: number; dec
   subdivision: { hz: 1350, peak: 0.32, decaySec: 0.015 },
 }
 
+/** Still the gentlest of the four, but no longer a dull thud — it keeps the
+ * high fundamental and simply rings longer and quieter. */
 const TIER_SOFT: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }> = {
   downbeat: { hz: 1700, peak: 0.6, decaySec: 0.045 },
   macro: { hz: 1450, peak: 0.42, decaySec: 0.04 },
@@ -36,40 +51,54 @@ const TIER_ELECTRONIC: Record<MetronomeClickTier, { hz: number; peak: number; de
 }
 
 export function normalizeMetronomeSoundId(id: string): MetronomeSoundId {
-  return id === 'woodblock' || id === 'soft' || id === 'electronic' ? id : 'classic'
+  if (id === 'woodblock' || id === 'soft' || id === 'electronic') return id
+  return 'classic'
 }
 
-export function metronomeClickProfile(tier: MetronomeClickTier, soundId: string) {
-  switch (normalizeMetronomeSoundId(soundId)) {
-    case 'woodblock': return TIER_WOODBLOCK[tier]
-    case 'soft': return TIER_SOFT[tier]
-    case 'electronic': return TIER_ELECTRONIC[tier]
-    default: return TIER_CLASSIC[tier]
-  }
-}
+function scheduleOscillatorClick(
+  ctx: AudioContext,
+  when: number,
+  tier: MetronomeClickTier,
+  outputNode: AudioNode,
+  muted: boolean,
+  profile: Record<MetronomeClickTier, { hz: number; peak: number; decaySec: number }>,
+  wave: OscillatorType,
+): void {
+  const { hz, peak, decaySec } = profile[tier]
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
 
-/** Smooth, zero-ended clicks. Modal sines give each voice its own character
- * without the buzzy overtones and aliasing of a hard square wave. */
-export function metronomeClickSample(time: number, tier: MetronomeClickTier, soundId: string): number {
-  const { hz, peak, decaySec } = metronomeClickProfile(tier, soundId)
-  if (time <= 0 || time >= decaySec) return 0
-  const attack = Math.min(1, time / CLICK_ATTACK_SEC)
-  const release = Math.min(1, (decaySec - time) / 0.002)
-  const envelope = Math.sin(attack * Math.PI / 2) ** 2 *
-    Math.exp(-6 * Math.max(0, time - CLICK_ATTACK_SEC) / (decaySec - CLICK_ATTACK_SEC)) *
-    Math.sin(release * Math.PI / 2) ** 2
-  const phase = 2 * Math.PI * hz * time
-  let wave: number
-  switch (normalizeMetronomeSoundId(soundId)) {
-    case 'woodblock': wave = 0.72 * Math.sin(phase) + 0.28 * Math.sin(phase * 1.48); break
-    case 'soft': wave = Math.sin(phase); break
-    case 'electronic': wave = 0.85 * Math.sin(phase) + 0.15 * Math.sin(phase * 2); break
-    default: wave = 0.8 * Math.sin(phase) + 0.2 * Math.sin(phase * 2.7)
-  }
-  return wave * envelope * peak * CLICK_OUTPUT_GAIN
-}
+  osc.type = wave
+  osc.frequency.value = hz
 
-const clickBuffers = new WeakMap<AudioContext, Map<string, AudioBuffer>>()
+  const effectivePeak = muted ? 0.0001 : Math.max(peak, 0.0002)
+
+  gain.gain.setValueAtTime(0.0001, when)
+  gain.gain.exponentialRampToValueAtTime(effectivePeak, when + CLICK_ATTACK_SEC)
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + decaySec)
+
+  osc.connect(gain)
+  gain.connect(outputNode)
+
+  // WebKit can retain ended nodes that remain connected to a long-lived
+  // destination graph. A continuous metronome creates thousands of these
+  // short voices, so explicitly detach each one as soon as it finishes.
+  osc.addEventListener(
+    'ended',
+    () => {
+      try {
+        osc.disconnect()
+        gain.disconnect()
+      } catch {
+        /* graph may already have been released during a route transition */
+      }
+    },
+    { once: true },
+  )
+
+  osc.start(when)
+  osc.stop(when + decaySec + 0.01)
+}
 
 export function scheduleMetronomeClick(
   ctx: AudioContext,
@@ -79,22 +108,21 @@ export function scheduleMetronomeClick(
   muted: boolean,
   soundId: string,
 ): void {
-  if (muted) return
   const sound = normalizeMetronomeSoundId(soundId)
-  let buffers = clickBuffers.get(ctx)
-  if (!buffers) { buffers = new Map(); clickBuffers.set(ctx, buffers) }
-  const key = `${sound}:${tier}`
-  let buffer = buffers.get(key)
-  if (!buffer) {
-    const duration = metronomeClickProfile(tier, sound).decaySec
-    buffer = ctx.createBuffer(1, Math.ceil(duration * ctx.sampleRate) + 1, ctx.sampleRate)
-    const samples = buffer.getChannelData(0)
-    for (let i = 0; i < samples.length; i++) samples[i] = metronomeClickSample(i / ctx.sampleRate, tier, sound)
-    buffers.set(key, buffer)
+
+  // Waveform separates the four voices now that they share a register:
+  // sine = pure, triangle = bright, square = cutting.
+  switch (sound) {
+    case 'woodblock':
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_WOODBLOCK, 'square')
+      return
+    case 'soft':
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_SOFT, 'sine')
+      return
+    case 'electronic':
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_ELECTRONIC, 'square')
+      return
+    default:
+      scheduleOscillatorClick(ctx, when, tier, outputNode, muted, TIER_CLASSIC, 'triangle')
   }
-  const source = ctx.createBufferSource()
-  source.buffer = buffer
-  source.connect(outputNode)
-  source.addEventListener('ended', () => source.disconnect(), { once: true })
-  source.start(when)
 }

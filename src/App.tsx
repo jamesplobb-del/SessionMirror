@@ -2135,6 +2135,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     elapsed,
     recordingMode,
     changeRecordingMode,
+    switchCamera,
+    cameraFacingFront,
+    isSwitchingCamera,
     toggleRecording,
     startRecording,
     startAutoRecording,
@@ -2468,6 +2471,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const nativeHandsFreeCaptureActive = isNativeAudioCaptureActive()
   const autoMonitoringAllowed =
     !practiceTransitionBusy &&
+    !isSwitchingCamera &&
     pendingTakeSaves === 0 &&
     !isVaultOpen &&
     !isSettingsOpen &&
@@ -2702,7 +2706,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const vaultHydrateInFlightRef = useRef(false)
   /** Blocks ghost-tap reopen after sheet close (tuner tab has high-frequency pitch updates). */
   const overlayOpenSuppressUntilRef = useRef(0)
-  const settingsOpenInFlightRef = useRef(false)
 
   const canOpenOverlaySheet = useCallback(() => {
     return performance.now() >= overlayOpenSuppressUntilRef.current
@@ -2825,30 +2828,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [loadVaultTakesFromFilesystem])
 
   const handleOpenSettings = useCallback(() => {
-    if (!canOpenOverlaySheet() || isExperimentalOpen || settingsOpenInFlightRef.current) return
-    const openSettings = () => {
-      settingsOpenInFlightRef.current = false
-      if (!canOpenOverlaySheet() || isExperimentalOpen) return
-      setShowPitch(false)
-      setIsVaultOpen(false)
-      setIsSettingsOpen(true)
-      deferHudMediaPause()
-    }
-
-    if (recordingModeRef.current === 'video' && isAutoPreRollCaptureActive()) {
-      settingsOpenInFlightRef.current = true
-      void disarmAutoRecording().finally(openSettings)
-      return
-    }
-
-    openSettings()
-  }, [
-    canOpenOverlaySheet,
-    deferHudMediaPause,
-    disarmAutoRecording,
-    isAutoPreRollCaptureActive,
-    isExperimentalOpen,
-  ])
+    if (!canOpenOverlaySheet() || isExperimentalOpen) return
+    // Commit the menu first. Stopping a pre-roll can wait for the native writer
+    // to finish; that wait must not delay the user's navigation.
+    setIsVaultOpen(false)
+    setIsSettingsOpen(true)
+    deferHudMediaPause()
+    scheduleAfterPaint(() => {
+      if (isAutoPreRollCaptureActive()) {
+        void disarmAutoRecording().catch((error) => {
+          console.warn('[Settings] pre-roll cleanup failed', error)
+        })
+      }
+    })
+  }, [canOpenOverlaySheet, deferHudMediaPause, disarmAutoRecording, isAutoPreRollCaptureActive, isExperimentalOpen])
 
   /*
    * Tools and Camera are two different rooms, and the workspace widgets do not
@@ -3146,6 +3139,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
   }, [])
 
+
+  const handleSwitchCamera = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    void switchCamera().catch(() => {
+      showAlertOutsideTree({ message: 'Could not switch cameras. Please try again.', tone: 'error' })
+    })
+  }, [settings.hapticFeedback, switchCamera])
 
   const handleCloseSettings = useCallback(() => {
     if (import.meta.env.DEV) {
@@ -5928,7 +5928,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
-                pauseNativePreviewUpdates={hudModalState !== 'idle' || quickSettingsOpen}
+                pauseNativePreviewUpdates={hudModalState === 'review'}
+                cameraFacingFront={cameraFacingFront}
+                onSwitchCamera={ready && hudModalState === 'idle' && !quickSettingsOpen && !isRecording && !isStopping ? handleSwitchCamera : undefined}
                 nativeCameraBridgeEnabled={isNativeCameraPlatform}
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
@@ -6023,14 +6025,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               <div
                 className={`drone-display-layer${
-                  droneWidgetInteractive ? '' : ' floating-widget-layer--inert'
+                  metronomeHudSuspended ? ' floating-widget-layer--inert' : ''
                 }`}
                 aria-hidden={!droneWidgetInteractive}
               >
-                {showFloatingDroneWidget && (
-                  <Suspense fallback={null}>
-                    <AnimatePresence>
+                <Suspense fallback={null}>
+                  <AnimatePresence>
+                    {showFloatingDroneWidget && (
                       <DraggableDroneWidget
+                        key="desk-drone"
                         boundaryRef={appShellRef}
                         positionId="desk-drone"
                         defaultTopOffset={deskWidgetTopOffset + 158}
@@ -6041,9 +6044,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseDrone}
                       />
-                    </AnimatePresence>
-                  </Suspense>
-                )}
+                    )}
+                  </AnimatePresence>
+                </Suspense>
               </div>
 
               {/* Sibling of the rotator, not a child: `.app-ui-rotator` is a
@@ -6293,6 +6296,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           cameraNeedsPermission={cameraNeedsPermission}
                           recordingMode={recordingMode}
                           isRecording={isRecording}
+                          cameraFacingFront={cameraFacingFront}
+                          onSwitchCamera={ready && hudModalState === 'idle' && !quickSettingsOpen && !isRecording && !isStopping ? handleSwitchCamera : undefined}
                           cameraReady={ready}
                           cameraResumeNonce={cameraResumeNonce}
                           nativeLivePreviewActive={nativeLivePreviewActive}

@@ -3,7 +3,7 @@ import { useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ActionSheetTone } from '../../context/ActionSheetContext'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
-import { iosFade, iosSheetPremium, motionGpuLayer } from '../../utils/motionPresets'
+import { iosFade, iosSheetPremium, motionExitHide, motionGpuLayer } from '../../utils/motionPresets'
 
 type SheetRequest =
   | {
@@ -66,18 +66,20 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
       {request && (
         <>
           <motion.button
+            key="action-sheet-backdrop"
             type="button"
             className="action-sheet-backdrop fixed inset-0 z-[620] cursor-default touch-none bg-black/45"
             aria-label="Dismiss dialog"
             initial={{ opacity: 0 }}
             animate={{ opacity: backdropOpacity }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transitionEnd: motionExitHide }}
             transition={iosFade}
             style={motionGpuLayer}
             onClick={onCancel}
           />
 
           <motion.div
+            key="action-sheet-host"
             role="dialog"
             aria-modal="true"
             aria-labelledby="action-sheet-message"
@@ -88,7 +90,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
             }}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 28 }}
+            exit={{ opacity: 0, y: 28, transitionEnd: motionExitHide }}
             transition={iosSheetPremium}
             {...sheetDragProps}
           >
@@ -99,7 +101,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
               <div className="h-1 w-10 rounded-full bg-stone-300/70" />
             </div>
 
-            <div className="action-sheet-panel overflow-hidden rounded-2xl bg-white/95 shadow-2xl backdrop-blur-xl">
+            <div className="action-sheet-panel overflow-hidden rounded-2xl bg-white/95 shadow-2xl">
               <div className="action-sheet-copy border-b border-stone-200/80 px-4 py-4 text-center">
                 {request.title && (
                   <p className="text-sm font-semibold text-stone-900">{request.title}</p>
@@ -147,7 +149,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
               <button
                 type="button"
                 onClick={onCancel}
-                className="action-sheet-cancel mt-2 w-full rounded-2xl bg-white/95 py-3.5 text-[17px] font-semibold text-sky-600 shadow-2xl backdrop-blur-xl active:bg-stone-100"
+                className="action-sheet-cancel mt-2 w-full rounded-2xl bg-white/95 py-3.5 text-[17px] font-semibold text-sky-600 shadow-2xl active:bg-stone-100"
               >
                 Cancel
               </button>

@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core'
+import { isHeadphoneOutputActive } from './headphoneOutput'
 
 /**
  * Playback is deliberately FLAT.
@@ -68,10 +70,20 @@ export function youtubeVolumeFromUiSlider(uiVolume: number): number {
   return Math.round(Math.min(100, Math.max(YOUTUBE_VOLUME_FLOOR, boosted)))
 }
 
-/** Click samples carry their own calibrated level. Extra gain flattens accents. */
-export const METRONOME_GAIN_SPEAKER = 1
-export const METRONOME_GAIN_SPEAKER_WEB = 1
+/**
+ * Metronome clicks stay in WKWebView rather than the native engine, and a click
+ * has no dynamics worth protecting, so it can sit above take-playback gain
+ * without the clipping that would spoil a recording.
+ */
+export const METRONOME_GAIN_SPEAKER = 6
+export const METRONOME_GAIN_SPEAKER_WEB = 3
 
 export function metronomeSpeakerGain(muted: boolean): number {
-  return muted ? 0 : 1
+  if (muted) return 0
+  if (isHeadphoneOutputActive()) {
+    return effectiveHeadphoneGain(1, false)
+  }
+  return Capacitor.isNativePlatform()
+    ? METRONOME_GAIN_SPEAKER
+    : METRONOME_GAIN_SPEAKER_WEB
 }

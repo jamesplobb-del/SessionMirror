@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type Component
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
-import { iosDragRelease } from '../utils/motionPresets'
+import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 
 type TunerProps = Omit<
   ComponentProps<typeof LivePitchTuner>,
@@ -205,7 +205,7 @@ export default function DraggablePitchWidget({
         className={`pitch-widget-audio pitch-widget-audio--${layoutRegion} pitch-widget-audio--stage pointer-events-none absolute z-[5] flex min-h-0 flex-col`}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 10 }}
+        exit={{ opacity: 0, y: 10, transitionEnd: motionExitHide }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
         <div className="pitch-widget-audio__stage relative flex min-h-0 max-h-full w-full flex-col">
@@ -231,7 +231,7 @@ export default function DraggablePitchWidget({
       className={`pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 touch-none ${pinching ? 'pitch-widget-draggable--pinching' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.94 }}
+      exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
       style={{
         x: dragX,

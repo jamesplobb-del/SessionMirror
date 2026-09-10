@@ -61,7 +61,8 @@ html[data-refinement='depth-electric'] .settings-branch-tray__item:not(.settings
 html[data-refinement='depth-electric'] .settings-branch-tray__item--active :is(.settings-branch-tray__label,.settings-branch-tray__icon) { color:white !important; }
 html[data-refinement='depth-electric'] .settings-branch-tray__icon { background:#0066ff0d; }
 html[data-refinement='depth-electric'] .pitch-widget-living .pitch-living-readout__detail strong { color:#182b44; }
-html[data-preview-tuner-colors='off'] .pitch-widget-living canvas { filter:grayscale(1); }
+/* Keep the measured green target visible even when decorative tuner colors are off. */
+html[data-preview-tuner-colors='off'] .pitch-widget-living canvas { filter:none; }
 
 /* Carry the selected direction through routine setup and the active controller. */
 html[data-refinement='depth-electric'] :is(.routine-guide,.routine-program-setup,.routine-reference-setup) { --guide-bg:#edf5ff; --guide-panel:#fff; --guide-ink:#182b44; --guide-muted:#576a80; --guide-accent:#0066ff; --guide-line:#d8e6f6; --guide-selected:#e2eeff; font-family:-apple-system,system-ui,sans-serif; }
@@ -194,7 +195,14 @@ html[data-refinement='depth-electric'] button:not(:disabled):active > :is(.elect
 html[data-refinement='depth-electric'] button:not(:disabled):active .electric-control-icon { scale:.92; }
 html[data-refinement='depth-electric'] :is(.routine-guide-choice,.routine-guide-exercise,.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill,.vault-practice-folders button) { transition:scale 200ms var(--electric-settle),background-color 160ms ease,border-color 160ms ease; }
 html[data-refinement='depth-electric'] :is(.routine-guide-choice,.routine-guide-exercise,.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill,.vault-practice-folders button):not(:disabled):active { scale:.975; }
-html[data-refinement='depth-electric'] :is(.pitch-living-drone-panel,.pitch-living-transposition-panel,.vault-practice-overview) { animation:electric-content-in 220ms var(--electric-settle) both; }
+html[data-refinement='depth-electric'] .vault-practice-overview { animation:electric-content-in 220ms var(--electric-settle) both; }
+/*
+ * Home/Workspace/Settings overlays are motion-driven. Putting this enter
+ * animation on the tuner drone (and the Tuning panel) made the close blink:
+ * motion fades the panel out, then clears its inline opacity, and `both`
+ * restores the `to { opacity: 1 }` keyframe for one frame before unmount.
+ */
+html[data-refinement='depth-electric'] :is(.pitch-living-drone-panel,.pitch-living-transposition-panel) { animation: none; }
 html[data-refinement='depth-electric'] .electric-vault-count { animation:electric-count-in 220ms var(--electric-settle) both; }
 @keyframes electric-content-in { from { opacity:0; } to { opacity:1; } }
 @keyframes electric-count-in { from { opacity:.3; scale:.8; } to { opacity:1; scale:1; } }
@@ -332,3 +340,50 @@ html[data-refinement='depth-electric'] .review-action-menu { background:#f6fbfff
 /* Tools already has a painted backdrop: avoid recompositing live blur during tray entry. */
 html[data-refinement='depth-electric'] .settings-branch-tray:is(.settings-branch-tray--audio,.settings-branch-tray--tuner) { background:linear-gradient(145deg,#f7fcff,#e5f1ff); backdrop-filter:none; -webkit-backdrop-filter:none; }
 html.app-dark-mode[data-refinement='depth-electric'] .settings-branch-tray:is(.settings-branch-tray--audio,.settings-branch-tray--tuner) { background:linear-gradient(145deg,#1c3046,#122235)!important; backdrop-filter:none!important; -webkit-backdrop-filter:none!important; }
+
+/* Camera overlays use their own surfaces instead of sampling the moving canvas.
+ * Removing a backdrop-filter on dismissal can invalidate WebKit's camera layer. */
+html:not(.app-audio-mode) :is(.native-sheet-backdrop, .native-bottom-sheet, .settings-branch-tray) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-refinement='depth-electric']:not(.app-audio-mode) .settings-branch-tray {
+  background: linear-gradient(145deg, #f7fcff, #e5f1ff);
+}
+html.app-dark-mode[data-refinement='depth-electric']:not(.app-audio-mode) .settings-branch-tray {
+  background: linear-gradient(145deg, #1c3046, #122235);
+}
+
+/* A flat dimmer animates without resampling the live camera/tuner underneath. */
+.native-sheet-backdrop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* Workspace tray: the same `:not(.app-audio-mode)` gap, one surface over.
+ *
+ * The rule above that strips backdrop-filter off `.settings-branch-tray` is
+ * scoped to camera mode, so in audio mode the base rule's
+ * `backdrop-filter: blur(24px) saturate(1.18)` stayed live -- on the element
+ * framer-motion fades and unmounts (`exit={{opacity:0}}`). WebKit then
+ * resamples a blur of the tuner canvas on every frame of the fade and drops
+ * the layer at unmount. A screen recording of the camera-mode tray caught the
+ * matching artefact: one frame where the card painted its own background flat
+ * with every child and the scrim behind it missing, between two normal frames.
+ *
+ * The tray surface is already 90-92% opaque in both modes and camera mode has
+ * shipped without the blur, so this only removes a sample of the ~8% showing
+ * through. Nothing else about the tray changes. */
+html.app-audio-mode .settings-branch-tray,
+html.app-audio-mode .native-bottom-sheet {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Nested header materials also sample the camera during a sheet exit. Keep
+ * animated sheets self-contained all the way through their final frame. */
+.native-bottom-sheet .native-sheet-header,
+.practice-menu-backdrop,
+.practice-menu-card {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

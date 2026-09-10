@@ -23,6 +23,23 @@ label[for] {
   transition-timing-function: var(--sm-motion-ease);
 }
 
+/*
+ * Overlay scrims are `button`s whose opacity is driven by framer-motion.
+ * The rule above also transitions `opacity` over 150ms. When motion finishes
+ * an exit it clears its inline opacity, and that CSS transition interpolates
+ * back toward the stylesheet value — then React unmounts the node, which
+ * clips the interpolation to one frame. That is the post-close blink on
+ * Home, Workspace, and Settings. Keep Motion as the only opacity driver.
+ */
+button.practice-menu-backdrop,
+button.native-sheet-backdrop,
+button.settings-branch-backdrop,
+button.action-sheet-backdrop,
+button.hands-free-card-backdrop,
+button.tutorial-sheet-backdrop {
+  transition: none;
+}
+
 button.ui-pressable,
 [role='button'].ui-pressable,
 [role='tab'].ui-pressable,
@@ -264,6 +281,10 @@ html.app-dark-mode .practice-menu-card--home .practice-menu-focus-tools .practic
     min-height: 230px;
     grid-template-rows: minmax(126px, 1.2fr) minmax(96px, 1fr);
   }
+}
+
+.action-sheet-backdrop {
+  opacity: 0;
 }
 
 html.app-dark-mode .action-sheet-backdrop {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import type { PluginListenerHandle } from '@capacitor/core'
 import { isNativeCameraTestAvailable } from '../utils/nativeCameraTest'
-import { subscribeNativeAudioPitchFrames } from '../utils/nativeAudioPitchTap'
+import { acquireNativeAudioTap, releaseNativeAudioTap, subscribeNativeAudioPitchFrames } from '../utils/nativeAudioPitchTap'
 import { readAnalyserMetrics } from '../utils/audioLevel'
 
 /* Roughly 2.3 seconds of history at 30fps: dense enough to draw a liquid
@@ -79,6 +79,7 @@ export function useLiveRecordingWaveform({
     let sampleBuffer: Float32Array | null = null
     let pollTimer: number | null = null
     let nativeListener: PluginListenerHandle | null = null
+    let nativeTapClaimed = false
 
     const appendMetrics = (rms: number, peak: number) => {
       if (cancelled) return
@@ -104,6 +105,11 @@ export function useLiveRecordingWaveform({
         const metrics = measureSamples(chunk.samples)
         appendMetrics(metrics.rms, metrics.peak)
       })
+
+      // Listening alone does not enable bridge delivery. Hold our own shared
+      // tap claim so recording works even when the tuner is closed.
+      nativeTapClaimed = true
+      void acquireNativeAudioTap()
 
       void listenerPromise
         ?.then((listener) => {
@@ -180,6 +186,9 @@ export function useLiveRecordingWaveform({
       }
       if (nativeListener) {
         void nativeListener.remove()
+      }
+      if (nativeTapClaimed) {
+        void releaseNativeAudioTap()
       }
     }
   }, [active, streamGeneration, streamRef])

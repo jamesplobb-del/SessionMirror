@@ -2,10 +2,40 @@ import type { CSSProperties } from 'react'
 
 /** Shared iOS-style motion tokens for framer-motion. */
 
-/** Promote animated surfaces to their own compositor layer (transform/opacity only). */
+/**
+ * Promote animated surfaces to their own compositor layer (transform/opacity only).
+ *
+ * Emptying this was tried on 2026-09-10 against the blink seen on the homepage,
+ * workspace, Settings and drone, on the theory that a permanently pinned layer
+ * is expensive to tear down. It changed nothing, so it was put back rather than
+ * left as an unexplained diff. Don't spend another pass on it.
+ *
+ * What that ruled out is useful: the blink lands at the end of the *opening*
+ * animation as well as the closing one, so it is not unmount teardown and not
+ * `will-change` demotion — with this hint present the surface stays promoted
+ * throughout and still blinks. Stripping `filter: drop-shadow` off the drone's
+ * animated element didn't help either; that element is promoted by its own drag
+ * transform regardless. Which property does the promoting is not the issue.
+ *
+ * The surviving theory is the re-rasterisation a composited layer does when an
+ * animation settles: on a surface carrying gradients, large-blur shadows or
+ * backdrop filters that final repaint costs more than a frame, and the stale
+ * frame is the blink. Untested — see the flicker notes before changing this.
+ */
 export const motionGpuLayer: CSSProperties = {
   willChange: 'transform, opacity',
 }
+
+/**
+ * Pin the last exit frame so it cannot paint at stylesheet opacity.
+ *
+ * After an exit, motion drops the inline `opacity` it was driving and the
+ * node paints once more at CSS before React removes it. Overlay scrims rest
+ * at opacity 1 in the stylesheet, so that stray frame is a full-strength
+ * blink. `display: none` lands on the same frame the animation finishes,
+ * before that paint.
+ */
+export const motionExitHide = { display: 'none' } as const
 
 export const iosSpring = {
   type: 'spring' as const,

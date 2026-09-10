@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
-import { iosFade, iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
+import { iosFade, iosSpringSnappy, motionExitHide, motionGpuLayer } from '../utils/motionPresets'
 import {
   INSTRUMENT_FAMILIES,
   describeHandsFreeGate,
@@ -373,15 +373,19 @@ export default function PracticeHub({
   return createPortal(
     <AnimatePresence initial={false}>
       {isOpen && (
-        <div className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : activePage === 'home' ? 'practice-menu-layer--home' : ''}`}>
-          <motion.button
+        <motion.div
+          key="practice-menu"
+          className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : activePage === 'home' ? 'practice-menu-layer--home' : ''}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, transitionEnd: motionExitHide }}
+          transition={iosFade}
+          style={motionGpuLayer}
+        >
+          <button
             type="button"
             className="practice-menu-backdrop"
             aria-label="Close practice menu"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={iosFade}
             onClick={onClose}
           />
 
@@ -393,11 +397,10 @@ export default function PracticeHub({
             aria-labelledby={activePage === 'routine' ? undefined : 'practice-menu-title'}
             aria-label={activePage === 'routine' ? 'Build your routine' : undefined}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: activePage === 'routine' || reducedMotion ? 1 : 0.96, y: activePage === 'routine' || reducedMotion ? 0 : 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: activePage === 'routine' || reducedMotion ? 1 : 0.97, y: activePage === 'routine' || reducedMotion ? 0 : 8 }}
+            initial={{ scale: activePage === 'routine' || reducedMotion ? 1 : 0.96, y: activePage === 'routine' || reducedMotion ? 0 : 10 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: activePage === 'routine' || reducedMotion ? 1 : 0.97, y: activePage === 'routine' || reducedMotion ? 0 : 8 }}
             transition={iosSpringSnappy}
-            style={motionGpuLayer}
           >
             <header className="practice-menu-header">
               <div className="practice-menu-header-slot">
@@ -792,7 +795,7 @@ export default function PracticeHub({
               </AnimatePresence>
             </div>
           </motion.section>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

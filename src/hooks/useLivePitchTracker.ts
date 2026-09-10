@@ -1334,7 +1334,7 @@ function drawLivingPitchSurface(
   const bandBottom = Math.max(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
   const glow = Math.min(1, Math.max(0, inTuneHighlight))
 
-  ctx.fillStyle = `rgba(34, 197, 94, ${0.15 + glow * 0.24})`
+  ctx.fillStyle = `rgba(34, 197, 94, ${0.28 + glow * 0.24})`
   ctx.fillRect(0, bandTop, width, bandBottom - bandTop)
 
   const centerY = centsToY(0)
@@ -1682,6 +1682,27 @@ function drawPitchCanvasIfDue(
     traceEndBlend,
     inTuneHighlight,
     responsiveTrace,
+  )
+}
+
+/** Static tuner chrome (in-tune band, center line) without waiting for pitch. */
+export function paintPitchCanvasFrame(
+  canvas: HTMLCanvasElement,
+  theme: PitchCanvasTheme,
+  centsHistory: number[] = [],
+  active = false,
+  inTuneHighlight = 0,
+): void {
+  drawPitchCanvas(
+    canvas,
+    new Float32Array(0),
+    centsHistory,
+    active,
+    theme,
+    1,
+    0,
+    inTuneHighlight,
+    false,
   )
 }
 
@@ -2540,7 +2561,20 @@ export function useLivePitchTracker(
           ) {
             void tryAttachRef.current?.()
           }
-          // Avoid heavy canvas work while waiting for mic graph attach.
+          const canvas = canvasForThisFrame()
+          if (canvas) {
+            drawPitchCanvasIfDue(
+              canvas,
+              new Float32Array(activeProfile.frameSize),
+              historyRef.current,
+              false,
+              canvasTheme,
+              traceWindow,
+              traceBlend,
+              0,
+              responsiveTrace,
+            )
+          }
           tickRef.current = realtimeModeRef.current
             ? requestAnimationFrame(tick)
             : (window.setTimeout(tick, 100) as unknown as number)

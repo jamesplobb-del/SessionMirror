@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { createCameraDoubleTapGesture } from '../utils/cameraDoubleTap'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
 import type { RecordingMode } from '../types'
 import { useCameraPreviewResume } from '../hooks/useCameraPreviewResume'
@@ -28,6 +29,8 @@ interface LiveCameraBackgroundProps {
   streamGeneration: number
   recordingMode: RecordingMode
   isRecording: boolean
+  cameraFacingFront?: boolean
+  onSwitchCamera?: () => void
   resumeNonce?: number
   /** Brief overlay while switching between camera and audio capture. */
   modePreparing?: boolean
@@ -66,6 +69,8 @@ function LiveCameraBackground({
   streamGeneration,
   recordingMode,
   isRecording,
+  cameraFacingFront = true,
+  onSwitchCamera,
   resumeNonce = 0,
   modePreparing = false,
   pitchStageActive = false,
@@ -85,6 +90,8 @@ function LiveCameraBackground({
   onHandsFreePlaybackPlayingChange,
   onHandsFreePlaybackComplete,
 }: LiveCameraBackgroundProps) {
+  const doubleTapRef = useRef(createCameraDoubleTapGesture())
+  useEffect(() => { doubleTapRef.current.cancel() }, [onSwitchCamera, recordingMode, isRecording, holdPreviewForTakePlayback])
   const handsFreePlaybackVideoRef = useRef<HTMLVideoElement>(null)
   const handsFreePlaybackSessionRef = useRef(false)
   const handsFreeStallRecoveryRef = useRef<(() => void) | null>(null)
@@ -687,13 +694,14 @@ function LiveCameraBackground({
         ? 'camera-background camera-background--visually-suppressed'
         : 'camera-background',
     pinchZoomEnabled ? 'camera-background--pinch-zoom' : '',
+    cameraFacingFront ? '' : 'camera-background--rear',
   ]
     .filter(Boolean)
     .join(' ')
 
   const previewClassName = [
     isEmbedded ? 'camera-preview--embedded' : 'camera-preview',
-    'camera-preview--mirror',
+    cameraFacingFront ? 'camera-preview--mirror' : '',
     'camera-preview--live',
     isAudioMode || activeNativeLivePreview || showHandsFreeTakePlayback || previewWorkSuppressed ? 'camera-preview--hidden' : '',
   ]
@@ -716,11 +724,30 @@ function LiveCameraBackground({
       ref={shellRef}
       className={shellClass}
       aria-hidden={!isEmbedded && !visuallySuppressed}
-      onPointerDown={handleCameraPinchPointerDown}
-      onPointerMove={handleCameraPinchPointerMove}
-      onPointerUp={handleCameraPinchPointerEnd}
-      onPointerCancel={handleCameraPinchPointerEnd}
-      onPointerLeave={handleCameraPinchPointerEnd}
+      onPointerDown={(event) => {
+        if (onSwitchCamera && !isAudioMode && !isRecording && !holdPreviewForTakePlayback && !handsFreeTakePlaybackRequested && !previewWorkSuppressed) {
+          doubleTapRef.current.down(event)
+        } else {
+          doubleTapRef.current.cancel()
+        }
+        handleCameraPinchPointerDown(event)
+      }}
+      onPointerMove={(event) => {
+        doubleTapRef.current.move(event)
+        handleCameraPinchPointerMove(event)
+      }}
+      onPointerUp={(event) => {
+        if (doubleTapRef.current.up(event)) onSwitchCamera?.()
+        handleCameraPinchPointerEnd(event)
+      }}
+      onPointerCancel={(event) => {
+        doubleTapRef.current.cancel()
+        handleCameraPinchPointerEnd(event)
+      }}
+      onPointerLeave={(event) => {
+        doubleTapRef.current.leave()
+        handleCameraPinchPointerEnd(event)
+      }}
     >
       {showNativeBridgeCanvas && (
         <>
@@ -840,6 +867,8 @@ export default memo(
     prev.streamGeneration === next.streamGeneration &&
     prev.recordingMode === next.recordingMode &&
     prev.isRecording === next.isRecording &&
+    prev.cameraFacingFront === next.cameraFacingFront &&
+    prev.onSwitchCamera === next.onSwitchCamera &&
     prev.resumeNonce === next.resumeNonce &&
     prev.modePreparing === next.modePreparing &&
     prev.pitchStageActive === next.pitchStageActive &&

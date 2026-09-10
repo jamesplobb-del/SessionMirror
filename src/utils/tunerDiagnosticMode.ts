@@ -1,5 +1,8 @@
 // Opt-in investigation build only. Normal builds ignore even a saved test mode.
-export const TUNER_DIAGNOSTICS_ENABLED = import.meta.env?.VITE_TUNER_DIAGNOSTICS === '1'
+// No optional chaining: Vite only substitutes the literal `import.meta.env.VITE_*`
+// form, so `import.meta.env?.` left this as a runtime check and shipped the whole
+// diagnostic UI — strings, modes and picker — into release builds.
+export const TUNER_DIAGNOSTICS_ENABLED = import.meta.env.VITE_TUNER_DIAGNOSTICS === '1'
 export const TUNER_DIAGNOSTIC_MODES = ['normal', 'static-background', 'no-graph', 'no-insights', 'view-off'] as const
 export type TunerDiagnosticMode = typeof TUNER_DIAGNOSTIC_MODES[number]
 const STORAGE_KEY = 'besttake.tuner-diagnostic-mode.v1'

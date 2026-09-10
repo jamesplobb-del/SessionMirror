@@ -1,4 +1,4 @@
-import { motion, useDragControls, useMotionValue } from 'framer-motion'
+import { motion, useDragControls, useMotionValue, useIsPresent } from 'framer-motion'
 import { Minus, Plus, Square, Play } from 'lucide-react'
 import {
   useCallback,
@@ -18,7 +18,7 @@ import {
   saveWidgetPosition,
 } from '../utils/floatingWidgetLayout'
 import { triggerLightHaptic } from '../utils/haptics'
-import { iosDragRelease } from '../utils/motionPresets'
+import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 import { getWrittenPitchLabel, type TunerTranspositionId } from '../utils/tunerTransposition'
 
 interface DraggableDroneWidgetProps {
@@ -68,7 +68,15 @@ export default function DraggableDroneWidget({
   const resumePitchClassRef = useRef<number | null>(null)
 
   const drone = useDrone({ volume: 1, waveform: droneWaveform, hapticFeedback })
-  const sounding = drone.enabled && drone.activeNotes.length > 0
+  const isPresent = useIsPresent()
+  const closingSoundingRef = useRef<boolean | null>(null)
+  const wasPresentRef = useRef(isPresent)
+  if (isPresent && !wasPresentRef.current) closingSoundingRef.current = null
+  wasPresentRef.current = isPresent
+  const lastPresentedSoundingRef = useRef(false)
+  const engineSounding = drone.enabled && drone.activeNotes.length > 0
+  const sounding = closingSoundingRef.current ?? (isPresent ? engineSounding : lastPresentedSoundingRef.current)
+  if (isPresent && closingSoundingRef.current === null) lastPresentedSoundingRef.current = engineSounding
   const heldPitchClass = drone.activeNotes[0] ?? drone.lastPitchClass ?? FALLBACK_PITCH_CLASS
   const written = getWrittenPitchLabel(heldPitchClass, drone.octave, tunerTransposition)
 
@@ -195,9 +203,9 @@ export default function DraggableDroneWidget({
       }`}
       initial={{ opacity: 0, scale: 0.96 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.96 }}
+      exit={{ opacity: 0, scale: 0.96, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
-      style={{ x: dragX, y: dragY, touchAction: 'none', width: WIDGET_WIDTH }}
+      style={{ x: dragX, y: dragY, touchAction: 'none', width: WIDGET_WIDTH, pointerEvents: isPresent ? 'auto' : 'none' }}
     >
       <div
         className="ui-orient-spin drone-widget relative w-full rounded-3xl"
@@ -221,6 +229,7 @@ export default function DraggableDroneWidget({
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.stopPropagation()
+                closingSoundingRef.current = sounding
                 drone.silence()
                 onClose()
               }}

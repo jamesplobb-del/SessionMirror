@@ -1,12 +1,7 @@
-# Clearer practice sounds
+# Drone sound preview
 
-These previews are rendered from the updated sound recipes used by the app.
+The drone preview uses the current app sound recipes: Sine, Triangle, Organ, and Warm Synth, each playing A3 (220 Hz) for three seconds.
 
-- **Metronome:** Classic, Woodblock, Soft, Electronic, in that order. Each plays eight clicks at 120 BPM, demonstrating the strong beat, regular beats, accents, and subdivisions.
-- **Drone:** Sine, Triangle, Organ, Warm Synth, in that order. Each plays A3 (220 Hz) for three seconds, separated by half a second of silence.
+The metronome sounds and gain configuration have been restored to their pre-update versions. The experimental metronome preview has been removed.
 
-The click voices now retain their natural attacks and accent levels without an overdriven output. Drone tones use a strong fundamental with controlled harmonics, and the native engine smoothly changes timbre and normalizes chords without clipping.
-
-Phone-speaker loudness and the preferred tonal character still need a listening check on the target device. These files demonstrate the synthesis, not the phone's speaker or microphone processing.
-
-Regenerate and verify with `node scripts/verify-practice-sounds.mjs sound-previews`.
+Verify practice sounds and regenerate the drone preview with `node scripts/verify-practice-sounds.mjs sound-previews`.

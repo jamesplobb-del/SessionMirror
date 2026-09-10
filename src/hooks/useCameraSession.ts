@@ -11,6 +11,8 @@ import {
   shouldUseRecordingTimeslice,
 } from '../utils/mobileVideo'
 import {
+  getCameraFacingFront,
+  setCameraFacingFront,
   maybeBoostTabletPreviewResolution,
   resetCameraPreviewZoom,
   normalizeVideoPreviewAfterWake,
@@ -350,6 +352,10 @@ export function useCameraSession({
   /** While true (multitrack stage open), native failures must not tear down the bridge preview. */
   const suppressBridgeRecoveryRef = useRef(false)
   const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
+  const cameraSwitchInFlightRef = useRef(false)
+  const cameraFacingFrontRef = useRef(getCameraFacingFront())
+  const [cameraFacingFront, setFacingFront] = useState(getCameraFacingFront)
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false)
   const nativePreviewActiveRef = useRef(false)
   const nativePreviewStartTokenRef = useRef(0)
   const nativeBridgeAcquireInFlightRef = useRef<Promise<boolean> | null>(null)
@@ -718,7 +724,7 @@ export function useCameraSession({
       }
 
       const result = await startNativeCameraBridge({
-        useFrontCamera: true,
+        useFrontCamera: cameraFacingFrontRef.current,
         audioSessionProfile: 'videoRecording',
         micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
       })
@@ -1969,7 +1975,7 @@ export function useCameraSession({
       suspendSharedMicForNativeRecording()
 
       const result = await startNativeCameraRecording({
-        useFrontCamera: true,
+        useFrontCamera: cameraFacingFrontRef.current,
         audioSessionProfile: 'videoRecording',
         micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
       })
@@ -2010,6 +2016,7 @@ export function useCameraSession({
    * second before the actual first note while the live preview is replaced.
    */
   const beginNativeVideoAutoPreRollCapture = useCallback((): Promise<boolean> => {
+    if (cameraSwitchInFlightRef.current) return Promise.resolve(false)
     if (
       nativeExperimentalRecordingRef.current ||
       nativeStartSettleRef.current ||
@@ -2039,7 +2046,7 @@ export function useCameraSession({
       suspendSharedMicForNativeRecording()
 
       const result = await startNativeCameraRecording({
-        useFrontCamera: true,
+        useFrontCamera: cameraFacingFrontRef.current,
         audioSessionProfile: 'videoRecording',
         micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
       })
@@ -2549,6 +2556,7 @@ export function useCameraSession({
 
   /** Resolves true once recording has actually started (native: didStartRecording confirmed). */
   const startRecording = useCallback((): Promise<boolean> => {
+    if (cameraSwitchInFlightRef.current) return Promise.resolve(false)
     if (isRecordingRef.current) return Promise.resolve(true)
 
     if (simulatorCaptureAvailable && recordingModeRef.current === 'video') {
@@ -2790,6 +2798,7 @@ export function useCameraSession({
   }, [startAutoAudioRecording, startRecording])
 
   const warmAutoRecording = useCallback(async () => {
+    if (cameraSwitchInFlightRef.current) return
     if (!isAppInForeground()) return
 
     if (recordingModeRef.current === 'audio') {
@@ -2829,6 +2838,54 @@ export function useCameraSession({
       }
     }
   }, [cancelAutoPreRollCapture, disarmAutoAudioRecorder, isNativeVideoRecordingEnabled])
+
+  const switchCamera = useCallback(async () => {
+    if (recordingModeRef.current !== 'video' || cameraSwitchInFlightRef.current ||
+        isRecordingRef.current || isStopping || resumeInFlightRef.current ||
+        streamAcquireInFlightRef.current || nativeBridgeAcquireInFlightRef.current) return
+    cameraSwitchInFlightRef.current = true
+    setIsSwitchingCamera(true)
+    const previous = cameraFacingFrontRef.current
+    try {
+      await disarmAutoRecording()
+      if (recordingModeRef.current !== 'video' || !isAppInForeground()) return
+      cameraFacingFrontRef.current = !previous
+      setCameraFacingFront(!previous)
+      resetCameraPreviewZoom()
+      if (isNativeVideoRecordingEnabled()) {
+        const result = await startNativeCameraBridge({
+          useFrontCamera: !previous,
+          audioSessionProfile: 'videoRecording',
+          micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+        })
+        if (!result) throw new Error('Camera switch failed')
+      } else {
+        releaseLiveStream()
+        const stream = await acquireStream('video')
+        if (!stream) throw new Error('Camera switch failed')
+      }
+      setFacingFront(!previous)
+    } catch (error) {
+      cameraFacingFrontRef.current = previous
+      setCameraFacingFront(previous)
+      // A failed lens acquisition may already have released the old input.
+      if (recordingModeRef.current === 'video' && isAppInForeground()) {
+        if (isNativeVideoRecordingEnabled()) {
+          await startNativeCameraBridge({
+            useFrontCamera: previous,
+            audioSessionProfile: 'videoRecording',
+            micInputPreference: resolveNativeBridgeMicPreference(micInputPreferenceRef.current),
+          })
+        } else {
+          await acquireStream('video')
+        }
+      }
+      throw error
+    } finally {
+      cameraSwitchInFlightRef.current = false
+      setIsSwitchingCamera(false)
+    }
+  }, [acquireStream, disarmAutoRecording, isNativeVideoRecordingEnabled, isStopping, releaseLiveStream])
 
   const stopRecording = useCallback((options?: MultitrackRecordingStopOptions) => {
     console.log('[AudioRecordLifecycle] userPressedStop')
@@ -3677,6 +3734,9 @@ export function useCameraSession({
     restartAutoPreRollCapture,
     refreshCameraSession,
     requestCameraPreviewResume,
+    switchCamera,
+    cameraFacingFront,
+    isSwitchingCamera,
     reacquireStreamForAudioRoute,
     retuneCaptureAudio,
     reacquireCaptureStream,

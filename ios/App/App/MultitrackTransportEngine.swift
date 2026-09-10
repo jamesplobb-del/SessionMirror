@@ -510,14 +510,21 @@ final class MultitrackTransportEngine {
 
         for beat in 0..<beatsPerBar {
             let isDownbeat = beat == 0
-            let profile = BestTakeClickSound.profile(for: isDownbeat ? .downbeat : .beat, sound: MetronomeSoundId.parse(soundId))
+            let profile = clickProfile(soundId: soundId, downbeat: isDownbeat)
             let clickFrames = min(
                 beatFrames,
-                max(64, Int((Double(profile.decaySec) * sampleRate).rounded()))
+                max(64, Int((profile.decaySec * sampleRate).rounded()))
             )
             let start = beat * beatFrames
             for frame in 0..<clickFrames where start + frame < totalFrames {
-                let value = BestTakeClickSound.sample(time: Double(frame) / sampleRate, profile: profile)
+                let t = Double(frame) / sampleRate
+                let envelope = exp(-7.0 * t / max(0.005, profile.decaySec))
+                let phase = 2.0 * Double.pi * profile.frequency * t
+                let fundamental = sin(phase)
+                let attack = frame < max(1, Int(sampleRate * 0.0015))
+                    ? (1.0 - Double(frame) / max(1, sampleRate * 0.0015))
+                    : 0
+                let value = Float((fundamental * 0.82 + attack * 0.18) * envelope * profile.amplitude)
                 for channel in 0..<Int(format.channelCount) {
                     channels[channel][start + frame] += value
                 }
@@ -527,4 +534,19 @@ final class MultitrackTransportEngine {
         return buffer
     }
 
+    private func clickProfile(
+        soundId: String,
+        downbeat: Bool
+    ) -> (frequency: Double, amplitude: Double, decaySec: Double) {
+        switch soundId {
+        case "woodblock":
+            return downbeat ? (1_050, 0.72, 0.040) : (760, 0.50, 0.034)
+        case "soft":
+            return downbeat ? (820, 0.46, 0.080) : (620, 0.30, 0.066)
+        case "electronic":
+            return downbeat ? (1_800, 0.64, 0.030) : (1_350, 0.42, 0.026)
+        default:
+            return downbeat ? (1_200, 0.66, 0.046) : (880, 0.46, 0.040)
+        }
+    }
 }

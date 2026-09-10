@@ -37,69 +37,12 @@ struct MetronomeClickProfile {
 
 enum MetronomeWaveform {
     case sine
-    case classic
-    case woodblock
-    case electronic
+    case triangle
+    case square
 }
 
-// BEGIN CLICK SOUND SYNTHESIS
-// Shared with the web click renderer; sample peaks retain their headroom.
-enum BestTakeClickSound {
-    static func profile(for tier: MetronomeClickTier, sound: MetronomeSoundId) -> MetronomeClickProfile {
-        switch sound {
-        case .woodblock:
-            switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 1950, peak: 1.0, decaySec: 0.022, wave: .woodblock)
-            case .macro: return MetronomeClickProfile(hz: 1620, peak: 0.7, decaySec: 0.02, wave: .woodblock)
-            case .beat: return MetronomeClickProfile(hz: 1480, peak: 0.5, decaySec: 0.017, wave: .woodblock)
-            case .subdivision: return MetronomeClickProfile(hz: 1350, peak: 0.32, decaySec: 0.015, wave: .woodblock)
-            }
-        case .soft:
-            switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 1700, peak: 0.6, decaySec: 0.045, wave: .sine)
-            case .macro: return MetronomeClickProfile(hz: 1450, peak: 0.42, decaySec: 0.04, wave: .sine)
-            case .beat: return MetronomeClickProfile(hz: 1320, peak: 0.3, decaySec: 0.034, wave: .sine)
-            case .subdivision: return MetronomeClickProfile(hz: 1200, peak: 0.19, decaySec: 0.028, wave: .sine)
-            }
-        case .electronic:
-            switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 2400, peak: 0.95, decaySec: 0.026, wave: .electronic)
-            case .macro: return MetronomeClickProfile(hz: 1950, peak: 0.6, decaySec: 0.022, wave: .electronic)
-            case .beat: return MetronomeClickProfile(hz: 1770, peak: 0.43, decaySec: 0.02, wave: .electronic)
-            case .subdivision: return MetronomeClickProfile(hz: 1600, peak: 0.28, decaySec: 0.017, wave: .electronic)
-            }
-        case .classic:
-            switch tier {
-            case .downbeat: return MetronomeClickProfile(hz: 2150, peak: 1.0, decaySec: 0.03, wave: .classic)
-            case .macro: return MetronomeClickProfile(hz: 1800, peak: 0.72, decaySec: 0.027, wave: .classic)
-            case .beat: return MetronomeClickProfile(hz: 1650, peak: 0.52, decaySec: 0.023, wave: .classic)
-            case .subdivision: return MetronomeClickProfile(hz: 1500, peak: 0.34, decaySec: 0.019, wave: .classic)
-            }
-        }
-    }
-
-    static func sample(time: Double, profile: MetronomeClickProfile) -> Float {
-        let duration = Double(profile.decaySec)
-        guard time > 0, time < duration else { return 0 }
-        let attack = min(1, time / 0.0008)
-        let release = min(1, (duration - time) / 0.002)
-        let envelope = pow(sin(attack * .pi / 2), 2) *
-            exp(-6 * max(0, time - 0.0008) / (duration - 0.0008)) *
-            pow(sin(release * .pi / 2), 2)
-        let phase = 2 * Double.pi * Double(profile.hz) * time
-        let wave: Double
-        switch profile.wave {
-        case .woodblock: wave = 0.72 * sin(phase) + 0.28 * sin(phase * 1.48)
-        case .sine: wave = sin(phase)
-        case .electronic: wave = 0.85 * sin(phase) + 0.15 * sin(phase * 2)
-        case .classic: wave = 0.8 * sin(phase) + 0.2 * sin(phase * 2.7)
-        }
-        return Float(wave * envelope * Double(profile.peak) * 0.85)
-    }
-}
-// END CLICK SOUND SYNTHESIS
-
-/// Native metronome with headroom-safe, smoothly enveloped click voices.
+/// Native metronome — direct AVAudioEngine path with speaker bus gain + hard clip
+/// (matches Web Audio metronome: ~48× GainNode into destination, no dynamics on bursts).
 final class MetronomeEngine {
     static let shared = MetronomeEngine()
 
@@ -153,7 +96,8 @@ final class MetronomeEngine {
     private var firstClickHostTimeSec: Double = 0
 
     private let scheduleAheadFrames: Int64 = 5_760 // 0.12 s @ 48 kHz
-    private let speakerBusGain: Float = 1
+    /// Matches native Web Audio speaker bus (`PLAYBACK_GAIN_NATIVE` / phone preset audit).
+    private let speakerBusGain: Float = 48
 
     private var configurationObserver: NSObjectProtocol?
 
@@ -526,13 +470,59 @@ final class MetronomeEngine {
 
     private struct ClickVoice {
         var elapsed: Int = 0
-        let totalSamples: Int
-        let profile: MetronomeClickProfile
+        var totalSamples: Int
+        var attackSamples: Int
+        var phase: Float = 0
+        var hz: Float
+        var peak: Float
+        var wave: MetronomeWaveform
+    }
+
+    /// Keep in sync with src/utils/metronomeClickSounds.ts — the same four
+    /// voices are synthesized on the web path, and a mismatch means the
+    /// metronome changes character between the native and web engines.
+    ///
+    /// All four sit at 1.2–2.4 kHz, where the ear is most sensitive and a loud
+    /// instrument masks least, with short decays so each click reads as a
+    /// transient rather than a tone. Waveform separates them now that they
+    /// share a register: sine = pure, triangle = bright, square = cutting.
+    private func profile(for tier: MetronomeClickTier, sound: MetronomeSoundId) -> MetronomeClickProfile {
+        switch sound {
+        case .woodblock:
+            switch tier {
+            case .downbeat: return MetronomeClickProfile(hz: 1950, peak: 1.0, decaySec: 0.022, wave: .square)
+            case .macro: return MetronomeClickProfile(hz: 1620, peak: 0.7, decaySec: 0.02, wave: .square)
+            case .beat: return MetronomeClickProfile(hz: 1480, peak: 0.5, decaySec: 0.017, wave: .square)
+            case .subdivision: return MetronomeClickProfile(hz: 1350, peak: 0.32, decaySec: 0.015, wave: .square)
+            }
+        case .soft:
+            switch tier {
+            case .downbeat: return MetronomeClickProfile(hz: 1700, peak: 0.6, decaySec: 0.045, wave: .sine)
+            case .macro: return MetronomeClickProfile(hz: 1450, peak: 0.42, decaySec: 0.04, wave: .sine)
+            case .beat: return MetronomeClickProfile(hz: 1320, peak: 0.3, decaySec: 0.034, wave: .sine)
+            case .subdivision: return MetronomeClickProfile(hz: 1200, peak: 0.19, decaySec: 0.028, wave: .sine)
+            }
+        case .electronic:
+            switch tier {
+            case .downbeat: return MetronomeClickProfile(hz: 2400, peak: 0.95, decaySec: 0.026, wave: .square)
+            case .macro: return MetronomeClickProfile(hz: 1950, peak: 0.6, decaySec: 0.022, wave: .square)
+            case .beat: return MetronomeClickProfile(hz: 1770, peak: 0.43, decaySec: 0.02, wave: .square)
+            case .subdivision: return MetronomeClickProfile(hz: 1600, peak: 0.28, decaySec: 0.017, wave: .square)
+            }
+        case .classic:
+            switch tier {
+            case .downbeat: return MetronomeClickProfile(hz: 2150, peak: 1.0, decaySec: 0.03, wave: .triangle)
+            case .macro: return MetronomeClickProfile(hz: 1800, peak: 0.72, decaySec: 0.027, wave: .triangle)
+            case .beat: return MetronomeClickProfile(hz: 1650, peak: 0.52, decaySec: 0.023, wave: .triangle)
+            case .subdivision: return MetronomeClickProfile(hz: 1500, peak: 0.34, decaySec: 0.019, wave: .triangle)
+            }
+        }
     }
 
     private func render(frameCount: AVAudioFrameCount, audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
         let frames = Int(frameCount)
         let sampleRate = Float(renderFormat.sampleRate)
+        let twoPi = Float.pi * 2
 
         stateLock.lock()
         var clicks = activeClicks
@@ -569,10 +559,21 @@ final class MetronomeEngine {
             var voiceIndex = 0
             while voiceIndex < clicks.count {
                 var voice = clicks[voiceIndex]
-                mixed += BestTakeClickSound.sample(
-                    time: Double(voice.elapsed) / Double(sampleRate), profile: voice.profile
-                )
+                let gain: Float
+                if voice.elapsed < voice.attackSamples {
+                    let t = Float(voice.elapsed + 1) / Float(max(1, voice.attackSamples))
+                    gain = max(0.0001, voice.peak * t)
+                } else {
+                    let decayPos = Float(voice.elapsed - voice.attackSamples)
+                    let decayLen = Float(max(1, voice.totalSamples - voice.attackSamples))
+                    let envelope = expf(-5 * decayPos / decayLen)
+                    gain = max(0.0001, voice.peak * envelope)
+                }
 
+                mixed += waveSample(phase: voice.phase, wave: voice.wave) * gain
+
+                voice.phase += twoPi * voice.hz / sampleRate
+                if voice.phase > twoPi { voice.phase -= twoPi }
                 voice.elapsed += 1
                 if voice.elapsed < voice.totalSamples {
                     clicks[voiceIndex] = voice
@@ -607,15 +608,36 @@ final class MetronomeEngine {
     }
 
     private func makeVoice(for click: PendingClick, sound: MetronomeSoundId) -> ClickVoice {
-        let profile = BestTakeClickSound.profile(for: click.tier, sound: sound)
+        let profile = profile(for: click.tier, sound: sound)
+        let sampleRate = Float(renderFormat.sampleRate)
+        let attackSamples = max(1, Int((0.0015 * Double(sampleRate)).rounded()))
+        let totalSamples = max(attackSamples + 1, Int((Double(profile.decaySec) * Double(sampleRate)).rounded()))
         return ClickVoice(
-            totalSamples: Int(ceil(Double(profile.decaySec) * renderFormat.sampleRate)) + 1,
-            profile: profile
+            totalSamples: totalSamples,
+            attackSamples: attackSamples,
+            hz: profile.hz,
+            peak: profile.peak,
+            wave: profile.wave
         )
     }
 
-    /// Only a guard for unexpected overlap; normal click voices do not reach it.
+    private func waveSample(phase: Float, wave: MetronomeWaveform) -> Float {
+        switch wave {
+        case .sine:
+            return sin(phase)
+        case .triangle:
+            let t = phase / (2 * Float.pi)
+            let wrapped = t - floor(t)
+            return 4 * abs(wrapped - 0.5) - 1
+        case .square:
+            return sin(phase) >= 0 ? 1 : -1
+        }
+    }
+
+    /// Hard clip at the bus output — same speaker-loudness trick as Web Audio destination clipping.
     private func speakerClip(_ value: Float) -> Float {
-        return max(-0.98, min(0.98, value))
+        if value > 0.98 { return 0.98 }
+        if value < -0.98 { return -0.98 }
+        return value
     }
 }

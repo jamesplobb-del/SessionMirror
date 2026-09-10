@@ -27,6 +27,8 @@ interface SplitCompareLayoutProps {
   cameraNeedsPermission: boolean
   recordingMode: RecordingMode
   isRecording: boolean
+  cameraFacingFront?: boolean
+  onSwitchCamera?: () => void
   cameraReady: boolean
   cameraResumeNonce?: number
   nativeLivePreviewActive?: boolean
@@ -76,6 +78,8 @@ export default function SplitCompareLayout({
   cameraNeedsPermission,
   recordingMode,
   isRecording,
+  cameraFacingFront,
+  onSwitchCamera,
   cameraReady,
   cameraResumeNonce = 0,
   nativeLivePreviewActive = false,
@@ -318,6 +322,8 @@ export default function SplitCompareLayout({
                   streamGeneration={streamGeneration}
                   recordingMode={recordingMode}
                   isRecording={isRecording}
+                  cameraFacingFront={cameraFacingFront}
+                  onSwitchCamera={onSwitchCamera}
                   resumeNonce={cameraResumeNonce}
                   modePreparing={!cameraReady && !isRecording && !cameraNeedsPermission}
                   nativeLivePreviewActive={nativeLivePreviewActive}

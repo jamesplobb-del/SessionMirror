@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core'
 import { X, Youtube } from 'lucide-react'
 import { setYoutubeDialogOpen } from '../utils/youtubeDialogState'
 import { triggerLightHaptic } from '../utils/haptics'
-import { nativeGlideEase, motionGpuLayer } from '../utils/motionPresets'
+import { nativeGlideEase, motionExitHide, motionGpuLayer } from '../utils/motionPresets'
 import { nativeGlideIn, nativeGlideShown, NATIVE_SQUISH } from '../utils/interactiveUx'
 import {
   applyViewportCssVarsOnResume,
@@ -180,10 +180,11 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
     <AnimatePresence>
       {open && (
         <motion.div
+          key="youtube-dialog"
           className="fixed left-0 right-0 z-[120] flex items-end justify-center sm:items-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transitionEnd: motionExitHide }}
           transition={nativeGlideEase}
           style={{
             top: `${viewportTop}px`,
@@ -195,13 +196,9 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
             if (event.target === event.currentTarget) handleClose()
           }}
         >
-          <motion.div
-            className="absolute inset-0 bg-[rgba(23,26,34,0.2)] backdrop-blur-[6px]"
+          <div
+            className="absolute inset-0 bg-[rgba(23,26,34,0.2)]"
             aria-hidden
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={nativeGlideEase}
           />
           <motion.div
             className="relative w-full max-w-lg rounded-2xl border border-[rgba(23,26,34,0.06)] bg-[#f7f8fa] p-4 shadow-[0_-18px_48px_rgba(23,26,34,0.1),0_-4px_14px_rgba(23,26,34,0.05)]"

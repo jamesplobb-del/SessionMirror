@@ -1,20 +1,24 @@
 import type { RecordingOrientation } from './takeVideoTransform'
 import { isTabletViewport } from './deviceFormFactor'
 
+let cameraFacingFront = true
+export function setCameraFacingFront(front: boolean): void { cameraFacingFront = front }
+export function getCameraFacingFront(): boolean { return cameraFacingFront }
+
 /**
  * Full field-of-view front camera — no width/height/aspect locks (those crop/zoom on iPhone).
  */
 export function getPortraitVideoCaptureConstraints(): MediaTrackConstraints {
   if (typeof window !== 'undefined' && isTabletViewport()) {
     return {
-      facingMode: 'user',
+      facingMode: cameraFacingFront ? 'user' : 'environment',
       width: { ideal: 1920 },
       height: { ideal: 1080 },
     }
   }
 
   return {
-    facingMode: 'user',
+    facingMode: cameraFacingFront ? 'user' : 'environment',
   }
 }
 
@@ -22,7 +26,7 @@ export function getPortraitVideoCaptureConstraints(): MediaTrackConstraints {
 export function getLandscapeVideoCaptureConstraints(): MediaTrackConstraints {
   if (typeof window !== 'undefined' && isTabletViewport()) {
     return {
-      facingMode: 'user',
+      facingMode: cameraFacingFront ? 'user' : 'environment',
       width: { ideal: 1920 },
       height: { ideal: 1080 },
       aspectRatio: { ideal: 16 / 9 },
@@ -30,7 +34,7 @@ export function getLandscapeVideoCaptureConstraints(): MediaTrackConstraints {
   }
 
   return {
-    facingMode: 'user',
+    facingMode: cameraFacingFront ? 'user' : 'environment',
     width: { ideal: 1280 },
     height: { ideal: 720 },
     aspectRatio: { ideal: 16 / 9 },
@@ -59,7 +63,7 @@ export async function maybeBoostTabletPreviewResolution(
 
   try {
     await track.applyConstraints({
-      facingMode: 'user',
+      facingMode: cameraFacingFront ? 'user' : 'environment',
       width: { ideal: 1920 },
       height: { ideal: 1080 },
     })

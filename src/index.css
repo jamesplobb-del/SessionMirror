@@ -583,13 +583,8 @@ body.settings-branch-open * {
   pointer-events: none !important;
 }
 
-/* Nothing on its way out needs a blurred backdrop sampled for it. */
-.floating-widget-layer--inert .metronome-widget,
-.floating-widget-layer--inert .drone-widget,
-.floating-widget-layer--inert .pitch-widget-draggable {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
+/* Preserve widget materials throughout the fade. Switching backdrop-filter
+ * before opacity reaches zero produces a visible change in the widget. */
 
 .metronome-widget-draggable {
   cursor: grab;
@@ -2388,8 +2383,13 @@ html.physical-landscape-right .ui-orient-spin {
 }
 
 .native-sheet-backdrop {
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  /*
+   * Invisible unless framer-motion is actively driving it. See
+   * `.practice-menu-backdrop` — same exit-frame snap, same default.
+   */
+  opacity: 0;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .native-bottom-sheet {
@@ -6177,10 +6177,23 @@ html.app-dark-mode .pitch-spectrogram--glass {
 
 /* Anchored Workspace tray shared by Camera and Tools. The transparent backdrop
  * preserves the live context while still making outside-tap dismissal easy. */
+.settings-branch-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+
 .settings-branch-backdrop {
+  position: absolute;
+  inset: 0;
   padding: 0;
   border: 0;
   background: rgba(8, 13, 21, 0.36);
+}
+
+.settings-branch-tray-anchor {
+  position: absolute;
+  z-index: 1;
 }
 
 html.app-audio-mode .settings-branch-backdrop {
@@ -10006,3 +10019,10 @@ html.app-dark-mode .hands-free-card__stepper {
 .routine-bar--simple .routine-bar__line { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; }
 .routine-bar--simple .routine-bar__actions { margin-top: 8px; }
 .routine-bar--simple .routine-bar__actions button { min-height: 44px; }
+
+/* Front preview is mirrored; rear preview and its recovery frame are not. */
+.camera-background--rear :is(.camera-preview-canvas--live, .camera-preview-canvas--primed, .camera-preview--live, .camera-preview-placeholder__frame, .camera-preview-frozen-frame) {
+  transform: scale(var(--camera-preview-zoom, 1)) !important;
+}
+.camera-background { touch-action: manipulation; }
+.camera-background--pinch-zoom { touch-action: none; }

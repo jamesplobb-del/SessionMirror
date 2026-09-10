@@ -1106,26 +1106,11 @@ class SharedMetronomeEngine {
     void this.recoverAfterModeSwitch(targetMode)
   }
 
-  /**
-   * A sheet can release or reconfigure the shared AVAudioSession without
-   * changing the metronome's React state. Reassert the route and restart the
-   * native engine once that surface transition settles.
-   */
+  /** A sheet is not an audio interruption. Recover only when lifecycle state
+   * or the web scheduler reports a problem; reasserting the native speaker
+   * route on every Settings close can interrupt the live camera session. */
   reconcileAfterSurfaceTransition(_targetMode: 'video' | 'audio' = 'video'): void {
-    if (!this.snapshot.playing) return
-    if (!this.useNativeAudio) {
-      this.reconcileAfterInterrupt()
-      return
-    }
-    void (async () => {
-      try {
-        await this.reassertNativeSpeakerRoute()
-      } catch {
-        /* The native start below prepares the route again. */
-      }
-      if (!this.snapshot.playing) return
-      await this.start({ recovered: true, fromStale: true })
-    })()
+    this.reconcileAfterInterrupt()
   }
 
   private async recoverAfterModeSwitch(targetMode: 'video' | 'audio'): Promise<void> {

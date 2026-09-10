@@ -2,8 +2,9 @@ import TunerHistory from './audioPractice/TunerHistory'
 import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BarChart3, Music2, Settings, SlidersHorizontal } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
+  paintPitchCanvasFrame,
   useLivePitchTracker,
   type AcceptedPitchFrame,
   type PitchSourceHealth,
@@ -24,7 +25,7 @@ import {
   midiToNoteName,
   type PitchReadout,
 } from '../utils/pitchUtils'
-import type { TunerInstrument } from '../utils/pitchConfig'
+import type { PitchCanvasTheme, TunerInstrument } from '../utils/pitchConfig'
 import {
   DEFAULT_TUNER_TRANSPOSITION,
   concertPitchFromWrittenMidi,
@@ -38,6 +39,8 @@ import { StableNoteTracker } from '../utils/stableNoteTracker'
 import { useTutorialAction } from '../context/TutorialContext'
 import { safeRandomUUID } from '../utils/uuid'
 import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
+import { motionExitHide } from '../utils/motionPresets'
+
 interface LivePitchTunerProps {
   nativePitchProcessing?: boolean
   mediaRef: RefObject<HTMLMediaElement | null>
@@ -86,15 +89,55 @@ function PitchChartCanvas({
   fill = false,
   living = false,
   toolFree = false,
+  idleTheme,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
   glass?: boolean
   fill?: boolean
   living?: boolean
   toolFree?: boolean
+  idleTheme?: PitchCanvasTheme
 }) {
+  const shellRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (!idleTheme) return
+    const canvas = canvasRef.current
+    const shell = shellRef.current
+    if (!canvas || !shell) return
+
+    const paintIdleChrome = () => {
+      if (isTunerDiagnosticMode('no-graph')) return
+      const width = canvas.clientWidth
+      const height = canvas.clientHeight
+      if (width <= 0 || height <= 0) return
+      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      const targetWidth = Math.floor(width * dpr)
+      const targetHeight = Math.floor(height * dpr)
+      // Live ticks own the bitmap once it matches layout. Only fill a blank or
+      // newly-sized canvas so the in-tune band is there on the first frame.
+      if (canvas.width === targetWidth && canvas.height === targetHeight) return
+      paintPitchCanvasFrame(canvas, idleTheme)
+    }
+
+    paintIdleChrome()
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const sized =
+      canvas.clientWidth > 0 &&
+      canvas.width === Math.floor(canvas.clientWidth * dpr) &&
+      canvas.height === Math.floor(canvas.clientHeight * dpr)
+    const raf = sized ? 0 : requestAnimationFrame(paintIdleChrome)
+    const observer = new ResizeObserver(paintIdleChrome)
+    observer.observe(shell)
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
+  }, [canvasRef, idleTheme])
+
   return (
     <div
+      ref={shellRef}
       className={`pitch-chart-shell relative w-full flex-1 ${
         living ? 'pitch-chart-shell--living' : ''
       }`}
@@ -334,7 +377,13 @@ function LiveAudioTunerPane({
       <div className="pitch-living-canvas">
         {visualsOff ? null : (
           <>
-            <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
+            <PitchChartCanvas
+              canvasRef={canvasRef}
+              fill
+              living
+              toolFree={!audioToolsEnabled}
+              idleTheme="living-audio"
+            />
             <TuningGauge
               readout={readout}
               coach={coach}
@@ -416,14 +465,25 @@ function LiveAudioTunerPane({
               ) : null}
             </div>
 
+            {/*
+              * Both panels share this AnimatePresence, so both need a key.
+              *
+              * Without one, framer-motion identifies a child by its position
+              * and sees a single slot: swapping the drone panel for the
+              * transposition panel reads as "the same child re-rendered",
+              * not as one leaving and another arriving, so the outgoing
+              * panel's exit is skipped and the incoming one's enter starts
+              * from whatever state the last frame left behind.
+              */}
             <AnimatePresence>
               {droneOpen && drone ? (
                 <motion.section
+                  key="drone-panel"
                   id="pitch-living-drone-panel"
                   className="pitch-living-drone-panel"
                   initial={{ y: '105%', opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '105%', opacity: 0 }}
+                  exit={{ y: '105%', opacity: 0, transitionEnd: motionExitHide }}
                   transition={{ type: 'spring', stiffness: 390, damping: 36 }}
                   aria-label="Drone widget"
                 >
@@ -445,11 +505,12 @@ function LiveAudioTunerPane({
 
               {transpositionOpen && onTunerTranspositionChange ? (
                 <motion.section
+                  key="transposition-panel"
                   id="pitch-living-transposition-panel"
                   className="pitch-living-transposition-panel"
                   initial={{ y: '105%', opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '105%', opacity: 0 }}
+                  exit={{ y: '105%', opacity: 0, transitionEnd: motionExitHide }}
                   transition={{ type: 'spring', stiffness: 390, damping: 36 }}
                 >
                   <TunerTranspositionMenu
@@ -719,7 +780,7 @@ function LivePitchTunerAudio({
 
   return (
     <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col">
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={paneKey}
           className={`flex min-h-0 flex-1 flex-col ${showLive || showPlayback ? 'pitch-tuner__live-body' : ''}`}
