@@ -346,6 +346,7 @@ export default function AudioTunerTab({
             <option value="static-background">Static background</option>
             <option value="no-graph">Graph off</option>
             <option value="no-insights">Insights off</option>
+            <option value="view-off">Visuals off</option>
           </select>
         </label>
       )}

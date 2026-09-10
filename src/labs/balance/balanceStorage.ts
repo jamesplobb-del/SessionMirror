@@ -1,4 +1,4 @@
-import { clampWrittenMidi, getBalanceInstrument } from './balanceMusic'
+import { clampWrittenMidi, fitBalanceScaleRoot, getBalanceInstrument } from './balanceMusic'
 import { resolveBalanceInstrumentId } from './balanceInstruments'
 import { isBalanceCharacterId } from './balanceCharacters'
 import { awardBalanceTrophies, isBalanceTrophyId } from './balanceTrophies'
@@ -121,10 +121,7 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
       ? soundRest.restDuration
       : defaults.soundRest.restDuration
   const octaveRange = scale.octaveRange === 2 ? 2 : 1
-  const maxScaleRoot = Math.max(
-    instrument.minWrittenMidi,
-    instrument.maxWrittenMidi - octaveRange * 12,
-  )
+
 
   return {
     routineType:
@@ -138,10 +135,7 @@ function normalizeSettings(value: unknown, instrumentId: string): BalanceSetting
       repetitions: Math.max(1, Math.min(12, Math.round(finiteNumber(single.repetitions, 3)))),
     },
     scale: {
-      rootWrittenMidi: Math.min(
-        clampWrittenMidi(finiteNumber(scale.rootWrittenMidi, defaults.scale.rootWrittenMidi), instrument),
-        maxScaleRoot,
-      ),
+      rootWrittenMidi: fitBalanceScaleRoot(finiteNumber(scale.rootWrittenMidi, defaults.scale.rootWrittenMidi), instrument),
       scaleType:
         scale.scaleType === 'naturalMinor' ||
         scale.scaleType === 'harmonicMinor' ||

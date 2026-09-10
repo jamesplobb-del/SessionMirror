@@ -45,17 +45,12 @@ export const STAFF_LINE_Y_LIST = [
   STAFF_LINE_YPX.E4,
 ] as const
 
-/**
- * Every clef this notation map can draw. Alto is here for Balance, which
- * notates a viola's target note; it is deliberately not one of the clefs Staff
- * Jumper offers to read in (see `STAFF_JUMPER_READING_CLEFS`), because that
- * game has no alto instruments and no alto ranges.
- */
+/** Clefs supported by both games and their previews. */
 export const STAFF_JUMPER_CLEFS = ['treble', 'bass', 'alto'] as const
 export type StaffJumperClef = (typeof STAFF_JUMPER_CLEFS)[number]
 
 /** The clefs Staff Jumper's own setup offers. */
-export const STAFF_JUMPER_READING_CLEFS = ['treble', 'bass'] as const
+export const STAFF_JUMPER_READING_CLEFS = ['treble', 'bass', 'alto'] as const
 
 export const CLEF_LABELS: Record<StaffJumperClef, string> = {
   treble: 'Treble',

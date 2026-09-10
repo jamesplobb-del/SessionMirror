@@ -3,19 +3,40 @@ import { Capacitor } from '@capacitor/core'
 const STATUS_BAR_BG = '#000000'
 const LIGHT_STATUS_BAR_BG = '#ffffff'
 
-async function applyStatusBar(lightBackground: boolean): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return
+let appliedLightBackground: boolean | null = null
+let requestedLightBackground = false
+let overlayConfigured = false
+let pendingUpdate: Promise<void> | null = null
 
-  try {
-    const { StatusBar, Style } = await import('@capacitor/status-bar')
-    await StatusBar.setOverlaysWebView({ overlay: true })
-    await StatusBar.setStyle({ style: lightBackground ? Style.Light : Style.Dark })
-    await StatusBar.setBackgroundColor({
-      color: lightBackground ? LIGHT_STATUS_BAR_BG : STATUS_BAR_BG,
-    })
-  } catch {
-    // Status bar plugin may be unavailable in web dev or before native sync.
-  }
+/** Serialize theme changes and coalesce duplicate sheet-open/close requests. */
+function applyStatusBar(lightBackground: boolean): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return Promise.resolve()
+  requestedLightBackground = lightBackground
+  if (pendingUpdate) return pendingUpdate
+  if (appliedLightBackground === lightBackground) return Promise.resolve()
+
+  pendingUpdate = (async () => {
+    try {
+      const { StatusBar, Style } = await import('@capacitor/status-bar')
+      if (!overlayConfigured) {
+        await StatusBar.setOverlaysWebView({ overlay: true })
+        overlayConfigured = true
+      }
+      while (appliedLightBackground !== requestedLightBackground) {
+        const next = requestedLightBackground
+        await StatusBar.setStyle({ style: next ? Style.Light : Style.Dark })
+        // iOS draws the page under its overlay; Android owns a background bar.
+        if (Capacitor.getPlatform() !== 'ios') {
+          await StatusBar.setBackgroundColor({ color: next ? LIGHT_STATUS_BAR_BG : STATUS_BAR_BG })
+        }
+        appliedLightBackground = next
+      }
+    } catch {
+      // Leave the value unapplied so a later request can retry.
+      appliedLightBackground = null
+    }
+  })().finally(() => { pendingUpdate = null })
+  return pendingUpdate
 }
 
 /** Light status-bar icons on the dark BestTake HUD (Capacitor Style.Dark). */

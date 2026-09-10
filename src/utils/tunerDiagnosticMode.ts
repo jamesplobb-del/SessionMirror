@@ -1,6 +1,6 @@
 // Opt-in investigation build only. Normal builds ignore even a saved test mode.
 export const TUNER_DIAGNOSTICS_ENABLED = import.meta.env?.VITE_TUNER_DIAGNOSTICS === '1'
-export const TUNER_DIAGNOSTIC_MODES = ['normal', 'static-background', 'no-graph', 'no-insights'] as const
+export const TUNER_DIAGNOSTIC_MODES = ['normal', 'static-background', 'no-graph', 'no-insights', 'view-off'] as const
 export type TunerDiagnosticMode = typeof TUNER_DIAGNOSTIC_MODES[number]
 const STORAGE_KEY = 'besttake.tuner-diagnostic-mode.v1'
 

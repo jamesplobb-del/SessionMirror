@@ -352,7 +352,7 @@ export default function StaffJumperGame({
    * beginning, then leaves the playfield instead of crowding every measure.
    */
   const staffHead = useMemo(() => {
-    const clefName = config.clef === 'treble' ? ('trebleClef' as const) : ('bassClef' as const)
+    const clefName = config.clef === 'alto' ? ('altoClef' as const) : config.clef === 'treble' ? ('trebleClef' as const) : ('bassClef' as const)
     const clefWidth = layoutMusicGlyph(clefName, STAFF_SPACE_PX, glyphMetrics).width
     let width = STAFF_CLEF_X + clefWidth
 

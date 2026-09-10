@@ -1,5 +1,5 @@
 import { writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
-import { getBalanceInstrument } from './balanceInstruments'
+import { fitBalanceScaleRoot, getBalanceInstrument } from './balanceInstruments'
 import type {
   BalanceCustomRoutine,
   BalanceInstrument,
@@ -16,6 +16,7 @@ const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A
 export {
   BALANCE_INSTRUMENTS,
   clampWrittenMidi,
+  fitBalanceScaleRoot,
   getBalanceInstrument,
   inferBalanceInstrument,
   resolveBalanceInstrumentId,
@@ -98,7 +99,7 @@ function descendingIntervals(type: BalanceScaleType, octaves: 1 | 2): number[] {
   return [...high.slice(0, -1), ...MELODIC_MINOR_DESCENDING]
 }
 
-export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettings): number[] {
+export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettings, instrument?: BalanceInstrument): number[] {
   const ascending = ascendingIntervals(settings.scaleType, settings.octaveRange)
   const descending = descendingIntervals(settings.scaleType, settings.octaveRange)
   let onePass: number[]
@@ -106,7 +107,11 @@ export function buildBalanceScaleWrittenMidi(settings: BalanceScaleRoutineSettin
   else if (settings.direction === 'descending') onePass = descending
   else onePass = [...ascending, ...descending.slice(1)]
 
-  const notes = onePass.map((interval) => settings.rootWrittenMidi + interval)
+  const root = instrument ? fitBalanceScaleRoot(settings.rootWrittenMidi, instrument) : settings.rootWrittenMidi
+  const inRange = onePass.map(interval => root + interval)
+    .filter(midi => !instrument || (midi >= instrument.minWrittenMidi && midi <= instrument.maxWrittenMidi))
+  // Clipping the turnaround must not repeat the last playable note.
+  const notes = inRange.filter((midi, index) => index === 0 || midi !== inRange[index - 1])
   return Array.from({ length: settings.repetitions }, () => notes).flat()
 }
 
@@ -133,16 +138,33 @@ export function buildBalanceTargetsFromWritten(
   })
 }
 
+/** Saved routines remain editable when a different instrument cannot play them. */
+export function balanceCustomRoutineIssue(
+  settings: BalanceSettings,
+  customRoutines: readonly BalanceCustomRoutine[],
+): string | null {
+  if (settings.routineType !== 'custom') return null
+  const routine = customRoutines.find(item => item.id === settings.selectedCustomRoutineId)
+  if (!routine || routine.notes.length === 0) return 'Choose a custom routine with at least one note.'
+  const instrument = getBalanceInstrument(settings.instrumentId)
+  const invalid = routine.notes.some(note => !Number.isFinite(note.writtenMidi) ||
+    note.writtenMidi < instrument.minWrittenMidi || note.writtenMidi > instrument.maxWrittenMidi)
+  return invalid
+    ? `This routine has notes outside ${instrument.name}’s written range (${midiToBalanceNoteName(instrument.minWrittenMidi)}–${midiToBalanceNoteName(instrument.maxWrittenMidi)}). Edit the notes in More options or choose another instrument.`
+    : null
+}
+
 export function buildBalanceTargets(
   settings: BalanceSettings,
   customRoutines: readonly BalanceCustomRoutine[],
 ): BalanceTarget[] {
   const instrument = getBalanceInstrument(settings.instrumentId)
+  if (balanceCustomRoutineIssue(settings, customRoutines)) return []
   let written: number[]
   if (settings.routineType === 'single') {
     written = Array.from({ length: settings.single.repetitions }, () => settings.single.writtenMidi)
   } else if (settings.routineType === 'scale') {
-    written = buildBalanceScaleWrittenMidi(settings.scale)
+    written = buildBalanceScaleWrittenMidi(settings.scale, instrument)
   } else {
     written =
       customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)?.notes.map((note) => note.writtenMidi) ?? []
@@ -160,7 +182,10 @@ export function routineSummary(
   }
   if (settings.routineType === 'scale') {
     const root = midiToBalanceNoteName(settings.scale.rootWrittenMidi).replace(/\d+$/, '')
-    return `${root} ${BALANCE_SCALE_TYPE_LABELS[settings.scale.scaleType]} · ${settings.scale.octaveRange} octave${settings.scale.octaveRange === 1 ? '' : 's'} · ${BALANCE_DIRECTION_LABELS[settings.scale.direction]}`
+    const instrument = getBalanceInstrument(settings.instrumentId)
+    const limited = fitBalanceScaleRoot(settings.scale.rootWrittenMidi, instrument) + settings.scale.octaveRange * 12 > instrument.maxWrittenMidi
+    const rangeLabel = limited ? `Up to ${settings.scale.octaveRange} octave${settings.scale.octaveRange === 1 ? '' : 's'} · range limited` : `${settings.scale.octaveRange} octave${settings.scale.octaveRange === 1 ? '' : 's'}`
+    return `${root} ${BALANCE_SCALE_TYPE_LABELS[settings.scale.scaleType]} · ${rangeLabel} · ${BALANCE_DIRECTION_LABELS[settings.scale.direction]}`
   }
   const routine = customRoutines.find((item) => item.id === settings.selectedCustomRoutineId)
   return routine ? `${routine.name} · ${routine.notes.length} notes` : 'Choose a saved custom routine'

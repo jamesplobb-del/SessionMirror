@@ -700,7 +700,10 @@ function LiveCameraBackground({
     .filter(Boolean)
     .join(' ')
 
-  const showPreparingOverlay = modePreparing && !resumingPreview
+  // Capture readiness can briefly reset while hands-free disarms/rearms behind
+  // a sheet. A live native preview already has its own first-frame indicator;
+  // covering it with another animated dark veil causes a visible flash.
+  const showPreparingOverlay = modePreparing && !resumingPreview && !activeNativeLivePreview
   const showPlaceholder =
     !showHandsFreeTakePlayback &&
     !activeNativeLivePreview &&

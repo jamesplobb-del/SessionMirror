@@ -9,13 +9,8 @@ interface AnimatedTabPanelProps {
   dataTutorial?: string
 }
 
-/**
- * Mutually-exclusive tab panel.
- *
- * Incoming content plays a short settle (same idea as the Games world enter).
- * The outgoing tree is not kept mounted — crossfading two media-heavy screens
- * made them compete for a WebKit frame and flashed on iPhone.
- */
+/** One active media panel, painted immediately without scaling/fading the
+ * entire camera/tuner surface on every tab selection. */
 export default function AnimatedTabPanel({
   panelKey,
   active,
@@ -28,7 +23,7 @@ export default function AnimatedTabPanel({
   return (
     <div
       key={panelKey}
-      className={`audio-tab-arrive ${className ?? ''}`.trim()}
+      className={className}
       data-tutorial={dataTutorial}
       style={{ position: 'absolute', inset: 0 }}
     >

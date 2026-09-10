@@ -30,7 +30,7 @@ function clampOctave(value: number): number {
 }
 
 function parseWaveform(value: unknown): DroneWaveform {
-  if (value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
+  if (value === 'sine' || value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
   return DEFAULT_DRONE_PREFS.waveform
 }
 
@@ -47,12 +47,12 @@ export function loadDronePrefs(): DronePrefs {
     const parsed = JSON.parse(raw) as Partial<DronePrefs>
     return {
       activeNotes: [],
-      octave: clampOctave(Number(parsed.octave) || DEFAULT_DRONE_PREFS.octave),
+      octave: clampOctave(Number.isFinite(parsed.octave) ? Number(parsed.octave) : DEFAULT_DRONE_PREFS.octave),
       enabled: false,
       volume:
         parsed.volume === undefined
           ? DEFAULT_DRONE_PREFS.volume
-          : Math.min(1, Math.max(0, Number(parsed.volume) || DEFAULT_DRONE_PREFS.volume)),
+          : Math.min(1, Math.max(0, Number.isFinite(parsed.volume) ? Number(parsed.volume) : DEFAULT_DRONE_PREFS.volume)),
       waveform: parseWaveform(parsed.waveform),
       lastPitchClass: parsePitchClass(parsed.lastPitchClass),
     }

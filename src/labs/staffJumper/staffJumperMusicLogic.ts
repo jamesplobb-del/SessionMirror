@@ -1,3 +1,4 @@
+import { MIN_GAMEPLAY_HZ, MAX_GAMEPLAY_HZ } from '../../utils/pitchConfig'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import { getTunerTransposition } from '../../utils/tunerTransposition'
@@ -986,11 +987,9 @@ export function pitchClassesMatch(detected: number, target: number): boolean {
 
 /**
  * Widest band any supported profile can report — tuba/bass low E1 up through
- * a flute's top register. Narrower gates here silently dropped notes that the
+ * the piccolo's top register. Narrower gates here silently dropped notes that the
  * tuner itself was tracking fine.
  */
-const MIN_GAMEPLAY_HZ = 55
-const MAX_GAMEPLAY_HZ = 1760
 
 export function readoutToConcertPitchClass(readout: PitchReadout): number | null {
   if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null

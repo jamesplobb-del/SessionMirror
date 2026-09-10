@@ -42,6 +42,11 @@ const MEDIUM_GATE = 24
 const LOUD_GATE = 34
 
 export const INSTRUMENT_PROFILES: readonly InstrumentProfile[] = [
+  {
+    id: 'recorder', label: 'Soprano recorder', family: 'Woodwind',
+    tunerInstrument: 'winds', tunerTransposition: 'c_octave_up',
+    soundVolumeThreshold: QUIET_GATE,
+  },
   // Brass — loud, fast attacks, wide written-pitch spread.
   {
     id: 'trumpet',

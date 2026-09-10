@@ -113,7 +113,7 @@ export default function BalanceRoutineEditor({
                 )
               }
             >
-              {noteOptions.map((midi) => <option key={midi} value={midi}>{midiToBalanceNoteName(midi)}</option>)}
+              {noteOptions.map((midi) => <option key={midi} value={midi}>{midiToBalanceNoteName(midi)}{midi < instrument.minWrittenMidi || midi > instrument.maxWrittenMidi ? ' · outside range' : ''}</option>)}
             </select>
             <Pressable intensity="icon" hapticFeedback={hapticFeedback} onClick={() => move(index, index - 1)} aria-label="Move note up"><ArrowUp /></Pressable>
             <Pressable intensity="icon" hapticFeedback={hapticFeedback} onClick={() => move(index, index + 1)} aria-label="Move note down"><ArrowDown /></Pressable>

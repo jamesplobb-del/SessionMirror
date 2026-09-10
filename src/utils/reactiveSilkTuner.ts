@@ -11,6 +11,24 @@ export function silkTunerGeometry(width: number, height: number) {
   return { center, centsToY, bandBottom, targetY: bandBottom + 18, flatY: bandBottom + 52, headroom: Math.min(40, width * .16) }
 }
 
+/**
+ * Consecutive silence-floor samples a held line is allowed to span.
+ *
+ * The live trace ticks at 60Hz, so three samples is about 50ms — shorter than
+ * any real gap between notes, and far shorter than a breath.
+ */
+const MAX_BRIDGED_GAP_SAMPLES = 3
+
+/**
+ * How much time the live trace shows across the canvas.
+ *
+ * `LIVING_TRACE_HISTORY_LENGTH` (110) samples at the tuner's 60Hz tick. Pitch
+ * history browses the same shape, so it has to span the same window — it used
+ * to show 8 seconds in the width the live trace gives 1.8, which squashed the
+ * line into something unreadable the moment you scrolled back.
+ */
+export const SILK_TRACE_WINDOW_MS = Math.round((110 / 60) * 1000)
+
 type SilkPoint = { x: number; y: number; cents: number }
 type IndexedSilkPoint = { point: SilkPoint; index: number }
 
@@ -89,12 +107,29 @@ export function drawSilkTuner(
   // occupy, so the trace and its endpoint dot stay clear of the bottom edge.
   ctx.lineCap='round';ctx.lineJoin='round'
   let run: IndexedSilkPoint[] = []
+  let gap = 0
   for (let index = 0; index < points.length; index += 1) {
     const point = points[index]
     if (isSilenceFloorSample(point.cents)) {
-      drawSilkRun(ctx, run, points.length)
-      run = []
+      // Bridge a dropout of a frame or two instead of severing the line.
+      //
+      // The tracker writes a silence-floor sample on *every* tick that does not
+      // accept a pitch, and at 60Hz a breath's worth of background noise, a note
+      // attack, or one frame failing the clarity gate is enough to interleave
+      // them with good samples. Splitting on each one shredded a held note into
+      // fragments, and a fragment shorter than two points draws nothing at all —
+      // so the line visibly blinked while the player was doing nothing wrong.
+      //
+      // Only a gap longer than MAX_BRIDGED_GAP_SAMPLES ends the run, so a real
+      // rest still reads as a break. This is a drawing decision only: no sample
+      // is invented and nothing measured is changed.
+      gap += 1
+      if (gap > MAX_BRIDGED_GAP_SAMPLES) {
+        drawSilkRun(ctx, run, points.length)
+        run = []
+      }
     } else {
+      gap = 0
       run.push({ point, index })
     }
   }

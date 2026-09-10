@@ -1,3 +1,4 @@
+import { isBalanceDecayInstrument } from './balanceInstruments'
 import { isGameTestInputOn } from '../gameTestInput'
 import { recordPlannedGame } from '../../utils/dailyChallengePlan'
 import {
@@ -293,7 +294,7 @@ export function useBalanceGame({
       if (
         (current.phase === 'active' || current.phase === 'pitchLock') &&
         lastAcceptedAtRef.current > 0 &&
-        Date.now() - lastAcceptedAtRef.current >= BALANCE_DROPOUT_GRACE_MS
+        Date.now() - lastAcceptedAtRef.current >= (isBalanceDecayInstrument(current.settings.instrumentId) ? 2000 : BALANCE_DROPOUT_GRACE_MS)
       ) {
         if (current.phase === 'active') {
           const validPersonalBest =
@@ -479,6 +480,7 @@ export function useBalanceGame({
             getBalanceInstrument(settings.instrumentId),
           )
         : buildBalanceTargets(settings, dataRef.current.customRoutines)
+      if (targets.length === 0) return
       dispatch({
         type: 'START',
         targets,

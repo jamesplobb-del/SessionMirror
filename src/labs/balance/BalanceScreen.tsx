@@ -28,6 +28,7 @@ import BalanceTrophyCase from './BalanceTrophyCase'
 import {
   buildBalanceTargets,
   clampWrittenMidi,
+  fitBalanceScaleRoot,
   getBalanceInstrument,
   inferBalanceInstrument,
 } from './balanceMusic'
@@ -262,10 +263,7 @@ export default function BalanceScreen({
               },
               scale: {
                 ...game.state.settings.scale,
-                rootWrittenMidi: Math.min(
-                  clampWrittenMidi(game.state.settings.scale.rootWrittenMidi, next),
-                  next.maxWrittenMidi - game.state.settings.scale.octaveRange * 12,
-                ),
+                rootWrittenMidi: fitBalanceScaleRoot(game.state.settings.scale.rootWrittenMidi, next),
               },
             })
             setRoute('home')

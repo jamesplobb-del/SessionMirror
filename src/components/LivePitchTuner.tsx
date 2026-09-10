@@ -262,6 +262,26 @@ function LiveAudioTunerPane({
     typeof document !== 'undefined' &&
     document.documentElement.dataset.refinement === 'depth-electric'
 
+  /**
+   * "Visuals off": everything except the pitch rendering keeps running.
+   *
+   * The detector, the native results, the readout state, history collection
+   * and Insights are all untouched — only the canvas, the gauge, the history
+   * overlay and the zone class go away. With no canvas mounted, `canvasRef`
+   * stays null, so the draw loop paints nothing and the `--silk-live` /
+   * `--silk-wash` writes never happen either.
+   *
+   * This is the one test that halves the search space rather than picking off
+   * a suspect: if WebContent still climbs, the cause is JavaScript or state
+   * and every rendering hypothesis is out at once; if it goes flat, the cause
+   * is entirely in these four things.
+   *
+   * The tool rail deliberately stays, so a drone can still be started — a held
+   * drone is the reproduction (constant pitch, 100% duty cycle, the trace never
+   * breaks for silence), and hiding the drone button would make it untestable.
+   */
+  const visualsOff = isTunerDiagnosticMode('view-off')
+
   const catchNote = () => {
     if (!drone || !catchConcert || catchOctave === null) return
     onDroneInteraction?.()
@@ -309,27 +329,31 @@ function LiveAudioTunerPane({
   return (
     <div
       ref={stageRef}
-      className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--continuous-wash pitch-audio-stage--${pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
+      className={`pitch-audio-stage pitch-audio-stage--besttake pitch-audio-stage--continuous-wash pitch-audio-stage--${visualsOff ? 'idle' : pitchZone} flex min-h-0 flex-1 flex-col overflow-hidden`}
     >
       <div className="pitch-living-canvas">
-        <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
-        <TuningGauge
-          readout={readout}
-          coach={coach}
-          onCatchNote={drone ? catchNote : undefined}
-          catchPressed={holdingCaughtNote}
-          catchLabel={
-            holdingCaughtNote
-              ? `Release ${readout.noteName} drone`
-              : `Hold ${readout.noteName} as a drone`
-          }
-        />
+        {visualsOff ? null : (
+          <>
+            <PitchChartCanvas canvasRef={canvasRef} fill living toolFree={!audioToolsEnabled} />
+            <TuningGauge
+              readout={readout}
+              coach={coach}
+              onCatchNote={drone ? catchNote : undefined}
+              catchPressed={holdingCaughtNote}
+              catchLabel={
+                holdingCaughtNote
+                  ? `Release ${readout.noteName} drone`
+                  : `Hold ${readout.noteName} as a drone`
+              }
+            />
 
-        {pitchHistory && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} transposition={tunerTransposition} />}
-        <div className="pitch-living-canvas__direction" aria-hidden>
-          <span>Sharp</span>
-          <span>Flat</span>
-        </div>
+            {pitchHistory && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} transposition={tunerTransposition} />}
+            <div className="pitch-living-canvas__direction" aria-hidden>
+              <span>Sharp</span>
+              <span>Flat</span>
+            </div>
+          </>
+        )}
 
         {audioToolsEnabled && (drone || onTunerTranspositionChange || insightsEnabled) ? (
           <>

@@ -8,16 +8,14 @@
  * (its tuba topped out a fifth low, its "home" notes were guesses); one table
  * is now the source of truth for both games.
  *
- * Two things are Balance's own, because Staff Jumper cannot express them:
+ * Balance adds sounding-octave transpositions and a generic concert option:
  *
- *   • **Octave transpositions.** Staff Jumper's type only admits `bb`/`eb`, so
+ *   • **Octave transpositions.** Staff Jumper matches pitch classes, so
  *     a tenor sax is listed as B♭. Balance compares against the microphone, so
  *     it needs the pitch that actually sounds — written C4 on a tenor is
  *     concert B♭2, an octave below what plain `bb` would predict. Getting this
  *     wrong means the game never hears the note the player is holding.
- *   • **Instruments with no staff.** Balance shows no notation, so viola (alto
- *     clef) and a plain concert-pitch option can exist here even though Staff
- *     Jumper has to leave them out.
+ *   • **Generic concert pitch.** Balance also offers a neutral fallback.
  */
 import { STAFF_JUMPER_INSTRUMENTS } from '../staffJumper/staffJumperInstruments'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -25,10 +23,15 @@ import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import type { BalanceInstrument } from './balanceTypes'
 
 /**
- * Instruments whose written pitch sounds an octave (or more) below what the
- * plain B♭/E♭ transposition implies. Balance must use the sounding pitch.
+ * Instruments whose sounding octave differs from the shared pitch-class
+ * transposition. Balance must use the sounding pitch.
  */
 const OCTAVE_TRANSPOSITIONS: Record<string, TunerTranspositionId> = {
+  piccolo: 'c_octave_up',
+  recorder: 'c_octave_up',
+  guitar: 'c_octave_down',
+  'bass-guitar': 'c_octave_down',
+  'double-bass': 'c_octave_down',
   'tenor-sax': 'bb_octave',
   'bass-clarinet': 'bb_octave',
   'bari-sax': 'eb_octave',
@@ -43,10 +46,10 @@ const FAMILY_PROFILE: Record<string, TunerInstrument> = {
   'Voice & keys': 'voice',
 }
 
-const N = { C2: 36, C3: 48, C4: 60, E6: 88, C6: 84 } as const
+const N = { C3: 48, C4: 60, C6: 84 } as const
 
 /**
- * Balance-only entries, appended after the shared table.
+ * Balance-only fallback, placed before the shared instrument table.
  *
  * `concert` stays first because it is the fallback for a player who has not
  * picked an instrument, and every lookup falls back to index 0.
@@ -63,18 +66,6 @@ const BALANCE_ONLY: readonly BalanceInstrument[] = [
     homeWrittenMidi: N.C4,
     maxWrittenMidi: N.C6,
   },
-  {
-    // Alto clef, so Staff Jumper cannot list it; Balance draws no staff.
-    id: 'viola',
-    name: 'Viola',
-    transposition: 'concert',
-    tunerInstrument: 'strings',
-    clef: 'alto',
-    family: 'Strings',
-    minWrittenMidi: N.C3,
-    homeWrittenMidi: N.C4,
-    maxWrittenMidi: N.E6,
-  },
 ]
 
 function fromStaffJumper(): BalanceInstrument[] {
@@ -82,7 +73,7 @@ function fromStaffJumper(): BalanceInstrument[] {
     id: instrument.id,
     name: instrument.name,
     transposition: OCTAVE_TRANSPOSITIONS[instrument.id] ?? instrument.transposition,
-    tunerInstrument: FAMILY_PROFILE[instrument.family] ?? 'winds',
+    tunerInstrument: instrument.id.startsWith('piano-') ? 'strings' : FAMILY_PROFILE[instrument.family] ?? 'winds',
     clef: instrument.clef,
     family: instrument.family,
     minWrittenMidi: instrument.range.minMidi,
@@ -96,7 +87,6 @@ function fromStaffJumper(): BalanceInstrument[] {
 export const BALANCE_INSTRUMENTS: readonly BalanceInstrument[] = [
   BALANCE_ONLY[0]!,
   ...fromStaffJumper(),
-  BALANCE_ONLY[1]!,
 ]
 
 /**
@@ -148,4 +138,17 @@ export function clampWrittenMidi(midi: number, instrument: BalanceInstrument): n
     instrument.minWrittenMidi,
     Math.min(instrument.maxWrittenMidi, Math.round(midi)),
   )
+}
+
+/** Move an out-of-range root by octaves, preserving the selected key. */
+export function fitBalanceScaleRoot(midi: number, instrument: BalanceInstrument): number {
+  let root = Math.round(midi)
+  while (root < instrument.minWrittenMidi) root += 12
+  while (root > instrument.maxWrittenMidi) root -= 12
+  return root
+}
+
+/** These instruments need renewed attacks as a note decays. */
+export function isBalanceDecayInstrument(id: string): boolean {
+  return ['guitar', 'bass-guitar', 'ukulele', 'piano-treble', 'piano-bass'].includes(id)
 }

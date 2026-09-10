@@ -2887,7 +2887,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       changeRecordingMode(mode)
       if (modeChanged) {
-        void forceNativeRecordingMode(mode)
+        scheduleAfterPaint(() => {
+          if (recordingModeRef.current === mode) void forceNativeRecordingMode(mode)
+        })
         // The camera/audio session changes after the carousel state flips.
         // Recheck once that handoff settles so an active metronome survives it.
         const reconcileMetronomeAfterModeSwitch = () => {
@@ -5926,7 +5928,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 }
                 visuallySuppressed={isSplitView}
                 nativeLivePreviewActive={nativeLivePreviewActive}
-                pauseNativePreviewUpdates={hudModalState === 'review' || isVaultOpen}
+                pauseNativePreviewUpdates={hudModalState !== 'idle' || quickSettingsOpen}
                 nativeCameraBridgeEnabled={isNativeCameraPlatform}
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}

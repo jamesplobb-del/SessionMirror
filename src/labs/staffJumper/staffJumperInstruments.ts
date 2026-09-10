@@ -22,8 +22,7 @@
  * numbers are Learn Your Instrument's chromatic-course bounds, which come from
  * the standard printed fingering charts.
  *
- * Alto clef is not in Staff Jumper's notation map, so viola is deliberately
- * absent rather than listed against a clef a violist does not read.
+ * Viola uses the shared alto-clef notation map.
  */
 import { INSTRUMENT_FAMILIES, type InstrumentFamily } from '../../utils/instrumentProfiles'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -72,7 +71,7 @@ export interface StaffJumperInstrument {
 /** MIDI numbers so the table below reads like note names. */
 const N = {
   E1: 28, Bb1: 34,
-  C2: 36, E2: 40, F2: 41, Bb2: 46, C3: 48,
+  C2: 36, E2: 40, F2: 41, Bb2: 46, C3: 48, Eb3: 51,
   D3: 50, E3: 52, F3: 53, Fs3: 54, G3: 55, Bb3: 58,
   C4: 60, D4: 62, F4: 65, G4: 67, Bb4: 70,
   C5: 72, D5: 74, A5: 81, C6: 84, E6: 88, Fs6: 90, G6: 91,
@@ -159,7 +158,7 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   {
     id: 'bass-clarinet', name: 'Bass Clarinet', shortName: 'Bass Clarinet', family: 'Woodwind',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
-    range: reads(N.E3, N.C6),
+    range: reads(N.Eb3, N.C6),
   },
   {
     id: 'soprano-sax', name: 'B♭ Soprano Sax', shortName: 'Soprano Sax', family: 'Woodwind',
@@ -202,6 +201,11 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   {
     // D3 is the open D string and first position; the octave below reads just
     // as neatly on the staff, which is why this one is spelled out.
+    id: 'viola', name: 'Viola', shortName: 'Viola', family: 'Strings',
+    clef: 'alto', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D4,
+    range: reads(N.C3, N.E6),
+  },
+  {
     id: 'cello', name: 'Cello', shortName: 'Cello', family: 'Strings',
     clef: 'bass', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D3,
     range: reads(N.C2, N.C5),
@@ -224,7 +228,8 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   {
     id: 'ukulele', name: 'Ukulele', shortName: 'Ukulele', family: 'Strings',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
-    range: reads(N.C4, N.C6),
+    // Includes a standard 12-fret soprano; extended ranges need more frets.
+    range: reads(N.C4, N.A5),
   },
 
   /* ── Voice & keys ── */

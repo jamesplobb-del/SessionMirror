@@ -1,6 +1,6 @@
 /** Pitch detection bounds — instruments + singing voice (A440). */
 
-/** Low bass voice / double bass ≈ 65 Hz. */
+/** Low voice range; instrument-specific bounds are defined below. */
 export const MIN_INSTRUMENT_HZ = 65
 
 /** Upper singing voice / violin upper range. */
@@ -78,8 +78,8 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
   description: 'Reads cents exactly, and eases between notes so slides stay readable.',
-  minHz: 82,
-  maxHz: 1400,
+  minHz: 38,
+  maxHz: 1700,
   clarityMin: 0.76,
   clarityMinMic: 0.84,
   frameSize: 8192,
@@ -106,12 +106,13 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
 const WINDS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Winds',
   description: 'Reacts fast across a wide range, for anything from piccolo down to horn.',
-  minHz: 55,
-  maxHz: 1760,
+  minHz: 38,
+  maxHz: 3300,
   clarityMin: 0.68,
   clarityMinMic: 0.72,
   frameSize: 4096,
-  frameSizeMic: 2048,
+  // Several periods of a tuba low E1, even at a 48 kHz sample rate.
+  frameSizeMic: 4096,
   rmsGateDbMedia: -50,
   rmsGateDbMic: -42,
   attackFrames: 1,
@@ -209,3 +210,7 @@ export type PitchCanvasTheme =
   | 'glass-audio'
   | 'living-audio'
   | 'solid'
+
+/** Shared game gate follows the supported detector profiles. */
+export const MIN_GAMEPLAY_HZ = Math.min(...TUNER_INSTRUMENTS.map(id => getTunerProfile(id).minHz))
+export const MAX_GAMEPLAY_HZ = Math.max(...TUNER_INSTRUMENTS.map(id => getTunerProfile(id).maxHz))

@@ -23,9 +23,11 @@ import {
   BALANCE_INSTRUMENTS,
   BALANCE_SCALE_TYPE_LABELS,
   clampWrittenMidi,
+  fitBalanceScaleRoot,
   getBalanceInstrument,
   midiToBalanceNoteName,
   routineSummary,
+  balanceCustomRoutineIssue,
 } from './balanceMusic'
 import { formatBalanceDuration, toleranceCentsForSettings } from './balanceStorage'
 import { startBalanceTone, type DroneHandle } from './balanceAudio'
@@ -136,9 +138,8 @@ export default function BalanceSetup({
   const instrument = getBalanceInstrument(settings.instrumentId)
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
   const selectedCustom = customRoutines.find((routine) => routine.id === settings.selectedCustomRoutineId)
+  const customIssue = balanceCustomRoutineIssue(settings, customRoutines)
   const tolerance = toleranceCentsForSettings(settings)
-  const scaleSpan = settings.scale.octaveRange * 12
-  const maxScaleRoot = Math.max(instrument.minWrittenMidi, instrument.maxWrittenMidi - scaleSpan)
   const micLabel = permissionBlocked
     ? 'Microphone permission is off'
     : permissionPending || sourceHealth === 'connecting'
@@ -152,7 +153,7 @@ export default function BalanceSetup({
   const targetMidi =
     settings.routineType === 'scale' ? settings.scale.rootWrittenMidi : settings.single.writtenMidi
   const targetMin = instrument.minWrittenMidi
-  const targetMax = settings.routineType === 'scale' ? maxScaleRoot : instrument.maxWrittenMidi
+  const targetMax = instrument.maxWrittenMidi
   const targetCanChange = settings.routineType !== 'custom' && targetMax > targetMin
 
   const pitchToneRef = useRef<DroneHandle | null>(null)
@@ -648,12 +649,13 @@ export default function BalanceSetup({
             <label className="balance-setting-row" htmlFor="balance-octaves"><span>Octave range</span>
               <select id="balance-octaves" value={settings.scale.octaveRange} onChange={(event) => {
                 const octaveRange = Number(event.target.value) as 1 | 2
-                onUpdate({ scale: { ...settings.scale, octaveRange, rootWrittenMidi: Math.min(settings.scale.rootWrittenMidi, instrument.maxWrittenMidi - octaveRange * 12) } })
+                onUpdate({ scale: { ...settings.scale, octaveRange, rootWrittenMidi: fitBalanceScaleRoot(settings.scale.rootWrittenMidi, instrument) } })
               }}>
                 <option value={1}>1 octave</option>
                 <option value={2} disabled={instrument.maxWrittenMidi - instrument.minWrittenMidi < 24}>2 octaves</option>
               </select>
             </label>
+            <p className="balance-subdisplay">Scales keep your key and stop at your instrument’s range limit.</p>
             <label className="balance-setting-row" htmlFor="balance-scale-repetitions"><span>Repetitions</span>
               <select id="balance-scale-repetitions" value={settings.scale.repetitions} onChange={(event) => onUpdate({ scale: { ...settings.scale, repetitions: Number(event.target.value) } })}>
                 {[1, 2, 3, 4].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -694,10 +696,7 @@ export default function BalanceSetup({
                 single: { ...settings.single, writtenMidi: clampWrittenMidi(settings.single.writtenMidi, nextInstrument) },
                 scale: {
                   ...settings.scale,
-                  rootWrittenMidi: Math.min(
-                    clampWrittenMidi(settings.scale.rootWrittenMidi, nextInstrument),
-                    nextInstrument.maxWrittenMidi - settings.scale.octaveRange * 12,
-                  ),
+                  rootWrittenMidi: fitBalanceScaleRoot(settings.scale.rootWrittenMidi, nextInstrument),
                 },
               })
             }}
@@ -713,6 +712,7 @@ export default function BalanceSetup({
       </SetupGroup>
         </div>
 
+        {customIssue && <p className="balance-subdisplay" role="status">{customIssue}</p>}
         <div className="balance-start">
           <Pressable
             haptic="medium"
@@ -723,7 +723,7 @@ export default function BalanceSetup({
               onRequestMic()
               onStart()
             }}
-            disabled={settings.routineType === 'custom' && !selectedCustom}
+            disabled={Boolean(customIssue)}
           ><Play aria-hidden /> Start</Pressable>
           <Pressable
             intensity="soft"

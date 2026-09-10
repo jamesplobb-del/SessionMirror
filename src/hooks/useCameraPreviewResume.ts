@@ -151,7 +151,7 @@ export function useCameraPreviewResume({
   }, [beginResume, recordingMode, resumeNonce])
 
   useEffect(() => {
-    if (recordingMode !== 'video') return
+    if (recordingMode !== 'video' || Capacitor.isNativePlatform()) return
 
     const intervalId = window.setInterval(() => {
       if (isVideoPreviewLive(previewRef.current, streamRef.current)) {

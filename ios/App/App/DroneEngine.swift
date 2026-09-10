@@ -17,6 +17,36 @@ enum DroneWaveform: String, CaseIterable {
 
 /// Standalone reference-tone engine — decoupled from tuner pitch detection.
 /// Uses one stable source node and mixes selected notes internally to avoid graph churn.
+// BEGIN DRONE SOUND SYNTHESIS
+/// Band-limited harmonic recipes, with a strong fundamental for tuning.
+/// SIMD storage keeps timbre smoothing free of per-sample heap allocations.
+func droneHarmonics(waveform: DroneWaveform, frequency: Float, sampleRate: Float) -> SIMD8<Float> {
+    var weights: SIMD8<Float>
+    switch waveform {
+    case .sine: weights = SIMD8(1, 0, 0, 0, 0, 0, 0, 0)
+    case .triangle: weights = SIMD8(1, 0, -1.0/9, 0, 1.0/25, 0, -1.0/49, 0)
+    case .organ: weights = SIMD8(1, 0.32, 0.12, 0.06, 0, 0, 0, 0)
+    case .warmSynth: weights = SIMD8(1, 0.16, 0.06, 0.02, 0, 0, 0, 0)
+    }
+    var total: Float = 0
+    for index in 0..<8 {
+        let hz = frequency * Float(index + 1)
+        // Fade partials out before Nyquist, including the top keyboard octave.
+        weights[index] *= max(0, min(1, (sampleRate * 0.48 - hz) / (sampleRate * 0.08)))
+        total += abs(weights[index])
+    }
+    return weights / SIMD8(repeating: max(1, total))
+}
+
+func droneWaveSample(phase: Double, harmonics: SIMD8<Float>) -> Float {
+    var sample: Float = 0
+    for index in 0..<8 where abs(harmonics[index]) > 0.000001 {
+        sample += harmonics[index] * Float(sin(phase * Double(index + 1)))
+    }
+    return sample
+}
+// END DRONE SOUND SYNTHESIS
+
 final class DroneEngine {
     static let shared = DroneEngine()
 
@@ -38,8 +68,8 @@ final class DroneEngine {
     private let stateLock = NSLock()
 
     private let fadeDuration: TimeInterval = 0.035
-    private let oscillatorHeadroom: Float = 0.62
-    private let speakerBusGain: Float = 1.9
+    private let oscillatorHeadroom: Float = 0.82
+    private let speakerBusGain: Float = 1
 
     private init() {
         engine.attach(mainMixer)
@@ -158,6 +188,7 @@ final class DroneEngine {
     func setWaveform(_ raw: String?) {
         stateLock.lock()
         waveform = DroneWaveform.parse(raw)
+        for pitchClass in voices.keys { updateVoiceFrequency(pitchClass: pitchClass) }
         stateLock.unlock()
     }
 
@@ -219,8 +250,11 @@ final class DroneEngine {
         let pitchClass: Int
         var currentGain: Float = 0
         var targetGain: Float = 0
-        var phase: Float = 0
+        var phase: Double = 0
         var frequency: Float = 440
+        var targetFrequency: Float = 440
+        var harmonics = SIMD8<Float>(repeating: 0)
+        var targetHarmonics = SIMD8<Float>(repeating: 0)
     }
 
     private func midi(for pitchClass: Int) -> Int {
@@ -236,29 +270,28 @@ final class DroneEngine {
         if voices[pitchClass] != nil { return }
         var voice = DroneVoice(pitchClass: pitchClass)
         voice.frequency = frequency(for: pitchClass)
+        voice.targetFrequency = voice.frequency
+        voice.targetHarmonics = droneHarmonics(waveform: waveform, frequency: voice.frequency, sampleRate: Float(renderFormat.sampleRate))
         voices[pitchClass] = voice
     }
 
     private func render(frameCount: AVAudioFrameCount, audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
         stateLock.lock()
         var renderVoices = voices
-        let wave = waveform
-        let activeCount = max(
-            1,
-            renderVoices.values.filter { $0.targetGain > 0.001 || $0.currentGain > 0.001 }.count
-        )
         stateLock.unlock()
 
         let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
         let channelCount = Int(ablPointer.count)
         let frames = Int(frameCount)
-        let twoPi = Float.pi * 2
+        let twoPi = Double.pi * 2
         let sampleRate = Float(renderFormat.sampleRate)
         let fadeStep = Float(1.0 / (fadeDuration * renderFormat.sampleRate))
-        let chordNormalization = min(1, 0.82 / sqrt(Float(activeCount)))
+        let timbreSmoothing = Float(1 - exp(-1 / (0.012 * renderFormat.sampleRate)))
+        let frequencySmoothing = Float(1 - exp(-1 / (0.008 * renderFormat.sampleRate)))
 
         for frame in 0..<frames {
             var mixed: Float = 0
+            var totalGain: Float = 0
 
             for pitchClass in renderVoices.keys {
                 guard var voice = renderVoices[pitchClass] else { continue }
@@ -269,13 +302,21 @@ final class DroneEngine {
                     voice.currentGain = max(voice.targetGain, voice.currentGain - fadeStep)
                 }
 
-                mixed += Self.waveSample(phase: voice.phase, waveform: wave) * voice.currentGain
-                voice.phase += twoPi * voice.frequency / sampleRate
+                voice.frequency += (voice.targetFrequency - voice.frequency) * frequencySmoothing
+                voice.harmonics += (voice.targetHarmonics - voice.harmonics) * SIMD8(repeating: timbreSmoothing)
+                var audibleHarmonics = voice.harmonics
+                for index in 0..<8 where voice.frequency * Float(index + 1) >= sampleRate * 0.48 {
+                    audibleHarmonics[index] = 0
+                }
+                mixed += droneWaveSample(phase: voice.phase, harmonics: audibleHarmonics) * voice.currentGain
+                totalGain += voice.currentGain
+                voice.phase += twoPi * Double(voice.frequency / sampleRate)
                 if voice.phase > twoPi { voice.phase -= twoPi }
                 renderVoices[pitchClass] = voice
             }
 
-            let sample = Self.cleanLimit(mixed * chordNormalization * oscillatorHeadroom * speakerBusGain)
+            // Normalize by fading voice gains, so chord changes do not jump in level.
+            let sample = mixed / max(1, totalGain) * oscillatorHeadroom * speakerBusGain
             for channel in 0..<channelCount {
                 guard let buffer = ablPointer[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 buffer[frame] = sample
@@ -287,30 +328,12 @@ final class DroneEngine {
             guard var liveVoice = voices[pitchClass] else { continue }
             liveVoice.phase = renderedVoice.phase
             liveVoice.currentGain = renderedVoice.currentGain
+            liveVoice.frequency = renderedVoice.frequency
+            liveVoice.harmonics = renderedVoice.harmonics
             voices[pitchClass] = liveVoice
         }
         stateLock.unlock()
         return noErr
-    }
-
-    private static func waveSample(phase: Float, waveform: DroneWaveform) -> Float {
-        switch waveform {
-        case .sine:
-            return sin(phase)
-        case .triangle:
-            let t = phase / (2 * Float.pi)
-            let wrapped = t - floor(t)
-            return 4 * abs(wrapped - 0.5) - 1
-        case .organ:
-            let s = sin(phase)
-            return (s + 0.5 * sin(2 * phase) + 0.25 * sin(3 * phase)) / 1.75
-        case .warmSynth:
-            return sin(phase) * 0.72 + sin(2 * phase) * 0.18 + sin(3 * phase) * 0.10
-        }
-    }
-
-    private static func cleanLimit(_ value: Float) -> Float {
-        return max(-0.98, min(0.98, value))
     }
 
     private static func outputVolume(for requestedVolume: Float) -> Float {
@@ -327,7 +350,8 @@ final class DroneEngine {
 
     private func updateVoiceFrequency(pitchClass: Int) {
         guard var voice = voices[pitchClass] else { return }
-        voice.frequency = frequency(for: pitchClass)
+        voice.targetFrequency = frequency(for: pitchClass)
+        voice.targetHarmonics = droneHarmonics(waveform: waveform, frequency: voice.targetFrequency, sampleRate: Float(renderFormat.sampleRate))
         voices[pitchClass] = voice
     }
 

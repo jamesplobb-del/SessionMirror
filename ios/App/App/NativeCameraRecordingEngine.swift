@@ -482,6 +482,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 return
             }
 
+            if reason == "js-request",
+               self.session.isRunning,
+               self.isSessionConfigured,
+               !self.needsFullReconfigureAfterMediaReset,
+               (!self.isBridgePreviewActive || CACurrentMediaTime() - self.lastBridgeFrameTime < 2.5),
+               (!self.isTunerMonitorActive || (self.lastAudioTapSampleTime > 0 && CACurrentMediaTime() - self.lastAudioTapSampleTime < 2.5)) {
+                return
+            }
+
             // Always reapply the AVAudioSession category/route for our active
             // profile. This is NOT the expensive part — AppDelegate already
             // force-reactivates a generic session on every single foreground
@@ -2928,7 +2937,7 @@ func estimateNativeTunerPitch(_ input: [Float], sampleRate: Double) -> NativeTun
     vDSP_measqv(samples, 1, &power, vDSP_Length(samples.count))
     let rmsDb = 10 * log10(max(Double(power), 1e-16))
     guard rmsDb.isFinite, rmsDb > -65 else { return NativeTunerEstimate(frequency: 0, confidence: 0, rmsDb: rmsDb.isFinite ? rmsDb : -160) }
-    let n = samples.count, maxLag = min(n / 2, Int(sampleRate / 45))
+    let n = samples.count, maxLag = min(n / 2, Int(sampleRate / 38))
     var energy = [Double](repeating: 0, count: n+1)
     for i in 0..<n { energy[i+1] = energy[i]+Double(samples[i])*Double(samples[i]) }
     var nsdf = [Double](repeating: 0, count: maxLag+1)

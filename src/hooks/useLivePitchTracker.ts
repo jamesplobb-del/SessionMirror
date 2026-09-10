@@ -321,7 +321,6 @@ const CANVAS_DRAW_REALTIME_MS = 1000 / 30
  */
 const CANVAS_DRAW_TUNER_MS = 1000 / 60
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
-const REALTIME_MIC_FRAME_SIZE = 2048
 /** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
 const NATIVE_TAP_STALE_MS = 2600
 
@@ -481,7 +480,7 @@ async function createNativeTapPitchGraph(
   onFrame?: () => void,
   nativePitchOnly = false,
 ): Promise<MicPitchGraph> {
-  const frameSize = REALTIME_MIC_FRAME_SIZE
+  const frameSize = profile.frameSizeMic
 
   const detector = PitchDetector.forFloat32Array(frameSize)
   detector.clarityThreshold = profile.clarityMinMic
@@ -2111,7 +2110,6 @@ export function useLivePitchTracker(
             profileRef.current,
             sharedStreamLive ? sharedStream : null,
             requireSharedStream && sharedStreamLive,
-            realtimeModeRef.current ? REALTIME_MIC_FRAME_SIZE : undefined,
           )
           if (cancelled) {
             safeDisposeMicGraph(graph)

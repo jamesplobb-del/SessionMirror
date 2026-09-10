@@ -1,3 +1,4 @@
+import { isBalanceDecayInstrument } from './balanceInstruments'
 import { useMemo, useRef } from 'react'
 import { Mic, Play, Settings } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
@@ -6,7 +7,7 @@ import type { PitchReadout } from '../../utils/pitchUtils'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceScene from './BalanceScene'
 import { balanceDifficultyLabel } from './balanceLevels'
-import { midiToBalanceNoteName, routineSummary } from './balanceMusic'
+import { balanceCustomRoutineIssue, midiToBalanceNoteName, routineSummary } from './balanceMusic'
 import { formatBalanceDuration, toleranceCentsForSettings } from './balanceStorage'
 import type { BalanceCustomRoutine, BalanceSettings, BalanceTarget } from './balanceTypes'
 
@@ -90,9 +91,7 @@ export default function BalanceQuickPlay({
     [customRoutines, settings],
   )
 
-  const missingCustom =
-    settings.routineType === 'custom' &&
-    !customRoutines.some((routine) => routine.id === settings.selectedCustomRoutineId)
+  const customIssue = balanceCustomRoutineIssue(settings, customRoutines)
 
   return (
     <BalanceArcadeShell
@@ -105,7 +104,7 @@ export default function BalanceQuickPlay({
     >
       <div>
         <h1 className="balance-display balance-display--hero">Balance</h1>
-        <p className="balance-subdisplay">Hold your note. Reach the flag.</p>
+        <p className="balance-subdisplay">{isBalanceDecayInstrument(settings.instrumentId) ? 'Re-strike your note as it fades. Reach the flag.' : 'Hold your note. Reach the flag.'}</p>
       </div>
 
       <div className="balance-quick__hero">
@@ -134,13 +133,14 @@ export default function BalanceQuickPlay({
         </span>
       </div>
 
+      {customIssue && <p className="balance-subdisplay" role="status">{customIssue}</p>}
       <div className="balance-quick__actions">
         <Pressable
           haptic="medium"
           hapticFeedback={hapticFeedback}
           className="balance-cta"
           onClick={onStart}
-          disabled={missingCustom}
+          disabled={Boolean(customIssue)}
         >
           <Play aria-hidden /> Play
         </Pressable>
@@ -163,7 +163,7 @@ export default function BalanceQuickPlay({
           <Mic aria-hidden />
           <span>
             <b>{micLabel}</b>
-            <small>{missingCustom ? 'Pick a custom routine in More options' : routineLabel}</small>
+            <small>{routineLabel}</small>
           </span>
           <strong>
             {hasPitch

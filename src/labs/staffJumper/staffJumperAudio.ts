@@ -160,12 +160,11 @@ export interface DroneHandle {
 /**
  * Level for the web-fallback drone.
  *
- * A sustained tone cannot ride the metronome's clipping speaker bus the way a
- * percussive click can, so it gets its own headroom-safe level instead.
+ * Sustained reference tones have their own headroom-safe level.
  */
 const WEB_DRONE_PEAK = 0.34
 
-/** Web fallback: a soft two-oscillator drone in the shared playback context. */
+/** Web fallback: the same fundamental-led warm recipe as the native drone. */
 async function startWebDrone(
   pitchClass: number,
   octave: number,
@@ -184,11 +183,12 @@ async function startWebDrone(
   master.gain.exponentialRampToValueAtTime(peak, ctx.currentTime + 0.6)
   master.connect(ctx.destination)
 
-  // Root plus a quiet octave above — enough body to tune against without
-  // masking the player's own sound in the microphone.
+  // Harmonics stay quiet enough to leave the root easy to hear and match.
   const voices = [
-    { ratio: 1, gain: 1, type: 'sine' as OscillatorType },
-    { ratio: 2, gain: 0.28, type: 'sine' as OscillatorType },
+    { ratio: 1, gain: 1 / 1.24, type: 'sine' as OscillatorType },
+    { ratio: 2, gain: 0.16 / 1.24, type: 'sine' as OscillatorType },
+    { ratio: 3, gain: 0.06 / 1.24, type: 'sine' as OscillatorType },
+    { ratio: 4, gain: 0.02 / 1.24, type: 'sine' as OscillatorType },
   ].map(({ ratio, gain, type }) => {
     const osc = ctx.createOscillator()
     const voiceGain = ctx.createGain()

@@ -48,6 +48,8 @@ export function homePitchClass(instrumentId: string | null): number | null {
     case 'guitar':
     case 'bass-guitar':
       return 4 // E
+    case 'recorder':
+      return 0 // C
     case 'piano':
       return null
     default: {
@@ -76,10 +78,11 @@ function homeOctave(instrumentId: string | null): number {
     // Concert B♭3 is written middle C on a B♭ instrument.
     case 'trumpet':
     case 'clarinet':
+    case 'alto-sax':
+    case 'soprano-sax':
       return 3
-    case 'flute':
     case 'piccolo':
-    case 'violin':
+    case 'recorder':
       return 5
     default:
       return 4

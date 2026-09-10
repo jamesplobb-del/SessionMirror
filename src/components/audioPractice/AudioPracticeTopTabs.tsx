@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { AudioPracticeTab } from '../../types/audioPractice'
 import Pressable from '../ui/Pressable'
-import { requestInteractiveMediaRecovery } from '../../utils/appForeground'
 
 /**
  * Practice deliberately has no tab. It is reached from the Program button in
@@ -40,8 +39,7 @@ export default function AudioPracticeTopTabs({
             squish={false}
             haptic="light"
             onClick={() => {
-              requestInteractiveMediaRecovery(`audio-top-tab:${tab.id}`)
-              onTabChange(tab.id)
+              if (!isActive) onTabChange(tab.id)
             }}
             data-tutorial={`audio-tab-${tab.id}`}
             className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
