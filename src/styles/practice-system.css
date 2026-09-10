@@ -17,9 +17,28 @@ html.app-audio-mode:has(.app-ui-overlay--audio-practice-record) {
   --tuner-rim-spread: 34px;
 }
 
+/*
+ * These three zone blocks are scoped away from Reactive Silk on purpose.
+ *
+ * They key off `.pitch-audio-stage--green|yellow|red`, a class that changes as
+ * the player's intonation crosses ±5¢ and ±15¢ — several times a second while
+ * someone is actually playing. Each change re-resolves eight *inherited*
+ * custom properties on the root element through a `:has()`, which is a
+ * whole-document style invalidation, and the variables then repaint
+ * html / body / #root / the shell.
+ *
+ * Under `depth-electric` every one of those surfaces sits beneath the silk
+ * overlay, which is `position:fixed; inset:0` with an opaque `--silk-bg` — so
+ * that entire cascade produced pixels nobody could see. Measured in isolation
+ * on real WebKit it also grew WebContent at +0.072 MiB/s, second only to the
+ * animated wash. See [[animated-inherited-custom-property-leaks]].
+ *
+ * The record surface is unaffected: these selectors are tuner-only, and the
+ * shared base variables above still apply to both.
+ */
 /* In tune — the payoff state, so it goes furthest: strongest wash, the biggest
  * central bloom and a wide edge glow. */
-html.app-audio-mode:has(
+html.app-audio-mode:not([data-refinement='depth-electric']):has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--green
 ) {
   --tuner-ui-hue: #00b85c;
@@ -32,7 +51,7 @@ html.app-audio-mode:has(
   --tuner-rim-spread: 82px;
 }
 
-html.app-audio-mode:has(
+html.app-audio-mode:not([data-refinement='depth-electric']):has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--yellow
 ) {
   --tuner-ui-hue: #f0a000;
@@ -45,7 +64,7 @@ html.app-audio-mode:has(
   --tuner-rim-spread: 48px;
 }
 
-html.app-audio-mode:has(
+html.app-audio-mode:not([data-refinement='depth-electric']):has(
   .app-ui-overlay--audio-practice-tuner .pitch-audio-stage--red
 ) {
   --tuner-ui-hue: #f03348;

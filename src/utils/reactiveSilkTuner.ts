@@ -83,12 +83,10 @@ export function drawSilkTuner(
   for (const y of [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
   ctx.strokeStyle = dark ? '#adcfcf44' : '#567b8333'
   ctx.beginPath();ctx.moveTo(14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
-  ctx.fillStyle = dark ? '#c5e5e3' : '#4e6c73'
-  ctx.font = '10px -apple-system, system-ui, sans-serif'
-  ctx.fillText('0¢ / TARGET', 16, g.targetY)
-  ctx.font = '600 11px -apple-system, system-ui, sans-serif'
-  ctx.fillText('Sharp',16,g.center-height*.12)
-  ctx.fillText('Flat',16,g.flatY)
+  // No Sharp / Flat / TARGET captions. The green band already says where in
+  // tune is, and up/down needs no caption once the trace is moving. Geometry
+  // keeps targetY and flatY: they still reserve the space the labels used to
+  // occupy, so the trace and its endpoint dot stay clear of the bottom edge.
   ctx.lineCap='round';ctx.lineJoin='round'
   let run: IndexedSilkPoint[] = []
   for (let index = 0; index < points.length; index += 1) {
