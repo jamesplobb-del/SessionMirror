@@ -13,6 +13,7 @@ export const STABLE_NOTE_THRESHOLDS = {
   minimumOutlierBandCents: 4.5,
   maximumOutlierBandCents: 14,
   maximumVariabilityCents: 14,
+  maximumCandidateSamples: 640,
 } as const
 
 export interface StablePitchFrame {
@@ -140,6 +141,9 @@ export class StableNoteTracker {
       return
     }
 
+    if (current.samples.length >= STABLE_NOTE_THRESHOLDS.maximumCandidateSamples) {
+      current.samples.splice(0, Math.max(1, Math.floor(STABLE_NOTE_THRESHOLDS.maximumCandidateSamples / 5)))
+    }
     current.samples.push({
       cents: frame.centsOffset,
       confidence: frame.confidence,

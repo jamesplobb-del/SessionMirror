@@ -1,3 +1,5 @@
+import TunerHistory from './audioPractice/TunerHistory'
+import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BarChart3, Music2, Settings, SlidersHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
@@ -35,7 +37,9 @@ import { savePitchObservation } from '../db/pitchInsightsRepository'
 import { StableNoteTracker } from '../utils/stableNoteTracker'
 import { useTutorialAction } from '../context/TutorialContext'
 import { safeRandomUUID } from '../utils/uuid'
+import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
 interface LivePitchTunerProps {
+  nativePitchProcessing?: boolean
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
   mediaKey: string
@@ -190,6 +194,7 @@ function LiveAudioTunerPane({
   audioToolsEnabled = true,
   inTuneGlow = 0,
   coachEnabled = false,
+  pitchHistory,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -204,6 +209,7 @@ function LiveAudioTunerPane({
   audioToolsEnabled?: boolean
   inTuneGlow?: number
   coachEnabled?: boolean
+  pitchHistory?: RefObject<TunerHistorySample[]>
 }) {
   const notifyTutorial = useTutorialAction()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -252,6 +258,10 @@ function LiveAudioTunerPane({
       drone.octave === catchOctave,
   )
 
+  const usesReactiveSilk =
+    typeof document !== 'undefined' &&
+    document.documentElement.dataset.refinement === 'depth-electric'
+
   const catchNote = () => {
     if (!drone || !catchConcert || catchOctave === null) return
     onDroneInteraction?.()
@@ -267,7 +277,7 @@ function LiveAudioTunerPane({
     stageRef,
     pitchActive ? readout.cents : null,
     inTuneGlow,
-    true,
+    !usesReactiveSilk,
   )
 
   const toggleDrone = () => {
@@ -315,6 +325,7 @@ function LiveAudioTunerPane({
           }
         />
 
+        {pitchHistory && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} transposition={tunerTransposition} />}
         <div className="pitch-living-canvas__direction" aria-hidden>
           <span>Sharp</span>
           <span>Flat</span>
@@ -520,6 +531,7 @@ function LivePitchTunerAudio({
   drone,
   onLiveSourceHealthChange,
   audioToolsEnabled = true,
+  nativePitchProcessing = false,
 }: {
   mediaRef: RefObject<HTMLMediaElement | null>
   isPlaying: boolean
@@ -537,7 +549,10 @@ function LivePitchTunerAudio({
   drone?: LivePitchTunerProps['drone']
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
   audioToolsEnabled?: boolean
+  nativePitchProcessing?: boolean
 }) {
+  const pitchHistoryRef = useRef<TunerHistorySample[]>([])
+  useEffect(() => { pitchHistoryRef.current = [] }, [tunerInstrument, tunerTransposition])
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const droneAnalysisSuppressUntilRef = useRef(0)
@@ -558,6 +573,7 @@ function LivePitchTunerAudio({
   const stableNoteTrackerRef = useRef<StableNoteTracker | null>(null)
   if (!stableNoteTrackerRef.current) {
     stableNoteTrackerRef.current = new StableNoteTracker((observation) => {
+      if (nativePitchProcessing && isTunerDiagnosticMode('no-insights')) return
       void savePitchObservation(observation).catch((error: unknown) => {
         console.warn('[PitchInsights] Failed to save stable observation', error)
       })
@@ -572,6 +588,8 @@ function LivePitchTunerAudio({
   insightsSuppressedRef.current = insightsSuppressed
 
   const handleAcceptedPitchFrame = useCallback((frame: AcceptedPitchFrame | null) => {
+    appendTunerHistory(pitchHistoryRef.current, frame?.timestamp ?? Date.now(), frame?.readout ?? null)
+    if (nativePitchProcessing && isTunerDiagnosticMode('no-insights')) return
     const tracker = stableNoteTrackerRef.current
     if (!tracker) return
     if (!frame || insightsSuppressedRef.current) {
@@ -589,7 +607,7 @@ function LivePitchTunerAudio({
       },
       insightsContextRef.current,
     )
-  }, [])
+  }, [nativePitchProcessing])
 
   useEffect(() => {
     return () => stableNoteTrackerRef.current?.finish()
@@ -605,13 +623,13 @@ function LivePitchTunerAudio({
 
   const showPlayback = isPlaying && !liveMicOnly
   const showLive = liveMicOnly ? enabled : isPlaying || liveMicEnabled || enabled
-  const liveTrackerEnabled =
-    enabled && showLive && (!liveMicOnly || liveMicEnabled)
+  const liveTrackerEnabled = enabled && showLive && liveMicEnabled
   const playbackTrackerEnabled = enabled && showPlayback
 
   const liveTrackerOptions = useMemo(
     () => ({
       source: 'microphone' as const,
+      nativePitchProcessing: liveMicOnly && nativePitchProcessing,
       micStreamRef,
       continuousScroll: true,
       persistWhenPaused: true,
@@ -626,6 +644,7 @@ function LivePitchTunerAudio({
     }),
     [
       handleAcceptedPitchFrame,
+      nativePitchProcessing,
       liveMicOnly,
       micStreamRef,
       onLiveSourceHealthChange,
@@ -714,7 +733,8 @@ function LivePitchTunerAudio({
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
               inTuneGlow={liveTracker.inTuneGlow}
-              coachEnabled={liveMicOnly}
+              coachEnabled={liveMicOnly && !(nativePitchProcessing && isTunerDiagnosticMode('no-insights'))}
+              pitchHistory={liveMicOnly ? pitchHistoryRef : undefined}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -752,6 +772,7 @@ export default function LivePitchTuner({
   drone,
   onLiveSourceHealthChange,
   audioToolsEnabled = true,
+  nativePitchProcessing = false,
 }: LivePitchTunerProps) {
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
@@ -799,6 +820,7 @@ export default function LivePitchTuner({
         drone={drone}
         onLiveSourceHealthChange={onLiveSourceHealthChange}
         audioToolsEnabled={audioToolsEnabled}
+        nativePitchProcessing={nativePitchProcessing}
       />
     )
   }

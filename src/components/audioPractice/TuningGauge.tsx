@@ -66,11 +66,6 @@ function TuningGauge({
       }
       aria-live="polite"
     >
-      <p className="pitch-living-readout__status">
-        <span aria-hidden />
-        {status}
-      </p>
-
       {canCatch ? (
         <button
           type="button"

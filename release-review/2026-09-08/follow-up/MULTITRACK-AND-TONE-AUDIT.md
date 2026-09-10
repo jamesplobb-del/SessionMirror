@@ -39,3 +39,6 @@ Further changes needed before a broader release (not part of this integration):
 
 ## Integrated build verification
 Production type check/build, iOS sync, unsigned generic-device Xcode build, trim metadata, hands-free cycle, playback routing, audio lifecycle and zero-compression checks passed. All 72 web output files match the iOS bundle. No physical-device installation or listening test was performed. Main integration retains prior trimming safeguards and excludes preview-only fixture code.
+
+## September 9 follow-up
+The four multitrack findings and original-preserving enhancement workflow have now been implemented. The feature name is Audio Enhance. New native recordings retain the original and save a separate Enhanced copy when enabled. See `release-review/2026-09-09/AUDIO-AND-MULTITRACK.md` for implementation, validation, and remaining owner device checks; earlier descriptions above are historical.

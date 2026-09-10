@@ -1775,9 +1775,17 @@
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  pointer-events: none;
+  border: 0;
+  font-family: inherit;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transform: translateX(-50%);
 }
+
+.sj-test-input__badge:active { transform: translateX(-50%) scale(0.94); }
+.sj-test-input__badge:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .sj-next-note { display: grid; align-content: center; gap: 4px; opacity: .72; }
 .sj-next-note small { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .sj-next-note strong { font-size: 20px; font-weight: 600; }

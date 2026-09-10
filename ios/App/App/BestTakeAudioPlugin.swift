@@ -8,6 +8,9 @@ import UIKit
 
 @objc(BestTakeAudioPlugin)
 public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
+    // At most two PCM events may wait for JavaScript, including WebKit delivery.
+    private let pitchDeliveryWindow = PitchDeliveryWindow()
+    private let tunerResultWindow = PitchDeliveryWindow()
     public let identifier = "BestTakeAudioPlugin"
     public let jsName = "BestTakeAudioPlugin"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -46,6 +49,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setNativeCameraFrameBridgeEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ackNativeCameraPreviewFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeCameraPreviewZoom", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "acknowledgeNativePitchFrame", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setNativeTunerPitchEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeAudioTapEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeTunerMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeTunerMonitor", returnType: CAPPluginReturnPromise),
@@ -115,12 +120,37 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 "frameId": NSNumber(value: frameId),
             ])
         }
+        nativeCameraEngine.onTunerPitch = { [weak self] frequency, confidence, rmsDb in
+            guard let self = self, let token = self.tunerResultWindow.reserve() else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self, self.tunerResultWindow.contains(token) else { return }
+                guard let webView = self.bridge?.webView else { self.tunerResultWindow.acknowledge(token); return }
+                let json = "{\"frequency\":\(frequency),\"confidence\":\(confidence),\"rmsDb\":\(rmsDb)}"
+                webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('besttake:native-tuner-pitch', {detail: \(json)}))") { [weak self] _, _ in
+                    self?.tunerResultWindow.acknowledge(token)
+                }
+            }
+        }
         nativeCameraEngine.onAudioTapChunk = { [weak self] pcmBase64, sampleRate, sampleCount in
-            self?.notifyListeners("nativeAudioPitchFrame", data: [
-                "pcmBase64": pcmBase64,
-                "sampleRate": sampleRate,
-                "sampleCount": sampleCount,
-            ])
+            if let self = self, let token = self.pitchDeliveryWindow.reserve() {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self, self.pitchDeliveryWindow.contains(token) else { return }
+                    let data: [String: Any] = ["pcmBase64": pcmBase64, "sampleRate": sampleRate, "sampleCount": sampleCount]
+                    if token == "legacy" {
+                        self.notifyListeners("nativeAudioPitchFrame", data: data)
+                    } else {
+                        guard let webView = self.bridge?.webView,
+                              let json = try? JSONSerialization.data(withJSONObject: data),
+                              let payload = String(data: json, encoding: .utf8) else {
+                            self.pitchDeliveryWindow.acknowledge(token)
+                            return
+                        }
+                        webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('besttake:native-pitch-frame', {detail: \(payload)}))") { [weak self] _, _ in
+                            self?.pitchDeliveryWindow.acknowledge(token)
+                        }
+                    }
+                }
+            }
             self?.appendSpokenFeedbackAudio(
                 pcmBase64: pcmBase64,
                 sampleRate: sampleRate,
@@ -1096,8 +1126,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
             let asset = AVURLAsset(url: sourceURL)
             guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-                print("[Multitrack] skipping unreadable source \(source["id"] ?? "?")")
-                continue
+                call.reject("A panel video could not be read. Relink the missing take and retry.")
+                return
             }
 
             guard let compositionVideo = composition.addMutableTrack(
@@ -1134,8 +1164,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             do {
                 try compositionVideo.insertTimeRange(sourceTimeRange, of: videoTrack, at: offsetInsertTime)
             } catch {
-                print("[Multitrack] failed to insert video source \(source["id"] ?? "?"): \(error.localizedDescription)")
-                continue
+                call.reject("A panel video could not be added to the export", nil, error)
+                return
             }
             
             let endOnTimeline = CMTimeAdd(offsetInsertTime, sourceTimeRange.duration)
@@ -1146,6 +1176,22 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             let geometry = multitrackVideoGeometry(track: videoTrack, targetRect: targetRect)
             layerInstruction.setCropRectangle(geometry.cropRect, at: .zero)
             layerInstruction.setTransform(geometry.transform, at: .zero)
+            if let windows = source["layoutWindows"] as? [[String: Any]] {
+                for window in windows {
+                    let start = (window["startSec"] as? NSNumber)?.doubleValue ?? 0
+                    let time = CMTime(seconds: max(0, start), preferredTimescale: 600)
+                    if let rect = window["rect"] as? [String: Any] {
+                        let frame = multitrackRectFrame(rect, renderSize: renderSize)
+                        let placement = multitrackVideoGeometry(track: videoTrack, targetRect: frame)
+                        layerInstruction.setCropRectangle(placement.cropRect, at: time)
+                        layerInstruction.setTransform(placement.transform, at: time)
+                        layerInstruction.setOpacity(1, at: time)
+                    } else {
+                        layerInstruction.setOpacity(0, at: time)
+                    }
+                }
+            }
+            layerInstruction.setOpacity(0, at: endOnTimeline)
             layerInstructions.append(layerInstruction)
 
             // Mixer state from Play All — muted panels export silent, others at
@@ -1167,7 +1213,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     parameters.setVolume(sourceVolume, at: .zero)
                     audioParameters.append(parameters)
                 } catch {
-                    print("[Multitrack] failed to insert audio for source \(source["id"] ?? "?"): \(error.localizedDescription)")
+                    call.reject("A panel audio track could not be added to the export", nil, error)
+                    return
                 }
             }
         }
@@ -1197,7 +1244,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                         parameters.setVolume(gain, at: .zero)
                         audioParameters.append(parameters)
                     } catch {
-                        print("[Multitrack] failed to insert backing audio: \(error.localizedDescription)")
+                        call.reject("The backing audio could not be added to the export", nil, error)
+                        return
                     }
                 }
             }
@@ -1650,8 +1698,24 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    @objc func acknowledgeNativePitchFrame(_ call: CAPPluginCall) {
+        if let token = call.getString("token") { pitchDeliveryWindow.acknowledge(token) }
+        call.resolve()
+    }
+
+    @objc func setNativeTunerPitchEnabled(_ call: CAPPluginCall) {
+        let enabled = call.getBool("enabled") ?? false
+        tunerResultWindow.configure(enabled: enabled, acknowledged: true)
+        nativeCameraEngine.setTunerPitchEnabled(enabled)
+        if enabled { print("[NativeTuner] detector=native-mpm-v1 compact-results-only") }
+        call.resolve()
+    }
+
     @objc func setNativeAudioTapEnabled(_ call: CAPPluginCall) {
         let enabled = call.getBool("enabled") ?? false
+        let acknowledgedDelivery = call.getBool("completionDelivery") ?? false
+        pitchDeliveryWindow.configure(enabled: enabled, acknowledged: acknowledgedDelivery)
+        if enabled { print("[PitchTap] delivery=\(acknowledgedDelivery ? "completion-v2 maxInFlight=2" : "legacy")") }
         jsAudioTapEnabled = enabled
         nativeCameraEngine.setAudioTapEnabled(enabled || spokenFeedbackActive)
         call.resolve()
@@ -1799,7 +1863,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let isVideo = (call.getString("mediaType") ?? "video") == "video"
 
-        AudioEnhancerRenderer.enhanceInPlace(
+        AudioEnhancerRenderer.enhanceCopy(
             fileURL: fileURL,
             isVideo: isVideo,
             params: params
@@ -2455,3 +2519,34 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         #endif
     }
 }
+
+// BEGIN PITCH DELIVERY WINDOW
+/// No timeout can release credit: a stalled WebView must not accumulate more PCM.
+private final class PitchDeliveryWindow {
+    private let lock = NSLock()
+    private var enabled = false
+    private var acknowledged = false
+    private var pending = Set<String>()
+    func configure(enabled: Bool, acknowledged: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        self.enabled = enabled; self.acknowledged = acknowledged; pending.removeAll()
+    }
+    func reserve() -> String? {
+        lock.lock(); defer { lock.unlock() }
+        guard enabled else { return nil }
+        guard acknowledged else { return "legacy" }
+        guard pending.count < 2 else { return nil }
+        let token = UUID().uuidString
+        pending.insert(token)
+        return token
+    }
+    func contains(_ token: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return enabled && (token == "legacy" ? !acknowledged : pending.contains(token))
+    }
+    func acknowledge(_ token: String) {
+        lock.lock(); defer { lock.unlock() }
+        pending.remove(token)
+    }
+}
+// END PITCH DELIVERY WINDOW

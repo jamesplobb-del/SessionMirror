@@ -22,6 +22,7 @@ import {
 } from '../../utils/appForeground'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { createAudioRecovery } from '../../utils/audioRecovery'
+import { TUNER_DIAGNOSTICS_ENABLED, getTunerDiagnosticMode, setTunerDiagnosticMode, type TunerDiagnosticMode } from '../../utils/tunerDiagnosticMode'
 
 interface AudioTunerTabProps {
   /** False while a sheet or another full-screen surface covers the tuner. */
@@ -78,6 +79,13 @@ export default function AudioTunerTab({
   onRequestMicStream,
 }: AudioTunerTabProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
+  const [diagnosticMode, setDiagnosticMode] = useState(getTunerDiagnosticMode)
+  useEffect(() => {
+    if (!TUNER_DIAGNOSTICS_ENABLED || !active) return
+    document.documentElement.dataset.tunerDiagnostic = diagnosticMode
+    console.info(`[TunerDiagnostic] mode=${diagnosticMode}`)
+    return () => { delete document.documentElement.dataset.tunerDiagnostic }
+  }, [active, diagnosticMode])
 
   const [micLiveEpoch, setMicLiveEpoch] = useState(0)
   const [micSessionReady, setMicSessionReady] = useState(false)
@@ -320,8 +328,31 @@ export default function AudioTunerTab({
       className="audio-practice-tuner-shell relative flex min-h-0 flex-1 flex-col"
       aria-label="Tuner"
     >
+      {TUNER_DIAGNOSTICS_ENABLED && (
+        <label style={{ position: 'absolute', right: 8, top: 4, zIndex: 20, padding: '4px 8px', borderRadius: 8, background: '#172b38', color: '#fff', fontSize: 11 }}>
+          Crash test{' '}
+          <select
+            aria-label="Tuner crash isolation mode"
+            disabled={isRecording}
+            value={diagnosticMode}
+            style={{ color: '#fff', background: '#172b38', fontSize: 11 }}
+            onChange={event => {
+              const mode = event.target.value as TunerDiagnosticMode
+              setTunerDiagnosticMode(mode)
+              setDiagnosticMode(mode)
+            }}
+          >
+            <option value="normal">Normal</option>
+            <option value="static-background">Static background</option>
+            <option value="no-graph">Graph off</option>
+            <option value="no-insights">Insights off</option>
+          </select>
+        </label>
+      )}
       <LivePitchTuner
+        key={diagnosticMode}
         variant="audio"
+        nativePitchProcessing
         mediaRef={mediaRef}
         enabled={active}
         isPlaying={isRecording}

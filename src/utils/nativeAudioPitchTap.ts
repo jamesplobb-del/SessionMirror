@@ -6,6 +6,7 @@ import {
   setNativeAudioCaptureActive,
 } from './cameraSessionState'
 import type { MicInputPreference } from './appSettings'
+import { claimNativeTunerMicrophone, releaseNativeTunerMicrophone } from './tunerMicrophoneOwnership'
 
 /**
  * Native audio tap for the camera-mode pitch widget.
@@ -57,15 +58,18 @@ async function startTunerMonitor(
 ): Promise<boolean> {
   if (!isNativeCameraTestAvailable()) return false
   try {
+    await claimNativeTunerMicrophone()
     const result = await BestTakeAudioPlugin.startNativeTunerMonitor({
       micInputPreference,
     })
     const active = result.active === true
     tunerMonitorActive = active
     setNativeAudioCaptureActive(active)
+    if (!active) releaseNativeTunerMicrophone(false)
     return active
   } catch (error) {
     tunerMonitorActive = false
+    releaseNativeTunerMicrophone(false)
     if (!isNativeCaptureSessionActive()) {
       setNativeAudioCaptureActive(false)
     }
@@ -82,6 +86,7 @@ async function stopTunerMonitor(): Promise<void> {
     console.warn('[PitchTap] native tuner monitor stop failed', error)
   } finally {
     tunerMonitorActive = false
+    releaseNativeTunerMicrophone()
   }
 }
 
@@ -141,7 +146,8 @@ export async function acquireNativeAudioTap(): Promise<void> {
   await enqueueTapOperation(async () => {
     if (tapRefCount === 0 || tapActive) return
     try {
-      await BestTakeAudioPlugin.setNativeAudioTapEnabled({ enabled: true })
+      await ensureSharedPitchFrameListener()
+      await BestTakeAudioPlugin.setNativeAudioTapEnabled({ enabled: true, completionDelivery: true })
       tapActive = true
       console.info('[PitchTap] JS enabled native audio tap')
     } catch (error) {
@@ -185,6 +191,7 @@ type PitchFrameSubscriber = (chunk: NativeAudioPitchChunk) => void
 const pitchFrameSubscribers = new Set<PitchFrameSubscriber>()
 let sharedPitchFrameListener: PluginListenerHandle | null = null
 let sharedPitchFrameListenerPromise: Promise<PluginListenerHandle> | null = null
+let completionFrameReceiverInstalled = false
 let loggedFirstPitchFrame = false
 let loggedPitchSubscriberFailure = false
 
@@ -192,7 +199,7 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
   if (sharedPitchFrameListener) return Promise.resolve(sharedPitchFrameListener)
   if (sharedPitchFrameListenerPromise) return sharedPitchFrameListenerPromise
 
-  const pending = BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', (event) => {
+  const handleFrame = (event: { pcmBase64?: string; sampleRate?: number; sampleCount?: number }) => {
     // Keep the bridge listener for the lifetime of the app, but skip decoding
     // entirely while no pitch feature is using it. Removing and recreating the
     // listener during a quick Games -> Tuner switch can race Capacitor's
@@ -219,7 +226,16 @@ function ensureSharedPitchFrameListener(): Promise<PluginListenerHandle> {
         }
       }
     }
-  }).then((handle) => {
+  }
+  // Native completion delivery uses the WebView completion callback as credit,
+  // rather than a second JS-to-native RPC that can leave the tap starved.
+  if (typeof window !== 'undefined' && !completionFrameReceiverInstalled) {
+    window.addEventListener('besttake:native-pitch-frame', (event) => {
+      handleFrame((event as CustomEvent).detail ?? {})
+    })
+    completionFrameReceiverInstalled = true
+  }
+  const pending = BestTakeAudioPlugin.addListener('nativeAudioPitchFrame', handleFrame).then((handle) => {
     sharedPitchFrameListener = handle
     return handle
   }).finally(() => {

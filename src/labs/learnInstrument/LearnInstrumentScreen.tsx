@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
-import { GAME_TEST_INPUT } from '../gameTestInput'
+import { GAME_TEST_INPUT_AVAILABLE } from '../gameTestInput'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw, Settings } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
@@ -357,7 +357,7 @@ export default function LearnInstrumentScreen({
   // In a test build, show how many times the microphone has been rebuilt. It
   // is the only way to see from outside whether a resume actually triggered
   // recovery, which is exactly the failure this screen used to hide.
-  const micLine = GAME_TEST_INPUT ? `${statusText} · mic ${micEpoch}` : statusText
+  const micLine = GAME_TEST_INPUT_AVAILABLE ? `${statusText} · mic ${micEpoch}` : statusText
 
   return (
     <main className="li-screen li-play" data-status={status}>

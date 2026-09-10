@@ -623,13 +623,14 @@ export async function persistUploadedVideo(
 export async function persistRenderedTakeVideo(
   renderedUri: string,
   takeId: string,
+  mediaType: 'video' | 'audio' = 'video',
 ): Promise<PersistedTakeVideo> {
   if (!Capacitor.isNativePlatform() || !renderedUri) {
     throw new Error('Rendered Take Vault saves require a native file.')
   }
 
   await ensureTakesDirectory()
-  const filePath = `${TAKES_DIR}/${takeId}.mp4`
+  const filePath = `${TAKES_DIR}/${takeId}.${mediaType === 'audio' ? 'm4a' : 'mp4'}`
   await deleteTakeFile(filePath)
 
   const copied = await Filesystem.copy({
@@ -695,4 +696,12 @@ export async function deleteTakeFile(filePath: string): Promise<boolean> {
 
   deleteTakeFileInFlight.set(filePath, task)
   return task
+}
+
+/** Discard a native renderer's absolute output URI after Vault has copied it. */
+export async function discardRenderedTakeFile(uri: string): Promise<void> {
+  if (!Capacitor.isNativePlatform() || !uri.startsWith('file://')) return
+  try { await Filesystem.deleteFile({ path: uri }) } catch (error) {
+    if (!isFilesystemMissingError(error)) console.warn('[TakeStorage] Render cleanup failed', error)
+  }
 }

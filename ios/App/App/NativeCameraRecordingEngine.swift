@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import CoreMedia
 import Foundation
@@ -118,6 +119,24 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int, _ frameId: UInt64) -> Void)?
 
     /// Delivers mono Float32 PCM chunks (base64, sampleRate, sampleCount) for the JS pitch tracker.
+    private var tunerPitchEnabled = false
+    private var tunerPitchSamples: [Float] = []
+    private var tunerPitchSampleRate: Double = 0
+    /// Compact pitch results only. The full tuner never sends PCM through WebKit.
+    var onTunerPitch: ((_ frequency: Double, _ confidence: Double, _ rmsDb: Double) -> Void)?
+    private let tunerPitchWorkQueue = DispatchQueue(label: "com.besttake.tuner-detection", qos: .userInitiated)
+    private let tunerPitchWorkLock = NSLock()
+    private var tunerPitchWorkPending = false
+    private var tunerPitchGeneration = 0
+
+    func setTunerPitchEnabled(_ enabled: Bool) {
+        audioTapQueue.async {
+            self.tunerPitchEnabled = enabled
+            self.tunerPitchSamples.removeAll(keepingCapacity: enabled)
+            self.tunerPitchGeneration += 1
+        }
+    }
+
     var onAudioTapChunk: ((_ pcmBase64: String, _ sampleRate: Double, _ sampleCount: Int) -> Void)?
 
     /// True once a `mediaServicesWereReset` notification fires — hardware objects
@@ -2771,7 +2790,7 @@ extension NativeCameraRecordingEngine {
     private func handleAudioTapSample(_ sampleBuffer: CMSampleBuffer) {
         appendAudioFallbackSample(sampleBuffer)
         lastAudioTapSampleTime = CACurrentMediaTime()
-        guard isAudioTapEnabled || isAudioOnlyRecording else { return }
+        guard isAudioTapEnabled || isAudioOnlyRecording || tunerPitchEnabled else { return }
         if !didLogFirstTapSample {
             didLogFirstTapSample = true
             print("[PitchTap] FIRST audio sample received from capture session — tap is delivering")
@@ -2829,6 +2848,40 @@ extension NativeCameraRecordingEngine {
             return
         }
 
+        if tunerPitchEnabled {
+            if tunerPitchSampleRate != asbd.mSampleRate {
+                tunerPitchSamples.removeAll(keepingCapacity: true)
+                tunerPitchSampleRate = asbd.mSampleRate
+                tunerPitchGeneration += 1
+            }
+            tunerPitchSamples.append(contentsOf: mono)
+            let windowSize = 4096
+            if tunerPitchSamples.count >= windowSize {
+                let window = Array(tunerPitchSamples.suffix(windowSize))
+                tunerPitchSamples.removeFirst(tunerPitchSamples.count - 2048)
+                tunerPitchWorkLock.lock()
+                let busy = tunerPitchWorkPending
+                if !busy { tunerPitchWorkPending = true }
+                tunerPitchWorkLock.unlock()
+                if !busy {
+                    let generation = tunerPitchGeneration
+                    let rate = asbd.mSampleRate
+                    tunerPitchWorkQueue.async { [weak self] in
+                        guard let self = self else { return }
+                        let result = estimateNativeTunerPitch(window, sampleRate: rate)
+                        self.audioTapQueue.async {
+                            if self.tunerPitchEnabled && self.tunerPitchGeneration == generation {
+                                self.onTunerPitch?(result.frequency, result.confidence, result.rmsDb)
+                            }
+                            self.tunerPitchWorkLock.lock()
+                            self.tunerPitchWorkPending = false
+                            self.tunerPitchWorkLock.unlock()
+                        }
+                    }
+                }
+            }
+        }
+        guard isAudioTapEnabled || isAudioOnlyRecording else { return }
         tapAccumulator.append(contentsOf: mono)
         let chunkSize = 2048
         let sampleRate = asbd.mSampleRate
@@ -2855,3 +2908,55 @@ extension NativeCameraRecordingEngine {
         }
     }
 }
+
+// BEGIN NATIVE TUNER DETECTOR
+/// McLeod normalized square difference; bounded window, Accelerate dot products.
+/// The UI retains its existing instrument-specific smoothing and note hysteresis.
+struct NativeTunerEstimate {
+    let frequency: Double
+    let confidence: Double
+    let rmsDb: Double
+}
+func estimateNativeTunerPitch(_ input: [Float], sampleRate: Double) -> NativeTunerEstimate {
+    guard input.count >= 1024, sampleRate > 0 else { return NativeTunerEstimate(frequency: 0, confidence: 0, rmsDb: -160) }
+    var samples = input
+    var mean: Float = 0
+    vDSP_meanv(samples, 1, &mean, vDSP_Length(samples.count))
+    var negativeMean = -mean
+    vDSP_vsadd(samples, 1, &negativeMean, &samples, 1, vDSP_Length(samples.count))
+    var power: Float = 0
+    vDSP_measqv(samples, 1, &power, vDSP_Length(samples.count))
+    let rmsDb = 10 * log10(max(Double(power), 1e-16))
+    guard rmsDb.isFinite, rmsDb > -65 else { return NativeTunerEstimate(frequency: 0, confidence: 0, rmsDb: rmsDb.isFinite ? rmsDb : -160) }
+    let n = samples.count, maxLag = min(n / 2, Int(sampleRate / 45))
+    var energy = [Double](repeating: 0, count: n+1)
+    for i in 0..<n { energy[i+1] = energy[i]+Double(samples[i])*Double(samples[i]) }
+    var nsdf = [Double](repeating: 0, count: maxLag+1)
+    samples.withUnsafeBufferPointer { p in
+        guard let base = p.baseAddress else { return }
+        for lag in 0...maxLag {
+            var correlation: Float = 0
+            vDSP_dotpr(base, 1, base+lag, 1, &correlation, vDSP_Length(n-lag))
+            let denominator = energy[n-lag]+energy[n]-energy[lag]
+            nsdf[lag] = denominator > 1e-12 ? 2*Double(correlation)/denominator : 0
+        }
+    }
+    // Skip the zero-lag lobe, then retain the strongest peak in each positive lobe.
+    var peaks: [Int] = [], passedZero = false, candidate: Int? = nil
+    for lag in 1..<maxLag {
+        if nsdf[lag] <= 0 {
+            passedZero = true
+            if let peak = candidate { peaks.append(peak); candidate = nil }
+        } else if passedZero && (candidate == nil || nsdf[lag] > nsdf[candidate!]) { candidate = lag }
+    }
+    if let peak = candidate, peak < maxLag-1 { peaks.append(peak) }
+    let strongest = peaks.map { nsdf[$0] }.max() ?? 0
+    guard strongest >= 0.5, let peak = peaks.first(where: { nsdf[$0] >= max(0.5,strongest*0.93) }) else {
+        return NativeTunerEstimate(frequency: 0, confidence: max(0,strongest), rmsDb: rmsDb)
+    }
+    let a = nsdf[peak-1], b = nsdf[peak], c = nsdf[peak+1]
+    let denominator = a-2*b+c
+    let offset = abs(denominator) > 1e-12 ? 0.5*(a-c)/denominator : 0
+    return NativeTunerEstimate(frequency: sampleRate/(Double(peak)+offset), confidence: min(1,max(0,b)), rmsDb: rmsDb)
+}
+// END NATIVE TUNER DETECTOR

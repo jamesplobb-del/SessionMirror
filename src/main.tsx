@@ -74,3 +74,7 @@ import './styles/camera-transparent-concepts.css'
 import './styles/electric-refinement.css'
 import './styles/arcade-style-concepts.css'
 import './styles/signal-launch.css'
+
+import './styles/midnight-electric.css'
+
+import './styles/reactive-silk-tuner.css'

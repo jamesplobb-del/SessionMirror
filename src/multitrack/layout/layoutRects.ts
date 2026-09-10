@@ -141,8 +141,11 @@ export interface LayoutRectPercent {
 export function computeMultitrackLayoutRects(
   preset: MultitrackLayoutPreset,
   musicAsset: SheetMusicAsset | null,
+  visibleIds?: string[],
 ): { panelRects: Record<string, LayoutRectPercent>; musicRect: LayoutRectPercent | null } {
-  const { areas, columnWeights, rowWeights } = resolveMultitrackGridModel(preset, musicAsset)
+  const { areas, columnWeights, rowWeights } = visibleIds
+    ? resolveMultitrackGridModelForIds(preset, musicAsset, visibleIds)
+    : resolveMultitrackGridModel(preset, musicAsset)
   const colBounds = cumulativePercents(columnWeights)
   const rowBounds = cumulativePercents(rowWeights)
   const cells = areas.map((row) => row.trim().split(/\s+/))

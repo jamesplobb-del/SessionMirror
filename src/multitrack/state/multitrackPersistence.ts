@@ -1,3 +1,4 @@
+import { persistAsset, restoreAsset } from './multitrackAssets'
 import type { Take } from '../../types'
 import { createPanelsForLayout, getLayoutPreset } from '../layout/layoutPresets'
 import type {
@@ -6,15 +7,11 @@ import type {
   MultitrackSession,
 } from '../types'
 
-/**
- * Auto-project persistence: the last multitrack canvas survives app restarts
- * (CapCut-style — never ask the user to save or name anything).
- *
- * Only durable references are persisted: take IDs (rehydrated from the vault
- * takes list), practice settings, and YouTube backings (just a URL). File/blob
- * backings and sheet-music assets are session-scoped object URLs and cannot be
- * restored — they stay ephemeral by design.
- */
+/** Auto-saved canvas metadata; imported blobs are committed before their references. */
+
+function bounded(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback
+}
 
 const STORAGE_KEY = 'sm.multitrack.session.v1'
 
@@ -30,10 +27,11 @@ interface PersistedMultitrackSession {
   /** Section window per panel slot: [startSec|null, endSec|null]. */
   panelSections?: ([number | null, number | null] | null)[]
   practice: MultitrackPracticeSettings
-  backing: { kind: 'youtube'; embedUrl: string; label: string; volume: number } | null
+  backing: MultitrackBackingTrack | null
+  sheetMusic?: MultitrackSession['sheetMusic']
 }
 
-export function saveMultitrackSession(session: MultitrackSession): void {
+export async function saveMultitrackSession(session: MultitrackSession): Promise<void> {
   try {
     const performancePanels = session.panels.filter(
       (panel) => panel.kind === 'performance',
@@ -61,15 +59,23 @@ export function saveMultitrackSession(session: MultitrackSession): void {
           : null,
       ),
       practice: session.practice,
-      backing: session.backing.kind === 'youtube' ? session.backing : null,
+      backing: session.backing.kind === 'audio'
+        ? { ...session.backing, src: await persistAsset(session.backing.src) } : session.backing,
+      sheetMusic: {
+        ...session.sheetMusic,
+        asset: session.sheetMusic.asset ? { ...session.sheetMusic.asset, src: await persistAsset(session.sheetMusic.asset.src) } : null,
+        cues: await Promise.all((session.sheetMusic.cues ?? []).map(async cue => ({
+          ...cue, asset: { ...cue.asset, src: await persistAsset(cue.asset.src) },
+        }))),
+      },
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
-  } catch {
-    /* storage unavailable — persistence is best-effort */
+  } catch (error) {
+    throw new Error('Could not save this workspace. Keep it open and try again.', { cause: error })
   }
 }
 
-export function loadMultitrackSession(takes: Take[]): MultitrackSession | null {
+export async function loadMultitrackSession(takes: Take[]): Promise<MultitrackSession | null> {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
@@ -93,45 +99,74 @@ export function loadMultitrackSession(takes: Take[]): MultitrackSession | null {
         ...panel,
         // Takes deleted since last session are silently dropped.
         take: takeId ? takeById.get(takeId) ?? null : null,
-        ...(typeof volume === 'number' ? { volume } : null),
+        ...(typeof volume === 'number' ? { volume: bounded(volume, 1, 0, 1) } : null),
         ...(muted === true ? { muted: true } : null),
         ...(Array.isArray(trim)
           ? {
-              trimStartSec: typeof trim[0] === 'number' ? trim[0] : 0,
-              ...(typeof trim[1] === 'number' ? { trimEndSec: trim[1] } : null),
+              trimStartSec: bounded(trim[0], 0, 0, takeById.get(takeId ?? '')?.duration ?? 86400),
+              ...(typeof trim[1] === 'number' ? { trimEndSec: bounded(trim[1], 86400, 0, takeById.get(takeId ?? '')?.duration ?? 86400) } : null),
             }
           : null),
         ...(Array.isArray(section)
           ? {
-              ...(typeof section[0] === 'number' ? { sectionStartSec: section[0] } : null),
-              ...(typeof section[1] === 'number' ? { sectionEndSec: section[1] } : null),
+              ...(typeof section[0] === 'number' ? { sectionStartSec: bounded(section[0], 0, 0, 86400) } : null),
+              ...(typeof section[1] === 'number' ? { sectionEndSec: bounded(section[1], 86400, 0, 86400) } : null),
             }
           : null),
+      }
+      const restoredPanel = panels[i]
+      if (restoredPanel.kind === 'performance') {
+        if (restoredPanel.trimEndSec !== undefined && restoredPanel.trimEndSec <= (restoredPanel.trimStartSec ?? 0)) {
+          restoredPanel.trimStartSec = 0
+          restoredPanel.trimEndSec = undefined
+        }
+        if (restoredPanel.sectionEndSec !== undefined && restoredPanel.sectionEndSec <= (restoredPanel.sectionStartSec ?? 0)) {
+          restoredPanel.sectionStartSec = undefined
+          restoredPanel.sectionEndSec = undefined
+        }
       }
       performanceIndex += 1
     }
 
-    const backing: MultitrackBackingTrack =
-      persisted.backing?.kind === 'youtube'
-        ? persisted.backing
-        : { kind: 'none', volume: 0.85 }
+    let backing: MultitrackBackingTrack = { kind: 'none', volume: 0.85 }
+    let missingAssets = false
+    if (persisted.backing?.kind === 'youtube' && typeof persisted.backing.embedUrl === 'string') {
+      backing = { ...persisted.backing, volume: bounded(persisted.backing.volume, .85, 0, 1) }
+    } else if (persisted.backing?.kind === 'audio') {
+      const src = await restoreAsset(persisted.backing.src)
+      if (src) backing = { ...persisted.backing, src, volume: bounded(persisted.backing.volume, .85, 0, 1) }
+      else missingAssets = true
+    }
+    const sheetMusic: MultitrackSession['sheetMusic'] = { kind: 'sheet-music', id: 'music', asset: null, cues: [] }
+    if (persisted.sheetMusic?.asset) {
+      const src = await restoreAsset(persisted.sheetMusic.asset.src)
+      if (src) sheetMusic.asset = { ...persisted.sheetMusic.asset, src }
+      else missingAssets = true
+    }
+    for (const cue of persisted.sheetMusic?.cues ?? []) {
+      const src = await restoreAsset(cue.asset.src)
+      if (src) sheetMusic.cues!.push({ ...cue, startSec: bounded(cue.startSec, 0, 0, 86400), asset: { ...cue.asset, src } })
+      else missingAssets = true
+    }
+    sheetMusic.cues!.sort((a, b) => a.startSec - b.startSec)
 
     return {
       layoutId: preset.id,
       panels,
-      sheetMusic: { kind: 'sheet-music', id: 'music', asset: null },
+      sheetMusic,
+      ...(missingAssets ? { recoveryNotice: 'Some imported files are missing. Reimport your backing audio or sheet music.' } : {}),
       practice: {
-        showMetronome: persisted.practice?.showMetronome ?? false,
-        showPitch: persisted.practice?.showPitch ?? false,
-        practiceOverlayEnabled: persisted.practice?.practiceOverlayEnabled ?? true,
-        clickEnabled: persisted.practice?.clickEnabled ?? true,
-        countInBars: persisted.practice?.countInBars ?? 1,
-        bpm: persisted.practice?.bpm ?? 120,
+        showMetronome: typeof persisted.practice?.showMetronome === 'boolean' ? persisted.practice.showMetronome : false,
+        showPitch: typeof persisted.practice?.showPitch === 'boolean' ? persisted.practice.showPitch : false,
+        practiceOverlayEnabled: typeof persisted.practice?.practiceOverlayEnabled === 'boolean' ? persisted.practice.practiceOverlayEnabled : true,
+        clickEnabled: typeof persisted.practice?.clickEnabled === 'boolean' ? persisted.practice.clickEnabled : true,
+        countInBars: Math.round(bounded(persisted.practice?.countInBars, 1, 0, 8)),
+        bpm: bounded(persisted.practice?.bpm, 120, 30, 300),
       },
       backing,
     }
-  } catch {
-    return null
+  } catch (error) {
+    throw new Error('Could not restore workspace', { cause: error })
   }
 }
 

@@ -18,6 +18,8 @@ const config: CapacitorConfig = {
     ],
   },
   ios: {
+    // Explicitly expose only the opt-in investigation build to Safari.
+    ...(process.env.VITE_TUNER_DIAGNOSTICS === '1' ? { webContentsDebuggingEnabled: true } : {}),
     // Edge-to-edge on all iPhones; HUD uses env(safe-area-inset-*) for notch / island / home bar.
     contentInset: 'never',
     backgroundColor: '#000000',

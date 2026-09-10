@@ -84,6 +84,7 @@ export type MultitrackBackingTrack =
   | { kind: 'youtube'; embedUrl: string; label: string; volume: number }
 
 export interface MultitrackSession {
+  recoveryNotice?: string
   layoutId: string
   panels: MultitrackPanelState[]
   sheetMusic: SheetMusicPanelState

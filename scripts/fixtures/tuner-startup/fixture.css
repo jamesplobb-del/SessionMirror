@@ -1,0 +1,5 @@
+body { background:#faf9f5!important; color:#182a3c!important; overflow:auto!important; }
+#root { height:auto!important; overflow:visible!important; padding:16px; }
+#root > button { padding:8px; margin:4px; border:1px solid #8899aa; border-radius:10px; }
+.fixture-screen.app-ui-overlay { position:relative!important; inset:auto!important; height:640px!important; width:440px!important; max-width:100%!important; display:flex!important; padding:0!important; pointer-events:auto!important; overflow:hidden; }
+pre { font-size:12px; white-space:pre-wrap; }

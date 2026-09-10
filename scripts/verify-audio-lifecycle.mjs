@@ -60,11 +60,13 @@ const registration = deferred()
 let receive, registrations = 0, removals = 0, startsNative = 0, stopsNative = 0
 let startResult = Promise.resolve({ active: true })
 const tapChanges = []
+const deliveryModes = []
+globalThis.window = new EventTarget()
 globalThis.__audioLifecycleMock = {
   addListener: (_event, callback) => { registrations++; receive = callback; return registration.promise },
   startNativeTunerMonitor: () => { startsNative++; return startResult },
   stopNativeTunerMonitor: async () => { stopsNative++; return { active: false } },
-  setNativeAudioTapEnabled: async ({ enabled }) => { tapChanges.push(enabled) },
+  setNativeAudioTapEnabled: async ({ enabled, completionDelivery }) => { tapChanges.push(enabled); deliveryModes.push(completionDelivery) },
 }
 const boundary = { name: 'native-boundary', setup(builder) {
   builder.onResolve({ filter: /\/(audioSessionRoute|nativeCameraTest|cameraSessionState)$/ }, args => ({ path: args.path, namespace: 'mock' }))
@@ -85,7 +87,12 @@ const pcmBase64 = Buffer.from(new Float32Array([0.2, -0.2]).buffer).toString('ba
 receive({ pcmBase64, sampleRate: 48000 })
 assert.equal(oldFrames, 0)
 assert.equal(newFrames, 1, 'New tool receives audio after leaving a tool during bridge registration')
+// Exercise the actual new event receiver through repeated delivery and tool changes.
+for (let i = 0; i < 3000; i++) window.dispatchEvent(new CustomEvent('besttake:native-pitch-frame', { detail: { pcmBase64, sampleRate: 48000 } }))
+assert.equal(newFrames,3001,'Completion delivery keeps flowing past the first two frames without an acknowledgement RPC')
 await current.remove()
+window.dispatchEvent(new CustomEvent('besttake:native-pitch-frame', {detail:{pcmBase64,sampleRate:48000}}))
+assert.equal(newFrames,3001,'No consumer receives frames after leaving')
 for (let i = 0; i < 100; i++) {
   const handle = await tap.subscribeNativeAudioPitchFrames(() => {})
   await handle.remove()
@@ -95,6 +102,7 @@ assert.equal(removals, 0)
 await tap.acquireNativeAudioTap()
 await tap.acquireNativeAudioTap()
 await tap.releaseNativeAudioTap()
+assert.equal(deliveryModes[0],true,'Negotiate completion delivery only after receiver registration')
 assert.deepEqual(tapChanges, [true], 'A remaining consumer keeps the native tap')
 await tap.releaseNativeAudioTap()
 assert.deepEqual(tapChanges, [true, false])
@@ -102,7 +110,7 @@ await tap.acquireNativeTunerMonitor()
 const nativeRecovery = deferred()
 startResult = nativeRecovery.promise
 const repairs = Array.from({ length: 20 }, () => tap.recoverNativeTunerMonitor())
-await Promise.resolve()
+await new Promise(resolve => setImmediate(resolve))
 assert.equal(startsNative, 2, 'A burst of repair requests starts native recovery only once')
 const release = tap.releaseNativeTunerMonitor()
 nativeRecovery.resolve({ active: true })

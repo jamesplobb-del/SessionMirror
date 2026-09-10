@@ -16,7 +16,7 @@ import {
 import './staff-jumper.css'
 import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
-import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
+import { GAME_TEST_INPUT_AVAILABLE, isGameTestInputOn, SILENT_READOUT, setGameTestInputOn, syntheticReadout, TEST_TAP_HOLD_MS, useGameTestInput } from '../gameTestInput'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
@@ -350,7 +350,8 @@ export default function StaffJumperScreen({
   const [tapMidi, setTapMidi] = useState<number | null>(null)
   const targetMidiRef = useRef<number | null>(null)
   const tapTimerRef = useRef<number | null>(null)
-  const effectiveReadout = !GAME_TEST_INPUT
+  const touchInput = useGameTestInput()
+  const effectiveReadout = !touchInput
     ? readout
     : tapMidi == null
       ? SILENT_READOUT
@@ -384,7 +385,7 @@ export default function StaffJumperScreen({
   } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
 
   useEffect(() => {
-    if (!GAME_TEST_INPUT && state.config) recordPlannedGame({ game: 'staff-jumper', instrumentId: state.config.instrumentId ?? null, key: state.config.key, scaleMode: state.config.scaleMode, correctNotes: state.correctCount, startedAtMs: state.startedAtMs })
+    if (!isGameTestInputOn() && state.config) recordPlannedGame({ game: 'staff-jumper', instrumentId: state.config.instrumentId ?? null, key: state.config.key, scaleMode: state.config.scaleMode, correctNotes: state.correctCount, startedAtMs: state.startedAtMs })
   }, [state.correctCount, state.config, state.startedAtMs])
 
   targetMidiRef.current =
@@ -974,19 +975,32 @@ export default function StaffJumperScreen({
     />
   )
 
-  if (!GAME_TEST_INPUT) return game
+  if (!GAME_TEST_INPUT_AVAILABLE) return game
 
   return (
     <div
       className="sj-test-input"
       onPointerDown={(event) => {
+        if (!touchInput) return
         // Let the pause button and any other control keep its own press.
+        // The mode switch below is a <button>, so it is excluded by this too.
         if ((event.target as HTMLElement).closest('button')) return
         playTestNote()
       }}
     >
       {game}
-      <span className="sj-test-input__badge" aria-hidden>tap = play note</span>
+      <button
+        type="button"
+        className="sj-test-input__badge"
+        onClick={() => setGameTestInputOn(!touchInput)}
+        aria-label={
+          touchInput
+            ? 'Touch input is on. Switch to playing your instrument.'
+            : 'Playing your instrument. Switch to touch input.'
+        }
+      >
+        {touchInput ? 'Tap to play · switch to instrument' : 'Instrument · switch to touch'}
+      </button>
     </div>
   )
 }

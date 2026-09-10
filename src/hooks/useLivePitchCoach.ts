@@ -15,6 +15,7 @@ import type { TunerTranspositionId } from '../utils/tunerTransposition'
 
 /** Wait until the live note has settled before speaking. Hunting should stay quiet. */
 const LIVE_COACH_HOLD_MS = 560
+const LIVE_COACH_OBSERVATION_LIMIT = 2000
 
 export function useLivePitchCoach({
   enabled,
@@ -46,7 +47,7 @@ export function useLivePitchCoach({
 
     const load = async () => {
       try {
-        const rows = await listPitchObservations({ transpositionId })
+        const rows = await listPitchObservations({ transpositionId, limit: LIVE_COACH_OBSERVATION_LIMIT })
         if (!cancelled && activeRef.current) setObservations(rows)
       } catch (error) {
         console.warn('[LivePitchCoach] Failed to load pitch history', error)
@@ -65,7 +66,7 @@ export function useLivePitchCoach({
           if (current.some((observation) => observation.id === detail.observation.id)) {
             return current
           }
-          return [detail.observation, ...current]
+          return [detail.observation, ...current].slice(0, LIVE_COACH_OBSERVATION_LIMIT)
         })
         return
       }

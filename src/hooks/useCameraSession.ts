@@ -59,8 +59,11 @@ import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs, requestPitchGraphReattach } from './useLivePitchTracker'
 import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
+import { nativeTunerOwnsMicrophone, requestWebAudioStream, subscribeTunerMicrophoneOwnership } from '../utils/tunerMicrophoneOwnership'
 import {
   forceNativeRecordingMode,
+  isNativeCaptureSessionActive,
+  subscribeNativeCaptureSessionActive,
   setNativeAudioCaptureActive,
   syncNativeCameraSessionState,
 } from '../utils/cameraSessionState'
@@ -573,6 +576,26 @@ export function useCameraSession({
     detachAllPreviewTargets()
   }, [detachAllPreviewTargets, stopStreamTracks])
 
+  useEffect(() => subscribeTunerMicrophoneOwnership((owned, restore) => {
+    if (recordingModeRef.current !== 'audio' || isRecordingRef.current || autoPreRollActiveRef.current) return
+    if (owned) {
+      const tracks = streamRef.current?.getAudioTracks().length ?? 0
+      releaseLiveStream()
+      setReady(isNativeCaptureSessionActive())
+      console.info(`[TunerMicOwnership] native tuner claimed microphone; released WebKit tracks=${tracks}`)
+    } else if (restore && isAppInForeground() && !isAutoPlaybackHoldingMicWarmup()) {
+      requestCameraAccessRef.current?.('audio')
+    }
+  }), [releaseLiveStream])
+
+  useEffect(() => subscribeNativeCaptureSessionActive(() => {
+    if (recordingModeRef.current === 'audio' && nativeTunerOwnsMicrophone()) {
+      // The Record control is ready when native capture is ready, even though
+      // there is deliberately no WebRTC MediaStream on the tuner screen.
+      setReady(isNativeCaptureSessionActive())
+    }
+  }), [])
+
   const clearStaleCaptureStartState = useCallback(() => {
     streamAcquireInFlightRef.current = false
     permissionRequestInFlightRef.current = false
@@ -883,6 +906,7 @@ export function useCameraSession({
       cancelled?: () => boolean,
       options?: { forceNew?: boolean; liveCapture?: boolean },
     ) => {
+      if (mode === 'audio' && nativeTunerOwnsMicrophone()) return null
       const epoch = captureSessionEpochRef.current
       setError(null)
 
@@ -945,7 +969,10 @@ export function useCameraSession({
         if (isCaptureSessionStale(epoch, mode, cancelled)) return null
 
         logGetUserMediaEvent('before', `useCameraSession.acquireStream.${mode}`, { constraints })
-        const mediaStream = await getUserMedia(constraints)
+        const mediaStream = await (mode === 'audio'
+          ? requestWebAudioStream(() => getUserMedia(constraints))
+          : getUserMedia(constraints))
+        if (!mediaStream) return null
         logGetUserMediaEvent('after', `useCameraSession.acquireStream.${mode}`, describeMediaStream(mediaStream))
         if (isCaptureSessionStale(epoch, mode, cancelled)) {
           mediaStream.getTracks().forEach((track) => track.stop())
@@ -1042,6 +1069,7 @@ export function useCameraSession({
   const requestCameraAccess = useCallback((requestedMode?: RecordingMode) => {
     const mode = requestedMode ?? recordingModeRef.current
     if (isRecordingRef.current) return
+    if (mode === 'audio' && nativeTunerOwnsMicrophone()) return
 
     const pendingNativeRelease = nativeBridgeReleaseInFlightRef.current
     if (mode === 'audio' && pendingNativeRelease) {
@@ -1116,8 +1144,12 @@ export function useCameraSession({
 
     // iOS requires getUserMedia to start synchronously inside the tap handler.
     logGetUserMediaEvent('before', `useCameraSession.requestCameraAccess.${mode}`, { constraints })
-    getUserMedia(constraints)
+    const request = mode === 'audio'
+      ? requestWebAudioStream(() => getUserMedia(constraints))
+      : getUserMedia(constraints)
+    request
       .then(async (mediaStream) => {
+        if (!mediaStream) return
         if (epoch !== captureSessionEpochRef.current) {
           stopStreamTracks(mediaStream)
           return

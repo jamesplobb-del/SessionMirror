@@ -1,0 +1,78 @@
+/* Animate the ambient color separately from measured pitch history.
+ *
+ * `inherits: false` is load-bearing, not a tidy-up. This property is registered
+ * so the 900ms transition below can interpolate it, and it is read in exactly
+ * two places -- the two `background:radial-gradient(...)` declarations on this
+ * same overlay element (light on line 6, dark on line 31). Nothing else reads
+ * it. While it inherited, every frame of that transition had to push a new
+ * computed value through the whole overlay subtree -- readout, tool rail, the
+ * mounted-but-closed Insights sheet -- for no visual gain at all.
+ *
+ * Measured on real WebKit (out-of-process WebContent, WKWebView, 420x900,
+ * colour stepped 8x/sec): inheriting cost a 172 MiB baseline climbing at
+ * +0.39 MiB/s, monotonic. Not inheriting is a 46 MiB baseline at -0.02 MiB/s.
+ * Isolating the same pattern without the transition, or without the gradient,
+ * showed no growth either way -- it is specifically an *animating inherited*
+ * registered property feeding a full-screen gradient that runs away.
+ */
+@property --silk-wash { syntax: '<color>'; inherits: false; initial-value: transparent; }
+/* Approved Reactive Silk, scoped to the full tuner tab. */
+html[data-refinement='depth-electric'].app-audio-mode .app-ui-overlay.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  --silk-live:transparent; --silk-bg:#faf9f5; --silk-ink:#273c43; --silk-muted:#546f76; --silk-accent:#009bc4;
+  background:radial-gradient(ellipse at 50% 50%,color-mix(in srgb,var(--silk-wash) 56%,var(--silk-bg)),color-mix(in srgb,var(--silk-wash) 24%,var(--silk-bg)) 77%,var(--silk-bg))!important;
+}
+html.app-dark-mode[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner { --silk-bg:#0b2025; --silk-ink:#e8f8f3; --silk-muted:#c5e5e3; --silk-accent:#53e8ef; }
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-practice-tuner::before,
+html[data-refinement='depth-electric'] .app-ui-overlay--audio-practice-tuner::after,
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-canvas::before,
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-canvas::after { background:transparent!important; box-shadow:none!important; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell :is(.pitch-living-canvas,.pitch-audio-stage--besttake) { background:transparent!important; box-shadow:none!important; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-canvas__direction { display:none!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note,
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note span { color:var(--silk-ink)!important; font-family:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,sans-serif!important; font-weight:700!important; letter-spacing:normal!important; text-shadow:none!important; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-readout { top:12px; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-readout__note { margin-top:0; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note small { color:var(--silk-accent)!important; opacity:1!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail,
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail span { color:var(--silk-muted)!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail strong { color:var(--silk-accent)!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__status { background:color-mix(in srgb,var(--silk-live) 18%,var(--silk-bg))!important; color:var(--silk-ink)!important; border:0!important; box-shadow:none!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__status > span { background:var(--silk-live)!important; box-shadow:0 0 9px var(--silk-live)!important; animation:none!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__coach { color:var(--silk-ink)!important; background:color-mix(in srgb,var(--silk-bg) 85%,transparent)!important; border:1px solid color-mix(in srgb,var(--silk-ink) 10%,transparent)!important; box-shadow:none!important; font-weight:500!important; }
+html[data-refinement='depth-electric'] .audio-practice-tuner-shell .pitch-living-tool-rail { border-top:0!important; }
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button,
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button svg { color:var(--silk-accent)!important; }
+/* Dark appearance uses a concentrated neon glow against deep ink, rather than a bright wash. */
+html.app-dark-mode[data-refinement='depth-electric'].app-audio-mode .app-ui-overlay.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  background:radial-gradient(ellipse at 50% 51%,color-mix(in srgb,var(--silk-wash) 24%,#081822),color-mix(in srgb,var(--silk-wash) 7%,#081822) 68%,#08121e)!important;
+}
+html.app-dark-mode[data-refinement='depth-electric'].app-audio-mode .app-ui-overlay.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+ --silk-bg:#081822; --silk-ink:#e8f8f3; --silk-muted:#c5e5e3; --silk-accent:#53e8ef;
+}
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail,
+html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button { background:transparent!important; box-shadow:none!important; border:0!important; }
+
+/* Opaque backing prevents the underlying recording surface showing through at rest. */
+html[data-refinement='depth-electric'].app-audio-mode .app-ui-overlay.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner { background-color:var(--silk-bg)!important; transition:--silk-wash 900ms cubic-bezier(.25,.65,.3,1); }
+@media (prefers-reduced-motion:reduce) { html[data-refinement='depth-electric'] .app-ui-overlay.app-ui-overlay--audio-practice-tuner { transition:--silk-wash 200ms linear; } }
+
+/* Only the opt-in investigation build sets this attribute. */
+html[data-tuner-diagnostic='static-background'][data-refinement='depth-electric'].app-audio-mode .app-ui-overlay.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-tuner {
+  background:var(--silk-bg)!important;
+  transition:none!important;
+}
+
+/* History uses the live graph's exact bounds, renderer and pitch scale. */
+.tuner-history { position:absolute; inset:0; z-index:4; pointer-events:none; color:var(--silk-ink,#273c43); }
+.tuner-history__gesture { position:absolute; inset:38% 0 22%; pointer-events:auto; touch-action:none; cursor:grab; }
+.tuner-history__gesture:active { cursor:grabbing; }
+.tuner-history__plot { position:absolute; inset:0; width:100%; height:100%; }
+.tuner-history__readout { position:absolute; top:72%; left:12%; right:12%; display:flex; align-items:center; justify-content:center; gap:8px; flex-wrap:wrap; z-index:2; font-size:12px; }
+.tuner-history__readout span { color:var(--silk-muted); font-size:11px; }
+.tuner-history__readout strong { font-size:16px; font-weight:600; }
+.tuner-history__readout p { margin:0; }
+.tuner-history__readout button,.tuner-history__hint { pointer-events:auto; border:0; border-radius:20px; padding:6px 10px; color:var(--silk-accent,#009bc4); background:color-mix(in srgb,var(--silk-accent,#009bc4) 10%,var(--silk-bg,#faf9f5)); }
+.tuner-history__slider { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.tuner-history__slider:focus-visible { left:15%; bottom:16%; width:70%; height:20px; opacity:1; pointer-events:auto; }
+.tuner-history__gesture:focus-visible { outline:2px solid var(--silk-accent,#009bc4); outline-offset:-4px; border-radius:12px; }
+.pitch-living-canvas:has(.tuner-history.is-browsing) > .pitch-chart-shell { visibility:hidden; }

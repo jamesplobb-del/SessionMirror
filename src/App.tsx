@@ -1,3 +1,4 @@
+import { queueAudioEnhancement } from './utils/enhancementQueue'
 import { recordPlannedRoutine, resolveDailyPractice, isChallengeRoutine, type DailyChallengePlan } from './utils/dailyChallengePlan'
 import ChallengeRewardNotice from './components/ChallengeRewardNotice'
 import {
@@ -101,6 +102,7 @@ import {
   NATIVE_AUDIO_MIME,
   NATIVE_VIDEO_MIME,
   persistRenderedTakeVideo,
+  discardRenderedTakeFile,
   persistUploadedVideo,
   readCachedPlaybackSrc,
   resolveTakePlaybackUrl,
@@ -154,7 +156,6 @@ import {
   setProjectBenchmarkBinding,
   setProjectBestTake,
   setProjectLibraryBenchmark,
-  setTakeEnhancerBaked,
   startPracticeSession,
   uiTakesFromVaultRowsFast,
   hydrateVaultTakeRowsProgressive,
@@ -531,6 +532,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   usePhysicalOrientation()
   const isNativeCameraPlatform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
   const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
+  const [takesLoaded, setTakesLoaded] = useState(true)
   const [projects, setProjects] = useState<Project[]>(bootSnapshot.projects)
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     bootSnapshot.activeProjectId
@@ -1336,6 +1338,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const reloadProjectTakes = useCallback(
     async (projectId: string) => {
+      setTakesLoaded(false)
       const generation = ++reloadTakesGenerationRef.current
       const rows = await getTakesByProject(projectId)
       const libraryRows = await getLibraryItemsByProject(projectId)
@@ -1363,6 +1366,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setLibraryItems(hydratedLibrary)
       setBenchmarkBinding(binding)
       setTakes((current) => mergeHydratedTakes(current, loadedFast))
+      setTakesLoaded(true)
       setBenchmarkId(bestId)
       setChallengerId((current) => {
         if (!showTakeCardsRef.current) return null
@@ -1931,50 +1935,54 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           }
         }
 
-        // Bake the Audio Enhancer into the saved file (native offline render).
-        // Non-blocking: playback of the take uses the live WebAudio enhancer
-        // until enhancerBaked flips, so audio is never double-enhanced and
-        // never un-enhanced. On any native failure the original file survives.
-        if (audioEnhancerEnabledRef.current && isNativeCameraPlatform && resolvedFilePath) {
-          void (async () => {
+        // Keep the original immutable; enhancement gets its own Vault entry and file.
+        if (projectId && audioEnhancerEnabledRef.current && isNativeCameraPlatform && resolvedFilePath) {
+          const params = buildNativeEnhancerParams(audioEnhancerSettingsRef.current)
+          void queueAudioEnhancement(async () => {
+            let copyPath: string | undefined
+            let outputPath: string | undefined
             try {
-              // The bake swaps the file on disk (replaceItemAt). Hands-free
-              // replays the take straight away — in camera mode the <video>
-              // streams that very file through range requests, and having it
-              // replaced mid-stream froze the decoder and aborted playback
-              // back to record. Wait for the replay to finish first; the take
-              // plays with the live enhancer in the meantime.
-              const bakeParams = buildNativeEnhancerParams(audioEnhancerSettingsRef.current)
-              const bakeHoldStartedAt = performance.now()
-              while (
-                (handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) &&
-                performance.now() - bakeHoldStartedAt < 120_000
-              ) {
-                await waitMs(250)
-              }
-              // Never replace the media beneath a long-running hands-free replay.
-              if (handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) return
+              if (!(await getTakesByProject(projectId)).some(take => take.id === takeId)) return
               const fileUri = await resolveNativeFileUri(resolvedFilePath)
-              if (!fileUri || handsFreePlaybackBusyRef.current || pendingAutoPlaybackRef.current) return
-              await BestTakeAudioPlugin.enhanceTakeAudio({
-                url: fileUri,
-                mediaType: mediaType === 'audio' ? 'audio' : 'video',
-                params: bakeParams,
+              if (!fileUri) return
+              const rendered = await BestTakeAudioPlugin.enhanceTakeAudio({
+                url: fileUri, mediaType: mediaType === 'audio' ? 'audio' : 'video', params,
               })
-              await setTakeEnhancerBaked(takeId, true)
-              setTakes((current) =>
-                current.map((take) =>
-                  take.id === takeId ? { ...take, enhancerBaked: true } : take
-                )
-              )
-              console.info('[AudioEnhancer] baked into take', takeId)
+              outputPath = rendered.path
+              if (!rendered.enhanced || !Number.isFinite(rendered.duration) || rendered.duration <= 0) {
+                throw new Error('Invalid enhanced recording')
+              }
+              const original = (await getTakesByProject(projectId)).find((take) => take.id === takeId)
+              if (!original) return // Original was deleted while rendering; do not resurrect it.
+              const copyId = crypto.randomUUID()
+              const persisted = await persistRenderedTakeVideo(rendered.path, copyId, mediaType === 'audio' ? 'audio' : 'video')
+              copyPath = persisted.filePath
+              const name = `${original.name || takesRef.current.find(take => take.id === takeId)?.name || 'Take'} · Enhanced`
+              await saveTake({
+                projectId, takeId: copyId, filePath: copyPath, duration: rendered.duration,
+                name, mediaType, mimeType: mediaType === 'audio' ? 'audio/mp4' : 'video/mp4',
+                recordingOrientation, enhancerBaked: true,
+                timelineOffsetMs: original.timelineOffsetMs,
+                performanceStartSeconds: original.performanceStartSeconds,
+                // The original's analysis stays attached to the original. The copy can be analyzed independently.
+              })
+              copyPath = undefined // Ownership transferred to the Vault.
+              if (activeProjectIdRef.current === projectId) {
+                const copy: Take = {
+                  ...createTake(copyId, takesRef.current.length + 1, persisted.videoUrl, persisted.filePath,
+                    mediaType === 'audio' ? 'audio/mp4' : 'video/mp4', mediaType),
+                  name, duration: rendered.duration, enhancerBaked: true, recordingOrientation,
+                  timelineOffsetMs: original.timelineOffsetMs, performanceStartSeconds: original.performanceStartSeconds,
+                }
+                setTakes((current) => [...current, copy])
+              }
             } catch (error) {
-              console.warn(
-                '[AudioEnhancer] bake failed; take keeps live playback enhancement',
-                error
-              )
+              console.warn('[AudioEnhancer] copy failed; original remains unchanged', error)
+            } finally {
+              if (copyPath) await deleteTakeFile(copyPath)
+              if (outputPath) await discardRenderedTakeFile(outputPath)
             }
-          })()
+          })
         }
 
         let audioAnalysisSource: Blob | string | null = normalizedBlob ?? blob ?? null
@@ -4157,29 +4165,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [settings.backUpTakesToIcloud])
 
   useEffect(() => {
-    // A take whose file already has the enhancement baked in (native offline
-    // render after recording) must NOT also pass through the live WebAudio
-    // enhancer — that would double-process. When any take likely to be
-    // playing right now is baked, bypass the live chain; unbaked/legacy takes
-    // keep the live preview enhancement.
-    const bakedTakeActive =
-      handsFreeBackgroundTake?.enhancerBaked === true ||
-      (autoPlaybackTakeId !== null &&
-        takes.find((take) => take.id === autoPlaybackTakeId)?.enhancerBaked === true) ||
-      challengerTake?.enhancerBaked === true
-    const liveChainEnabled = settings.audioEnhancerEnabled && !bakedTakeActive
     setTakePlaybackEnhancerState(
-      liveChainEnabled,
-      liveChainEnabled ? settings.audioEnhancerSettings : undefined
+      settings.audioEnhancerEnabled,
+      settings.audioEnhancerSettings,
+      takes.filter(take => take.enhancerBaked).flatMap(take => [take.filePath ?? '', take.videoUrl ?? '']),
     )
-  }, [
-    autoPlaybackTakeId,
-    challengerTake,
-    handsFreeBackgroundTake,
-    settings.audioEnhancerEnabled,
-    settings.audioEnhancerSettings,
-    takes,
-  ])
+  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings, takes])
 
   useEffect(() => {
     setActiveCaptureProfile('natural')
@@ -6702,6 +6693,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   />
 
                   <MultitrackOverlay
+                    takesLoaded={takesLoaded}
                     isOpen={multitrackOpen}
                     takes={sortedTakes}
                     streamRef={streamRef}

@@ -1,0 +1,155 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BestTake · Tuner concepts</title><style>
+*{box-sizing:border-box}body{margin:0;background:#edf1f6;color:#182d44;font:14px -apple-system,BlinkMacSystemFont,system-ui,sans-serif}main{max-width:960px;margin:auto;padding:24px 18px}a{color:#3569a4}h1{font-size:28px;letter-spacing:-1px;margin:10px 0}p{line-height:1.6;color:#5b7087;margin:8px 0}.eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;color:#6080a0}.options{display:flex;gap:8px;margin:18px 0 12px;flex-wrap:wrap}button{font:inherit;cursor:pointer;padding:11px 15px;min-height:44px;border:1px solid #cdd8e5;border-radius:12px;background:#ffffff;color:#26455f}button[aria-pressed=true]{background:#173b62;color:white;border-color:#173b62}.options button strong{display:block;font-size:13px}.options button span{display:block;margin-top:4px;font-size:11px;opacity:.75}.toolbar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:12px 0}.toolbar button{padding:9px 12px;font-size:12px}.toolbar label{margin-right:10px}.comparisons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:14px}.phone{width:100%;overflow:hidden;border-radius:26px;background:#f7f9fc;border:1px solid #ccd8e4;box-shadow:0 18px 45px #2639510c}.phone iframe{display:block;width:390px;height:844px;border:0;transform-origin:top left}h2{font-size:14px;margin:0 0 10px}.caption{font-size:12px;min-height:38px}.note{font-size:12px;margin-top:16px}.status{font-size:12px;min-height:20px}@media(max-width:540px){.comparisons{grid-template-columns:1fr}.baseline{display:none}main{padding:18px 14px}}
+</style></head><body><main><div class="eyebrow">BESTTAKE / TUNER STUDIES</div><h1>Same tuner. More character.</h1><p>The note, tools, tabs and bottom controls stay where they are. Compare three finishes for the color, typography and pitch trail.</p><div class="options" role="group" aria-label="Tuner concept"><button data-concept="signal" aria-pressed="false"><strong>01 · Clear Signal</strong><span>Electric blue · crisp trace</span></button><button data-concept="silk" aria-pressed="true"><strong>02 · Liquid Silk</strong><span>Cool teal · flowing ribbon</span></button><button data-concept="prism" aria-pressed="false"><strong>03 · Prism</strong><span>Indigo + cyan · luminous trail</span></button></div><p id="description">My starting pick: a vivid blue pitch line, readable ink note and a quiet target lane. Energy without a full-page color wash.</p><div class="toolbar"><label><input type="checkbox" id="dark"> Dark appearance</label><label><input type="checkbox" id="colors" checked> Reactive tuner colors</label><button data-state="tuned" aria-pressed="true">In tune</button><button data-state="sharp" aria-pressed="false">Sharp</button><button data-state="flat" aria-pressed="false">Flat</button><button data-state="far" aria-pressed="false">Far out</button><button data-state="idle" aria-pressed="false">Listening</button><button id="motion" aria-pressed="true">Motion on</button></div><p class="status" id="status" role="status">Opening the tuner…</p><div class="comparisons"><section class="baseline"><h2>Current Electric</h2><div class="phone"><iframe id="current" title="Current tuner" src="/?refinement=depth-electric"></iframe></div><p class="caption">Existing tuner rendering with the preview’s generated input.</p></section><section><h2 id="concept-title">01 · Clear Signal</h2><div class="phone"><iframe id="variant" title="Tuner concept" src="/?refinement=depth-electric"></iframe></div><p class="caption" id="concept-caption">Thin pitch history. A clear latest-note dot. One quiet center target.</p></section></div><p class="note">Concept side uses illustrative pitch data, not a microphone. Sharp/Flat/Listening and motion controls apply to the concept; the current tuner stays live on generated input. The tendency comment is a labeled example; the app’s existing comments use your Pitch Insights history. No recording or tuning logic changes. <a href="/refinement-review.html?dark=1">Back to all app concepts →</a></p></main><script>
+
+const variant=document.getElementById('variant');
+document.getElementById('dark').checked=new URLSearchParams(location.search).get('dark')==='1';
+let selected='silk',state='tuned',moving=!matchMedia('(prefers-reduced-motion: reduce)').matches,ready=false;
+const info={signal:['01 · Clear Signal','My starting pick: a vivid blue pitch line, readable ink note and a quiet target lane. Energy without a full-page color wash.','Thin pitch history. A clear latest-note dot. One quiet center target.'],silk:['02 · Liquid Silk','Reactive Silk: bright green when centered, gold-yellow when close, and bright red when farther out. The trace retains its pitch colors as it travels left.','More room beyond the live marker, a bright ribbon, and a steady luminous halo. No flashing.'],prism:['03 · Prism','A little more futuristic: indigo typography and a cyan-to-violet pitch trail. Color lives in the signal, rather than flooding the screen.','Fading history dots lead into a luminous current-pitch marker.']};
+async function waitFor(get){for(let i=0;i<400;i++){const result=get();if(result)return result;await new Promise(resolve=>setTimeout(resolve,50))}throw new Error('The screen is still loading. Try its button again.')}
+async function openScreen(frame,screen){
+ if(screen==='playback'||screen==='quick-preview') {frame.src='/playback-preview.html?refinement='+(frame.id==='current'?'current':'depth-electric')+(screen==='quick-preview'?'&quick=1':'');await waitFor(()=>frame.contentDocument?.querySelector(screen==='quick-preview'?'.quick-take-demo':'.review-overlay'));return;}
+ if(frame.src.includes('playback-preview.html')) {frame.src='/?refinement='+(frame.id==='current'?'current':'depth-electric');await waitFor(()=>frame.contentDocument?.querySelector('.practice-home-quick-start'));}
+
+ const doc=await waitFor(()=>frame.contentDocument?.querySelector('#root')&&frame.contentDocument);
+ if(['balance-home','balance-options','staff-jumper','staff-options'].includes(screen)){
+  await openScreen(frame,'games');
+  const isStaff=screen.startsWith('staff');
+  (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>(el.getAttribute('aria-label')||'').includes(isStaff?'Staff Jumper.':'Balance.')))).click();
+  await waitFor(()=>doc.querySelector('button[aria-label="Back to Practice Games"]'));
+  if(screen==='balance-options'){
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='Quick Play'))).click();
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='More options'))).click();
+   await waitFor(()=>doc.querySelector('.balance-setup-sheet'));
+  }
+  if(screen==='staff-options'){
+   (await waitFor(()=>Array.from(doc.querySelectorAll('button')).find(el=>el.textContent.trim()==='More options'))).click();
+   await waitFor(()=>doc.querySelector('.sj-panel'));
+  }
+  return;
+ }
+ if(screen==='games'){
+  for(let n=0;n<4;n++){
+   const back=doc.querySelector('button[aria-label="Back to Practice Games"],button[aria-label="Back to Balance home"]');
+   if(!back)break;
+   back.click();await new Promise(resolve=>setTimeout(resolve,180));
+  }
+  if(doc.querySelector('.balance-arcade--hall'))return;
+ }
+ const closeVault=doc.querySelector('button[aria-label="Close vault"]');if(closeVault){closeVault.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close vault"]'))}
+ if(screen==='vault'){
+  await openScreen(frame,'record');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open TakeVault"]'))).click();
+  await waitFor(()=>doc.querySelector('.native-bottom-sheet--vault'));
+  return;
+ }
+ const closeInsights=doc.querySelector('.pitch-insights-screen__close');if(closeInsights){closeInsights.click();await waitFor(()=>!doc.querySelector('.pitch-insights-screen'))}
+ const closeSettings=doc.querySelector('button[aria-label="Close settings"]');if(closeSettings){closeSettings.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close settings"]'))}
+ const closeWorkspace=doc.querySelector('button[aria-label="Close workspace"]');if(closeWorkspace)closeWorkspace.click();
+ if(['workspace','settings','pitch-widget'].includes(screen)){
+  await openScreen(frame,'camera');
+  (await waitFor(()=>doc.querySelector('button[aria-label="'+(screen==='settings'?'Open settings':'Open workspace')+'"]:not(:disabled)'))).click();
+  if(screen==='pitch-widget'){
+   const pitch=await waitFor(()=>doc.querySelector('[data-tutorial="branch-pitch"]'));
+   if(pitch.getAttribute('aria-checked')!=='true')pitch.click();
+   const close=doc.querySelector('button[aria-label="Close workspace"]');if(close)close.click();
+   await waitFor(()=>doc.querySelector('.pitch-widget-draggable'));
+  }else await waitFor(()=>doc.querySelector(screen==='settings'?'.settings-sheet':'.settings-branch-tray'));
+  return;
+ }
+ if(screen==='program'){
+  await openScreen(frame,'metronome');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open practice program"]'))).click();
+  await waitFor(()=>doc.querySelector('.practice-timeline'));
+  return;
+ }
+ if(['insights','drone','tuning'].includes(screen)){
+  await openScreen(frame,'tuner');
+  const selector=screen==='insights'?'.pitch-living-insights-trigger':screen==='drone'?'.pitch-living-drone-trigger:not(.pitch-living-insights-trigger):not(.pitch-living-transposition-trigger)':'.pitch-living-transposition-trigger';
+  const trigger=await waitFor(()=>doc.querySelector(selector));
+  if(trigger.getAttribute('aria-expanded')!=='true')trigger.click();
+  await waitFor(()=>doc.querySelector(screen==='insights'?'.pitch-insights-screen':screen==='drone'?'.pitch-living-drone-panel':'.tuner-transposition-menu'));
+  return;
+ }
+ const closeGame=doc.querySelector('button[aria-label="Close Games"]');if(closeGame){closeGame.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close Games"]'))}
+ const closeRoutine=doc.querySelector('button[aria-label="Close routine builder"]');if(closeRoutine){closeRoutine.click();await waitFor(()=>!doc.querySelector('button[aria-label="Close routine builder"]'))}
+ if(screen==='camera'){
+  if(doc.querySelector('.camera-control-pill') && !doc.querySelector('.practice-home-quick-start') && !doc.querySelector('.routine-guide'))return;
+  await openScreen(frame,'record');
+  (await waitFor(()=>doc.querySelector('button[aria-label="Open Camera"]'))).click();
+  await waitFor(()=>doc.querySelector('.app-ui-overlay:not(.app-ui-overlay--audio-mode) .camera-control-pill'));
+  return;
+ }
+ const tabName=screen==='record'?'audio':screen;
+ if(['record','tuner','metronome','games'].includes(screen) && !doc.querySelector('.practice-home-quick-start') && doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"]')){
+  doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"]').click();
+  await waitFor(()=>screen==='games'?doc.querySelector('.balance-arcade--hall'):doc.querySelector('[data-tutorial="audio-tab-'+tabName+'"][aria-current="page"]'));
+  return;
+ }
+ if(!doc.querySelector('button[aria-label="Open Practice Home"]') && doc.querySelector('[data-tutorial="audio-tab-audio"]')){
+  doc.querySelector('[data-tutorial="audio-tab-audio"]').click();
+  await waitFor(()=>doc.querySelector('button[aria-label="Open Practice Home"]'));
+ }
+ if(!doc.querySelector('.practice-home-quick-start')){
+  const back=doc.querySelector('.practice-menu-card--home button[aria-label="Back"]');if(back)back.click();
+  else (await waitFor(()=>doc.querySelector('button[aria-label="Open Practice Home"]'))).click();
+ }
+ await waitFor(()=>doc.querySelector('.practice-home-quick-start'));
+ if(['record','tuner','metronome'].includes(screen)){
+  // Open the existing audio shell through its normal Games entry; no game is started.
+  Array.from(doc.querySelectorAll('.practice-menu-shortcut')).find(el=>el.textContent.includes('Games')).click();
+  (await waitFor(()=>doc.querySelector('button[aria-label="Close Games"]'))).click();
+  await waitFor(()=>!doc.querySelector('button[aria-label="Close Games"]'));
+  const tab=screen==='record'?'audio':screen;
+  (await waitFor(()=>doc.querySelector('[data-tutorial="audio-tab-'+tab+'"]'))).click();
+  await waitFor(()=>doc.querySelector('[data-tutorial="audio-tab-'+tab+'"][aria-current="page"]'));
+  return;
+ }
+
+ if(screen==='routines')doc.querySelector('.practice-home-build-routine').click();
+ if(screen==='games')Array.from(doc.querySelectorAll('.practice-menu-shortcut')).find(el=>el.textContent.includes('Games')).click();
+ if(screen==='routines')await waitFor(()=>doc.querySelector('.routine-guide'));
+ if(screen==='games')await waitFor(()=>doc.querySelector('.balance-arcade--hall'));
+}
+
+function sizePhones(){document.querySelectorAll('.phone').forEach(p=>{const s=p.clientWidth/390;p.style.height=(844*s)+'px';p.querySelector('iframe').style.transform=`scale(${s})`})}
+new ResizeObserver(sizePhones).observe(document.querySelector('.comparisons'));sizePhones();
+function apply(){if(!ready)return;const doc=variant.contentDocument;doc.documentElement.dataset.tunerConcept=selected;doc.documentElement.dataset.tunerReactive=document.getElementById('colors').checked?'on':'off';doc.documentElement.dataset.tunerSampleState=state;for(const id of ['current','variant'])document.getElementById(id).contentWindow.postMessage({type:'preview-tuner-colors',enabled:id==='current'&&document.getElementById('colors').checked},location.origin);for(const id of ['current','variant']){const d=document.getElementById(id).contentDocument;d.documentElement.dataset.previewDark=document.getElementById('dark').checked?'midnight':'';d.documentElement.classList.toggle('app-dark-mode',document.getElementById('dark').checked)}document.getElementById('concept-title').textContent=info[selected][0];document.getElementById('description').textContent=info[selected][1];document.getElementById('concept-caption').textContent=info[selected][2];draw(performance.now());}
+
+const pitchHistory=[];let currentCents=1;
+function pitchColor(cents){return Math.abs(cents)<=5?'#20ed78':Math.abs(cents)<=15?'#f4c52b':'#f54c62'}
+function draw(time){
+ if(!ready)return;
+ const doc=variant.contentDocument,root=doc.documentElement,canvas=doc.querySelector('.pitch-living-canvas'),graph=doc.querySelector('.tuner-sample-graph'),sample=doc.querySelector('.tuner-sample-readout');
+ if(!canvas||!graph||!sample)return;
+ const c=getComputedStyle(root),themeAccent=c.getPropertyValue('--tc-accent').trim(),muted=c.getPropertyValue('--tc-muted').trim();
+ const width=canvas.clientWidth,height=canvas.clientHeight,center=height*.51,range=height*.19,target=state==='sharp'?14:state==='flat'?-14:state==='far'?28:1;
+ if(moving){currentCents+=(target-currentCents)*.20;currentCents+=Math.sin(time/650)*.09}else currentCents=target;
+ const cents=currentCents;
+ if(!pitchHistory.length)for(let i=0;i<64;i++)pitchHistory.push(1+Math.sin(i*.25)*4*(1-i/64));
+ if(state!=='idle'&&moving){pitchHistory.push(cents);if(pitchHistory.length>64)pitchHistory.shift()}
+ if(!moving)pitchHistory[pitchHistory.length-1]=cents;
+ const points=pitchHistory.map((v,i)=>[16+(width-56)*i/63,center-v/30*range,v]);
+ const last=points.at(-1),accent=selected==='silk'?pitchColor(cents):themeAccent;
+ root.style.setProperty('--silk-live',accent);
+ if(selected==='silk')root.style.setProperty('--sample-wash',state==='idle'?'transparent':accent);else root.style.removeProperty('--sample-wash');
+ graph.setAttribute('viewBox',`0 0 ${width} ${height}`);
+ let art=`<defs><radialGradient id="halo"><stop stop-color="${accent}" stop-opacity=".7"/><stop offset=".38" stop-color="${accent}" stop-opacity=".34"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/></radialGradient><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter></defs><rect x="10" y="${center-range*5/30}" width="${width-20}" height="${range*10/30}" rx="10" fill="#20ed78" opacity=".18"/><path d="M20 ${center-range*5/30} H${width-20} M20 ${center+range*5/30} H${width-20}" stroke="#00d85a" stroke-opacity=".35" stroke-width="1"/><path d="M14 ${center} H${width-14}" stroke="${themeAccent}" stroke-opacity=".2" stroke-width="1"/><text x="17" y="${center+range*5/30+18}" font-size="9" fill="${muted}" font-family="system-ui" letter-spacing="1">0¢ / TARGET</text>`;
+ if(state!=='idle'){
+  for(let i=1;i<points.length;i++){
+   const prev=points[i-1],p=points[i],color=selected==='silk'?pitchColor(p[2]):themeAccent,opacity=.15+.85*i/63;
+   if(selected==='silk')art+=`<path d="M${prev[0]},${prev[1]} L${p[0]},${p[1]} L${p[0]},${p[1]+16} L${prev[0]},${prev[1]+16} Z" fill="${color}" opacity="${opacity*.13}"/><path d="M${prev[0]},${prev[1]} L${p[0]},${p[1]}" stroke="${color}" stroke-width="10" opacity="${opacity*.12}" filter="url(#soft)"/>`;
+   art+=selected==='prism'?`<circle cx="${p[0]}" cy="${p[1]}" r="2" fill="${color}" opacity="${opacity}"/>`:`<path d="M${prev[0]},${prev[1]} L${p[0]},${p[1]}" fill="none" stroke="${color}" stroke-width="${selected==='silk'?5:3}" opacity="${opacity}" stroke-linecap="round"/>`;
+  }
+  art+=`<circle cx="${last[0]}" cy="${last[1]}" r="33" fill="url(#halo)"/><circle cx="${last[0]}" cy="${last[1]}" r="12" fill="${accent}" opacity=".23"/><circle cx="${last[0]}" cy="${last[1]}" r="8" fill="${accent}" stroke="white" stroke-opacity=".85" stroke-width="1.7"/><circle cx="${last[0]}" cy="${last[1]}" r="2.4" fill="white"/>`;
+ }
+ graph.innerHTML=art;sample.querySelector('.tuner-sample-coach').hidden=state==='idle';
+ const status=state==='idle'?'Listening':Math.abs(cents)<=5?'In tune':Math.abs(cents)<=15?(cents<0?'Slightly flat':'Slightly sharp'):(cents<0?'Flat':'Sharp');
+ sample.querySelector('.pitch-living-readout__status').innerHTML='<span></span>'+status;
+ sample.querySelector('.pitch-living-readout__note').innerHTML=state==='idle'?'<span>—</span>':'<span>A</span><small>4</small>';
+ sample.querySelector('.pitch-living-readout__detail').innerHTML=state==='idle'?'<strong>Play a note</strong>':`<strong>${cents>=0?'+':'−'}${Math.abs(cents).toFixed(1)}¢</strong><span>·</span><span>${(440*Math.pow(2,cents/1200)).toFixed(1)} Hz</span>`;
+}
+let lastDraw=0;function animate(t){if(moving&&t-lastDraw>65){draw(t);lastDraw=t}requestAnimationFrame(animate)}requestAnimationFrame(animate);
+document.querySelectorAll('[data-concept]').forEach(b=>b.onclick=()=>{selected=b.dataset.concept;document.querySelectorAll('[data-concept]').forEach(x=>x.setAttribute('aria-pressed',x===b));apply()});document.querySelectorAll('[data-state]').forEach(b=>b.onclick=()=>{state=b.dataset.state;document.querySelectorAll('[data-state]').forEach(x=>x.setAttribute('aria-pressed',x===b));apply()});document.getElementById('dark').onchange=apply;document.getElementById('colors').onchange=apply;document.getElementById('motion').onclick=()=>{moving=!moving;document.getElementById('motion').textContent=moving?'Motion on':'Motion off';document.getElementById('motion').setAttribute('aria-pressed',moving);apply()};
+(async()=>{try{await Promise.all(['current','variant'].map(async id=>{const frame=document.getElementById(id);await waitFor(()=>frame.contentDocument?.querySelector('.practice-home-quick-start'));await openScreen(frame,'tuner');frame.contentWindow.postMessage({type:'preview-tuner-colors',enabled:id==='current'},location.origin)}));const doc=variant.contentDocument;await waitFor(()=>doc.querySelector('.pitch-living-readout')&&doc.querySelector('.pitch-living-canvas'));const link=doc.createElement('link');link.rel='stylesheet';link.href='/tuner-concepts.css';doc.head.append(link);await new Promise(resolve=>link.onload=resolve);const canvas=doc.querySelector('.pitch-living-canvas'),sample=doc.querySelector('.pitch-living-readout').cloneNode(true);sample.classList.add('tuner-sample-readout');sample.setAttribute('aria-live','off');sample.setAttribute('aria-label','Illustrative tuner readout');sample.querySelectorAll('button').forEach(b=>{b.tabIndex=-1;b.removeAttribute('aria-label')});sample.querySelector('.pitch-living-readout__coach')?.remove();const coach=doc.createElement('p');coach.className='pitch-living-readout__coach tuner-sample-coach';coach.textContent='Example · Your A tends slightly sharp';sample.insertBefore(coach,sample.querySelector('.pitch-living-readout__detail'));canvas.append(sample);const leftLabels=doc.querySelector('.pitch-living-canvas__direction').cloneNode(true);leftLabels.classList.add('tuner-direction-left');canvas.append(leftLabels);const graph=doc.createElementNS('http://www.w3.org/2000/svg','svg');graph.classList.add('tuner-sample-graph');graph.setAttribute('aria-hidden','true');canvas.append(graph);ready=true;apply();document.getElementById('status').textContent='Ready · switch styles, appearance or sample pitch above.';}catch(e){document.getElementById('status').textContent=e.message}})();
+</script></body></html>

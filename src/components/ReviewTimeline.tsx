@@ -1,4 +1,4 @@
-import { Pause, Play, Scissors } from 'lucide-react'
+import { Pause, Play } from 'lucide-react'
 import { useRef, useState, type RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
 import { useMediaWaveform } from '../hooks/useMediaWaveform'
@@ -65,6 +65,7 @@ export default function ReviewTimeline({
   const trimEndPercent = safeDuration > 0 ? (safeTrimEnd / safeDuration) * 100 : 100
   const trimSelectionPercent = Math.max(0, trimEndPercent - trimStartPercent)
   const pointerModeRef = useRef<'scrub' | 'start' | 'end' | null>(null)
+  const pointerOrigin = useRef<{ x: number; y: number; moved: boolean } | null>(null)
   const [trimHandle, setTrimHandle] = useState<'start' | 'end' | null>(null)
   const peaks = useMediaWaveform({
     filePath: mediaFilePath,
@@ -104,6 +105,7 @@ export default function ReviewTimeline({
     e.stopPropagation()
 
     if (trimApplying) return
+    pointerOrigin.current = { x: e.clientX, y: e.clientY, moved: false }
 
     if (trimActive && safeDuration > 0) {
       const rect = e.currentTarget.getBoundingClientRect()
@@ -134,6 +136,8 @@ export default function ReviewTimeline({
     e.preventDefault()
     e.stopPropagation()
 
+    const origin = pointerOrigin.current
+    if (origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 8) origin.moved = true
     const mode = pointerModeRef.current
     if ((mode === 'start' || mode === 'end') && safeDuration > 0) {
       const minimumDuration = Math.min(0.25, Math.max(0.1, safeDuration * 0.005))
@@ -159,7 +163,13 @@ export default function ReviewTimeline({
       onTrimEnd?.()
       return
     }
-    if (mode === 'scrub') onScrubEnd()
+    if (mode === 'scrub') {
+      const origin = pointerOrigin.current
+      // Enter trim before ending the scrub so playback does not resume underneath it.
+      if (e.type !== 'pointercancel' && origin && !origin.moved && !trimActive && trimAvailable) onRequestTrim?.()
+      onScrubEnd()
+    }
+    pointerOrigin.current = null
   }
 
   return (
@@ -199,6 +209,15 @@ export default function ReviewTimeline({
           aria-valuemax={trimActive ? undefined : safeDuration}
           aria-valuenow={trimActive ? undefined : safeCurrentTime}
           aria-label="Video timeline"
+          aria-description={trimAvailable && !trimActive ? 'Tap to trim. Drag to seek.' : undefined}
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (trimApplying || trimActive) return
+            if ((event.key === 'Enter' || event.key === ' ') && trimAvailable) {
+              event.preventDefault()
+              onRequestTrim?.()
+            }
+          }}
           className="review-timeline-track review-timeline-track--waveform relative h-12 min-w-0 flex-1 cursor-pointer touch-none"
           style={{ touchAction: 'none' }}
           onPointerDown={handlePointerDown}
@@ -262,7 +281,6 @@ export default function ReviewTimeline({
           {formatTime(safeDuration)}
         </span>
       </div>
-      {trimAvailable && !trimActive && <button type="button" className="review-trim-entry" onClick={onRequestTrim}><Scissors size={15} aria-hidden />Trim</button>}
       {trimActive && (
         <div className="review-trim-actions flex items-center justify-between gap-3 px-3 pb-2 pt-1">
           <Pressable

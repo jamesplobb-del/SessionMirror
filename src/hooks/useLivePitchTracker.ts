@@ -1,3 +1,6 @@
+import { subscribeNativeTunerPitch, type NativeTunerPitch } from '../utils/nativeTunerPitch'
+import { drawSilkTuner, silkTunerGeometry, silkPitchColor } from '../utils/reactiveSilkTuner'
+import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { PitchDetector } from 'pitchy'
 import {
@@ -243,6 +246,8 @@ const activeMicPitchGraphs = new Set<MicPitchGraph>()
 
 /** PCM chunks pushed from the native AVCaptureSession audio tap. */
 interface NativeTapBinding {
+  nativePitchOnly?: boolean
+  estimate?: NativeTunerPitch
   /** Most recent 2048-sample mono chunk (latest-wins; the loop copies it each tick). */
   latest: Float32Array | null
   sampleRate: number
@@ -293,8 +298,28 @@ const MIC_ECONOMY_TICK_MS = 72
 const READOUT_PUBLISH_ECONOMY_MS = 100
 /** Canvas analysis remains display-rate; React labels do not need more than 30fps. */
 const READOUT_PUBLISH_REALTIME_MS = 32
-/** Realtime mode updates synchronously on every requestAnimationFrame for fluid 60fps/120fps pitch rendering. */
-const CANVAS_DRAW_REALTIME_MS = 0
+/** Bound canvas work on ProMotion displays; pitch acquisition keeps its own cadence. */
+const CANVAS_DRAW_REALTIME_MS = 1000 / 30
+/**
+ * The full tuner tab draws every sample it analyses.
+ *
+ * It already ticks at 60Hz (see the native-pitch branch below) and pushes one
+ * history sample per tick, so the 30fps cap was painting every *other* sample —
+ * the trace advanced in visible pairs. This shows what is already being
+ * measured; it adds no analysis work and no history the trace did not have.
+ *
+ * The 30fps cap stays for every other realtime consumer. The camera widget in
+ * particular has no tick gate at all, so it would follow rAF to 120Hz on a
+ * ProMotion display while a camera preview is already compositing — which is
+ * the case that cap was written for.
+ *
+ * Safe on memory: the cap was added while the tuner's WebContent crash was
+ * still unattributed, and canvas turned out not to be the cause. Isolated on
+ * real WebKit, this renderer's gradient churn at 60fps peaked at 85 MiB and
+ * came back down. See [[animated-inherited-custom-property-leaks]] for what the
+ * cause actually was.
+ */
+const CANVAS_DRAW_TUNER_MS = 1000 / 60
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
 const REALTIME_MIC_FRAME_SIZE = 2048
 /** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
@@ -311,6 +336,8 @@ export interface AcceptedPitchFrame {
 }
 
 export interface PitchTrackerOptions {
+  /** Only the full tuner tab opts into native detection; other consumers keep PCM. */
+  nativePitchProcessing?: boolean
   source?: PitchTrackerSource
   micStreamRef?: RefObject<MediaStream | null>
   /** Keep readout/history and redraw the canvas while paused (video widget). */
@@ -452,6 +479,7 @@ async function createMicPitchGraph(
 async function createNativeTapPitchGraph(
   profile: PitchTunerProfile,
   onFrame?: () => void,
+  nativePitchOnly = false,
 ): Promise<MicPitchGraph> {
   const frameSize = REALTIME_MIC_FRAME_SIZE
 
@@ -460,6 +488,7 @@ async function createNativeTapPitchGraph(
   detector.minVolumeDecibels = profile.rmsGateDbMic
 
   const binding: NativeTapBinding = {
+    nativePitchOnly,
     latest: null,
     sampleRate: 48_000,
     sequence: 0,
@@ -475,8 +504,15 @@ async function createNativeTapPitchGraph(
     dispose: () => {},
   }
 
-  await acquireNativeAudioTap()
-  const subscription = subscribeNativeAudioPitchFrames((chunk) => {
+  if (!nativePitchOnly) await acquireNativeAudioTap()
+  const subscription = nativePitchOnly ? Promise.resolve(await subscribeNativeTunerPitch((estimate) => {
+    if (binding.disposed) return
+    binding.estimate = estimate
+    binding.sequence += 1
+    binding.receivedAny = true
+    binding.lastFrameAt = performance.now()
+    onFrame?.()
+  })) : subscribeNativeAudioPitchFrames((chunk) => {
     if (binding.disposed) return
     binding.latest = chunk.samples
     binding.sampleRate = chunk.sampleRate
@@ -492,7 +528,7 @@ async function createNativeTapPitchGraph(
     disposed = true
     binding.disposed = true
     void subscription?.then((handle) => handle.remove()).catch(() => {})
-    void releaseNativeAudioTap()
+    if (!nativePitchOnly) void releaseNativeAudioTap()
   }
 
   return {
@@ -1420,10 +1456,26 @@ function drawPitchCanvas(
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const dpr = window.devicePixelRatio || 1
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
   const width = canvas.clientWidth
   const height = canvas.clientHeight
   if (width <= 0 || height <= 0) return
+
+  const diagnosticOverlay = theme === 'living-audio'
+    ? canvas.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner') : null
+  if (diagnosticOverlay && isTunerDiagnosticMode('no-graph')) {
+    // Release the canvas backing store, not merely hide a still-rendering graph.
+    // Keep the measured readout, capture, Insights and changing page wash alive.
+    if (canvas.width !== 1) canvas.width = 1
+    if (canvas.height !== 1) canvas.height = 1
+    const cents = centsHistory.at(-1)
+    const color = active && cents != null && !isSilenceFloorSample(cents) ? silkPitchColor(cents) : 'transparent'
+    if (diagnosticOverlay.style.getPropertyValue('--silk-live') !== color) {
+      diagnosticOverlay.style.setProperty('--silk-live', color)
+      diagnosticOverlay.style.setProperty('--silk-wash', color)
+    }
+    return
+  }
 
   if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
     canvas.width = Math.floor(width * dpr)
@@ -1432,6 +1484,8 @@ function drawPitchCanvas(
   }
 
   const isLivingAudio = theme === 'living-audio'
+  const silkOverlay = isLivingAudio && document.documentElement.dataset.refinement === 'depth-electric'
+    ? canvas.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner') : null
   const isGlass =
     theme === 'glass-widget' ||
     theme === 'glass-legacy' ||
@@ -1450,7 +1504,9 @@ function drawPitchCanvas(
 
   let centsToY: (cents: number) => number
 
-  if (isWidgetGlass) {
+  if (silkOverlay) {
+    centsToY = silkTunerGeometry(width, height).centsToY
+  } else if (isWidgetGlass) {
     const metrics = blitGlassStaticLayer(ctx, canvas, width, height, dpr, 'widget')
     centsToY = metrics.centsToY
   } else if (isLivingAudio) {
@@ -1533,7 +1589,7 @@ function drawPitchCanvas(
   // edge -- the dot, its glow and the horizon caret were all drawn half off
   // screen. The head is the one part of the trace you actually watch while
   // playing, so hold back enough room for its widest glow.
-  const traceHeadroom = Math.min(
+  const traceHeadroom = silkOverlay ? silkTunerGeometry(width, height).headroom : Math.min(
     width * 0.12,
     isLivingAudio ? 11 : isAudioGlass || theme === 'glass-legacy' ? 17 : isWidgetGlass ? 13 : 8,
   )
@@ -1548,6 +1604,15 @@ function drawPitchCanvas(
     isLivingAudio,
     isLivingAudio ? LIVING_TRACE_MAX_STEP_CENTS : null,
   )
+
+  if (silkOverlay) {
+    const color = drawSilkTuner(ctx, width, height, tracePoints, active, document.documentElement.classList.contains('app-dark-mode'))
+    if (silkOverlay.style.getPropertyValue('--silk-live') !== color) {
+      silkOverlay.style.setProperty('--silk-live', color)
+      if (!isTunerDiagnosticMode('static-background')) silkOverlay.style.setProperty('--silk-wash', color)
+    }
+    return
+  }
 
   if (tracePoints.length > 1) {
     drawSmoothPitchTrace(ctx, tracePoints, theme, responsiveTrace)
@@ -1636,6 +1701,7 @@ export function useLivePitchTracker(
   canvasTheme: PitchCanvasTheme = 'solid',
   options: PitchTrackerOptions = {},
 ): LivePitchTrackerState {
+  const nativePitchProcessing = options.nativePitchProcessing ?? false
   const source = options.source ?? 'media'
   const micStreamRef = options.micStreamRef
   const persistWhenPaused = options.persistWhenPaused ?? false
@@ -1995,7 +2061,7 @@ export function useLivePitchTracker(
           ) {
             const graph = await createNativeTapPitchGraph(profileRef.current, () => {
               publishSourceHealth('healthy')
-            })
+            }, nativePitchProcessing)
             if (cancelled) {
               safeDisposeMicGraph(graph)
               return
@@ -2089,6 +2155,11 @@ export function useLivePitchTracker(
         safeDisposeActiveGraph(graphRef.current && !isMediaPitchGraph(graphRef.current) ? graphRef.current : null)
         graphRef.current = graph
       } catch (error) {
+        if (sourceRef.current === 'microphone' && attachAttempt === 1) {
+          // Surface the original bridge/setup error before recovery retries.
+          // Otherwise a missing native method looks like a paused microphone.
+          console.warn('[PitchTracker] microphone source attachment failed', error)
+        }
         if (sourceRef.current === 'microphone' && isMicrophonePermissionError(error)) {
           // Permission cannot change during a timer loop. Retrying here every
           // 120ms only burns CPU and floods the bridge/log while the user is
@@ -2321,7 +2392,7 @@ export function useLivePitchTracker(
         isAttaching.current = false
       }
     }
-  }, [enabled, mediaKey, tunerInstrument])
+  }, [enabled, mediaKey, tunerInstrument, nativePitchProcessing])
 
   useEffect(() => {
     const shouldTick = enabled && (isPlaying || persistWhenPaused)
@@ -2368,9 +2439,14 @@ export function useLivePitchTracker(
       if (
         sourceRef.current === 'microphone' &&
         continuousScroll &&
-        !realtimeModeRef.current
+        (!realtimeModeRef.current || nativePitchProcessing)
       ) {
-        if (frameNow - lastMicTickAtRef.current < MIC_ECONOMY_TICK_MS) {
+        const tickInterval = nativePitchProcessing
+          // History and instrument smoothing were tuned at 60Hz. Keep that
+          // inexpensive clock independent of the capped 30Hz canvas painting.
+          ? 1000 / 60
+          : MIC_ECONOMY_TICK_MS
+        if (frameNow - lastMicTickAtRef.current < tickInterval - 1) {
           tickRef.current = requestAnimationFrame(tick)
           return
         }
@@ -2380,10 +2456,14 @@ export function useLivePitchTracker(
       const canvasForThisFrame = (): HTMLCanvasElement | null => {
         const canvas = canvasRef?.current ?? null
         if (!canvas) return null
-        const interval = realtimeModeRef.current
-          ? CANVAS_DRAW_REALTIME_MS
-          : MIC_ECONOMY_TICK_MS
-        if (frameNow - lastCanvasDrawAtRef.current < interval) return null
+        const interval = !realtimeModeRef.current
+          ? MIC_ECONOMY_TICK_MS
+          : nativePitchProcessing
+            ? CANVAS_DRAW_TUNER_MS
+            : CANVAS_DRAW_REALTIME_MS
+        // RAF timestamps jitter slightly around 16.67ms. An exact comparison
+        // skips whole display frames and can turn a 60fps target into 30fps.
+        if (frameNow - lastCanvasDrawAtRef.current < interval - 1) return null
         lastCanvasDrawAtRef.current = frameNow
         return canvas
       }
@@ -2394,14 +2474,14 @@ export function useLivePitchTracker(
         suppressUntilRef?.current != null &&
         performance.now() < suppressUntilRef.current
       const snappyWidgetTrace =
-        realtimeModeRef.current && !activeProfile.widgetSmoothTrace
+        realtimeModeRef.current && canvasTheme !== 'living-audio' && !activeProfile.widgetSmoothTrace
       const responsiveTrace = snappyWidgetTrace
       const traceBlend = snappyWidgetTrace
         ? Math.max(activeProfile.traceEndBlend, 0.92)
         : activeProfile.traceEndBlend
       const traceWindow = snappyWidgetTrace
         ? Math.min(activeProfile.graphSmoothWindow, 3)
-        : activeProfile.graphSmoothWindow
+        : activeProfile.graphSmoothWindow + (canvasTheme === 'living-audio' ? 1 : 0)
       const traceSpikeCap = snappyWidgetTrace
         ? activeProfile.traceSpikeCapCents * 1.75
         : activeProfile.traceSpikeCapCents
@@ -2598,12 +2678,13 @@ export function useLivePitchTracker(
         // treats that as silence, which renders as an idle (not broken) tuner.
         const latest = nativeTap.latest
         nativeFrameFresh = Boolean(
-          latest && nativeTap.processedSequence !== nativeTap.sequence,
+          (latest || nativeTap.estimate) && nativeTap.processedSequence !== nativeTap.sequence,
         )
         // Keep analysis and canvas motion on the display's animation cadence.
         // Native PCM arrives in larger chunks, but reusing the latest complete
         // chunk between deliveries prevents the trace from dropping to the
         // audio chunk rate (roughly 23fps at 48kHz).
+        if (nativeTap.nativePitchOnly && nativeFrameFresh) nativeTap.processedSequence = nativeTap.sequence
         if (latest && nativeFrameFresh) {
           nativeTap.processedSequence = nativeTap.sequence
           publishSourceHealth('healthy')
@@ -2674,7 +2755,11 @@ export function useLivePitchTracker(
         let rawPitch = 0
         let clarity = 0
 
-        if (nativeTap && !nativeFrameFresh && nativeTap.hasAnalyzedFrame) {
+        if (nativeTap?.nativePitchOnly) {
+          signalStrong = (nativeTap.estimate?.rmsDb ?? -160) >= rmsGate
+          rawPitch = nativeTap.estimate?.frequency ?? 0
+          clarity = nativeTap.estimate?.confidence ?? 0
+        } else if (nativeTap && !nativeFrameFresh && nativeTap.hasAnalyzedFrame) {
           signalStrong = nativeTap.cachedSignalStrong
           rawPitch = nativeTap.cachedRawPitch
           clarity = nativeTap.cachedClarity
@@ -2889,6 +2974,7 @@ export function useLivePitchTracker(
     tunerInstrument,
     allowStandaloneMicFallback,
     preferNativeAudioTap,
+    nativePitchProcessing,
   ])
 
   return { readout, inTuneGlow }

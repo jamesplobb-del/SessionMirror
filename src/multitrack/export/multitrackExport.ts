@@ -1,3 +1,4 @@
+import { sectionExportWindows } from './sectionExport'
 import { Capacitor } from '@capacitor/core'
 import type { Take } from '../../types'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
@@ -60,10 +61,12 @@ export async function exportMultitrackSession(
     sheetLayoutAsset(session.sheetMusic),
   )
 
+  const windows = sectionExportWindows(session, layout, durationSeconds)
   const sources: Array<{
     id: string
     path: string
     rect: LayoutRectPercent
+    layoutWindows: Array<{ startSec: number; endSec: number; rect: LayoutRectPercent | null }>
     trimStartSec?: number
     trimEndSec?: number
     timelineOffsetMs?: number
@@ -73,13 +76,14 @@ export async function exportMultitrackSession(
   for (const panel of performancePanels) {
     const rect = panelRects[panel.id]
     if (!rect) continue
-    const path = await resolveNativeFileUri(panel.take as Take)
+    const path = await resolveNativeFileUri(panel.take as Take).catch(() => null)
     if (!path) return { ok: false, reason: 'missing_file' }
     const timelineOffsetMs = timelineOffsetMsForTake(panel.take!, session.practice.bpm)
     sources.push({
       id: panel.id,
       path,
       rect,
+      layoutWindows: windows.map(window => ({ startSec: window.startSec, endSec: window.endSec, rect: window.panelRects[panel.id] ?? null })),
       ...(panel.trimStartSec ? { trimStartSec: panel.trimStartSec } : null),
       ...(panel.trimEndSec !== undefined ? { trimEndSec: panel.trimEndSec } : null),
       ...(timelineOffsetMs ? { timelineOffsetMs } : null),
@@ -122,17 +126,21 @@ export async function exportMultitrackSession(
         blob,
       )
       const isPdf = asset.mimeType === 'application/pdf'
-      layers.push({
+      for (const layoutWindow of windows) {
+        const startSec = Math.max(window.startSec, layoutWindow.startSec)
+        const endSec = Math.min(window.endSec ?? durationSeconds, layoutWindow.endSec)
+        if (endSec <= startSec || !layoutWindow.musicRect) continue
+        layers.push({
         path,
         fileType: isPdf ? 'pdf' : 'image',
-        rect: musicRect!,
+        rect: layoutWindow.musicRect,
         x: asset.x ?? 0.5,
         y: asset.y ?? 0.5,
         scale: asset.scale ?? 1,
         contentMode: isPdf ? 'fit' : (asset.contentMode ?? 'fill'),
-        startSec: window.startSec,
-        ...(window.endSec !== undefined ? { endSec: window.endSec } : null),
-      })
+        startSec, endSec,
+        })
+      }
     }
     if (layers.length > 0) {
       // The first layer doubles as the static payload older native builds read.
@@ -169,7 +177,7 @@ export async function exportMultitrackSession(
       aspectRatio: MULTITRACK_EXPORT_ASPECT_RATIO,
       durationSeconds,
       sources,
-      gridRects: Object.values(panelRects),
+      gridRects: windows.length > 1 ? [] : Object.values(panelRects),
       sheetMusic,
       ...(sheetMusicCues ? { sheetMusicCues } : null),
       backingAudio,

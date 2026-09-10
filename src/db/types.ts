@@ -64,6 +64,7 @@ export interface VaultTake {
 }
 
 export interface SaveTakeInput {
+  enhancerBaked?: boolean
   projectId: string
   filePath: string
   duration: number

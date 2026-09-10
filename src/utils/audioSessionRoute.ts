@@ -269,6 +269,7 @@ export interface BestTakeAudioPluginType {
       id: string
       path: string
       rect: NativeRectPercent
+      layoutWindows?: Array<{ startSec: number; endSec: number; rect: NativeRectPercent | null }>
       trimStartSec?: number
       trimEndSec?: number
       timelineOffsetMs?: number
@@ -350,7 +351,9 @@ export interface BestTakeAudioPluginType {
   setNativeCameraFrameBridgeEnabled(options: { enabled: boolean }): Promise<void>
   ackNativeCameraPreviewFrame(options: { frameId: number }): Promise<void>
   setNativeCameraPreviewZoom(options: { zoom: number }): Promise<void>
-  setNativeAudioTapEnabled(options: { enabled: boolean }): Promise<void>
+  setNativeTunerPitchEnabled(options: { enabled: boolean }): Promise<void>
+  acknowledgeNativePitchFrame(options: { token: string }): Promise<void>
+  setNativeAudioTapEnabled(options: { enabled: boolean; acknowledgedDelivery?: boolean; completionDelivery?: boolean }): Promise<void>
   startNativeTunerMonitor(options?: {
     micInputPreference?: MicInputPreference
   }): Promise<{ active: boolean }>
@@ -361,7 +364,7 @@ export interface BestTakeAudioPluginType {
     url: string
     mediaType: 'video' | 'audio'
     params: Record<string, number>
-  }): Promise<{ enhanced: boolean; duration: number }>
+  }): Promise<{ enhanced: boolean; duration: number; path: string }>
   stopNativeCameraRecording(options?: { trimStartMs?: number }): Promise<NativeCameraRecordingStopResult>
   startNativeAudioRecording(options: {
     takeId: string
@@ -420,7 +423,7 @@ export interface BestTakeAudioPluginType {
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'nativeAudioPitchFrame',
-    listenerFunc: (data: { pcmBase64?: string; sampleRate?: number; sampleCount?: number }) => void,
+    listenerFunc: (data: { pcmBase64?: string; sampleRate?: number; sampleCount?: number; deliveryToken?: string }) => void,
   ): Promise<PluginListenerHandle>
   addListener(
     eventName: 'spokenFeedbackResult',

@@ -10,7 +10,6 @@ import {
 import { createSheetCueId } from '../sheetMusic/sheetMusicTimeline'
 import {
   loadMultitrackSession,
-  persistedSessionWantsTakes,
   saveMultitrackSession,
 } from './multitrackPersistence'
 import type {
@@ -41,30 +40,40 @@ function createInitialSession(): MultitrackSession {
   }
 }
 
-export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolean }) {
+export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolean; takesLoaded?: boolean }) {
   const takes = options?.takes ?? []
   const isOpen = options?.isOpen ?? false
   const [session, setSession] = useState<MultitrackSession>(createInitialSession)
   const hydratedRef = useRef(false)
   const layout = useMemo(() => getLayoutPreset(session.layoutId), [session.layoutId])
 
-  // Auto-project restore: rehydrate the last canvas on first open. If the
-  // persisted canvas references takes, wait until the vault list has loaded so
-  // an early restore doesn't drop every tile.
+  const [hydrated, setHydrated] = useState(false)
+  const [persistenceNotice, setPersistenceNotice] = useState<string | null>(null)
+  const saveQueue = useRef(Promise.resolve())
+  const takesLoaded = options?.takesLoaded ?? true
   useEffect(() => {
-    if (!isOpen || hydratedRef.current) return
-    if (takes.length === 0 && persistedSessionWantsTakes()) return
-    hydratedRef.current = true
-    const restored = loadMultitrackSession(takes)
-    if (restored) setSession(restored)
-  }, [isOpen, takes])
+    if (!isOpen || hydratedRef.current || !takesLoaded) return
+    let cancelled = false
+    void loadMultitrackSession(takes).then(restored => {
+      if (cancelled) return
+      if (restored) {
+        setSession(restored)
+        setPersistenceNotice(restored.recoveryNotice ?? null)
+      }
+      hydratedRef.current = true
+      setHydrated(true)
+    }).catch(() => {
+      if (!cancelled) setPersistenceNotice('Could not reopen your workspace. Close and reopen to retry.')
+    })
+    return () => { cancelled = true }
+  }, [isOpen, takes, takesLoaded])
 
-  // Auto-project save: debounce so slider drags don't hammer localStorage.
+  // Serialize snapshots: a slow file import must not overwrite a later edit.
   useEffect(() => {
-    if (!hydratedRef.current) return
-    const timer = window.setTimeout(() => saveMultitrackSession(session), 400)
-    return () => window.clearTimeout(timer)
-  }, [session])
+    if (!hydrated) return
+    saveQueue.current = saveQueue.current.catch(() => {}).then(() => saveMultitrackSession(session))
+    void saveQueue.current.catch(() => setPersistenceNotice('Workspace could not be saved. Keep it open and reimport the file to retry.'))
+  }, [session, hydrated])
 
   const setLayout = useCallback((layoutId: string) => {
     const preset = getLayoutPreset(layoutId)
@@ -231,6 +240,8 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
 
   return {
     session,
+    persistenceNotice,
+    isRestoring: !hydrated,
     layout,
     setLayout,
     addPerformanceBox,

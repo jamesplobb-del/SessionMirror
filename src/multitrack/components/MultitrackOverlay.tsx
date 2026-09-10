@@ -1,3 +1,4 @@
+import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
@@ -49,7 +50,6 @@ import { exportMultitrackSession, type MultitrackExportFailureReason } from '../
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
 import SheetPlacementDiagram from './SheetPlacementDiagram'
-import { hasSectionWindow } from '../layout/sectionVisibility'
 import { SHEET_BASE_CUE_ID, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../backing/MultitrackBackingTrackPanel'
@@ -78,6 +78,7 @@ const SHEET_FRAME_OPTIONS = [
 ] as const
 
 interface MultitrackOverlayProps {
+  takesLoaded?: boolean
   isOpen: boolean
   takes: Take[]
   streamRef: RefObject<MediaStream | null>
@@ -199,7 +200,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     removeSheetCue,
     updatePractice,
     updateBacking,
-  } = useMultitrackSession({ takes, isOpen })
+    persistenceNotice,
+    isRestoring,
+  } = useMultitrackSession({ takes, isOpen, takesLoaded: props.takesLoaded })
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
   const nativeGridPlaybackActiveRef = useRef(false)
@@ -412,23 +415,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         const proceed = await showConfirm({
           title: 'Backing track not included',
           message: "YouTube audio can't be captured for export. Continue without the backing track?",
-          confirmLabel: 'Export anyway',
-        })
-        if (!proceed) return
-      }
-
-      // The native renderer composites one fixed rect per source for the whole
-      // video, so a box scoped to a section keeps its slot the entire time in the
-      // export instead of the grid reflowing around it as it does on the canvas.
-      // Only a box that actually holds a clip can reflow the canvas, so an empty
-      // one carrying a leftover window must not trigger this warning.
-      if (session.panels.some(
-        (panel) => panel.kind === 'performance' && panel.take !== null && hasSectionWindow(panel),
-      )) {
-        const proceed = await showConfirm({
-          title: 'Section boxes export full length',
-          message:
-            "Boxes set to show for part of the song keep their spot for the whole exported video — the grid won't reshuffle like it does here. Export anyway?",
           confirmLabel: 'Export anyway',
         })
         if (!proceed) return
@@ -1336,7 +1322,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 {isExporting ? 'Rendering…' : 'Export'}
               </Pressable>
             </header>
-            <div className={`multitrack-overlay__body ${alignStageOpen ? 'multitrack-overlay__body--editing' : ''}`}>
+            {isRestoring && !persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">Opening workspace…</p> : null}
+            {persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">{persistenceNotice}</p> : null}
+            <div inert={isRestoring} className={`multitrack-overlay__body ${alignStageOpen ? 'multitrack-overlay__body--editing' : ''}`}>
               <div className="multitrack-mix-strip" aria-label="Project audio sources" hidden={alignStageOpen}>
                 {/* Practice toggles lead the strip — they are tapped most and must
                     stay reachable without scrolling past a long backing/file name. */}

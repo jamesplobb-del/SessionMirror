@@ -15,6 +15,7 @@ import { motion, useDragControls, useMotionValue } from 'framer-motion'
 import { ArrowLeftRight, Pin, RotateCcw, Share, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
+import { isYoutubeDialogOpen } from '../utils/youtubeDialogState'
 import PipWindow from './PipWindow'
 import Pressable from './ui/Pressable'
 import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
@@ -248,6 +249,8 @@ function MovableTakeSlot({
 
   const clampPositionToBoundary = useCallback(() => {
     if (!layoutReady.current || !movable || editing || draggingRef.current) return
+    // Dialog/keyboard geometry is temporary, not a new position for the cards.
+    if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
     const node = slotNodeRef.current
     const boundary = boundaryRef.current
     if (!node || !boundary) return
@@ -390,7 +393,10 @@ function MovableTakeSlot({
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       if (!movable || event.button !== 0) return
-      if ((event.target as HTMLElement).closest('[data-card-move-ignore]')) return
+      const target = event.target as HTMLElement
+      // React portal events still bubble through this card, even outside its DOM.
+      if (!slotNodeRef.current?.contains(target)) return
+      if (target.closest('button, a, input, textarea, select, [contenteditable="true"], [data-card-move-ignore]')) return
 
       clearHoldTimer()
       if (hapticFeedback) warmHaptics()

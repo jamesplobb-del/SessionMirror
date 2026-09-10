@@ -1,4 +1,4 @@
-import { GAME_TEST_INPUT } from '../gameTestInput'
+import { isGameTestInputOn } from '../gameTestInput'
 import { recordPlannedGame } from '../../utils/dailyChallengePlan'
 import {
   useCallback,
@@ -414,7 +414,7 @@ export function useBalanceGame({
     dataRef.current = next
     setData(next)
     saveBalanceData(next)
-    if (!GAME_TEST_INPUT) recordPlannedGame({ game: 'balance', instrumentId: state.settings.instrumentId, date: launchRef.current.kind === 'daily' ? launchRef.current.id : null, completed: result.completed })
+    if (!isGameTestInputOn()) recordPlannedGame({ game: 'balance', instrumentId: state.settings.instrumentId, date: launchRef.current.kind === 'daily' ? launchRef.current.id : null, completed: result.completed })
     dispatch({ type: 'SET_BEST', bestBalancedMs: getBalanceBestMs(next) })
   }, [state])
 

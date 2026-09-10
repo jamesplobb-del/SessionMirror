@@ -384,8 +384,8 @@ function ControlDeck({
         isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
       }`}
     >
-      {onOpenVault && !isRecording && !isStopping && !branchActive && !focusedPostTakeActive && (
-        <VaultHandle onOpen={onOpenVault} revision={vaultRevision} />
+      {onOpenVault && !isRecording && !isStopping && !focusedPostTakeActive && (
+        <VaultHandle onOpen={onOpenVault} revision={vaultRevision} concealed={branchActive} />
       )}
       <SettingsBranchWheel
         open={branchOpen}
@@ -756,11 +756,14 @@ function ControlDeck({
  * and losing them lets the whole deck sit lower and gives the pitch graph
  * above it the room back.
  */
-function VaultHandle({ onOpen, revision }: { onOpen: () => void; revision?: number }) {
+function VaultHandle({ onOpen, revision, concealed = false }: { onOpen: () => void; revision?: number; concealed?: boolean }) {
   return (
     <button
       type="button"
       className="take-vault-handle"
+      style={{ visibility: concealed ? 'hidden' : undefined }}
+      aria-hidden={concealed || undefined}
+      tabIndex={concealed ? -1 : undefined}
       aria-label="Open TakeVault"
       onClick={onOpen}
     >
@@ -776,7 +779,7 @@ export default memo(ControlDeck)
 function ElectricControlIcon({ kind }: { kind: 'home' | 'workspace' | 'tools' | 'camera' | 'settings' }) {
   return <svg className="electric-control-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {kind === 'home' && <><path d="M3 10.5 10.6 4a2.1 2.1 0 0 1 2.8 0l7.6 6.5M5 9v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9" fill="currentColor" fillOpacity=".10"/><path d="M9 21v-7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v7"/></>}
-    {kind === 'workspace' && <><path d="m3 8 8-4a2.2 2.2 0 0 1 2 0l8 4-9 4.5Z" fill="currentColor" fillOpacity=".18"/><path d="m3 12 9 4.5 9-4.5M3 16l9 4.5 9-4.5"/></>}
+    {kind === 'workspace' && <><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16M10 10v10"/></>}
     {kind === 'camera' && <><path d="M8 6 9.5 3.5h5L16 6h3a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z" fill="currentColor" fillOpacity=".10"/><circle cx="12" cy="13" r="4"/><path d="M17.5 9h.01" strokeWidth="2.5"/></>}
     {kind === 'tools' && <><path d="M14 4a6 6 0 0 0-7 7L3.5 16.5a2.8 2.8 0 0 0 4 4L13 15a6 6 0 0 0 7-7l-4 4-4-4 4-4Z" fill="currentColor" fillOpacity=".12"/><path d="m6 18 .01-.01" strokeWidth="2.5"/></>}
     {kind === 'settings' && <><path d="m9.5 3-.6 2.2-1.5.9-2.2-.5L2.7 10l1.6 1.6v1.8L2.7 15l2.5 4.4 2.2-.5 1.5.9.6 2.2h5l.6-2.2 1.5-.9 2.2.5 2.5-4.4-1.6-1.6v-1.8l1.6-1.6-2.5-4.4-2.2.5-1.5-.9-.6-2.2Z" fill="currentColor" fillOpacity=".10" transform="translate(0 -0.5)"/><circle cx="12" cy="12" r="3.3"/></>}

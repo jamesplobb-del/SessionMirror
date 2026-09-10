@@ -935,12 +935,12 @@ export default function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="playback" title="Playback">
-            <SettingsGroup footer="Bakes EQ, compression, and reverb into new recordings and enhances older takes on playback. Off keeps the flat original.">
+            <SettingsGroup footer="Previews EQ, compression, and reverb during playback. New iPhone recordings also save an Enhanced copy in Vault; the original stays unchanged.">
               <div data-tutorial="settings-enhancer">
                 <SwitchRow
                   icon={Sparkles}
                   tint={TINT.orange}
-                  label="Tone Studio"
+                  label="Audio Enhance"
                   checked={hudQuickSettings.audioEnhancerEnabled}
                   onChange={onAudioEnhancerChange}
                 />

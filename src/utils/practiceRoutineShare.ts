@@ -1,3 +1,6 @@
+import { buildRoutineFile, parseRoutineFile } from '../practiceTimeline/storage/routineFile'
+import { getTimelineById, saveTimeline } from '../practiceTimeline/storage/timelineStorage'
+import type { PracticeTimeline } from '../practiceTimeline/types'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
@@ -10,18 +13,8 @@ import {
 } from './practiceRoutines'
 import { storeLibraryRoutine } from './routineLibrary'
 
-/**
- * Handing a practice routine to another musician — a teacher sending a week's
- * work to a student, most of the time.
- *
- * NOT the same thing as `practiceTimeline/storage/routineFile.ts`. That one
- * carries a *metronome program*: bars, tempo ramps and section markers for the
- * click to play. This one carries the routine the app is actually built
- * around — the ordered checklist of exercises, each with the tool it opens,
- * the desk it sets up and the reference it loads. They travel as different
- * file types on purpose, so opening one never quietly produces the other, and
- * so a student who is sent "my routine" gets the session, not a click track.
- */
+/** Shared practice plans carry their exercise checklist and attached metronome
+ * programs. Standalone programs still use their own .btroutine file type. */
 
 export const PRACTICE_PLAN_FORMAT = 'besttake.practice-plan'
 export const PRACTICE_PLAN_VERSION = 1
@@ -30,7 +23,7 @@ export const PRACTICE_PLAN_UTI = 'com.besttake.app.practice-plan'
 export const PRACTICE_PLAN_MIME = 'application/json'
 
 /** Well past any real routine — a bigger file is a wrong file, not a big one. */
-export const MAX_PRACTICE_PLAN_BYTES = 200_000
+export const MAX_PRACTICE_PLAN_BYTES = 5_000_000
 
 export interface PracticePlanEnvelope {
   format: typeof PRACTICE_PLAN_FORMAT
@@ -39,10 +32,11 @@ export interface PracticePlanEnvelope {
   appVersion?: string
   exportedAt: number
   routine: Routine
+  programs?: Record<string, unknown>
 }
 
 export type PracticePlanParseResult =
-  | { ok: true; routine: Routine }
+  | { ok: true; routine: Routine; programs: PracticeTimeline[] }
   | { ok: false; error: string }
 
 function safeFileNameFor(routine: Routine): string {
@@ -56,6 +50,12 @@ function safeFileNameFor(routine: Routine): string {
 }
 
 export function buildPracticePlanFile(routine: Routine, appVersion?: string): string {
+  const programs: Record<string, unknown> = {}
+  for (const id of new Set(routine.steps.map(step => step.programId).filter((id): id is string => Boolean(id)))) {
+    const program = getTimelineById(id)
+    if (!program) throw new Error('An attached metronome program is missing. Choose another program before sharing.')
+    programs[id] = JSON.parse(buildRoutineFile(program))
+  }
   const envelope: PracticePlanEnvelope = {
     format: PRACTICE_PLAN_FORMAT,
     version: PRACTICE_PLAN_VERSION,
@@ -63,8 +63,11 @@ export function buildPracticePlanFile(routine: Routine, appVersion?: string): st
     appVersion,
     exportedAt: Date.now(),
     routine,
+    programs,
   }
-  return JSON.stringify(envelope, null, 2)
+  const text = JSON.stringify(envelope, null, 2)
+  if (text.length > MAX_PRACTICE_PLAN_BYTES) throw new Error('This routine has too many program details to share in one file.')
+  return text
 }
 
 /**
@@ -115,15 +118,27 @@ export function parsePracticePlanFile(text: string): PracticePlanParseResult {
    * Both are re-issued here, so the routine binds to the student's own items
    * on first use exactly as a routine they built would.
    */
+  const programs: PracticeTimeline[] = []
+  const linkedIds = new Map<string, string>()
+  for (const id of new Set(routine.steps.map(step => step.programId).filter((id): id is string => Boolean(id)))) {
+    const embedded = envelope.programs && Object.prototype.hasOwnProperty.call(envelope.programs,id) ? envelope.programs[id] : undefined
+    if (!embedded) continue // Older shares did not carry programs; never bind to an unrelated local ID.
+    const result = parseRoutineFile(JSON.stringify(embedded))
+    if (!result.ok) return { ok: false, error: `An attached metronome program could not be read: ${result.error}` }
+    programs.push(result.routine)
+    linkedIds.set(id,result.routine.id)
+  }
   const now = Date.now()
   return {
     ok: true,
+    programs,
     routine: {
       ...createRoutine(routine.name, [], routine.instrumentId),
       steps: routine.steps.map((step) => ({
         ...step,
         id: makeId('step'),
         projectId: null,
+        programId: step.programId ? linkedIds.get(step.programId) ?? null : null,
       })),
       createdAt: now,
       updatedAt: now,
@@ -134,7 +149,19 @@ export function parsePracticePlanFile(text: string): PracticePlanParseResult {
 /** Parse, then put it in the library so it is there when the builder opens. */
 export function importPracticePlanFromText(text: string): PracticePlanParseResult {
   const result = parsePracticePlanFile(text)
-  if (result.ok) storeLibraryRoutine(result.routine)
+  if (result.ok) {
+    const keys = ['besttake:practice-timelines','besttake:practice-timeline-active','besttake:routine-library:v1']
+    const previous = keys.map(key => localStorage.getItem(key))
+    try {
+      for (const program of result.programs) saveTimeline(program)
+      // Importing a practice plan must not change the currently selected standalone program.
+      if (previous[1] === null) localStorage.removeItem(keys[1]); else localStorage.setItem(keys[1],previous[1])
+      storeLibraryRoutine(result.routine)
+    } catch {
+      keys.forEach((key,index) => { try { const value=previous[index]; if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value) } catch { /* Keep original storage error. */ } })
+      return {ok:false,error:'Could not save this routine and its programs. Please check available storage and try again.'}
+    }
+  }
   return result
 }
 
@@ -207,10 +234,9 @@ export async function sharePracticeRoutine(routine: Routine): Promise<SharePract
   if (routine.steps.length === 0) {
     return { ok: false, error: 'Add at least one exercise before sharing this routine.' }
   }
-  const json = buildPracticePlanFile(routine, __APP_VERSION__)
-  const fileName = safeFileNameFor(routine)
-
   try {
+    const json = buildPracticePlanFile(routine, __APP_VERSION__)
+    const fileName = safeFileNameFor(routine)
     if (Capacitor.isNativePlatform()) {
       await shareOnDevice(json, fileName, routine.name.slice(0, MAX_ROUTINE_NAME))
       return { ok: true }

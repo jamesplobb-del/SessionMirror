@@ -2,13 +2,12 @@ import AVFoundation
 import AudioToolbox
 import Foundation
 
-/// Offline "bake" of the Audio Enhancer into a recorded take file.
+/// Offline enhancement into a separate recording file.
 ///
 /// Mirrors the WebAudio playback chain in src/utils/audioEnhancer.ts:
 ///   input → 3-band EQ → compressor → { dry, reverb → wet gain } → sum → limiter → −1 dB ceiling
 /// Uses AVAudioEngine manual rendering (never touches AVAudioSession, so it is
-/// safe to run while the native camera session is live). The original file is
-/// left untouched on ANY failure.
+/// safe to run while the native camera session is live). The original is never replaced.
 struct AudioEnhancerParams {
     let lowHz: Double
     let lowGainDb: Float
@@ -86,10 +85,10 @@ final class AudioEnhancerRenderer {
     /// Post-record offline bake — not user-interactive; matches AVAssetExportSession QoS.
     private static let workQueue = DispatchQueue(label: "SessionMirror.AudioEnhancerRenderer", qos: .utility)
 
-    /// Enhance the audio of a recorded take in place. Video takes keep their
+    /// Create an enhanced copy. Video takes keep their
     /// video track byte-for-byte (passthrough remux); audio-only takes are
-    /// replaced with the enhanced AAC render.
-    static func enhanceInPlace(
+    /// copied into an enhanced AAC render.
+    static func enhanceCopy(
         fileURL: URL,
         isVideo: Bool,
         params: AudioEnhancerParams,
@@ -146,22 +145,25 @@ final class AudioEnhancerRenderer {
             tailSeconds: tailSeconds
         )
 
-        // Step C — reassemble and atomically replace the original.
-        if isVideo {
-            let remuxedURL = tempDir.appendingPathComponent("enhancer-mux-\(UUID().uuidString).mp4")
-            defer { try? FileManager.default.removeItem(at: remuxedURL) }
-            try await remuxVideo(originalURL: fileURL, enhancedAudioURL: renderedAudioURL, outputURL: remuxedURL)
-            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: remuxedURL)
-        } else {
-            _ = try FileManager.default.replaceItemAt(fileURL, withItemAt: renderedAudioURL)
+        // Publish a separate durable file. Readers of the original never see a replacement.
+        let outputURL = fileURL.deletingLastPathComponent().appendingPathComponent(
+            "enhanced-\(UUID().uuidString).\(isVideo ? "mp4" : "m4a")"
+        )
+        do {
+            if isVideo {
+                try await remuxVideo(originalURL: fileURL, enhancedAudioURL: renderedAudioURL, outputURL: outputURL)
+            } else {
+                try FileManager.default.copyItem(at: renderedAudioURL, to: outputURL)
+            }
+            let duration = CMTimeGetSeconds(AVURLAsset(url: outputURL).duration)
+            guard duration.isFinite && duration > 0 else {
+                throw AudioEnhancerRendererError.exportFailed("Invalid output duration")
+            }
+            return ["enhanced": true, "duration": duration, "path": outputURL.absoluteString]
+        } catch {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw error
         }
-
-        let finalAsset = AVURLAsset(url: fileURL)
-        let duration = CMTimeGetSeconds(finalAsset.duration)
-        return [
-            "enhanced": true,
-            "duration": duration.isFinite && duration > 0 ? duration : 0,
-        ]
     }
 
     // MARK: - Step A: extraction
@@ -206,6 +208,7 @@ final class AudioEnhancerRenderer {
     ) throws {
         let engine = AVAudioEngine()
         let player = AVAudioPlayerNode()
+        let inputMixer = AVAudioMixerNode()
         let eq = AVAudioUnitEQ(numberOfBands: 3)
         let compressor = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
             componentType: kAudioUnitType_Effect,
@@ -229,7 +232,7 @@ final class AudioEnhancerRenderer {
         let sourceFormat = inputFile.processingFormat
         guard let format = AVAudioFormat(
             standardFormatWithSampleRate: sourceFormat.sampleRate,
-            channels: sourceFormat.channelCount
+            channels: 2
         ) else {
             throw AudioEnhancerRendererError.renderFailed("Unsupported source format")
         }
@@ -262,6 +265,7 @@ final class AudioEnhancerRenderer {
         postCompressor.outputVolume = 1.0
 
         engine.attach(player)
+        engine.attach(inputMixer)
         engine.attach(eq)
         engine.attach(compressor)
         engine.attach(postCompressor)
@@ -272,7 +276,9 @@ final class AudioEnhancerRenderer {
             engine.attach(wetGain)
         }
 
-        engine.connect(player, to: eq, format: format)
+        // Normalize mono recordings before effects that require a stereo bus.
+        engine.connect(player, to: inputMixer, format: sourceFormat)
+        engine.connect(inputMixer, to: eq, format: format)
         engine.connect(eq, to: compressor, format: format)
         if useReverb {
             // Fan out: dry to the sum, wet through reverb → wet gain → sum.

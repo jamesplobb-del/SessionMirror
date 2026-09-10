@@ -230,8 +230,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
    *
    * A teacher writes the week once and sends it; every student opens the
    * attachment and has the same session, with the same tools set up on each
-   * item. What travels is the routine, not a metronome program — see
-   * `utils/practiceRoutineShare.ts` for why those are separate file types.
+   * item. Attached metronome programs travel with the routine, so the
+   * recipient can play the same tempo and meter sequence.
    */
   const shareRoutine = (item: Routine) => {
     setError('')

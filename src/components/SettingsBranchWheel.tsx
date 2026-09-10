@@ -6,7 +6,7 @@ import {
   LayoutGrid,
   MicVocal,
   Radio,
-  Sparkles,
+  SlidersHorizontal,
   X,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
@@ -212,6 +212,7 @@ export default function SettingsBranchWheel({
   }, [anchorRef, open])
 
   const handleExitComplete = () => {
+    if (open) return
     setAnchor(null)
     setSavingDesk(false)
     setDeskNameDraft('')
@@ -321,7 +322,7 @@ export default function SettingsBranchWheel({
 
     items.push({
       id: 'audio-enhancer',
-      label: 'Tone Studio',
+      label: 'Audio Enhance',
       icon: 'enhancer',
       active: audioEnhancerEnabled,
       onSelect: () => onAudioEnhancerChange(!audioEnhancerEnabled),
@@ -447,9 +448,9 @@ export default function SettingsBranchWheel({
               className={`settings-branch-tray settings-branch-tray--${layoutMode} pointer-events-auto relative`}
               role="menu"
               aria-label="Workspace"
-              initial={{ opacity: 0, y: 10, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              initial={{ opacity: 0, y: layoutMode === 'camera' ? 6 : 0 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: layoutMode === 'camera' ? 6 : 0 }}
               transition={BRANCH_MOTION}
               style={{
                 ...motionGpuLayer,
@@ -575,19 +576,19 @@ export default function SettingsBranchWheel({
                       <span className="ui-orient-spin settings-branch-tray__item-content">
                         <span className="settings-branch-tray__icon" aria-hidden="true">
                           {item.icon === 'pitch' ? (
-                            <AudioLines strokeWidth={2.1} />
+                            <AudioLines strokeWidth={1.8} />
                           ) : item.icon === 'take-cards' || item.icon === 'tuner-takes' ? (
-                            <LayoutGrid strokeWidth={2.1} />
+                            <LayoutGrid strokeWidth={1.8} />
                           ) : item.icon === 'enhancer' ? (
-                            <Sparkles strokeWidth={2.1} />
+                            <SlidersHorizontal strokeWidth={1.8} />
                           ) : item.icon === 'drone' ? (
-                            <Radio strokeWidth={2.1} />
+                            <Radio strokeWidth={1.8} />
                           ) : item.icon === 'hands-free' ? (
-                            <MicVocal strokeWidth={2.1} />
+                            <MicVocal strokeWidth={1.8} />
                           ) : item.icon === 'expand' ? (
-                            <Columns2 strokeWidth={2.1} />
+                            <Columns2 strokeWidth={1.8} />
                           ) : item.icon === 'multitrack' ? (
-                            <Grid2X2 strokeWidth={2.1} />
+                            <Grid2X2 strokeWidth={1.8} />
                           ) : (
                             <MetronomeIcon />
                           )}

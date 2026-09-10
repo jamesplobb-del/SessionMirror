@@ -42,10 +42,16 @@ export function useTunerWash(
   enabled: boolean,
 ) {
   useEffect(() => {
-    if (!enabled) return
+    const stage = stageRef.current
+    const overlay = stage?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
+    if (!enabled) {
+      clearWash(stage)
+      clearWash(overlay ?? null)
+      if (overlay) clearWash(document.documentElement)
+      return
+    }
     const target = getTunerWashTarget(cents, inTuneGlow)
-    applyWash(stageRef.current, target)
-    const overlay = stageRef.current?.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
+    applyWash(stage, target)
     if (overlay) {
       applyWash(overlay, target)
       applyWash(document.documentElement, target)

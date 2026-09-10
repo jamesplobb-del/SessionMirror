@@ -1,0 +1,116 @@
+import { isSilenceFloorSample, TUNING_GREEN_CENTS, TUNING_YELLOW_CENTS } from './pitchUtils'
+
+export function silkPitchColor(cents: number): string {
+  return Math.abs(cents) <= TUNING_GREEN_CENTS ? '#20ed78'
+    : Math.abs(cents) <= TUNING_YELLOW_CENTS ? '#f4c52b' : '#f54c62'
+}
+export function silkTunerGeometry(width: number, height: number) {
+  const center = height * .51, range = height * .19
+  const centsToY = (cents: number) => center - Math.max(-40, Math.min(40, cents)) / 30 * range
+  const bandBottom = centsToY(-TUNING_GREEN_CENTS)
+  return { center, centsToY, bandBottom, targetY: bandBottom + 18, flatY: bandBottom + 52, headroom: Math.min(40, width * .16) }
+}
+
+type SilkPoint = { x: number; y: number; cents: number }
+type IndexedSilkPoint = { point: SilkPoint; index: number }
+
+function colorWithAlpha(color: string, alpha: number): string {
+  const red = Number.parseInt(color.slice(1, 3), 16)
+  const green = Number.parseInt(color.slice(3, 5), 16)
+  const blue = Number.parseInt(color.slice(5, 7), 16)
+  return `rgba(${red},${green},${blue},${Math.max(0, Math.min(1, alpha))})`
+}
+
+function silkGradient(
+  ctx: CanvasRenderingContext2D,
+  run: IndexedSilkPoint[],
+  totalPoints: number,
+  startAlpha: number,
+  endAlpha: number,
+) {
+  const firstX = run[0].point.x
+  const lastX = Math.max(firstX + 1, run[run.length - 1].point.x)
+  const gradient = ctx.createLinearGradient(firstX, 0, lastX, 0)
+  const stopStride = Math.max(1, Math.ceil(run.length / 24))
+  for (let runIndex = 0; runIndex < run.length; runIndex += stopStride) {
+    const entry = run[runIndex]
+    const age = totalPoints <= 1 ? 1 : entry.index / (totalPoints - 1)
+    gradient.addColorStop(
+      run.length <= 1 ? 1 : runIndex / (run.length - 1),
+      colorWithAlpha(silkPitchColor(entry.point.cents), startAlpha + (endAlpha - startAlpha) * age),
+    )
+  }
+  const last = run[run.length - 1]
+  const lastAge = totalPoints <= 1 ? 1 : last.index / (totalPoints - 1)
+  gradient.addColorStop(1, colorWithAlpha(silkPitchColor(last.point.cents), startAlpha + (endAlpha - startAlpha) * lastAge))
+  return gradient
+}
+
+function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], totalPoints: number) {
+  if (run.length < 2) return
+  ctx.fillStyle = silkGradient(ctx, run, totalPoints, .02, .13)
+  ctx.beginPath()
+  ctx.moveTo(run[0].point.x, run[0].point.y)
+  for (let index = 1; index < run.length; index += 1) {
+    ctx.lineTo(run[index].point.x, run[index].point.y)
+  }
+  for (let index = run.length - 1; index >= 0; index -= 1) {
+    ctx.lineTo(run[index].point.x, run[index].point.y + 16)
+  }
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.strokeStyle = silkGradient(ctx, run, totalPoints, .15, 1)
+  ctx.lineWidth = 5
+  ctx.beginPath()
+  ctx.moveTo(run[0].point.x, run[0].point.y)
+  for (let index = 1; index < run.length; index += 1) {
+    ctx.lineTo(run[index].point.x, run[index].point.y)
+  }
+  ctx.stroke()
+}
+
+/** Paint measured history only. No simulated movement or changes to pitch detection. */
+export function drawSilkTuner(
+  ctx: CanvasRenderingContext2D, width: number, height: number,
+  points: SilkPoint[], active: boolean, dark: boolean,
+): string {
+  const g = silkTunerGeometry(width, height)
+  ctx.save()
+  ctx.fillStyle = '#20ed782e'
+  ctx.fillRect(10, g.centsToY(5), width - 20, g.bandBottom - g.centsToY(5))
+  ctx.strokeStyle = '#00d85a59'; ctx.lineWidth = 1
+  for (const y of [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
+  ctx.strokeStyle = dark ? '#adcfcf44' : '#567b8333'
+  ctx.beginPath();ctx.moveTo(14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
+  ctx.fillStyle = dark ? '#c5e5e3' : '#4e6c73'
+  ctx.font = '10px -apple-system, system-ui, sans-serif'
+  ctx.fillText('0¢ / TARGET', 16, g.targetY)
+  ctx.font = '600 11px -apple-system, system-ui, sans-serif'
+  ctx.fillText('Sharp',16,g.center-height*.12)
+  ctx.fillText('Flat',16,g.flatY)
+  ctx.lineCap='round';ctx.lineJoin='round'
+  let run: IndexedSilkPoint[] = []
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index]
+    if (isSilenceFloorSample(point.cents)) {
+      drawSilkRun(ctx, run, points.length)
+      run = []
+    } else {
+      run.push({ point, index })
+    }
+  }
+  drawSilkRun(ctx, run, points.length)
+  const last=points.at(-1)
+  const color=active&&last&&!isSilenceFloorSample(last.cents)?silkPitchColor(last.cents):'transparent'
+  if(color!=='transparent'&&last) {
+    const halo=ctx.createRadialGradient(last.x,last.y,0,last.x,last.y,33)
+    halo.addColorStop(0,color+'b3');halo.addColorStop(.38,color+'57');halo.addColorStop(1,color+'00')
+    ctx.fillStyle=halo;ctx.beginPath();ctx.arc(last.x,last.y,33,0,Math.PI*2);ctx.fill()
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(last.x,last.y,8,0,Math.PI*2);ctx.fill()
+    ctx.strokeStyle='#ffffffd9';ctx.lineWidth=1.7;ctx.stroke()
+    ctx.fillStyle='white';ctx.beginPath();ctx.arc(last.x,last.y,2.4,0,Math.PI*2);ctx.fill()
+  }
+  ctx.restore()
+  return color
+}

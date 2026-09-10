@@ -46,8 +46,14 @@ const routedSpeakerElements = new Set<HTMLMediaElement>()
 
 let enhancerEnabled = false
 let enhancerSettings: AudioEnhancerSettings | null = null
-function shouldUseEnhancer(_nodes: TakeSpeakerNodes): boolean {
-  return enhancerEnabled && Boolean(enhancerSettings)
+let processedFileNames = new Set<string>()
+export function playbackFileName(src: string): string {
+  try { return decodeURIComponent(src.split(/[?#]/)[0]).split('/').pop() ?? '' } catch { return src }
+}
+function shouldUseEnhancer(nodes: TakeSpeakerNodes): boolean {
+  const element = nodes.source.mediaElement
+  const alreadyProcessed = processedFileNames.has(playbackFileName(element.src || element.currentSrc))
+  return enhancerEnabled && Boolean(enhancerSettings) && !alreadyProcessed
 }
 
 function connectPlaybackTail(tail: AudioNode, nodes: TakeSpeakerNodes): void {
@@ -127,7 +133,9 @@ function applyGraphOutputElementState(el: HTMLMediaElement): void {
 export function setTakePlaybackEnhancerState(
   enabled: boolean,
   settings?: AudioEnhancerSettings,
+  processedSources: string[] = [],
 ): void {
+  processedFileNames = new Set(processedSources.map(playbackFileName).filter(Boolean))
   enhancerEnabled = enabled
   enhancerSettings = settings ?? null
 
@@ -143,7 +151,7 @@ export function setTakePlaybackEnhancerState(
     if (!shouldUseEnhancer(nodes) || !enhancerSettings) {
       disconnectEnhancer(nodes)
       ensurePassthroughChain(nodes)
-      nodes.gain.gain.value = busGain(1, false)
+      nodes.gain.gain.value = busGain(nodes.lastVolume ?? 1, nodes.lastMuted ?? false)
       armPlaybackGraphKeepAlive(el, nodes)
       continue
     }
@@ -151,7 +159,7 @@ export function setTakePlaybackEnhancerState(
     if (nodes.enhancer) {
       updateAudioEnhancerChain(nodes.enhancer, enhancerSettings)
     }
-    nodes.gain.gain.value = busGain(1, false)
+    nodes.gain.gain.value = busGain(nodes.lastVolume ?? 1, nodes.lastMuted ?? false)
     armPlaybackGraphKeepAlive(el, nodes)
   }
 

@@ -13,7 +13,7 @@ import { Pause, Play, RotateCcw } from 'lucide-react'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { useLivePitchTracker, type PitchSourceHealth } from '../../hooks/useLivePitchTracker'
-import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTestInput'
+import { GAME_TEST_INPUT_AVAILABLE, setGameTestInputOn, syntheticReadout, TEST_HOLD_FRAME_MS, useGameTestInput } from '../gameTestInput'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceHome from './BalanceHome'
@@ -84,6 +84,7 @@ export default function BalanceScreen({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [sourceHealth, setSourceHealth] = useState<PitchSourceHealth>('idle')
   const [route, setRoute] = useState<BalanceRoute>('home')
+  const touchInput = useGameTestInput()
   const game = useBalanceGame({
     initialInstrumentId: initialInstrument.id,
     hapticFeedback,
@@ -185,6 +186,11 @@ export default function BalanceScreen({
   }, [])
 
   useEffect(() => stopTestHold, [stopTestHold])
+  // Switching back to the instrument mid-press would otherwise leave the
+  // synthetic note sounding forever, with no pointer left to release it.
+  useEffect(() => {
+    if (!touchInput) stopTestHold()
+  }, [touchInput, stopTestHold])
 
   const previewTargets = useMemo(
     () => buildBalanceTargets(game.state.settings, game.customRoutines),
@@ -502,10 +508,11 @@ export default function BalanceScreen({
 
   return (
     <div
-      className={`balance-play-screen ${GAME_TEST_INPUT ? 'balance-play-screen--test-input' : ''}`}
-      {...(GAME_TEST_INPUT
+      className={`balance-play-screen ${touchInput ? 'balance-play-screen--test-input' : ''}`}
+      {...(touchInput
         ? {
             onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
+              // The mode switch is a <button>, so this skips it as well.
               if ((event.target as HTMLElement).closest('button')) return
               startTestHold()
             },
@@ -568,8 +575,19 @@ export default function BalanceScreen({
         <p className={`balance-pitch-feedback balance-pitch-feedback--${pitchFeedbackTone}`} aria-live="polite">{pitchFeedback}</p>
         <div className="balance-progress" aria-label={`${Math.round(game.hud.progress * 100)} percent complete`}><i style={{ width: `${game.hud.progress * 100}%` }} /></div>
       </section>
-      {GAME_TEST_INPUT ? (
-        <span className="balance-test-input-badge" aria-hidden>hold anywhere = play the note</span>
+      {GAME_TEST_INPUT_AVAILABLE ? (
+        <button
+          type="button"
+          className="balance-test-input-badge"
+          onClick={() => setGameTestInputOn(!touchInput)}
+          aria-label={
+            touchInput
+              ? 'Touch input is on. Switch to playing your instrument.'
+              : 'Playing your instrument. Switch to touch input.'
+          }
+        >
+          {touchInput ? 'Hold to play · switch to instrument' : 'Instrument · switch to touch'}
+        </button>
       ) : null}
     </div>
   )
