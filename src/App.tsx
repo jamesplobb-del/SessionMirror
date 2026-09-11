@@ -4131,8 +4131,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isNativeCameraPlatform,
   ])
 
+  /*
+   * A game is played with both hands on the instrument, so nothing touches
+   * the screen for long stretches — long enough for auto-lock, which takes the
+   * microphone and the game's sound down with it. The lobby needs neither.
+   */
+  const isPracticeGameOpen = labsRoute !== null && labsRoute !== 'menu'
+
   useAppShellPolicies({
-    keepAwake: isRecording || isReviewOpen || takePlaybackActive,
+    keepAwake: isRecording || isReviewOpen || takePlaybackActive || isPracticeGameOpen,
     hudSurface: hudModalState,
     lightStatusBarSurface: recordingMode === 'audio' && !settings.darkMode,
   })
@@ -4163,8 +4170,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const isAudioPracticeRecordTab = recordingMode === 'audio' && audioPracticeTab === 'audio'
 
+  /*
+   * Games can open over the Tuner tab — from Practice Home, a daily challenge
+   * or a routine step, none of which change the tab — and the tuner must stand
+   * down underneath. An active tuner claims the microphone natively, which
+   * releases the WebKit stream every game listens through, and it claims it
+   * again on every return to the app.
+   */
   const isAudioPracticeTunerActive =
-    isAudioPracticeTunerTab && !audioPracticeSheetOpen && !isReviewOpen
+    isAudioPracticeTunerTab && !audioPracticeSheetOpen && !isReviewOpen && !isLabsOpen
 
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
@@ -6661,6 +6675,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   <LabsOverlay
                     dailyChallenge={dailyGameLaunch}
+                    homeInstrumentId={preferredInstrumentId}
                     isOpen={isLabsOpen}
                     route={labsRoute ?? 'menu'}
                     streamRef={streamRef}

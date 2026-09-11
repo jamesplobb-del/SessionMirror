@@ -1,6 +1,7 @@
 import { isBalanceDecayInstrument } from './balanceInstruments'
 import { isGameTestInputOn } from '../gameTestInput'
 import { recordPlannedGame } from '../../utils/dailyChallengePlan'
+import { APP_BACKGROUND_SUSPEND_EVENT } from '../../utils/appForeground'
 import {
   useCallback,
   useEffect,
@@ -420,15 +421,27 @@ export function useBalanceGame({
   }, [state])
 
   useEffect(() => {
+    /*
+     * Any trip away from the app — screen lock, the home screen, Control
+     * Center — deactivates the audio session under the tone and the
+     * microphone, and Control Center never hides the page. Pausing on all of
+     * them means the player comes back to a Resume tap, which restarts both,
+     * rather than to a run that can no longer hear or be heard.
+     */
+    const pauseForAppAway = () => {
+      stopTone()
+      countInRef.current?.stop()
+      dispatch({ type: 'PAUSE' })
+    }
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        stopTone()
-        countInRef.current?.stop()
-        dispatch({ type: 'PAUSE' })
-      }
+      if (document.visibilityState === 'hidden') pauseForAppAway()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, pauseForAppAway)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener(APP_BACKGROUND_SUSPEND_EVENT, pauseForAppAway)
+    }
   }, [stopTone])
 
   useEffect(() => {

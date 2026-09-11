@@ -58,7 +58,7 @@ interface StaffPreviewProps {
  * constants — so the notes on the setup screen are literally the notes the run
  * will put on the staff, in the same hand. No separate music logic to drift.
  */
-export default function StaffPreview({ config, bars = 1, onEdit }: StaffPreviewProps) {
+export default function StaffPreview({ config, bars = 2, onEdit }: StaffPreviewProps) {
   const glyphMetrics = useMusicGlyphMetrics()
   const hostRef = useRef<HTMLDivElement>(null)
   const [box, setBox] = useState({ width: 320, height: 150 })

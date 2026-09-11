@@ -180,7 +180,7 @@
 /* ── The staff preview itself ── */
 .sj-preview {
   position: relative;
-  height: clamp(7rem, 22vh, 10rem);
+  height: clamp(7.6rem, 24vh, 11.2rem);
   margin-top: 0.7rem;
   overflow: hidden;
   border-radius: 0.6rem;
@@ -354,16 +354,51 @@
 
 .sj-panel__head {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.7rem 1.05rem 0.15rem;
+  padding: 0.7rem 1.05rem;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .sj-panel__head strong {
   color: var(--sj-ink);
   font-size: var(--sm-text-title);
   font-weight: var(--sm-weight-medium);
+}
+
+.sj-panel__chevron {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  color: var(--sj-muted);
+  transition: transform 180ms ease;
+}
+
+.sj-panel--open .sj-panel__chevron {
+  transform: rotate(180deg);
+}
+
+.sj-panel--open .sj-panel__head {
+  padding-bottom: 0.35rem;
+}
+
+.sj-panel > summary {
+  list-style: none;
+}
+
+.sj-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sj-panel > summary::after {
+  content: none;
 }
 
 .sj-panel__close {
@@ -540,6 +575,66 @@
 .sj-key--on {
   color: #fff;
   background: var(--sj-ink);
+}
+
+/* Custom scale — same ink-on-paper language as the key grid, not the review
+   theme's blue capsules. */
+.sj-custom-scale {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.15rem 0 0.35rem;
+}
+
+.sj-custom-scale > label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--sj-ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sj-custom-scale > p {
+  margin: 0;
+  color: var(--sj-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.sj-custom-note-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--sj-hair);
+  border-radius: 0.45rem;
+  background: var(--sj-hair);
+}
+
+.sj-custom-note-grid button {
+  min-height: 2.5rem;
+  border: 0;
+  border-radius: 0;
+  color: var(--sj-muted);
+  background: var(--sj-paper);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.sj-custom-note-grid button[aria-pressed='true'] {
+  color: #fff;
+  background: var(--sj-ink);
+}
+
+.sj-custom-accidental {
+  position: absolute;
+  right: 24px;
+  top: 0;
+  transform: translateY(-50%);
+  color: #1c1917;
+  font: 38px/1 'Palatino', 'Times New Roman', Georgia, serif;
+  z-index: 3;
+  pointer-events: none;
 }
 
 /* ── Tempo ── */
@@ -869,9 +964,14 @@
 }
 
 /* Rests are drawn shapes that take their ink from `currentColor`, and they sit
-   in the notehead layer's stacking order. */
+   in the notehead layer's stacking order — above neighbouring heads, so a rest
+   is never painted *inside* a note even if the two slots sit close. */
+.sj-note--rest {
+  z-index: 5;
+}
+
 .sj-rest {
-  z-index: 2;
+  z-index: 5;
   color: #1c1917;
   pointer-events: none;
 }
@@ -1092,6 +1192,14 @@
 /* ── Note state modifiers ─────────────────── */
 
 /* Future notes: muted */
+.sj-note--future .sj-rest {
+  color: #a8a29e;
+}
+
+.sj-note--target .sj-rest {
+  color: #1c1917;
+}
+
 .sj-note--future .sj-note__head {
   background: #a8a29e;
 }

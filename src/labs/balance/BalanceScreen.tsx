@@ -111,7 +111,10 @@ export default function BalanceScreen({
    * without which the game returns to a suspended AudioContext and hears
    * nothing at all.
    */
-  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream, {
+    streamRef,
+    permissionPending: micPermissionPending,
+  })
 
   const { readout } = useLivePitchTracker(
     mediaRef,

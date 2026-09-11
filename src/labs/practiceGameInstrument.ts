@@ -6,6 +6,11 @@
  * The Games lobby writes all three, so a trumpeter is a trumpeter in every
  * game without saying it again.
  *
+ * The instrument named at the start, and on Home, feeds that same pick. Left
+ * to themselves the games guess from the tuner's written pitch, which makes a
+ * flute or a tuba a trombone, a clarinet a trumpet and a cello a violin — so
+ * players started on the wrong horn. See `syncPracticeGamesWithHomeInstrument`.
+ *
  * Canonical ids are Balance's, which is the superset of Staff Jumper's table
  * plus Concert Pitch and viola. Learn has a shorter beginner's list, so a
  * pick it does not teach (oboe, violin, concert pitch) is left alone there.
@@ -21,9 +26,16 @@ import {
   getStaffJumperInstrument,
   saveStaffJumperInstrumentId,
 } from './staffJumper/staffJumperInstruments'
+import type { TunerInstrument } from '../utils/pitchConfig'
 
 const INSTRUMENT_STORAGE_KEY = 'besttake.practiceGames.instrument'
 const LAST_GAME_STORAGE_KEY = 'besttake.practiceGames.lastGame'
+
+/**
+ * The Home instrument the games were last set up from — how a horn picked
+ * inside a game is told apart from one that Home has since replaced.
+ */
+const HOME_INSTRUMENT_STORAGE_KEY = 'besttake.practiceGames.homeInstrument'
 
 /**
  * Learn Your Instrument's own saved pick, patched raw.
@@ -59,8 +71,25 @@ const TO_LESSON: Record<string, string> = {
   'french-horn': 'french-horn',
   trombone: 'trombone',
   euphonium: 'baritone',
+  // Learn's one baritone row is taught from bass clef, but it is the same horn.
+  'euphonium-treble': 'baritone',
   tuba: 'tuba',
   recorder: 'soprano-recorder',
+}
+
+/**
+ * Home's instrument ids → canonical ids.
+ *
+ * Most are the same string. The exceptions are rows Home folds together:
+ * Home's euphonium reads treble-clef B♭, the written pitch its tuner shows;
+ * voice and keys each have a treble and a bass row here; and "Something else"
+ * is the games' neutral Concert Pitch.
+ */
+const FROM_HOME: Record<string, string> = {
+  euphonium: 'euphonium-treble',
+  voice: 'voice-treble',
+  piano: 'piano-treble',
+  other: 'concert',
 }
 
 export type PracticeGameId = 'staff-jumper' | 'balance' | 'learn-instrument'
@@ -200,6 +229,47 @@ export function savePracticeGameInstrumentId(id: string): void {
   patchLearnInstrumentId(canonicalId)
 }
 
+/** Canonical id for a Home instrument, or null for an id the games do not know. */
+export function practiceGameInstrumentIdForHome(homeInstrumentId: string): string | null {
+  const id = FROM_HOME[homeInstrumentId] ?? homeInstrumentId
+  return isPracticeGameInstrumentId(id) ? resolveBalanceInstrumentId(id) : null
+}
+
+function readHomeInstrumentMarker(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(HOME_INSTRUMENT_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function writeHomeInstrumentMarker(homeInstrumentId: string): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(HOME_INSTRUMENT_STORAGE_KEY, homeInstrumentId)
+  } catch {
+    // Without the marker the next open simply syncs again.
+  }
+}
+
+/**
+ * Point every game at the Home instrument — once per Home instrument.
+ *
+ * A player who names their horn at the start should find every game already
+ * on it, including games first set up from the old guess. A horn picked
+ * inside a game is the player's own choice, though — trying a friend's tuba
+ * should not be undone every time Games opens — so it is replaced only when
+ * Home names a *different* instrument, which is what the marker records.
+ */
+export function syncPracticeGamesWithHomeInstrument(homeInstrumentId: string | null): void {
+  if (!homeInstrumentId || readHomeInstrumentMarker() === homeInstrumentId) return
+  const gameId = practiceGameInstrumentIdForHome(homeInstrumentId)
+  if (!gameId) return
+  savePracticeGameInstrumentId(gameId)
+  writeHomeInstrumentMarker(homeInstrumentId)
+}
+
 export function loadLastPracticeGame(): PracticeGameId | null {
   if (typeof window === 'undefined') return null
   try {
@@ -228,4 +298,32 @@ export function lessonInstrumentIdFor(canonicalId: string): string | null {
 export function canonicalInstrumentIdFromLesson(lessonId: string): string | null {
   const canonical = FROM_LESSON[lessonId]
   return canonical && isPracticeGameInstrumentId(canonical) ? canonical : null
+}
+
+/**
+ * Push Learn's pick out to the other games.
+ *
+ * Learn's one baritone row stands for both euphonium rows, so when the shared
+ * pick is already that horn it is kept: starting a baritone lesson must not
+ * move a treble-clef reader's other games to bass clef.
+ */
+export function savePracticeGameInstrumentFromLesson(lessonId: string): void {
+  const canonicalId = canonicalInstrumentIdFromLesson(lessonId)
+  if (!canonicalId) return
+  const shared = readSharedInstrumentId()
+  if (shared && TO_LESSON[shared] === lessonId) return
+  savePracticeGameInstrumentId(canonicalId)
+}
+
+/**
+ * Pitch-detection profile for a game instrument, or `fallback` when the player
+ * has gone custom. Balance's table carries one per horn; a tuba heard through
+ * the voice profile, whose floor is 65 Hz, never registers its low B♭.
+ */
+export function practiceGameTunerInstrument(
+  gameInstrumentId: string | null | undefined,
+  fallback: TunerInstrument,
+): TunerInstrument {
+  if (!gameInstrumentId || !isPracticeGameInstrumentId(gameInstrumentId)) return fallback
+  return getBalanceInstrument(gameInstrumentId).tunerInstrument
 }

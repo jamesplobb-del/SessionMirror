@@ -4,6 +4,7 @@ import { parseRoutine, type Routine, type RoutineDay } from './practiceRoutines'
 import { balanceDailyChallenge, balanceDailyLaunch } from '../labs/balance/balanceDaily'
 import { getBalanceInstrument } from '../labs/balance/balanceInstruments'
 import { getStaffJumperInstrument, homeKeyForInstrument } from '../labs/staffJumper/staffJumperInstruments'
+import { practiceGameInstrumentIdForHome } from '../labs/practiceGameInstrument'
 import type { StaffJumperKey } from '../labs/staffJumper/staffJumperMusicLogic'
 import type { BalanceLaunch } from '../labs/balance/balanceTypes'
 import { awardChallenge, challengeDate } from './dailyChallenges'
@@ -54,8 +55,11 @@ export function getDailyChallengePlan(instrumentId: string | null, routine: Rout
   const step = { ...(source ?? stepFromTemplate(template, id)), minutes: 1 }
   if (!source) { step.id = `daily-item:${date}:${id}`; step.referenceQuery = ''; if (step.desk) step.desk = { ...step.desk, autoSoundRecording: false } }
   const practiceRoutine: Routine = { id: `daily-practice:${date}:${id}`, name: 'Today’s practice challenge', instrumentId: id, steps: [step], createdAt: now.getTime(), updatedAt: now.getTime() }
-  const staffInstrument = getStaffJumperInstrument(id)
-  const balanceInstrument = getBalanceInstrument(id)
+  // The games' own row for this horn, so the challenge opens on the instrument
+  // the Games lobby does — Home's euphonium, for one, reads treble clef.
+  const gameInstrumentId = practiceGameInstrumentIdForHome(id) ?? id
+  const staffInstrument = getStaffJumperInstrument(gameInstrumentId)
+  const balanceInstrument = getBalanceInstrument(gameInstrumentId)
   const balance = balanceDailyLaunch(balanceDailyChallenge(balanceInstrument.id, date))
   // Unsupported clefs use Balance's notation rather than a made-up treble part.
   const staff = Boolean(staffInstrument) && (hash % 2 === 0 || ['piano', 'guitar', 'bass-guitar'].includes(id))

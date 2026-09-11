@@ -7,6 +7,8 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import '../../styles/labs-arcade.css'
 import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
+import { releaseGameAudioContext } from '../../labs/gameAudioContext'
+import { syncPracticeGamesWithHomeInstrument } from '../../labs/practiceGameInstrument'
 import LabsMenu from './LabsMenu'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
@@ -18,6 +20,8 @@ export type LabsRoute = 'menu' | 'staff-jumper' | 'balance' | 'learn-instrument'
 
 interface LabsOverlayProps {
   dailyChallenge?: DailyChallengePlan | null
+  /** The instrument chosen at the start or on Home; the games open on it. */
+  homeInstrumentId: string | null
   isOpen: boolean
   route: LabsRoute
   streamRef: RefObject<MediaStream | null>
@@ -35,6 +39,7 @@ interface LabsOverlayProps {
 
 export default function LabsOverlay({
   dailyChallenge,
+  homeInstrumentId,
   isOpen,
   route,
   streamRef,
@@ -157,6 +162,9 @@ export default function LabsOverlay({
   if (isOpen !== wasOpenRef.current) {
     wasOpenRef.current = isOpen
     if (isOpen) {
+      // Before any game below reads its saved horn, so every game opens on the
+      // instrument chosen at the start. Idempotent: a repeated render is safe.
+      syncPracticeGamesWithHomeInstrument(homeInstrumentId)
       const reduceMotion =
         typeof window !== 'undefined' &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -165,6 +173,11 @@ export default function LabsOverlay({
       setEnteringWorld(false)
     }
   }
+
+  // The games' audio context lives only while Games is open.
+  useEffect(() => {
+    if (!isOpen) releaseGameAudioContext()
+  }, [isOpen])
 
   useEffect(() => {
     if (!enteringWorld) return
@@ -201,6 +214,7 @@ export default function LabsOverlay({
               streamGeneration={streamGeneration}
               tunerInstrument={tunerInstrument}
               hapticFeedback={hapticFeedback}
+              micPermissionPending={micPermissionPending}
               onRequestMicStream={onRequestMicStream}
               onBack={() => onNavigate('menu')}
             />

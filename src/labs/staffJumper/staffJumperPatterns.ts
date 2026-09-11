@@ -6,9 +6,8 @@
  * offsets [0, 2, 4] outline the triad on any degree of any scale without the
  * pattern needing to know a single note name.
  *
- * A run is a full scale statement followed by an endless stream of these,
- * chosen at random from the difficulty's vocabulary and often sequenced up or
- * down the scale the way a real exercise book would.
+ * A run is an endless stream of these, chosen from the difficulty's vocabulary
+ * and shaped into phrases. Everything stays inside the chosen scale.
  */
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { StaffJumperDifficulty } from './staffJumperMusicLogic'
@@ -115,6 +114,9 @@ export const SCALE_PATTERNS: readonly ScalePattern[] = [
   { id: 'step-back', name: 'Step and back', offsets: [0, 1, 2, 1], tier: 'easy', sequenceable: true, direction: 'arch', character: 'step' },
   { id: 'neighbour', name: 'Neighbour tone', offsets: [0, 1, 0, -1], tier: 'easy', sequenceable: true, direction: 'static', character: 'ornament' },
   { id: 'five-up', name: 'Five-note run', offsets: [0, 1, 2, 3, 4], tier: 'easy', sequenceable: true, direction: 'up', character: 'step' },
+  { id: 'three-fall', name: 'Three-note fall', offsets: [2, 1, 0], tier: 'easy', sequenceable: true, direction: 'down', character: 'step' },
+  { id: 'leaning', name: 'Leaning tone', offsets: [0, 1, 0], tier: 'easy', sequenceable: true, direction: 'static', character: 'ornament' },
+  { id: 'skip-up', name: 'Skip and step', offsets: [0, 2, 3], tier: 'easy', sequenceable: true, direction: 'up', character: 'step' },
 
   // ── Triads and thirds ──
   { id: 'triad', name: 'Triad', offsets: [0, 2, 4], tier: 'medium', sequenceable: true, direction: 'up', character: 'leap' },
@@ -124,6 +126,9 @@ export const SCALE_PATTERNS: readonly ScalePattern[] = [
   { id: 'thirds-run', name: 'Thirds sequence', offsets: [0, 2, 1, 3, 2, 4], tier: 'medium', sequenceable: false, direction: 'up', character: 'leap' },
   { id: 'turn', name: 'Turn', offsets: [0, 1, 0, -1, 0], tier: 'medium', sequenceable: true, direction: 'static', character: 'ornament' },
   { id: 'group-1231', name: '1‑2‑3‑1', offsets: [0, 1, 2, 0], tier: 'medium', sequenceable: true, direction: 'arch', character: 'step' },
+  { id: 'call', name: 'Call', offsets: [0, 2, 4, 3], tier: 'medium', sequenceable: false, direction: 'up', character: 'leap' },
+  { id: 'reply', name: 'Reply', offsets: [4, 3, 2, 0], tier: 'medium', sequenceable: false, direction: 'down', character: 'leap' },
+  { id: 'pentatonic', name: 'Pentatonic skip', offsets: [0, 1, 3, 4], tier: 'medium', sequenceable: true, direction: 'up', character: 'step' },
 
   // ── Seventh chords, wider intervals, octaves ──
   { id: 'seventh', name: 'Seventh chord', offsets: [0, 2, 4, 6], tier: 'hard', sequenceable: true, direction: 'up', character: 'leap' },
@@ -221,6 +226,8 @@ export interface ExerciseBlockOptions {
    * line that rises to a peak and one that mills about.
    */
   targetDegree: number
+  /** Notes still owed in this phrase — shapes that fit keep their identity. */
+  remainingNotes?: number
 }
 
 /**
@@ -278,6 +285,7 @@ function pickWeighted<T>(items: readonly T[], weightOf: (item: T) => number, rng
 export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[] {
   const { difficulty, topDegree, rng, previousDegree, previousPattern, targetDegree, maxLeap } =
     options
+  const remainingNotes = options.remainingNotes ?? 8
   const inRange = patternsForDifficulty(difficulty).filter(
     (pattern) => validStarts(pattern, topDegree).length > 0,
   )
@@ -288,15 +296,23 @@ export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[]
   // are rather than giving up on the block.
   const playable = inRange.filter((pattern) => widestStepInPattern(pattern) <= maxLeap)
   const narrowest = Math.min(...inRange.map(widestStepInPattern))
-  const candidates =
-    playable.length > 0
-      ? playable
-      : inRange.filter((pattern) => widestStepInPattern(pattern) === narrowest)
+  const sized = (playable.length > 0 ? playable : inRange.filter((pattern) => widestStepInPattern(pattern) === narrowest))
+  const fitting = sized.filter((pattern) => pattern.offsets.length <= remainingNotes)
+  const candidates = fitting.length > 0 ? fitting : sized
 
   // Avoid running the same shape twice in a row when there is an alternative.
   const fresh = candidates.filter((pattern) => pattern.id !== previousPattern?.id)
   const pool = fresh.length > 0 ? fresh : candidates
-  const pattern = pickWeighted(pool, (candidate) => successionWeight(previousPattern, candidate), rng)
+  const pattern = pickWeighted(
+    pool,
+    (candidate) => {
+      let weight = successionWeight(previousPattern, candidate)
+      if (candidate.offsets.length <= remainingNotes) weight *= 1.8
+      if (candidate.offsets.length > remainingNotes) weight *= 0.25
+      return weight
+    },
+    rng,
+  )
 
   const starts = validStarts(pattern, topDegree)
   // Aim at the contour's target, but let the line stay joined to where the
@@ -346,14 +362,14 @@ export function buildExerciseBlock(options: ExerciseBlockOptions): PatternStep[]
   }
 
   const wanted = rng() > 0.5 ? 1 : -1
-  // Repeating the shape adds one interval the printed figure does not contain.
-  // Prefer the direction the draw wanted, take the other if only it fits, and
-  // fall back to stating the shape once rather than forcing a join too wide
-  // for these notes.
   const direction = sequenceSeamInterval(pattern, wanted) <= maxLeap ? wanted : -wanted
   const seamFits = sequenceSeamInterval(pattern, direction) <= maxLeap
-  const sequenceLength =
-    pattern.sequenceable && seamFits && rng() > 0.45 ? 2 + Math.floor(rng() * 3) : 1
+  const canSequence =
+    pattern.sequenceable &&
+    seamFits &&
+    remainingNotes >= pattern.offsets.length * 2 &&
+    rng() > 0.78
+  const sequenceLength = canSequence ? 2 : 1
 
   for (let repeat = 0; repeat < sequenceLength; repeat += 1) {
     const shifted = start + repeat * direction
@@ -386,12 +402,14 @@ const CADENCE_DEGREE_CLASS: Record<PhraseCadence, number> = {
  * An arch is the commonest melodic shape there is — rise to a peak, fall back
  * — so it is weighted accordingly, with plain ascents and descents behind it.
  */
-type PhraseContour = 'arch' | 'rise' | 'fall'
+type PhraseContour = 'arch' | 'rise' | 'fall' | 'valley' | 'late-peak'
 
 const CONTOUR_WEIGHTS: readonly (readonly [PhraseContour, number])[] = [
-  ['arch', 3],
+  ['arch', 2.8],
+  ['late-peak', 1.6],
+  ['valley', 1.2],
   ['rise', 1],
-  ['fall', 1.5],
+  ['fall', 1.3],
 ]
 
 function contourDegree(contour: PhraseContour, progress: number, topDegree: number): number {
@@ -401,6 +419,10 @@ function contourDegree(contour: PhraseContour, progress: number, topDegree: numb
       return progress * span
     case 'fall':
       return span - progress * span
+    case 'valley':
+      return span - Math.sin(Math.PI * progress) * span * 0.85
+    case 'late-peak':
+      return Math.sin(Math.PI * Math.pow(progress, 0.62)) * span
     case 'arch':
     default:
       return Math.sin(Math.PI * progress) * span
@@ -493,6 +515,7 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
     // Past the two-thirds mark the contour gives way to the cadence, so the
     // closing shapes are already chosen to sit near where the phrase lands.
     const homing = Math.max(0, (progress - 0.62) / 0.38)
+    const remaining = noteCount - steps.length
     const block = buildExerciseBlock({
       difficulty,
       topDegree,
@@ -502,6 +525,7 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
       targetDegree:
         contourDegree(contour, progress, topDegree) * (1 - homing) + cadenceDegree * homing,
       maxLeap: capAt(steps.length),
+      remainingNotes: remaining,
     })
     if (block.length === 0) break
     previousPattern = SCALE_PATTERNS.find((pattern) => pattern.id === block[0]!.patternId) ?? null

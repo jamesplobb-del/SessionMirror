@@ -87,9 +87,9 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 }
 
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
-  easy: 'Note names shown. Stepwise runs, neighbour tones and rests on the beat.',
-  medium: 'Adds triads, broken thirds, turns and rests that split a beat.',
-  hard: 'Adds seventh chords, wide intervals and entries after a rest.',
+  easy: 'Note names shown. Short musical phrases, mostly stepwise, with rests on the beat.',
+  medium: 'Adds triads, turns, and rests that split a beat — still a tune, not a drill.',
+  hard: 'Wider leaps, off-beat entries, and phrases that keep changing shape.',
 }
 
 export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {
@@ -578,37 +578,43 @@ function topDegreeForConfig(config: StaffJumperConfig): number {
   return resolved
 }
 
-/**
- * A complete scale statement, up and down, that opens every run.
- *
- * It orients the player in the key before the patterns start, and it is the one
- * part of the exercise that is the same every time.
- */
-export function buildScaleIntroDegreePath(config: StaffJumperConfig): number[] {
-  const topDegree = topDegreeForConfig(config)
-  return [
-    ...Array.from({ length: topDegree + 1 }, (_, degree) => degree),
-    ...Array.from({ length: topDegree }, (_, index) => topDegree - 1 - index),
-  ]
-}
-
 interface ExerciseCache {
   steps: PatternStep[]
   phraseCount: number
-  /**
-   * Degrees of the opening scale statement still owed to the player.
-   *
-   * Drained a phrase at a time rather than laid down in one go, so the scale
-   * occupies whole phrases like everything else — the opening is the first
-   * period of the exercise, not a preamble sitting outside the structure.
-   */
-  introQueue: number[]
   lastPatternId: string | null
   /** Written length of the last note emitted, for the leap check at the seam. */
   lastNoteUnits: number | null
 }
 
 const exerciseCache = new WeakMap<StaffJumperConfig, ExerciseCache>()
+
+/** First note of a run: tonic often, but not a scale from the floor every time. */
+function pickOpeningDegree(rng: () => number, topDegree: number): number {
+  const choices: Array<[number, number]> = [
+    [0, 2.4],
+    [2, 1.1],
+    [4, 1.6],
+  ]
+  if (topDegree >= 5) choices.push([5, 0.7])
+  if (topDegree >= 7) choices.push([7, 1.2])
+  const allowed = choices.filter(([degree]) => degree <= topDegree)
+  return pickWeightedLocal(allowed, ([, weight]) => weight, rng)[0]
+}
+
+function pickWeightedLocal<T>(
+  items: readonly T[],
+  weightOf: (item: T) => number,
+  rng: () => number,
+): T {
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0)
+  if (total <= 0) return items[Math.floor(rng() * items.length)]!
+  let ticket = rng() * total
+  for (const item of items) {
+    ticket -= weightOf(item)
+    if (ticket <= 0) return item
+  }
+  return items[items.length - 1]!
+}
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0
@@ -640,32 +646,21 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
     cache.phraseCount,
   )
   const rng = mulberry32(seed + cache.phraseCount * 7919)
-  const steps: PatternStep[] = []
-
-  // The opening statement is not bent to a cadence — a scale is a scale, and
-  // forcing its sixth note onto the tonic would break the one part of the run
-  // the player is using to hear the key.
-  while (cache.introQueue.length > 0 && steps.length < span.noteCount) {
-    steps.push({ degree: cache.introQueue.shift()!, patternId: 'scale', patternName: 'Scale' })
-  }
-
-  if (steps.length < span.noteCount) {
-    const phrase = buildPhraseSteps({
-      difficulty: config.difficulty,
-      topDegree: topDegreeForConfig(config),
-      rng,
-      noteCount: span.noteCount - steps.length,
-      startDegree: steps.at(-1)?.degree ?? cache.steps.at(-1)?.degree ?? 0,
-      // Odd phrases answer even ones: a question on the dominant, then an
-      // answer that settles on the tonic.
-      cadence: cache.phraseCount % 2 === 0 ? 'open' : 'closed',
-      previousPatternId: cache.lastPatternId,
-      noteDurations: noteDurations.slice(steps.length),
-      instrument: config.tunerInstrument,
-    })
-    steps.push(...phrase)
-    cache.lastPatternId = phrase.at(-1)?.patternId ?? cache.lastPatternId
-  }
+  const topDegree = topDegreeForConfig(config)
+  const startDegree = cache.steps.at(-1)?.degree ?? pickOpeningDegree(rng, topDegree)
+  const phrase = buildPhraseSteps({
+    difficulty: config.difficulty,
+    topDegree,
+    rng,
+    noteCount: span.noteCount,
+    startDegree,
+    cadence: cache.phraseCount % 2 === 0 ? 'open' : 'closed',
+    previousPatternId: cache.lastPatternId,
+    noteDurations,
+    instrument: config.tunerInstrument,
+  })
+  const steps: PatternStep[] = [...phrase]
+  cache.lastPatternId = phrase.at(-1)?.patternId ?? cache.lastPatternId
 
   // The phrase must be exactly the length the rhythm asked for or every note
   // index after it is off by one. Stepwise descent is the neutral filler; it
@@ -675,8 +670,8 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
     const previous = steps.at(-1)?.degree ?? 0
     steps.push({
       degree: previous > 0 ? previous - 1 : 1,
-      patternId: 'scale',
-      patternName: 'Scale',
+      patternId: 'line',
+      patternName: 'Phrase',
     })
   }
   steps.length = span.noteCount
@@ -693,7 +688,6 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
    *    a re-articulated unison is very nearly invisible to it — the player
    *    would tongue a second note and watch nothing happen.
    */
-  const topDegree = topDegreeForConfig(config)
   const clamp = (degree: number) => Math.max(0, Math.min(topDegree, degree))
   const seamDegree = cache.steps.at(-1)?.degree ?? null
   const unitsAt = (index: number) =>
@@ -781,7 +775,6 @@ export function exerciseStepForSequenceStep(
     cache = {
       steps: [],
       phraseCount: 0,
-      introQueue: buildScaleIntroDegreePath(config),
       lastPatternId: null,
       lastNoteUnits: null,
     }
@@ -891,7 +884,7 @@ export interface ScaleRangePreview {
   /** Written lowest and highest note, e.g. "B♭3" and "B♭5". */
   lowLabel: string
   highLabel: string
-  /** Notes in one full up-and-down lap of the scale. */
+  /** Notes from the tonic up to the top of the chosen range. */
   noteCount: number
   /** "2 flats", "no sharps or flats", etc. */
   signatureLabel: string
@@ -935,7 +928,7 @@ export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePrevi
   return {
     lowLabel: noteAt(0),
     highLabel: noteAt(topDegree),
-    noteCount: buildScaleIntroDegreePath(config).length,
+    noteCount: topDegree + 1,
     signatureLabel: config.customPitchClasses?.length ? "Custom notes · accidentals shown" : signatureLabel,
   }
 }

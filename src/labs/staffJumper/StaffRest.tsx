@@ -15,8 +15,8 @@ import { STAFF_SPACE_PX } from './staffNotationMap'
 import type { NoteValue } from './staffJumperRhythm'
 
 /** Drawing box around the anchor, in staff spaces. Wide enough for any rest. */
-const BOX_W_SPACES = 2.4
-const BOX_H_SPACES = 4
+const BOX_W_SPACES = 1.55
+const BOX_H_SPACES = 3.4
 
 /** Stroke weights, in staff spaces. */
 const ZIGZAG_STROKE = 0.3
@@ -24,9 +24,9 @@ const ZIGZAG_HOOK_STROKE = 0.19
 const FLAG_STROKE = 0.12
 
 /** Where a flag's ball sits relative to the point it leaves the stem. */
-const BALL_DX = -0.56
-const BALL_DY = 0.18
-const BALL_R = 0.21
+const BALL_DX = -0.48
+const BALL_DY = 0.16
+const BALL_R = 0.18
 
 /** A bar-length rest is a solid block half a space deep. */
 function BlockRest({ topSpaces }: { topSpaces: number }) {
@@ -44,14 +44,14 @@ function QuarterRest() {
   return (
     <>
       <path
-        d="M -0.30 -1.38 L 0.32 -0.60 L -0.26 0.00 L 0.34 0.74"
+        d="M -0.26 -1.22 L 0.28 -0.52 L -0.22 0.02 L 0.30 0.64"
         fill="none"
         strokeWidth={ZIGZAG_STROKE}
         strokeLinejoin="miter"
         strokeLinecap="round"
       />
       <path
-        d="M 0.34 0.74 C 0.02 0.56 -0.36 0.78 -0.30 1.14 C -0.26 1.40 0.06 1.44 0.24 1.28"
+        d="M 0.30 0.64 C 0.02 0.48 -0.30 0.68 -0.26 1.00 C -0.22 1.22 0.06 1.26 0.20 1.12"
         fill="none"
         strokeWidth={ZIGZAG_HOOK_STROKE}
         strokeLinecap="round"
@@ -69,9 +69,9 @@ function QuarterRest() {
  * separate rather than merging into a blob.
  */
 function FlaggedRest({ sixteenth }: { sixteenth: boolean }) {
-  const top = sixteenth ? { x: 0.34, y: -1.25 } : { x: 0.32, y: -0.82 }
-  const foot = sixteenth ? { x: -0.26, y: 1.3 } : { x: -0.26, y: 0.86 }
-  const flagStarts = sixteenth ? [0, 0.4] : [0]
+  const top = sixteenth ? { x: 0.28, y: -1.05 } : { x: 0.26, y: -0.72 }
+  const foot = sixteenth ? { x: -0.22, y: 1.08 } : { x: -0.22, y: 0.74 }
+  const flagStarts = sixteenth ? [0, 0.38] : [0]
 
   return (
     <>

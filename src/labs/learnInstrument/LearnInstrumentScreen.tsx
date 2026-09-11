@@ -104,8 +104,15 @@ export default function LearnInstrumentScreen({
    * the tracker key below, rebuilds the analysis graph on top of it —
    * without which the game returns to a suspended AudioContext and hears
    * nothing at all.
+   *
+   * Keyed to the lesson being on screen rather than to `pitchEnabled`,
+   * which itself waits for a live microphone: a stream that died while the
+   * app was away switched off the very recovery meant to bring it back.
    */
-  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+  const micEpoch = useGameMicRecovery(game.state.phase !== 'complete', onRequestMicStream, {
+    streamRef,
+    permissionPending: micPermissionPending,
+  })
 
   const { readout } = useLivePitchTracker(
     mediaRef,

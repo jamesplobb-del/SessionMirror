@@ -141,10 +141,8 @@ const SIXTEENTH_REST = rest('sixteenth')
 /**
  * A measure-length rhythm cell and the lowest difficulty it may appear at.
  *
- * Harder settings inherit every easier cell, so raising the difficulty widens
- * the vocabulary rather than replacing it — and because the rest cells are
- * tiered on top of a fixed set of note-only cells, silence gets steadily more
- * frequent and more syncopated as the player moves up.
+ * Harder settings inherit easier cells, but the phrase composer strongly
+ * prefers the current tier, so hard is not easy with extra rests stapled on.
  */
 interface BarTemplate {
   events: readonly RhythmValue[]
@@ -159,7 +157,9 @@ const bar = (tier: StaffJumperDifficulty, ...events: RhythmValue[]): BarTemplate
  *
  * Rests are placed the way they are engraved: a half rest only ever covers
  * beats 1–2 or 3–4, a quarter rest takes a whole beat, and an eighth rest sits
- * on either half of one.
+ * on either half of one. Hard does not live on one off-beat cell — the
+ * vocabulary has to be wide enough that a phrase composer can keep changing
+ * the idea instead of reprinting the same quarter / eighth-rest / eighth.
  */
 const SIMPLE_BARS: readonly BarTemplate[] = [
   bar('easy', QUARTER, QUARTER, QUARTER, QUARTER),
@@ -171,27 +171,57 @@ const SIMPLE_BARS: readonly BarTemplate[] = [
   bar('easy', QUARTER, QUARTER, EIGHTH, EIGHTH, QUARTER),
   bar('easy', EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF),
   bar('easy', WHOLE),
+  bar('easy', QUARTER, HALF, QUARTER),
+  bar('easy', EIGHTH, EIGHTH, QUARTER, EIGHTH, EIGHTH, QUARTER),
+  bar('easy', EIGHTH, EIGHTH, HALF, QUARTER),
+  bar('easy', QUARTER, DOTTED_HALF),
 
-  // ── Rests on the beat ──
   bar('easy', QUARTER, QUARTER, QUARTER, QUARTER_REST),
   bar('easy', QUARTER, QUARTER, HALF_REST),
   bar('easy', HALF, QUARTER, QUARTER_REST),
   bar('easy', QUARTER, QUARTER_REST, QUARTER, QUARTER),
+  bar('easy', EIGHTH, EIGHTH, QUARTER, HALF),
 
-  // ── Rests that start a bar or split a beat ──
   bar('medium', QUARTER_REST, QUARTER, QUARTER, QUARTER),
   bar('medium', HALF_REST, QUARTER, QUARTER),
   bar('medium', HALF, QUARTER_REST, QUARTER),
   bar('medium', EIGHTH, EIGHTH, QUARTER, QUARTER_REST, QUARTER),
   bar('medium', QUARTER, EIGHTH_REST, EIGHTH, QUARTER, QUARTER),
   bar('medium', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, QUARTER),
+  bar('medium', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
+  bar('medium', EIGHTH_REST, EIGHTH, QUARTER, QUARTER, QUARTER),
+  bar('medium', QUARTER, QUARTER_REST, HALF),
+  bar('medium', QUARTER, EIGHTH, EIGHTH, QUARTER, QUARTER_REST),
+  bar('medium', EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('medium', HALF, EIGHTH, EIGHTH, QUARTER),
 
-  // ── Off-beat entries and sixteenth rests ──
   bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, QUARTER),
   bar('hard', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, QUARTER),
   bar('hard', EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, HALF),
   bar('hard', QUARTER, QUARTER, EIGHTH, EIGHTH_REST, QUARTER),
   bar('hard', SIXTEENTH_REST, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
+  bar('hard', EIGHTH, QUARTER, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, EIGHTH, QUARTER, EIGHTH, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', SIXTEENTH, SIXTEENTH, EIGHTH, QUARTER, QUARTER, QUARTER),
+  bar('hard', DOTTED_QUARTER, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, DOTTED_QUARTER, EIGHTH, QUARTER),
+  bar('hard', EIGHTH_REST, EIGHTH, QUARTER, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH_REST, EIGHTH, QUARTER, QUARTER),
+  bar('hard', HALF, EIGHTH_REST, EIGHTH, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, HALF, QUARTER_REST),
+  bar('hard', QUARTER_REST, QUARTER, HALF),
+  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, QUARTER_REST, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
+  bar('hard', QUARTER, QUARTER, DOTTED_EIGHTH, SIXTEENTH, QUARTER),
+  bar('hard', EIGHTH, QUARTER, EIGHTH, HALF),
+  bar('hard', DOTTED_QUARTER, EIGHTH, HALF),
+  bar('hard', EIGHTH_REST, EIGHTH, QUARTER, HALF),
+  bar('hard', QUARTER, SIXTEENTH, SIXTEENTH, EIGHTH, HALF),
+  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, EIGHTH, EIGHTH, EIGHTH, SIXTEENTH, SIXTEENTH, QUARTER),
 ]
 
 /**
@@ -206,34 +236,38 @@ const COMPOUND_BARS: readonly BarTemplate[] = [
   bar('easy', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
   bar('easy', DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH),
   bar('easy', EIGHTH, EIGHTH, EIGHTH, DOTTED_QUARTER),
-  // The 6/8 lilt: long-short, long-short.
   bar('easy', QUARTER, EIGHTH, QUARTER, EIGHTH),
   bar('easy', QUARTER, EIGHTH, DOTTED_QUARTER),
   bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH),
   bar('easy', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH),
   bar('easy', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
-  bar('medium', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, DOTTED_QUARTER),
   bar('easy', DOTTED_HALF),
-
-  // ── The third eighth of a beat left silent ──
-  bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH_REST),
   bar('easy', QUARTER, EIGHTH, QUARTER, EIGHTH_REST),
+  bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH_REST),
   bar('easy', QUARTER, EIGHTH, QUARTER_REST, EIGHTH_REST),
   bar('easy', QUARTER, EIGHTH_REST, QUARTER, EIGHTH),
 
-  // ── Rests inside a running eighth-note beat ──
+  bar('medium', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, DOTTED_QUARTER),
   bar('medium', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH_REST),
   bar('medium', EIGHTH_REST, EIGHTH, EIGHTH, DOTTED_QUARTER),
   bar('medium', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH),
   bar('medium', EIGHTH, EIGHTH, EIGHTH_REST, DOTTED_QUARTER),
   bar('medium', DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH_REST),
+  bar('medium', QUARTER, EIGHTH_REST, DOTTED_QUARTER),
+  bar('medium', QUARTER, EIGHTH, EIGHTH, QUARTER),
 
-  // ── Both beats entering off the downbeat ──
   bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
   bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, QUARTER, EIGHTH),
   bar('hard', QUARTER_REST, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
   bar('hard', QUARTER, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
   bar('hard', EIGHTH, EIGHTH, EIGHTH_REST, QUARTER, EIGHTH),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, QUARTER, EIGHTH),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, DOTTED_EIGHTH, SIXTEENTH, EIGHTH),
+  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, EIGHTH),
+  bar('hard', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH_REST),
+  bar('hard', EIGHTH, QUARTER, EIGHTH, EIGHTH, EIGHTH),
+  bar('hard', QUARTER_REST, EIGHTH, DOTTED_QUARTER),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
 ]
 
 export interface RhythmMeasure {
@@ -399,6 +433,10 @@ interface RhythmTimeline {
   beamCursor: number
   /** How many sounded notes the timeline has emitted so far. */
   noteCursor: number
+  /** Remaining bars of the phrase currently being written. */
+  phraseQueue: RhythmValue[][]
+  /** Fingerprints of recent bars, used to keep the page from reprinting itself. */
+  recentFingerprints: string[]
 }
 
 /**
@@ -409,6 +447,17 @@ interface RhythmTimeline {
  */
 export const BARLINE_SPACING_UNITS = 0.9
 
+/**
+ * Rests sit on the middle line, so without extra room an eighth rest lands
+ * inside a neighbouring B, D or C. Lead/trail is space on either side of the
+ * glyph; the minimum is the slot itself, which has to clear a notehead plus
+ * the rest's own ink.
+ */
+export const REST_LEAD_SPACING = 0.44
+export const REST_TRAIL_SPACING = 0.38
+export const REST_MIN_SPACING = 1.14
+export const FLAGGED_REST_LEAD = 0.24
+
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0
   return () => {
@@ -417,6 +466,205 @@ function mulberry32(seed: number): () => number {
     value = Math.imul(value ^ (value >>> 15), value | 1)
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function fingerprintEvents(events: readonly Pick<RhythmValue, 'value' | 'dotted' | 'isRest'>[]): string {
+  return events.map((event) => `${event.isRest ? 'r' : ''}${event.value}${event.dotted ? '.' : ''}`).join('|')
+}
+
+function pickWeighted<T>(items: readonly T[], weightOf: (item: T) => number, rng: () => number): T {
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0)
+  if (total <= 0) return items[Math.floor(rng() * items.length)]!
+  let ticket = rng() * total
+  for (const item of items) {
+    ticket -= weightOf(item)
+    if (ticket <= 0) return item
+  }
+  return items[items.length - 1]!
+}
+
+function measureWeight(
+  measure: RhythmMeasure,
+  difficulty: StaffJumperDifficulty,
+  recent: readonly string[],
+  avoid: ReadonlySet<string>,
+): number {
+  const fp = fingerprintEvents(measure.events)
+  if (avoid.has(fp)) return 0.0001
+  const distance = TIER_ORDER[difficulty] - TIER_ORDER[measure.tier]
+  let weight = distance === 0 ? 5.2 : distance === 1 ? 1.15 : 0.28
+  const hits = recent.filter((entry) => entry === fp).length
+  weight *= 1 / (1 + hits * 12)
+  if (fp === recent[recent.length - 1]) weight *= 0.04
+  return weight
+}
+
+function pickMeasure(
+  pool: readonly RhythmMeasure[],
+  difficulty: StaffJumperDifficulty,
+  rng: () => number,
+  recent: readonly string[],
+  avoid: ReadonlySet<string>,
+): RhythmMeasure {
+  const fresh = pool.filter((measure) => !avoid.has(fingerprintEvents(measure.events)))
+  const use = fresh.length > 0 ? fresh : pool
+  return pickWeighted(use, (measure) => measureWeight(measure, difficulty, recent, avoid), rng)
+}
+
+function relatedMeasure(
+  idea: RhythmMeasure,
+  pool: readonly RhythmMeasure[],
+  difficulty: StaffJumperDifficulty,
+  rng: () => number,
+  recent: readonly string[],
+  avoid: ReadonlySet<string>,
+): RhythmMeasure {
+  const ideaFp = fingerprintEvents(idea.events)
+  const ideaHead = idea.events[0]
+  const rhymes = pool.filter((measure) => {
+    const fp = fingerprintEvents(measure.events)
+    if (fp === ideaFp || avoid.has(fp)) return false
+    const head = measure.events[0]
+    return (
+      head != null &&
+      ideaHead != null &&
+      head.value === ideaHead.value &&
+      head.isRest === ideaHead.isRest &&
+      head.dotted === ideaHead.dotted
+    )
+  })
+  if (rhymes.length > 0) {
+    return pickWeighted(rhymes, (measure) => measureWeight(measure, difficulty, recent, avoid), rng)
+  }
+  return pickMeasure(pool, difficulty, rng, recent, new Set([...avoid, ideaFp]))
+}
+
+type PhraseForm = 'period' | 'sentence' | 'through'
+
+function pickPhraseForm(difficulty: StaffJumperDifficulty, rng: () => number): PhraseForm {
+  if (difficulty === 'easy') return 'period'
+  return pickWeighted(
+    [
+      ['period', 2.4],
+      ['sentence', 2.1],
+      ['through', 1.3],
+    ] as const,
+    ([, weight]) => weight,
+    rng,
+  )[0]
+}
+
+/**
+ * Compose the bars of one phrase as a whole, then emit them one at a time.
+ *
+ * Period: an idea, a continuation, a *related* return of the idea, then a close.
+ * Sentence: the idea, a rhyme, denser motion, then a close.
+ * Through: three different moving bars and a close.
+ *
+ * Bar three is never a photocopy of bar one — that reprint is what made hard
+ * mode feel like the same quarter / eighth-rest cell forever.
+ */
+function composePhraseBars(
+  meter: MeterSpec,
+  difficulty: StaffJumperDifficulty,
+  rng: () => number,
+  recent: string[],
+): RhythmValue[][] {
+  const all = measuresFor(meter.id, difficulty)
+  const movers = all.filter((measure) => !measure.closes)
+  const closers = all.filter((measure) => measure.closes)
+  const movePool = movers.length > 0 ? movers : all
+  const closePool = closers.length > 0 ? closers : all
+  const remember = (measure: RhythmMeasure) => {
+    const fp = fingerprintEvents(measure.events)
+    recent.push(fp)
+    if (recent.length > 16) recent.shift()
+    return [...measure.events]
+  }
+
+  const bars = PHRASE_BARS[difficulty]
+  if (bars === 2) {
+    const idea = pickMeasure(movePool, difficulty, rng, recent, new Set())
+    const close = pickMeasure(
+      closePool,
+      difficulty,
+      rng,
+      recent,
+      new Set([fingerprintEvents(idea.events)]),
+    )
+    return [remember(idea), remember(close)]
+  }
+
+  const form = pickPhraseForm(difficulty, rng)
+  const idea = pickMeasure(movePool, difficulty, rng, recent, new Set())
+  const ideaFp = fingerprintEvents(idea.events)
+
+  if (form === 'period') {
+    const middle = pickMeasure(movePool, difficulty, rng, recent, new Set([ideaFp]))
+    const recall = relatedMeasure(
+      idea,
+      movePool,
+      difficulty,
+      rng,
+      recent,
+      new Set([ideaFp, fingerprintEvents(middle.events)]),
+    )
+    const close = pickMeasure(
+      closePool,
+      difficulty,
+      rng,
+      recent,
+      new Set([ideaFp, fingerprintEvents(middle.events), fingerprintEvents(recall.events)]),
+    )
+    return [remember(idea), remember(middle), remember(recall), remember(close)]
+  }
+
+  if (form === 'sentence') {
+    const rhyme = relatedMeasure(idea, movePool, difficulty, rng, recent, new Set([ideaFp]))
+    const ideaDensity = idea.events.filter((event) => !event.isRest).length
+    const denserPool = movePool.filter(
+      (measure) =>
+        fingerprintEvents(measure.events) !== ideaFp &&
+        measure.events.filter((event) => !event.isRest).length >= ideaDensity,
+    )
+    const continuation = pickMeasure(
+      denserPool.length > 0 ? denserPool : movePool,
+      difficulty,
+      rng,
+      recent,
+      new Set([ideaFp, fingerprintEvents(rhyme.events)]),
+    )
+    const close = pickMeasure(
+      closePool,
+      difficulty,
+      rng,
+      recent,
+      new Set([ideaFp, fingerprintEvents(rhyme.events), fingerprintEvents(continuation.events)]),
+    )
+    return [remember(idea), remember(rhyme), remember(continuation), remember(close)]
+  }
+
+  const seen = new Set<string>()
+  const moving: RhythmValue[][] = []
+  for (let index = 0; index < 3; index += 1) {
+    const next = pickMeasure(movePool, difficulty, rng, recent, seen)
+    seen.add(fingerprintEvents(next.events))
+    moving.push(remember(next))
+  }
+  moving.push(remember(pickMeasure(closePool, difficulty, rng, recent, seen)))
+  return moving
+}
+
+function restClearance(event: RhythmValue, previous: RhythmSlot | undefined): { lead: number; trail: number; own: number } {
+  const own = spacingUnitsForDuration(event.durationUnits)
+  if (!event.isRest) return { lead: 0, trail: 0, own }
+  const flaggedLead =
+    previous && !previous.isRest && isBeamable(previous.value) ? FLAGGED_REST_LEAD : 0
+  return {
+    lead: REST_LEAD_SPACING + flaggedLead,
+    trail: REST_TRAIL_SPACING,
+    own: Math.max(own, REST_MIN_SPACING),
   }
 }
 
@@ -485,31 +733,20 @@ function appendMeasure(
   difficulty: StaffJumperDifficulty,
   seed: number,
 ): void {
-  const measures = measuresFor(meter.id, difficulty)
-  const rng = mulberry32(seed + timeline.measureCount * 2654435761)
-
-  /**
-   * The last bar of a phrase closes; the bars before it keep going.
-   *
-   * This is the whole reason a phrase is audible rather than merely counted:
-   * the long note or the breath arrives where the melodic line arrives, so the
-   * two agree instead of cutting across each other. Either pool can be empty
-   * for a given meter and tier, in which case any bar is better than none.
-   */
-  const phraseBars = PHRASE_BARS[difficulty]
-  const closesPhrase = timeline.measureCount % phraseBars === phraseBars - 1
-  const preferred = measures.filter((measure) => measure.closes === closesPhrase)
-  const pool = preferred.length > 0 ? preferred : measures
-  const phraseOffset = timeline.measureCount % phraseBars
-  const motifStart = (timeline.measureCount - phraseOffset) * meter.capacityUnits
-  const motif = phraseOffset === 2 ? timeline.slots.filter(slot => slot.unitPosition >= motifStart && slot.unitPosition < motifStart + meter.capacityUnits) : []
-  const measure = motif.length ? { events: motif, capacityUnits: meter.capacityUnits } : pool[Math.floor(rng() * pool.length)]!
+  if (timeline.phraseQueue.length === 0) {
+    const phraseRng = mulberry32(seed + timeline.phrases.length * 2654435761 + 17)
+    timeline.phraseQueue = composePhraseBars(meter, difficulty, phraseRng, timeline.recentFingerprints)
+  }
+  const events = timeline.phraseQueue.shift()!
   const firstNewIndex = timeline.slots.length
   const measureStartUnits = timeline.measureCount * meter.capacityUnits
   timeline.unitCursor = measureStartUnits
 
-  measure.events.forEach((rhythmValue, indexInMeasure) => {
+  events.forEach((rhythmValue, indexInMeasure) => {
     const startsMeasure = indexInMeasure === 0
+    const previous = timeline.slots.at(-1)
+    const clearance = restClearance(rhythmValue, previous)
+    const barlinePad = startsMeasure ? BARLINE_SPACING_UNITS : 0
     const barlineBeforeSpacingPosition =
       startsMeasure && timeline.measureCount > 0
         ? timeline.spacingCursor + BARLINE_SPACING_UNITS / 2
@@ -526,19 +763,17 @@ function appendMeasure(
       unitsIntoMeasure: timeline.unitCursor - measureStartUnits,
       startsMeasure,
       barlineBeforeSpacingPosition,
-      spacingPosition: timeline.spacingCursor + (startsMeasure ? BARLINE_SPACING_UNITS : 0),
+      spacingPosition: timeline.spacingCursor + barlinePad + clearance.lead,
       beamGroupId: null,
       beamIndexInGroup: 0,
       beamGroupSize: 1,
     })
     timeline.unitCursor += rhythmValue.durationUnits
     if (!rhythmValue.isRest) timeline.noteCursor += 1
-    timeline.spacingCursor +=
-      spacingUnitsForDuration(rhythmValue.durationUnits) +
-      (startsMeasure ? BARLINE_SPACING_UNITS : 0)
+    timeline.spacingCursor += clearance.own + barlinePad + clearance.lead + clearance.trail
   })
 
-  if (timeline.unitCursor - measureStartUnits !== measure.capacityUnits) {
+  if (timeline.unitCursor - measureStartUnits !== meter.capacityUnits) {
     throw new Error(`Generated ${meter.label} measure did not reach exact capacity`)
   }
   timeline.measureCount += 1
@@ -572,6 +807,8 @@ function getTimeline(configKey: object): RhythmTimeline {
       spacingCursor: 0,
       beamCursor: 0,
       noteCursor: 0,
+      phraseQueue: [],
+      recentFingerprints: [],
     }
     timelineCache.set(configKey, timeline)
   }

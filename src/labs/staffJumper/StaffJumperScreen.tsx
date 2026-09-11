@@ -58,7 +58,7 @@ import {
   loadPracticeGameCharacter,
   type PracticeGameCharacterId,
 } from '../practiceGameCharacters'
-import { savePracticeGameInstrumentId } from '../practiceGameInstrument'
+import { practiceGameTunerInstrument, savePracticeGameInstrumentId } from '../practiceGameInstrument'
 import {
   CLEF_LABELS,
   STAFF_JUMPER_READING_CLEFS,
@@ -71,6 +71,7 @@ import ArcadeCycleChip, { cycleNext } from '../../components/labs/ArcadeCycleChi
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
 import StaffJumperGame from './StaffJumperGame'
 import StaffPreview from './StaffPreview'
+import { loadStaffJumperSetupPrefs, saveStaffJumperSetupPrefs } from './staffJumperSetupPrefs'
 
 const TEMPO_PRESETS = [60, 72, 80, 88, 96, 108, 120, 132] as const
 
@@ -97,6 +98,7 @@ interface StaffJumperScreenProps {
   streamGeneration: number
   tunerInstrument: TunerInstrument
   hapticFeedback: boolean
+  micPermissionPending?: boolean
   onRequestMicStream: GameMicRequest
   onBack: () => void
 }
@@ -189,14 +191,34 @@ function Options<T extends string>({
   )
 }
 
-function OptionsPanel({ title, children, open, onToggle }: { title: string; children: React.ReactNode; open: boolean; onToggle: () => void }) {
+function OptionsPanel({
+  title,
+  children,
+  open,
+  onToggle,
+  hapticFeedback,
+}: {
+  title: string
+  children: React.ReactNode
+  open: boolean
+  onToggle: () => void
+  hapticFeedback: boolean
+}) {
   return (
-    <details className="sj-panel" open={open}>
-      <summary className="sj-panel__head" onClick={event => { event.preventDefault(); onToggle() }}>
+    <section className={`sj-panel ${open ? 'sj-panel--open' : ''}`}>
+      <Pressable
+        type="button"
+        intensity="soft"
+        hapticFeedback={hapticFeedback}
+        className="sj-panel__head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
         <strong>{title}</strong>
-      </summary>
-      <div className="sj-group__body">{children}</div>
-    </details>
+        <ChevronDown className="sj-panel__chevron" aria-hidden />
+      </Pressable>
+      {open ? <div className="sj-group__body">{children}</div> : null}
+    </section>
   )
 }
 
@@ -212,37 +234,46 @@ export default function StaffJumperScreen({
   streamGeneration,
   tunerInstrument,
   hapticFeedback,
+  micPermissionPending = false,
   onRequestMicStream,
   onBack,
 }: StaffJumperScreenProps) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [savedSetup] = useState(initialInstrumentSetup)
-  const [activeOptionsPanel, setActiveOptionsPanel] = useState<string | null>("Exercise")
-  const [customEnabled, setCustomEnabled] = useState(false)
-  const [customNotes, setCustomNotes] = useState<number[]>([0, 2, 4, 7, 9])
-  const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>('major')
-  const [draftKey, setDraftKey] = useState<StaffJumperKey>(savedSetup.key)
-  const [draftRange, setDraftRange] = useState<StaffJumperRange>('1-octave')
-  const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>('easy')
+  const [savedPrefs] = useState(() => loadStaffJumperSetupPrefs())
+  const [activeOptionsPanel, setActiveOptionsPanel] = useState<string | null>(null)
+  const [customEnabled, setCustomEnabled] = useState(() => savedPrefs?.customEnabled ?? false)
+  const [customNotes, setCustomNotes] = useState<number[]>(() => savedPrefs?.customNotes ?? [0, 2, 4, 7, 9])
+  const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>(() => savedPrefs?.scaleMode ?? 'major')
+  const [draftKey, setDraftKey] = useState<StaffJumperKey>(() => {
+    if (savedPrefs && savedPrefs.instrumentId === savedSetup.instrumentId) return savedPrefs.key
+    return savedSetup.key
+  })
+  const [draftRange, setDraftRange] = useState<StaffJumperRange>(() => savedPrefs?.range ?? '1-octave')
+  const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>(() => savedPrefs?.difficulty ?? 'easy')
   const [draftInstrumentId, setDraftInstrumentId] = useState<string | null>(savedSetup.instrumentId)
-  const [draftClef, setDraftClef] = useState<StaffJumperClef>(savedSetup.clef)
+  const [draftClef, setDraftClef] = useState<StaffJumperClef>(() =>
+    savedSetup.instrumentId == null && savedPrefs?.clef ? savedPrefs.clef : savedSetup.clef,
+  )
   const [draftTransposition, setDraftTransposition] = useState<StaffJumperTransposition>(
-    savedSetup.transposition,
+    savedSetup.instrumentId == null && savedPrefs?.transposition
+      ? savedPrefs.transposition
+      : savedSetup.transposition,
   )
   const [draftPlayerModel] = useState<PracticeGameCharacterId>(
     loadPracticeGameCharacter,
   )
-  const [draftMeter, setDraftMeter] = useState<StaffJumperMeter>('simple')
-  const [draftTempo, setDraftTempo] = useState(STAFF_JUMPER_TEMPO_DEFAULT)
-  const [draftMetronome, setDraftMetronome] = useState(true)
-  const [draftDrone, setDraftDrone] = useState(false)
+  const [draftMeter, setDraftMeter] = useState<StaffJumperMeter>(() => savedPrefs?.meter ?? 'simple')
+  const [draftTempo, setDraftTempo] = useState(() => savedPrefs?.tempoBpm ?? STAFF_JUMPER_TEMPO_DEFAULT)
+  const [draftMetronome, setDraftMetronome] = useState(() => savedPrefs?.metronome ?? true)
+  const [draftDrone, setDraftDrone] = useState(() => savedPrefs?.drone ?? false)
   /*
    * Off by default: reading a page straight through, and being told how much
    * of it was right, is what practice actually looks like. Lives are the
    * arcade version, kept for players who want the pressure.
    */
-  const [draftLives, setDraftLives] = useState(false)
+  const [draftLives, setDraftLives] = useState(() => savedPrefs?.lives ?? false)
   const [showOptions, setShowOptions] = useState(false)
   /**
    * The preview shows one sample of a randomized exercise, so it needs its own
@@ -311,6 +342,15 @@ export default function StaffJumperScreen({
   }, [onRequestMicStream, streamGeneration])
 
   const challengeTunerInstrument = dailyChallenge ? getInstrumentProfile(dailyChallenge.instrumentId)?.tunerInstrument ?? tunerInstrument : tunerInstrument
+  /**
+   * Detection follows the horn on the setup screen, as it does in Balance.
+   * The tuner's profile belongs to the Home instrument, so a player who picks
+   * another horn here — or never named one on Home — was heard through the
+   * wrong profile. A custom setup has no horn to go by and keeps the tuner's.
+   */
+  const trackerTunerInstrument = dailyChallenge
+    ? challengeTunerInstrument
+    : practiceGameTunerInstrument(draftInstrumentId, tunerInstrument)
   const pitchEnabled = true
   /*
    * Coming back from the background, the stream is usually dead while
@@ -319,7 +359,10 @@ export default function StaffJumperScreen({
    * without which the game returns to a suspended AudioContext and hears
    * nothing at all.
    */
-  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream, {
+    streamRef,
+    permissionPending: micPermissionPending,
+  })
 
   const { readout } = useLivePitchTracker(
     mediaRef,
@@ -331,7 +374,7 @@ export default function StaffJumperScreen({
     {
       source: 'microphone',
       micStreamRef: streamRef,
-      tunerInstrument: challengeTunerInstrument,
+      tunerInstrument: trackerTunerInstrument,
       realtimeMode: true,
       continuousScroll: false,
       allowStandaloneMicFallback: true,
@@ -433,6 +476,40 @@ export default function StaffJumperScreen({
     () => ({ ...draftConfig, sessionSeed: previewSeed }),
     [draftConfig, previewSeed],
   )
+
+  useEffect(() => {
+    saveStaffJumperSetupPrefs({
+      scaleMode: draftScaleMode,
+      key: draftKey,
+      range: draftRange,
+      difficulty: draftDifficulty,
+      meter: draftMeter,
+      tempoBpm: draftTempo,
+      metronome: draftMetronome,
+      drone: draftDrone,
+      lives: draftLives,
+      customEnabled,
+      customNotes,
+      instrumentId: draftInstrumentId,
+      clef: draftInstrumentId ? undefined : draftClef,
+      transposition: draftInstrumentId ? undefined : draftTransposition,
+    })
+  }, [
+    customEnabled,
+    customNotes,
+    draftClef,
+    draftDifficulty,
+    draftDrone,
+    draftInstrumentId,
+    draftKey,
+    draftLives,
+    draftMeter,
+    draftMetronome,
+    draftRange,
+    draftScaleMode,
+    draftTempo,
+    draftTransposition,
+  ])
   const meterSpec = METERS[draftMeter]
   const droneNoteLabel = pitchClassLabel(getConcertTonicPitchClass(draftConfig), draftKey)
 
@@ -555,7 +632,7 @@ export default function StaffJumperScreen({
             </Pressable>
           </div>
 
-          <StaffPreview config={previewConfig} onEdit={target => { setShowOptions(true); setActiveOptionsPanel(target === "clef" ? "Instrument" : "Tempo & sound") }} />
+          <StaffPreview config={previewConfig} bars={2} onEdit={target => { setShowOptions(true); setActiveOptionsPanel(target === "clef" ? "Instrument" : "Tempo & sound") }} />
 
           <p className="sj-hero__hint">Tap the clef, key or time signature to change it.</p>
         </section>
@@ -593,7 +670,13 @@ export default function StaffJumperScreen({
           intensity="soft"
           hapticFeedback={hapticFeedback}
           className="balance-textlink"
-          onClick={() => setShowOptions((open) => !open)}
+          onClick={() => {
+            setShowOptions((open) => {
+              const next = !open
+              if (next && activeOptionsPanel == null) setActiveOptionsPanel('Exercise')
+              return next
+            })
+          }}
           aria-expanded={showOptions}
         >
           <Settings aria-hidden /> {showOptions ? 'Hide options' : 'More options'}
@@ -601,7 +684,7 @@ export default function StaffJumperScreen({
 
         {showOptions ? (
           <>
-        <OptionsPanel title="Exercise" open={activeOptionsPanel === "Exercise"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Exercise" ? null : "Exercise")}>
+        <OptionsPanel title="Exercise" open={activeOptionsPanel === "Exercise"} hapticFeedback={hapticFeedback} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Exercise" ? null : "Exercise")}>
           <div className="sj-custom-scale">
             <label><input type="checkbox" checked={customEnabled} onChange={event => setCustomEnabled(event.target.checked)} /> Build my own scale</label>
             {customEnabled && <>
@@ -680,7 +763,7 @@ export default function StaffJumperScreen({
           </div>
         </OptionsPanel>
 
-        <OptionsPanel title="Instrument" open={activeOptionsPanel === "Instrument"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Instrument" ? null : "Instrument")}>
+        <OptionsPanel title="Instrument" open={activeOptionsPanel === "Instrument"} hapticFeedback={hapticFeedback} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Instrument" ? null : "Instrument")}>
           <div className="sj-field sj-field--stack">
             <p className="sj-field__label">
               I play
@@ -747,7 +830,7 @@ export default function StaffJumperScreen({
 
         </OptionsPanel>
 
-        <OptionsPanel title="Tempo & sound" open={activeOptionsPanel === "Tempo & sound"} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Tempo & sound" ? null : "Tempo & sound")}>
+        <OptionsPanel title="Tempo & sound" open={activeOptionsPanel === "Tempo & sound"} hapticFeedback={hapticFeedback} onToggle={() => setActiveOptionsPanel(activeOptionsPanel === "Tempo & sound" ? null : "Tempo & sound")}>
           <div className="sj-field">
             <p className="sj-field__label">Tempo</p>
             <div className="sj-tempo" role="group" aria-label="Tempo">

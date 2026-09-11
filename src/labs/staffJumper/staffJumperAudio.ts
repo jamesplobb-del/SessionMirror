@@ -8,7 +8,7 @@
  * The drone prefers the native engine the tuner tab uses, and falls back to
  * oscillators on web where that plugin is a silent stub.
  */
-import { getPlaybackAudioContext } from '../../utils/playbackAudioContext'
+import { getGameAudioContext } from '../gameAudioContext'
 import { scheduleMetronomeClick } from '../../utils/metronomeClickSounds'
 import { metronomeSpeakerGain } from '../../utils/playbackVolume'
 import {
@@ -61,7 +61,7 @@ export interface ClickTrackOptions {
 }
 
 export async function startClickTrack(options: ClickTrackOptions): Promise<ClickTrackHandle> {
-  const ctx = await getPlaybackAudioContext()
+  const ctx = await getGameAudioContext()
 
   /**
    * Same output stage the shared metronome uses.
@@ -170,7 +170,7 @@ async function startWebDrone(
   octave: number,
   volume = DRONE_VOLUME,
 ): Promise<DroneHandle> {
-  const ctx = await getPlaybackAudioContext()
+  const ctx = await getGameAudioContext()
   const frequencyForPitch = (nextPitchClass: number, nextOctave: number) => {
     const midi = (nextOctave + 1) * 12 + nextPitchClass
     return 440 * Math.pow(2, (midi - 69) / 12)
