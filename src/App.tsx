@@ -710,6 +710,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const autoPlaybackUsesNativeRef = useRef(false)
+  const autoPlaybackTailCleanupRef = useRef<(() => void) | null>(null)
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
   const recordingModeRef = useRef<RecordingMode>('video')
@@ -930,6 +931,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const teardownAutoPlaybackMedia = useCallback(() => {
+    autoPlaybackTailCleanupRef.current?.()
+    autoPlaybackTailCleanupRef.current = null
     if (autoPlaybackUsesNativeRef.current) {
       autoPlaybackUsesNativeRef.current = false
       audioModePlaybackControlsRef.pause?.()
@@ -1089,6 +1092,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               tailTimer = null
             }
           }
+          autoPlaybackTailCleanupRef.current = clearTailTimer
           const completeNativeAutoPlayback = () => {
             clearTailTimer()
             if (autoPlaybackGenerationRef.current !== playbackGeneration) return
@@ -1122,12 +1126,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 if (remainingPlaybackSeconds > tailSkipSeconds + 0.25) {
                   tailTimer = window.setTimeout(() => {
                     tailTimer = null
+                    if (autoPlaybackGenerationRef.current !== playbackGeneration) return
                     audioModePlaybackControlsRef.pause?.()
                     completeNativeAutoPlayback()
                   }, (remainingPlaybackSeconds - tailSkipSeconds) * 1000)
                 }
               },
-              onFailed: completeNativeAutoPlayback,
+              onFailed: () => {
+                if (autoPlaybackGenerationRef.current !== playbackGeneration) return
+                setTakeDeleteError('Playback could not start. Your take is saved in Vault; try playing it there.')
+                completeNativeAutoPlayback()
+              },
               onEnded: completeNativeAutoPlayback,
             }
           )

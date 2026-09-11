@@ -167,6 +167,8 @@
 	<string>BestTake uses speech recognition when you choose to dictate a note for your next take.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>BestTake needs permission to save your takes to Photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BestTake saves your recorded takes to your Photos library. It does not read or upload your existing photos or videos.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 </dict>

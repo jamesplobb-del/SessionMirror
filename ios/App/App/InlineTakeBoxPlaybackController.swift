@@ -100,8 +100,9 @@ final class InlineTakeBoxPlaybackController {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
             queue: .main
-        ) { [weak self] _ in
-            self?.stop(notify: true)
+        ) { [weak self, weak player] _ in
+            guard let self = self, let player = player, self.player === player else { return }
+            self.stop(notify: true)
         }
 
         let safeStartTime = max(0, startTime)
@@ -285,10 +286,14 @@ final class InlineTakeBoxPlaybackController {
             frameCount: AVAudioFrameCount(remainingFrames),
             at: nil,
             completionCallbackType: .dataPlayedBack
-        ) { [weak self] _ in
+        ) { [weak self, weak audioPlayer] _ in
             DispatchQueue.main.async {
+                // stop() may deliver an old segment's completion after a new
+                // take has started on this shared controller.
+                guard let self = self, let audioPlayer = audioPlayer,
+                      self.audioPlayer === audioPlayer else { return }
                 print("[InlineTakeBoxPlayback] native audio engine completed")
-                self?.stop(notify: true)
+                self.stop(notify: true)
             }
         }
         audioPlayer.play()
@@ -308,8 +313,10 @@ final class InlineTakeBoxPlaybackController {
 
     private func scheduleAudioEndWatchdog(after duration: TimeInterval) {
         audioEndWatchdog?.cancel()
-        let watchdog = DispatchWorkItem { [weak self] in
-            guard let self = self, self.audioPlayer != nil else { return }
+        let expectedPlayer = audioPlayer
+        let watchdog = DispatchWorkItem { [weak self, weak expectedPlayer] in
+            guard let self = self, let expectedPlayer = expectedPlayer,
+                  self.audioPlayer === expectedPlayer else { return }
             print("[InlineTakeBoxPlayback] native audio end watchdog fired")
             self.stop(notify: true)
         }
