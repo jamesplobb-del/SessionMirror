@@ -155,11 +155,9 @@ const bar = (tier: StaffJumperDifficulty, ...events: RhythmValue[]): BarTemplate
  * 4/4 cells. Every entry sums to the meter's exact integer capacity, so
  * barlines can only occur after a complete measure.
  *
- * Rests are placed the way they are engraved: a half rest only ever covers
- * beats 1–2 or 3–4, a quarter rest takes a whole beat, and an eighth rest sits
- * on either half of one. Hard does not live on one off-beat cell — the
- * vocabulary has to be wide enough that a phrase composer can keep changing
- * the idea instead of reprinting the same quarter / eighth-rest / eighth.
+ * Rests occupy a whole beat or one half of a beat — never a chopped-up beam
+ * group. Harder tiers add sixteenths and dotted-eighth / sixteenth figures,
+ * not more fragmented eighth rests.
  */
 const SIMPLE_BARS: readonly BarTemplate[] = [
   bar('easy', QUARTER, QUARTER, QUARTER, QUARTER),
@@ -175,53 +173,54 @@ const SIMPLE_BARS: readonly BarTemplate[] = [
   bar('easy', EIGHTH, EIGHTH, QUARTER, EIGHTH, EIGHTH, QUARTER),
   bar('easy', EIGHTH, EIGHTH, HALF, QUARTER),
   bar('easy', QUARTER, DOTTED_HALF),
-
+  bar('easy', EIGHTH, EIGHTH, QUARTER, HALF),
   bar('easy', QUARTER, QUARTER, QUARTER, QUARTER_REST),
   bar('easy', QUARTER, QUARTER, HALF_REST),
   bar('easy', HALF, QUARTER, QUARTER_REST),
   bar('easy', QUARTER, QUARTER_REST, QUARTER, QUARTER),
-  bar('easy', EIGHTH, EIGHTH, QUARTER, HALF),
 
   bar('medium', QUARTER_REST, QUARTER, QUARTER, QUARTER),
   bar('medium', HALF_REST, QUARTER, QUARTER),
   bar('medium', HALF, QUARTER_REST, QUARTER),
   bar('medium', EIGHTH, EIGHTH, QUARTER, QUARTER_REST, QUARTER),
-  bar('medium', QUARTER, EIGHTH_REST, EIGHTH, QUARTER, QUARTER),
-  bar('medium', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, QUARTER),
   bar('medium', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
-  bar('medium', EIGHTH_REST, EIGHTH, QUARTER, QUARTER, QUARTER),
-  bar('medium', QUARTER, QUARTER_REST, HALF),
-  bar('medium', QUARTER, EIGHTH, EIGHTH, QUARTER, QUARTER_REST),
   bar('medium', EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
   bar('medium', HALF, EIGHTH, EIGHTH, QUARTER),
+  bar('medium', QUARTER, QUARTER_REST, HALF),
+  bar('medium', QUARTER, EIGHTH, EIGHTH, QUARTER, QUARTER_REST),
+  bar('medium', EIGHTH_REST, EIGHTH, QUARTER, QUARTER, QUARTER),
+  bar('medium', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, QUARTER),
+  bar('medium', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
 
-  bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, QUARTER),
-  bar('hard', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, QUARTER),
-  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH_REST, EIGHTH, HALF),
-  bar('hard', QUARTER, QUARTER, EIGHTH, EIGHTH_REST, QUARTER),
+  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
   bar('hard', SIXTEENTH_REST, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
-  bar('hard', EIGHTH, QUARTER, EIGHTH, QUARTER, QUARTER),
-  bar('hard', QUARTER, EIGHTH, QUARTER, EIGHTH, QUARTER),
-  bar('hard', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', QUARTER, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, QUARTER, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, QUARTER),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
+  bar('hard', QUARTER, DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, QUARTER, DOTTED_EIGHTH, SIXTEENTH, QUARTER),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('hard', EIGHTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
   bar('hard', SIXTEENTH, SIXTEENTH, EIGHTH, QUARTER, QUARTER, QUARTER),
-  bar('hard', DOTTED_QUARTER, EIGHTH, QUARTER, QUARTER),
-  bar('hard', QUARTER, DOTTED_QUARTER, EIGHTH, QUARTER),
-  bar('hard', EIGHTH_REST, EIGHTH, QUARTER, EIGHTH, EIGHTH, QUARTER),
-  bar('hard', QUARTER, QUARTER, EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH),
-  bar('hard', EIGHTH, EIGHTH, EIGHTH_REST, EIGHTH, QUARTER, QUARTER),
-  bar('hard', HALF, EIGHTH_REST, EIGHTH, QUARTER),
+  bar('hard', QUARTER, EIGHTH, SIXTEENTH, SIXTEENTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, SIXTEENTH, SIXTEENTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, HALF),
+  bar('hard', QUARTER, SIXTEENTH, SIXTEENTH, EIGHTH, HALF),
   bar('hard', EIGHTH, EIGHTH, HALF, QUARTER_REST),
   bar('hard', QUARTER_REST, QUARTER, HALF),
-  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
-  bar('hard', QUARTER, QUARTER_REST, EIGHTH, EIGHTH, QUARTER),
-  bar('hard', DOTTED_EIGHTH, SIXTEENTH, QUARTER, QUARTER, QUARTER),
-  bar('hard', QUARTER, QUARTER, DOTTED_EIGHTH, SIXTEENTH, QUARTER),
-  bar('hard', EIGHTH, QUARTER, EIGHTH, HALF),
-  bar('hard', DOTTED_QUARTER, EIGHTH, HALF),
-  bar('hard', EIGHTH_REST, EIGHTH, QUARTER, HALF),
-  bar('hard', QUARTER, SIXTEENTH, SIXTEENTH, EIGHTH, HALF),
-  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, EIGHTH, EIGHTH, QUARTER, QUARTER),
-  bar('hard', QUARTER, EIGHTH, EIGHTH, EIGHTH, SIXTEENTH, SIXTEENTH, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, EIGHTH, HALF),
+  bar('hard', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH, QUARTER),
+  bar('hard', SIXTEENTH, SIXTEENTH, SIXTEENTH, SIXTEENTH, HALF, QUARTER),
+  bar('hard', QUARTER_REST, EIGHTH, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, QUARTER, EIGHTH, SIXTEENTH, SIXTEENTH, QUARTER),
+  bar('hard', EIGHTH, EIGHTH, QUARTER, DOTTED_EIGHTH, SIXTEENTH, QUARTER),
+  bar('hard', DOTTED_QUARTER, EIGHTH, QUARTER, QUARTER),
+  bar('hard', QUARTER, DOTTED_QUARTER, EIGHTH, QUARTER),
 ]
 
 /**
@@ -229,7 +228,9 @@ const SIMPLE_BARS: readonly BarTemplate[] = [
  *
  * Rests stay inside their own pulse: a silent compound beat is written as a
  * quarter rest plus an eighth rest rather than a dotted rest, which is how the
- * beat's three-part division stays visible on the page.
+ * beat's three-part division stays visible on the page. An eighth rest takes
+ * the first or last third of a beat, never the middle — that splits the beam
+ * into two flagged notes with a rest jammed between them.
  */
 const COMPOUND_BARS: readonly BarTemplate[] = [
   bar('easy', DOTTED_QUARTER, DOTTED_QUARTER),
@@ -245,29 +246,25 @@ const COMPOUND_BARS: readonly BarTemplate[] = [
   bar('easy', QUARTER, EIGHTH, QUARTER, EIGHTH_REST),
   bar('easy', DOTTED_QUARTER, QUARTER, EIGHTH_REST),
   bar('easy', QUARTER, EIGHTH, QUARTER_REST, EIGHTH_REST),
-  bar('easy', QUARTER, EIGHTH_REST, QUARTER, EIGHTH),
 
   bar('medium', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, DOTTED_QUARTER),
   bar('medium', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH_REST),
   bar('medium', EIGHTH_REST, EIGHTH, EIGHTH, DOTTED_QUARTER),
-  bar('medium', QUARTER, EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH),
   bar('medium', EIGHTH, EIGHTH, EIGHTH_REST, DOTTED_QUARTER),
   bar('medium', DOTTED_QUARTER, EIGHTH, EIGHTH, EIGHTH_REST),
   bar('medium', QUARTER, EIGHTH_REST, DOTTED_QUARTER),
   bar('medium', QUARTER, EIGHTH, EIGHTH, QUARTER),
+  bar('medium', EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, EIGHTH),
 
-  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
-  bar('hard', EIGHTH, EIGHTH_REST, EIGHTH, QUARTER, EIGHTH),
-  bar('hard', QUARTER_REST, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
-  bar('hard', QUARTER, EIGHTH, EIGHTH_REST, EIGHTH, EIGHTH),
-  bar('hard', EIGHTH, EIGHTH, EIGHTH_REST, QUARTER, EIGHTH),
   bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, QUARTER, EIGHTH),
   bar('hard', EIGHTH, EIGHTH, EIGHTH, DOTTED_EIGHTH, SIXTEENTH, EIGHTH),
-  bar('hard', EIGHTH_REST, EIGHTH, EIGHTH, QUARTER, EIGHTH),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
+  bar('hard', QUARTER_REST, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
   bar('hard', QUARTER, EIGHTH, EIGHTH, EIGHTH, EIGHTH_REST),
   bar('hard', EIGHTH, QUARTER, EIGHTH, EIGHTH, EIGHTH),
   bar('hard', QUARTER_REST, EIGHTH, DOTTED_QUARTER),
-  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, EIGHTH, EIGHTH, EIGHTH),
+  bar('hard', EIGHTH, EIGHTH, EIGHTH, QUARTER, EIGHTH),
+  bar('hard', DOTTED_EIGHTH, SIXTEENTH, EIGHTH, DOTTED_EIGHTH, SIXTEENTH, EIGHTH),
 ]
 
 export interface RhythmMeasure {
@@ -351,8 +348,54 @@ function validateMeasures(
     if (!measure.events.some((event) => !event.isRest)) {
       throw new Error(`Invalid ${meter.label} measure ${index}: no sounded note`)
     }
+    assertConventionalGrouping(meter, template.events, index)
     return measure
   })
+}
+
+/**
+ * Beats should look like method-book music at every difficulty. Harder tiers
+ * add sixteenths and dotted figures — they do not chop a beam with an eighth
+ * rest in the middle, or write a quarter starting on the 'and'.
+ */
+function assertConventionalGrouping(
+  meter: MeterSpec,
+  events: readonly RhythmValue[],
+  measureIndex: number,
+): void {
+  const fail = (detail: string) => {
+    throw new Error(`Invalid ${meter.label} measure ${measureIndex}: ${detail}`)
+  }
+  let cursor = 0
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i]!
+    const offset = cursor % meter.pulseUnits
+    const startPulse = Math.floor(cursor / meter.pulseUnits)
+    const endPulse = Math.floor((cursor + event.durationUnits - 1) / meter.pulseUnits)
+
+    if (event.isRest && event.value === 'eighth' && meter.id === 'compound' && offset === 2) {
+      fail('eighth rest cannot sit in the middle of a compound beat')
+    }
+    if (event.value === 'eighth' && event.dotted && offset !== 0) {
+      fail('dotted eighth must begin on the beat')
+    }
+    if (
+      meter.id === 'simple' &&
+      event.value === 'quarter' &&
+      !event.dotted &&
+      offset !== 0
+    ) {
+      fail('quarter must sit on the beat, not the and')
+    }
+    if (
+      meter.id === 'compound' &&
+      event.durationUnits < meter.capacityUnits &&
+      startPulse !== endPulse
+    ) {
+      fail('event crosses a dotted-quarter beat')
+    }
+    cursor += event.durationUnits
+  }
 }
 
 const MEASURES_BY_METER: Record<StaffJumperMeter, readonly RhythmMeasure[]> = {
@@ -457,6 +500,14 @@ export const REST_LEAD_SPACING = 0.44
 export const REST_TRAIL_SPACING = 0.38
 export const REST_MIN_SPACING = 1.14
 export const FLAGGED_REST_LEAD = 0.24
+
+/**
+ * A dotted note's dot sits to the right of the head — and of an up-stem — so
+ * the following note needs extra room or its down-stem covers the dot. Dotted
+ * eighth plus sixteenth is the usual case: at ordinary eighth packing the
+ * sixteenth's left-hand stem lands on the dot.
+ */
+export const DOTTED_MIN_SPACING = 1.22
 
 function mulberry32(seed: number): () => number {
   let state = seed >>> 0
@@ -656,16 +707,21 @@ function composePhraseBars(
   return moving
 }
 
-function restClearance(event: RhythmValue, previous: RhythmSlot | undefined): { lead: number; trail: number; own: number } {
-  const own = spacingUnitsForDuration(event.durationUnits)
-  if (!event.isRest) return { lead: 0, trail: 0, own }
-  const flaggedLead =
-    previous && !previous.isRest && isBeamable(previous.value) ? FLAGGED_REST_LEAD : 0
-  return {
-    lead: REST_LEAD_SPACING + flaggedLead,
-    trail: REST_TRAIL_SPACING,
-    own: Math.max(own, REST_MIN_SPACING),
+function slotClearance(event: RhythmValue, previous: RhythmSlot | undefined): { lead: number; trail: number; own: number } {
+  let own = spacingUnitsForDuration(event.durationUnits)
+  let lead = 0
+  let trail = 0
+  if (event.isRest) {
+    const flaggedLead =
+      previous && !previous.isRest && isBeamable(previous.value) ? FLAGGED_REST_LEAD : 0
+    lead = REST_LEAD_SPACING + flaggedLead
+    trail = REST_TRAIL_SPACING
+    own = Math.max(own, REST_MIN_SPACING)
   }
+  if (event.dotted && !event.isRest) {
+    own = Math.max(own, DOTTED_MIN_SPACING)
+  }
+  return { lead, trail, own }
 }
 
 /** True for note values that need a flag or beam. */
@@ -745,7 +801,7 @@ function appendMeasure(
   events.forEach((rhythmValue, indexInMeasure) => {
     const startsMeasure = indexInMeasure === 0
     const previous = timeline.slots.at(-1)
-    const clearance = restClearance(rhythmValue, previous)
+    const clearance = slotClearance(rhythmValue, previous)
     const barlinePad = startsMeasure ? BARLINE_SPACING_UNITS : 0
     const barlineBeforeSpacingPosition =
       startsMeasure && timeline.measureCount > 0

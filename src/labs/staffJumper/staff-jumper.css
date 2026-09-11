@@ -982,6 +982,7 @@
 .sj-noteheads {
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
 /* ─────────────────────────────────────────────
@@ -1002,6 +1003,7 @@
   width: 0;
   height: 0;
   overflow: visible;
+  z-index: 1;
   /* No transform needed — positioned with left/top at the note center */
 }
 
@@ -1030,10 +1032,11 @@
 /* ── Augmentation dot ───────────────────────*/
 .sj-note__dot {
   position: absolute;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: #1c1917;
   z-index: 3;
+  pointer-events: none;
 }
 
 /* ── Stems, beams, flags, barlines ──────────
@@ -1044,6 +1047,7 @@
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 0;
   overflow: visible;
   pointer-events: none;
 }

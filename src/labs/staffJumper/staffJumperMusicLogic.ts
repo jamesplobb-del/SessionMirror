@@ -89,7 +89,7 @@ export const DIFFICULTY_LABELS: Record<StaffJumperDifficulty, string> = {
 export const DIFFICULTY_DESCRIPTIONS: Record<StaffJumperDifficulty, string> = {
   easy: 'Note names shown. Short musical phrases, mostly stepwise, with rests on the beat.',
   medium: 'Adds triads, turns, and rests that split a beat — still a tune, not a drill.',
-  hard: 'Wider leaps, off-beat entries, and phrases that keep changing shape.',
+  hard: 'Wider leaps, sixteenths and dotted rhythms — the beats still group the usual way.',
 }
 
 export const DIFFICULTY_TIMEOUT_SECONDS: Record<StaffJumperDifficulty, number> = {

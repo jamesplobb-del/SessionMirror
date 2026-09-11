@@ -17,8 +17,14 @@ try {
    if(prior) {assert.equal(slot.unitPosition,prior.unitPosition+prior.durationUnits);assert.ok(slot.spacingPosition-prior.spacingPosition>=.75-1e-7)}
    if(meter==='compound' && slot.durationUnits<12) assert.equal(Math.floor(slot.unitsIntoMeasure/6),Math.floor((slot.unitsIntoMeasure+slot.durationUnits-1)/6),'6/8 event must expose pulse boundary')
    if(slot.isRest) assert.equal(slot.beamGroupId,null)
+   if(meter==='compound' && slot.isRest && slot.durationUnits===2) {
+    assert.notEqual(slot.unitsIntoMeasure % 6, 2, 'eighth rest must not sit in the middle of a 6/8 beat')
+   }
    if(prior && (slot.isRest || prior.isRest) && slot.measureIndex===prior.measureIndex) {
     assert.ok(slot.spacingPosition-prior.spacingPosition>=1.05-1e-7,'rest must clear the neighbouring note')
+   }
+   if(prior && prior.dotted && !prior.isRest) {
+    assert.ok(slot.spacingPosition-prior.spacingPosition>=1.2-1e-7,'dotted note must clear the next stem')
    }
    if(prior && slot.beamGroupId!==null && prior.beamGroupId===slot.beamGroupId) assert.equal(Math.floor(slot.unitPosition/spec.pulseUnits),Math.floor(prior.unitPosition/spec.pulseUnits))
    prior=slot;checked++

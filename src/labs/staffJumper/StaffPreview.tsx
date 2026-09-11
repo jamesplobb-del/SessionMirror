@@ -10,8 +10,8 @@ import {
   BEAM_THICKNESS,
   CLEF_ANCHOR_YPX,
   CLEF_TO_SIGNATURE_GAP,
-  DOT_GAP,
   DOT_RADIUS,
+  augmentationDotXPx,
   dotYForNote,
   LEDGER_LINE_THICKNESS,
   LEDGER_LINE_W,
@@ -31,6 +31,7 @@ import {
   TIME_SIGNATURE_FONT_SIZE,
   TIME_SIGNATURE_WIDTH,
   TIME_SIGNATURE_YPX,
+  stemDirectionForY,
 } from './staffNotationMap'
 import StaffGlyph, { useMusicGlyphMetrics } from './StaffGlyph'
 import StaffRest from './StaffRest'
@@ -358,7 +359,7 @@ export default function StaffPreview({ config, bars = 2, onEdit }: StaffPreviewP
                     <span
                       className="sj-note__dot"
                       style={{
-                        left: `${NOTEHEAD_W / 2 + DOT_GAP}px`,
+                        left: `${augmentationDotXPx(stemDirectionForY(slot.note.yPx))}px`,
                         top: `${dotYForNote(slot.note.yPx, slot.note.kind) - slot.note.yPx}px`,
                         width: `${DOT_RADIUS * 2}px`,
                         height: `${DOT_RADIUS * 2}px`,

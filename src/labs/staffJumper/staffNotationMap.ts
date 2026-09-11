@@ -130,8 +130,21 @@ export const BEAM_MAX_SLANT = STAFF_SPACE_PX * 1.5
 export const NOTEHEAD_RING_THICKNESS = Math.max(3, STAFF_SPACE_PX * 0.17)
 
 /** Augmentation dot. */
-export const DOT_RADIUS = STAFF_SPACE_PX * 0.17
-export const DOT_GAP = STAFF_SPACE_PX * 0.42
+export const DOT_RADIUS = STAFF_SPACE_PX * 0.16
+/** Gap from the stem's outer edge (or the notehead, on a down-stem) to the dot. */
+export const DOT_GAP = STAFF_SPACE_PX * 0.22
+
+/**
+ * X of the dot's centre, relative to the notehead centre.
+ *
+ * Always to the right of the head. An up-stem occupies that same side, so the
+ * offset clears the stem instead of sitting on it. A down-stem is on the left,
+ * so the dot can sit closer to the head — the usual engraved placement.
+ */
+export function augmentationDotXPx(direction: StemDirection = 'up'): number {
+  const stemClearance = direction === 'up' ? STEM_THICKNESS / 2 : 0
+  return NOTEHEAD_W / 2 + stemClearance + DOT_GAP + DOT_RADIUS
+}
 
 export const BARLINE_THICKNESS = Math.max(2.6, STAFF_SPACE_PX * 0.11)
 
