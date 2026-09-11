@@ -792,15 +792,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const handleCompleteOnboardingTutorial = useCallback(() => {
-    showTakeCardsRef.current = true
-    updateSettings({
-      autoSoundRecording: false,
-      showTakeCards: true,
-    })
+    markAllCoachMarksSeen()
     setShowOnboardingTutorial(false)
-    setTutorialTourEnabled(true)
+    setTutorialTourEnabled(false)
     setIsPracticeHubOpen(true)
-  }, [updateSettings])
+  }, [])
 
   const handleSkipOnboardingTutorial = useCallback(() => {
     markAllCoachMarksSeen()
@@ -831,24 +827,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [updateSettings],
   )
 
-  /**
-   * The last onboarding card offers to lay out a routine. Either choice ends
-   * the cards and lands in the hub's builder; the guided tour waits until the
-   * hub closes, same as after a normal finish.
-   */
+  // The introduction finishes in Home or its real routine builder.
   const handleOnboardingRoutineChoice = useCallback(
     (mode: RoutineBuilderMode) => {
-      showTakeCardsRef.current = true
-      updateSettings({
-        autoSoundRecording: false,
-        showTakeCards: true,
-      })
+      markAllCoachMarksSeen()
       setShowOnboardingTutorial(false)
-      setTutorialTourEnabled(true)
+      setTutorialTourEnabled(false)
       setRoutineBuilderRequest(mode)
       setIsPracticeHubOpen(true)
     },
-    [updateSettings],
+    [],
   )
 
   useEffect(() => {
@@ -2956,21 +2944,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleReplayOnboardingTutorial = useCallback(() => {
     setIsSettingsOpen(false)
     setIsVaultOpen(false)
-    setIsPracticeHubOpen(false)
-    setIsSplitView(false)
     setQuickSettingsOpen(false)
-    setPracticeSessionActive(false)
     setTutorialTourEnabled(false)
-    showTakeCardsRef.current = true
-    updateSettings({
-      autoSoundRecording: false,
-      showTakeCards: true,
-    })
-    handleRecordingModeChange('video')
-    scheduleAfterPaint(() => {
-      setShowOnboardingTutorial(true)
-    })
-  }, [handleRecordingModeChange, updateSettings])
+    setShowOnboardingTutorial(true)
+  }, [])
 
   const handleToggleRecord = useCallback(() => {
     if (practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
@@ -6730,8 +6707,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     {showOnboardingTutorial && (
                       <OnboardingTutorial
                         key="onboarding-tutorial"
+                        initialInstrumentId={preferredInstrumentId ?? undefined}
                         onComplete={handleCompleteOnboardingTutorial}
                         onSkip={handleSkipOnboardingTutorial}
+                        onQuickPlay={() => {
+                          markAllCoachMarksSeen()
+                          setShowOnboardingTutorial(false)
+                          setTutorialTourEnabled(false)
+                          handlePauseRoutine()
+                          handleOpenQuickPractice()
+                        }}
                         onSelectInstrument={handleSelectInstrument}
                         onChooseRoutine={handleOnboardingRoutineChoice}
                         hapticFeedback={settings.hapticFeedback}

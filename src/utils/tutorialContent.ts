@@ -1,4 +1,4 @@
-export type OnboardingCardId = 'welcome' | 'instrument' | 'routine' | 'closing'
+export type OnboardingCardId = 'welcome' | 'instrument' | 'tools' | 'record' | 'workspace' | 'routine'
 
 export type CoachMarkId =
   | 'record-camera-take'
@@ -119,30 +119,18 @@ export interface HelpTopic {
 }
 
 export const ONBOARDING_CARDS: OnboardingCard[] = [
-  {
-    id: 'welcome',
-    title: 'Welcome to BestTake',
-    body: 'Take a tour.',
-    cta: 'Begin tour',
-  },
-  {
-    id: 'instrument',
-    title: 'What do you play?',
-    body: 'So the tuner shows your written notes, not concert pitch.',
-    cta: 'Continue',
-  },
-  {
-    id: 'routine',
-    title: 'Lay out your daily routine',
-    body: 'A short checklist. Each step opens the right tool, set the way you want it.',
-    cta: 'Skip for now',
-  },
-  {
-    id: 'closing',
-    title: 'Record your best take',
-    body: 'Then beat it.',
-    cta: 'Start tour',
-  },
+  { id: 'welcome', title: 'Welcome to BestTake',
+    body: 'A place to practice, record, and hear your progress.', cta: 'Get started' },
+  { id: 'instrument', title: 'What do you play?',
+    body: 'We’ll set up the tuner for your instrument.', cta: 'Continue' },
+  { id: 'tools', title: 'Your practice tools',
+    body: 'Find these in Tools.', cta: 'Continue' },
+  { id: 'record', title: 'Record a take',
+    body: 'Camera records video. Record in Tools captures audio.', cta: 'Continue' },
+  { id: 'workspace', title: 'Set up your space',
+    body: 'Tap Workspace beside Record.', cta: 'Continue' },
+  { id: 'routine', title: 'Ready to play?',
+    body: 'Put your exercises in order. Each step opens the tools you need.', cta: 'Explore on my own' },
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [
@@ -564,7 +552,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'reset-tutorials',
     title: 'Reset Tutorials',
-    body: 'Run the intro cards and the guided tour again. Your recordings and settings are untouched.',
+    body: 'Replay the introduction to instruments, practice tools, recordings, and routines. Your recordings are untouched.',
     bullets: [],
   },
 ]

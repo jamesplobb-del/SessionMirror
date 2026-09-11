@@ -100,7 +100,7 @@ function reads(minMidi: number, maxMidi: number): WrittenRange {
 export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   /* ── Brass ── */
   {
-    id: 'trumpet', name: 'B♭ Trumpet / Cornet', shortName: 'Trumpet', family: 'Brass',
+    id: 'trumpet', name: 'B♭ Trumpet', shortName: 'Trumpet', family: 'Brass',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Fs3, N.C6),
   },

@@ -1,302 +1,140 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowRight, Check, ChevronDown, ListChecks, Sparkles } from 'lucide-react'
-import Pressable from './ui/Pressable'
+import { ArrowLeft, ArrowRight, AudioLines, Timer, Pin, FolderOpen, Layers, ListChecks, Music2, Play, SlidersHorizontal, Gamepad2 } from 'lucide-react'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
 import type { RoutineBuilderMode } from './RoutineBuilder'
-import {
-  INSTRUMENT_FAMILIES,
-  getInstrumentProfile,
-  getInstrumentProfilesByFamily,
-} from '../utils/instrumentProfiles'
-import { getTunerProfile } from '../utils/pitchConfig'
+import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
 import { getTunerTransposition } from '../utils/tunerTransposition'
-import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import { triggerLightHaptic } from '../utils/haptics'
+import '../styles/practice-introduction.css'
 
 interface OnboardingTutorialProps {
   onComplete: () => void
   onSkip: () => void
-  /** Applies the tuner and hands-free settings implied by the chosen instrument. */
+  onQuickPlay: () => void
   onSelectInstrument: (instrumentId: string) => void
-  /** Ends the cards and opens the routine builder in the hub. */
   onChooseRoutine: (mode: RoutineBuilderMode) => void
+  initialInstrumentId?: string
   hapticFeedback?: boolean
 }
 
-export default function OnboardingTutorial({
-  onComplete,
-  onSkip,
-  onSelectInstrument,
-  onChooseRoutine,
-  hapticFeedback = true,
-}: OnboardingTutorialProps) {
+export default function OnboardingTutorial({ onComplete, onSkip, onQuickPlay, onSelectInstrument, onChooseRoutine, initialInstrumentId, hapticFeedback = true }: OnboardingTutorialProps) {
   const [index, setIndex] = useState(0)
-  const [selectedInstrument, setSelectedInstrument] = useState<string | null>(null)
-  const card = ONBOARDING_CARDS[index] ?? ONBOARDING_CARDS[0]
-  const isLast = index >= ONBOARDING_CARDS.length - 1
-  const isInstrumentStep = card.id === 'instrument'
-  const isRoutineStep = card.id === 'routine'
-  const isChoiceStep = isInstrumentStep || isRoutineStep
+  const [selected, setSelected] = useState(initialInstrumentId ?? '')
+  const dialog = useRef<HTMLDivElement>(null)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const reducedMotion = useReducedMotion()
+  const card = ONBOARDING_CARDS[index]
+  const last = index === ONBOARDING_CARDS.length - 1
+  const profile = selected ? getInstrumentProfile(selected) : undefined
 
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null
+    const siblings = Array.from(document.body.children).filter((element): element is HTMLElement => element instanceof HTMLElement && element !== dialog.current)
+    const inertBefore = siblings.map(element => element.inert)
+    siblings.forEach(element => { element.inert = true })
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     document.body.classList.add('tutorial-active')
     return () => {
+      siblings.forEach((element, index) => { element.inert = inertBefore[index] })
+      document.body.style.overflow = overflow
       document.body.classList.remove('tutorial-active')
+      if (previousFocus?.isConnected) previousFocus.focus()
     }
   }, [])
+  useEffect(() => { heading.current?.focus({ preventScroll: true }) }, [index])
 
-  const finish = useCallback(() => {
+  const finish = (action: () => void) => {
     markOnboardingComplete()
-    onComplete()
-  }, [onComplete])
-
-  const skip = useCallback(() => {
-    markOnboardingComplete()
-    onSkip()
-  }, [onSkip])
-
-  const handleNext = useCallback(() => {
+    action()
+  }
+  const advance = () => {
     void triggerLightHaptic(hapticFeedback)
-    if (isLast) {
-      finish()
-      return
-    }
-    setIndex((value) => Math.min(ONBOARDING_CARDS.length - 1, value + 1))
-  }, [finish, hapticFeedback, isLast])
-
-  /** The card body advances on tap, but only where there is nothing to choose. */
-  const handleCardTap = useCallback(() => {
-    if (isChoiceStep) return
-    handleNext()
-  }, [handleNext, isChoiceStep])
-
-  const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (isChoiceStep) return
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      handleNext()
-    },
-    [handleNext, isChoiceStep],
-  )
-
-  const handleChooseRoutine = useCallback(
-    (mode: RoutineBuilderMode) => {
-      void triggerLightHaptic(hapticFeedback)
-      markOnboardingComplete()
-      onChooseRoutine(mode)
-    },
-    [hapticFeedback, onChooseRoutine],
-  )
-
-  const handleSelectInstrument = useCallback(
-    (instrumentId: string) => {
-      if (!instrumentId) return
-      void triggerLightHaptic(hapticFeedback)
-      setSelectedInstrument(instrumentId)
-      onSelectInstrument(instrumentId)
-    },
-    [hapticFeedback, onSelectInstrument],
-  )
-
-  if (typeof document === 'undefined') return null
-
-  const selectedProfile = selectedInstrument ? getInstrumentProfile(selectedInstrument) : undefined
-  const selectionSummary = selectedProfile
-    ? `${getTunerProfile(selectedProfile.tunerInstrument).label} · Written pitch: ${
-        getTunerTransposition(selectedProfile.tunerTransposition).shortLabel
-      }`
-    : null
+    if (last) finish(onComplete)
+    else setIndex(index + 1)
+  }
 
   return createPortal(
-    <div
-      className="onboarding-lite fixed inset-0 z-[145]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="BestTake onboarding"
-      tabIndex={0}
-      onClick={handleCardTap}
-      onKeyDown={handleKeyDown}
-    >
-      <motion.div
-        className="onboarding-lite__backdrop absolute inset-0"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      />
-      <motion.div
-        className={`onboarding-lite__card onboarding-lite__card--${card.id}`}
-        data-onboarding-card={card.id}
-        initial={{ opacity: 0, y: 28, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 18, scale: 0.98 }}
-        transition={iosSpringSnappy}
-        style={motionGpuLayer}
-      >
-        <header className="onboarding-lite__top">
-          <div className="onboarding-lite__brand">
-            <div className="onboarding-lite__glyph" aria-hidden>
-              <img src="/icons/icon.png" alt="" draggable={false} />
-            </div>
-            <span>
-              <strong>BestTake</strong>
-              <small>Quick tour</small>
-            </span>
-          </div>
+    <div className="practice-intro" role="dialog" aria-modal="true" aria-labelledby="practice-intro-title" ref={dialog}
+      onKeyDown={(event) => {
+        event.stopPropagation()
+        if (event.key === 'Escape') { event.stopPropagation(); finish(onSkip) }
+        if (event.key !== 'Tab') return
+        const controls = Array.from(dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), select') ?? [])
+        const first = controls[0], end = controls.at(-1)
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === heading.current)) {
+          event.preventDefault(); end?.focus()
+        } else if (!event.shiftKey && document.activeElement === end) {
+          event.preventDefault(); first?.focus()
+        }
+      }}>
+      <div className={`practice-intro__shell ${index === 0 ? 'practice-intro__shell--welcome' : ''}`}>
+        <header className="practice-intro__header">
+          <span className="practice-intro__brand"><img src="/icons/icon.png" alt="" />BestTake</span>
+          <button className="practice-intro__quiet" onClick={() => finish(onSkip)}>Skip intro</button>
         </header>
+        <div className="practice-intro__progress" aria-label={`Step ${index + 1} of ${ONBOARDING_CARDS.length}`}>
+          {ONBOARDING_CARDS.map((step, i) => <span key={step.id} data-filled={i <= index} />)}
+        </div>
+        <motion.main key={card.id} className="practice-intro__body" data-onboarding-card={card.id}
+          initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .24 }}>
 
-        <AnimatePresence mode="wait">
-          <motion.section
-            key={card.id}
-            className="onboarding-lite__copy"
-            initial={{ opacity: 0, x: 14 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -14 }}
-            transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-          >
-            {card.kicker ? (
-              <span className="onboarding-lite__kicker">{card.kicker}</span>
-            ) : null}
-            <h1>{card.title}</h1>
-            <p>{card.body}</p>
+          {card.id === 'welcome' && <div className="practice-intro__welcome-mark" aria-hidden="true">
+            <img src="/icons/icon.png" alt="" draggable={false} />
+          </div>}
+          <h1 id="practice-intro-title" tabIndex={-1} ref={heading}>{card.title}</h1>
+          {!last && <p className="practice-intro__description">{card.body}</p>}
 
-            {isInstrumentStep ? (
-              <div className="onboarding-lite__instrument-field">
-                {/*
-                 * A plain <select> on purpose: iOS renders it as the system
-                 * wheel picker, so the instrument list scrolls the way every
-                 * other picker on the device does and needs no scroll
-                 * container of our own.
-                 */}
-                <select
-                  className="onboarding-lite__instrument-select"
-                  aria-label="Instrument"
-                  data-placeholder={selectedInstrument === null}
-                  value={selectedInstrument ?? ''}
-                  onClick={(event) => event.stopPropagation()}
-                  onChange={(event) => handleSelectInstrument(event.target.value)}
-                >
-                  <option value="" disabled>
-                    Choose your instrument
-                  </option>
-                  {INSTRUMENT_FAMILIES.map((family) => (
-                    <optgroup key={family} label={family}>
-                      {getInstrumentProfilesByFamily(family).map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                          {profile.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <ChevronDown className="onboarding-lite__instrument-chevron" aria-hidden />
-              </div>
-            ) : null}
+          {card.id === 'instrument' && <div className="practice-intro__panel">
+            <Music2 className="practice-intro__large-icon" aria-hidden="true" />
+            <label htmlFor="intro-instrument">Your instrument</label>
+            <select id="intro-instrument" value={selected} onChange={(event) => {
+              setSelected(event.target.value); onSelectInstrument(event.target.value)
+            }}>
+              <option value="" disabled>Choose your instrument</option>
+              {INSTRUMENT_FAMILIES.map(family => <optgroup key={family} label={family}>
+                {getInstrumentProfilesByFamily(family).map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </optgroup>)}
+            </select>
+            <p className="practice-intro__note" aria-live="polite">{profile
+              ? `${profile.label} selected · ${getTunerTransposition(profile.tunerTransposition).shortLabel} written pitch. Change this anytime from Home.`
+              : 'Choose your main instrument, or set this later.'}</p>
+          </div>}
 
-            {isInstrumentStep && selectionSummary ? (
-              <p className="onboarding-lite__instrument-summary" aria-live="polite">
-                <Check aria-hidden />
-                {selectionSummary}
-              </p>
-            ) : null}
+          {card.id === 'tools' && <div className="practice-intro__list">
+            <div><AudioLines /><span><strong>Tuner & Drone</strong><p>Check your pitch. Play against a drone. See your tendencies in Insights.</p></span></div>
+            <div><Timer /><span><strong>Metronome</strong><p>Set the beat. Use Program for tempo changes.</p></span></div>
+            <div><Gamepad2 /><span><strong>Games</strong><p>Practice pitch and sight-reading by playing.</p></span></div>
+          </div>}
 
-            {isRoutineStep ? (
-              <div className="onboarding-lite__routine-choices">
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  haptic="light"
-                  hapticFeedback={hapticFeedback}
-                  className="onboarding-lite__routine-choice is-primary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleChooseRoutine('build')
-                  }}
-                >
-                  <ListChecks aria-hidden />
-                  <span>
-                    <strong>Build my routine</strong>
-                    <small>Add the things you actually do, in order.</small>
-                  </span>
-                  <ArrowRight aria-hidden />
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  haptic="light"
-                  hapticFeedback={hapticFeedback}
-                  className="onboarding-lite__routine-choice"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleChooseRoutine('presets')
-                  }}
-                >
-                  <Sparkles aria-hidden />
-                  <span>
-                    <strong>Start from a preset</strong>
-                    <small>
-                      {selectedProfile ? `A common ${selectedProfile.label.toLowerCase()} routine to edit.` : 'A common routine you can edit.'}
-                    </small>
-                  </span>
-                  <ArrowRight aria-hidden />
-                </Pressable>
-              </div>
-            ) : null}
+          {card.id === 'record' && <div className="practice-intro__list">
+            <div><Play /><span><strong>Listen back</strong><p>Tap Record to start and stop. Tap the saved take to play it.</p></span></div>
+            <div><Pin /><span><strong>Keep your best</strong><p>Pin a Best Take to compare with your next try.</p></span></div>
+            <div><FolderOpen /><span><strong>Vault</strong><p>Takes save automatically. Find and share them from Home → Vault.</p></span></div>
+            <p className="practice-intro__tip">Hands-free: hold Record to turn it on. Play to start; pause to stop.</p>
+          </div>}
 
-            {card.highlights?.length ? (
-              <div className="onboarding-lite__highlights" aria-label="Highlights">
-                {card.highlights.map((highlight) => (
-                  <span key={highlight}>
-                    <Check aria-hidden />
-                    {highlight}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </motion.section>
-        </AnimatePresence>
+          {card.id === 'workspace' && <div className="practice-intro__list">
+            <div><Layers /><span><strong>Floating tools</strong><p>Keep pitch or tempo visible while recording.</p></span></div>
+            <div><Music2 /><span><strong>References</strong><p>Use Expand View to play beside a reference. Headphones keep it out of your take.</p></span></div>
+            <div><SlidersHorizontal /><span><strong>Audio Enhance & Multitrack</strong><p>Refine your sound or layer recordings in Camera’s Workspace.</p></span></div>
+          </div>}
 
-        <footer className="onboarding-lite__footer">
-          <Pressable
-            type="button"
-            intensity="soft"
-            haptic="light"
-            hapticFeedback={hapticFeedback}
-            onClick={(event) => {
-              event.stopPropagation()
-              skip()
-            }}
-            className="onboarding-lite__skip"
-          >
-            Skip tour
-          </Pressable>
-          {isChoiceStep ? (
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              onClick={(event) => {
-                event.stopPropagation()
-                handleNext()
-              }}
-              className={`onboarding-lite__tap-hint ${isRoutineStep ? 'onboarding-lite__tap-hint--quiet' : ''}`}
-            >
-              {card.cta}
-              <ArrowRight className="h-4 w-4" />
-            </Pressable>
-          ) : (
-            <div className="onboarding-lite__tap-hint" aria-hidden>
-              {card.cta}
-              <ArrowRight className="h-4 w-4" />
-            </div>
-          )}
+          {last && <>
+            <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Quick Play<ArrowRight /></button>
+            <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('presets'))}><ListChecks />Choose a routine<ArrowRight /></button>
+            <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('build'))}>Build my own routine<ArrowRight /></button>
+          </>}
+        </motion.main>
+        <footer className="practice-intro__footer">
+          <button aria-label="Previous step" className="practice-intro__back" disabled={index === 0} onClick={() => setIndex(index - 1)}><ArrowLeft /></button>
+          <span className="practice-intro__count">{index + 1} / {ONBOARDING_CARDS.length}</span>
+          <button className={last ? 'practice-intro__quiet' : 'practice-intro__primary'} onClick={advance}>{card.cta}<ArrowRight /></button>
         </footer>
-      </motion.div>
-    </div>,
-    document.body,
+      </div>
+    </div>, document.body,
   )
 }

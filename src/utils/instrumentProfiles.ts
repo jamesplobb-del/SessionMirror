@@ -50,7 +50,7 @@ export const INSTRUMENT_PROFILES: readonly InstrumentProfile[] = [
   // Brass — loud, fast attacks, wide written-pitch spread.
   {
     id: 'trumpet',
-    label: 'Trumpet / cornet',
+    label: 'Trumpet',
     family: 'Brass',
     tunerInstrument: 'winds',
     tunerTransposition: 'bb',
@@ -292,7 +292,7 @@ export function getInstrumentSettings(id: string): InstrumentSettingsPatch | nul
   }
 }
 
-/** Short enough to be the Practice Home title. "Trumpet / cornet" → "Trumpet". */
+/** Short enough to be the Practice Home title. */
 export function instrumentHeading(id: string | null): string {
   if (!id) return 'Choose your instrument'
   const profile = PROFILE_BY_ID.get(id)
