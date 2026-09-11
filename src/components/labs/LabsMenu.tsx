@@ -300,8 +300,12 @@ export default function LabsMenu({
       className="balance-arcade--plaza balance-arcade--hall"
     >
       <h1 className="sr-only">Practice Games</h1>
+      <p className="balance-hall__beta" role="note">
+        <strong>Beta</strong>
+        These games are still being shaped, so you may hit a few rough edges.
+      </p>
 
-      <Pressable
+      <Pressable>
         intensity="soft"
         hapticFeedback={hapticFeedback}
         className="balance-instrument-board"

@@ -44,8 +44,12 @@ export default function AudioPracticeTopTabs({
             data-tutorial={`audio-tab-${tab.id}`}
             className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}
             aria-current={isActive ? 'page' : undefined}
+            aria-label={tab.id === 'games' ? 'Games, beta' : undefined}
           >
             {tab.label}
+            {tab.id === 'games' ? (
+              <span className="audio-practice-top-tabs__beta"> Beta</span>
+            ) : null}
           </Pressable>
         )
       })}

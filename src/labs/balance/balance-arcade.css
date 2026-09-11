@@ -745,6 +745,31 @@
   gap: 0.5rem;
 }
 
+.balance-hall__beta {
+  margin: 0;
+  padding: 0.42rem 0.75rem 0.48rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 0.12rem 0.3rem rgba(30, 84, 138, 0.1);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.balance-hall__beta strong {
+  margin-right: 0.4rem;
+  color: var(--ink);
+  font-family: var(--display-font);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
 .balance-instrument-board {
   display: grid;
   width: 100%;
