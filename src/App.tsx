@@ -275,12 +275,12 @@ import {
   loadPreferredInstrumentId,
   loadRoutine,
   loadRoutineDay,
-  nextOpenStep,
   reconcileDay,
   routineResumeStep,
   savePreferredInstrumentId,
   saveRoutine,
   saveRoutineDay,
+  stepAfter,
   todayKey,
   type Routine,
   type RoutineDay,
@@ -5447,7 +5447,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       sharedMetronomeEngine.stop()
       applyDroneFromDesk(null, 4)
       deferHudMediaPause()
-      const next = nextOpenStep(target, nextDay, stepId)
+      // Done & next walks the list in order; only the last step finishes.
+      const next = stepAfter(target, stepId)
       if (next) await openRoutineStep(next.id)
       else {
         if (isChallengeRoutine(target)) {
@@ -5599,8 +5600,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const routineNextStep = useMemo(() => {
     if (!routine || !routineActiveStep) return null
-    return nextOpenStep(routine, routineDay, routineActiveStep.id)
-  }, [routine, routineActiveStep, routineDay])
+    return stepAfter(routine, routineActiveStep.id)
+  }, [routine, routineActiveStep])
 
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => {

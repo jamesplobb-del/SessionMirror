@@ -506,7 +506,18 @@ export function isStepSettled(day: RoutineDay | null, stepId: string): boolean {
 export function nextOpenStep(routine: Routine, day: RoutineDay | null, afterStepId?: string | null): RoutineStep | null {
   const startIndex = afterStepId ? routine.steps.findIndex((step) => step.id === afterStepId) + 1 : 0
   const ordered = [...routine.steps.slice(startIndex), ...routine.steps.slice(0, startIndex)]
-  return ordered.find((step) => !isStepSettled(day, step.id)) ?? null
+  // Wrapping round must never come back to the step it started from.
+  return ordered.find((step) => step.id !== afterStepId && !isStepSettled(day, step.id)) ?? null
+}
+
+/**
+ * What Done & next opens: the step after this one in the routine's own order,
+ * whether or not it was already done today — a second run through the routine
+ * walks the same list. Null on the last step, which finishes the routine.
+ */
+export function stepAfter(routine: Routine, stepId: string): RoutineStep | null {
+  const index = routine.steps.findIndex((step) => step.id === stepId)
+  return index < 0 ? null : routine.steps[index + 1] ?? null
 }
 
 /** What Start or Continue should open: the step in flight, else the next open one. */
