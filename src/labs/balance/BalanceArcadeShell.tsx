@@ -16,6 +16,8 @@ interface BalanceArcadeShellProps {
   className?: string
   /** The trail manages its own scrolling, so it opts the body out. */
   scrollBody?: boolean
+  /** Short status line under the bar — beta notice, and similar. */
+  notice?: ReactNode
 }
 
 /**
@@ -34,6 +36,7 @@ export default function BalanceArcadeShell({
   footer,
   className = '',
   scrollBody = true,
+  notice,
 }: BalanceArcadeShellProps) {
   return (
     <div className={`balance-arcade ${className}`}>
@@ -51,7 +54,10 @@ export default function BalanceArcadeShell({
         >
           <ArrowLeft aria-hidden />
         </Pressable>
-        <p className="balance-arcade__bar-title">{title}</p>
+        <p className="balance-arcade__bar-title">
+          {title}
+          {notice ? <span className="balance-arcade__bar-beta">Beta</span> : null}
+        </p>
         {stat ? (
           <p className="balance-arcade__bar-stat">
             <small>{stat.label}</small>
@@ -61,6 +67,12 @@ export default function BalanceArcadeShell({
           <span />
         )}
       </header>
+
+      {notice ? (
+        <p className="balance-arcade__notice" role="note">
+          {notice}
+        </p>
+      ) : null}
 
       <div
         className="balance-arcade__body"

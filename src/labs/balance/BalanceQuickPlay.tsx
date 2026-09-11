@@ -1,6 +1,7 @@
-import { isBalanceDecayInstrument } from './balanceInstruments'
+import { getBalanceInstrument, isBalanceDecayInstrument } from './balanceInstruments'
 import { useMemo, useRef } from 'react'
 import { Mic, Play, Settings } from 'lucide-react'
+import ArcadePickerChip from '../../components/labs/ArcadePickerChip'
 import Pressable from '../../components/ui/Pressable'
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { PitchReadout } from '../../utils/pitchUtils'
@@ -23,6 +24,7 @@ interface BalanceQuickPlayProps {
   hapticFeedback: boolean
   onBack: () => void
   onStart: () => void
+  onUpdate: (patch: Partial<BalanceSettings>) => void
   onOptions: () => void
   onRequestMic: () => void
 }
@@ -49,6 +51,7 @@ export default function BalanceQuickPlay({
   hapticFeedback,
   onBack,
   onStart,
+  onUpdate,
   onOptions,
   onRequestMic,
 }: BalanceQuickPlayProps) {
@@ -72,6 +75,32 @@ export default function BalanceQuickPlay({
       : settings.routineType === 'single'
         ? midiToBalanceNoteName(settings.single.writtenMidi)
         : '—')
+
+  /*
+   * The Note chip opens a picker with the same bounds as the setup screen:
+   * the instrument's written range. A custom routine's notes are its own, so
+   * there it stays a label.
+   */
+  const instrument = getBalanceInstrument(settings.instrumentId)
+  const noteMidi =
+    settings.routineType === 'scale' ? settings.scale.rootWrittenMidi : settings.single.writtenMidi
+  const noteCanChange =
+    settings.routineType !== 'custom' && instrument.maxWrittenMidi > instrument.minWrittenMidi
+  const noteOptions = useMemo(
+    () =>
+      Array.from({ length: instrument.maxWrittenMidi - instrument.minWrittenMidi + 1 }, (_, index) => {
+        const midi = instrument.minWrittenMidi + index
+        return { value: midi, label: midiToBalanceNoteName(midi) }
+      }),
+    [instrument.maxWrittenMidi, instrument.minWrittenMidi],
+  )
+  const chooseNote = (midi: number) => {
+    if (settings.routineType === 'scale') {
+      onUpdate({ scale: { ...settings.scale, rootWrittenMidi: midi } })
+    } else {
+      onUpdate({ single: { ...settings.single, writtenMidi: midi } })
+    }
+  }
 
   const goalLabel =
     settings.goalMode === 'personalBest' ? 'Best' : `${settings.goalSeconds} sec`
@@ -119,10 +148,22 @@ export default function BalanceQuickPlay({
       </div>
 
       <div className="balance-chips">
-        <span className="balance-chip">
-          <small>Note</small>
-          <strong>{noteLabel}</strong>
-        </span>
+        {noteCanChange ? (
+          <ArcadePickerChip
+            label="Note"
+            value={noteMidi}
+            display={noteLabel}
+            options={noteOptions}
+            hapticFeedback={hapticFeedback}
+            className="balance-chip"
+            onChange={chooseNote}
+          />
+        ) : (
+          <span className="balance-chip">
+            <small>Note</small>
+            <strong>{noteLabel}</strong>
+          </span>
+        )}
         <span className="balance-chip">
           <small>Goal</small>
           <strong>{goalLabel}</strong>

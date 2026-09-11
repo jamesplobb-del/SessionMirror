@@ -1,5 +1,7 @@
 import { memo } from 'react'
-import { Settings2 } from 'lucide-react'
+import { useHandsFreePanelLayout } from '../hooks/useHandsFreePanelLayout'
+import '../styles/hands-free-panel.css'
+import { Settings2, GripHorizontal, MoveDiagonal2 } from 'lucide-react'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
 /**
@@ -14,6 +16,8 @@ export type HandsFreeStagePlacement = 'center' | 'chip'
 interface HandsFreeStageProps {
   /** Null whenever hands-free is off or another surface owns the screen. */
   phase: HandsFreePhase | null
+  movable?: boolean
+  notice?: 'sensitive' | 'microphone' | 'start' | null
   /** Seconds elapsed in the current take — shown while recording. */
   elapsed: number
   replayCountdown?: number | null
@@ -49,6 +53,8 @@ function formatElapsed(seconds: number): string {
  */
 function HandsFreeStage({
   phase,
+  movable = false,
+  notice = null,
   elapsed,
   replayCountdown,
   onFinishTake,
@@ -57,12 +63,13 @@ function HandsFreeStage({
   placement = 'center',
   onTapForSettings,
 }: HandsFreeStageProps) {
+  const panel = useHandsFreePanelLayout(movable)
   const copy = phase ? PHASE_COPY[phase] : null
   const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
 
   return (
     <div
-      className={`hands-free-stage hands-free-stage--${placement} ${
+      className={`hands-free-stage ${movable ? 'hands-free-stage--movable' : ''} hands-free-stage--${placement} ${
         phase ? `hands-free-stage--${phase}` : ''
       } ${
         // The chip carries its own dark backing, so the light-backdrop palette
@@ -78,7 +85,9 @@ function HandsFreeStage({
       <div className="hands-free-stage__wash" aria-hidden />
       <div className="hands-free-stage__rim" aria-hidden />
 
-      <div className="hands-free-stage__center">
+      <div className="hands-free-stage__center" ref={panel.panelRef}
+        style={movable ? { position: 'absolute', left: panel.layout.x, top: panel.layout.y, width: panel.layout.width } : undefined}>
+        {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><GripHorizontal aria-hidden />Move</button>}
         <span className="hands-free-stage__pulse" aria-hidden />
         <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
         <small className="hands-free-stage__detail">{copy?.detail ?? ''}</small>
@@ -93,6 +102,14 @@ function HandsFreeStage({
         {phase === 'playback' && onNextTake && (
           <button type="button" className="hands-free-stage__action" onClick={onNextTake}>Next take</button>
         )}
+        {notice && <div className="hands-free-panel__notice">
+          <small>{notice === 'sensitive'
+            ? 'Room noise or very short takes? Try a higher start level so only louder playing triggers recording.'
+            : notice === 'microphone' ? 'Microphone signal interrupted. Check your audio connection before the next take.'
+            : 'Recording did not start. Try again or use manual Record.'}</small>
+          {notice === 'sensitive' && onTapForSettings && <button type="button" onClick={onTapForSettings}>Adjust start level</button>}
+        </div>}
+        {movable && <button type="button" className="hands-free-panel__resize" aria-label="Resize hands-free controls" {...panel.controls(true)}><MoveDiagonal2 aria-hidden /></button>}
         {/* The centre treatment has room for the words; the compact pill on the
           * dense Tools tabs takes a glyph instead, so the status copy is never
           * squeezed on a narrow phone. Both open the same card. */}

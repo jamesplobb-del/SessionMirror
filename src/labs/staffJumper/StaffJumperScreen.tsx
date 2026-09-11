@@ -68,29 +68,20 @@ import { useStaffJumperGame } from './useStaffJumperGame'
 import type { TunerInstrument } from '../../utils/pitchConfig'
 import Pressable from '../../components/ui/Pressable'
 import ArcadeCycleChip, { cycleNext } from '../../components/labs/ArcadeCycleChip'
+import ArcadePickerChip from '../../components/labs/ArcadePickerChip'
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
 import StaffJumperGame from './StaffJumperGame'
 import StaffPreview from './StaffPreview'
 import { loadStaffJumperSetupPrefs, saveStaffJumperSetupPrefs } from './staffJumperSetupPrefs'
 
-const TEMPO_PRESETS = [60, 72, 80, 88, 96, 108, 120, 132] as const
-
-function cycleTempo(current: number): number {
-  return TEMPO_PRESETS.find((bpm) => bpm > current) ?? TEMPO_PRESETS[0]!
-}
-
-function tempoPresetIndex(bpm: number): number {
-  let best = 0
-  let bestDist = Number.POSITIVE_INFINITY
-  TEMPO_PRESETS.forEach((preset, index) => {
-    const dist = Math.abs(preset - bpm)
-    if (dist < bestDist) {
-      best = index
-      bestDist = dist
-    }
-  })
-  return best
-}
+/** Every tempo the game plays, for the Tempo chip's picker wheel. */
+const TEMPO_OPTIONS = Array.from(
+  { length: STAFF_JUMPER_TEMPO_MAX - STAFF_JUMPER_TEMPO_MIN + 1 },
+  (_, index) => {
+    const bpm = STAFF_JUMPER_TEMPO_MIN + index
+    return { value: bpm, label: `${bpm} BPM` }
+  },
+)
 
 interface StaffJumperScreenProps {
   dailyChallenge?: DailyChallengePlan | null
@@ -654,13 +645,13 @@ export default function StaffJumperScreen({
             hapticFeedback={hapticFeedback}
             onCycle={() => setDraftRange(cycleNext(STAFF_JUMPER_RANGES, draftRange))}
           />
-          <ArcadeCycleChip
+          <ArcadePickerChip
             label="Tempo"
-            value={`${draftTempo}`}
-            step={tempoPresetIndex(draftTempo)}
-            stepCount={TEMPO_PRESETS.length}
+            value={draftTempo}
+            display={`${draftTempo}`}
+            options={TEMPO_OPTIONS}
             hapticFeedback={hapticFeedback}
-            onCycle={() => setDraftTempo(cycleTempo(draftTempo))}
+            onChange={setDraftTempo}
           />
         </div>
         <p className="balance-ready__hint">Tap a button to change it</p>

@@ -166,7 +166,11 @@
 }
 
 .balance-arcade__bar-title {
+  display: flex;
   min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   font-family: var(--display-font);
   font-size: 1rem;
   font-weight: 800;
@@ -175,6 +179,49 @@
   text-transform: uppercase;
   color: var(--ink);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.balance-arcade__bar-beta {
+  flex: 0 0 auto;
+  padding: 0.14rem 0.42rem 0.16rem;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.balance-arcade__notice {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  margin:
+    0
+    max(1rem, env(safe-area-inset-right, 0px))
+    0.15rem
+    max(1rem, env(safe-area-inset-left, 0px));
+  padding: 0.55rem 0.9rem 0.6rem;
+  border-radius: 0.95rem;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--lift);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.balance-arcade__notice strong {
+  margin-right: 0.4rem;
+  color: var(--ink);
+  font-family: var(--display-font);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
 }
 
 /* Round glass buttons, the same object at both ends of the bar. */
@@ -745,31 +792,6 @@
   gap: 0.5rem;
 }
 
-.balance-hall__beta {
-  margin: 0;
-  padding: 0.42rem 0.75rem 0.48rem;
-  border-radius: 0.95rem;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 0.12rem 0.3rem rgba(30, 84, 138, 0.1);
-  color: var(--ink-soft);
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.balance-hall__beta strong {
-  margin-right: 0.4rem;
-  color: var(--ink);
-  font-family: var(--display-font);
-  font-size: 0.68rem;
-  font-weight: 900;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
 .balance-instrument-board {
   display: grid;
   width: 100%;
@@ -1038,7 +1060,8 @@
   -webkit-user-drag: none;
 }
 
-.balance-hall__roster-pick svg {
+/* The selected tick on the art — not the trophy icon in the price below it. */
+.balance-hall__roster-pick > span svg {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -1060,6 +1083,55 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* What each character plays, in the arcade's rounded type. */
+.balance-hall__roster-pick small,
+.balance-plaza__character small {
+  max-width: 100%;
+  color: var(--ink-soft);
+  font-family: var(--display-font);
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.balance-plaza__character small {
+  font-size: 0.66rem;
+}
+
+/* The unlock price as a gold trophy chip, the same gold as the Continue pill. */
+.balance-hall__roster-pick .balance-trophy-cost,
+.balance-plaza__character .balance-trophy-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.14rem;
+  padding: 0.1rem 0.36rem 0.12rem 0.28rem;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--gold);
+  box-shadow: 0 0.1rem 0 var(--gold-edge);
+  font-size: 0.56rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.balance-trophy-cost svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+  stroke-width: 2.5;
+}
+
+.balance-plaza__character .balance-trophy-cost {
+  font-size: 0.7rem;
+}
+
+.balance-plaza__character .balance-trophy-cost svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .balance-hall__player {
@@ -1443,6 +1515,44 @@
 
 .balance-cycle__dots i.is-on {
   background: var(--blue-mid);
+}
+
+/* Picked from a list rather than stepped: the system picker's select covers the chip. */
+.arcade-picker {
+  position: relative;
+  cursor: pointer;
+}
+
+.arcade-picker__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  /* Under 16px, iOS zooms the page in when the picker opens. */
+  font-size: 16px;
+  cursor: pointer;
+  appearance: none;
+}
+
+.arcade-picker:focus-within {
+  outline: 0.14rem solid var(--blue-mid);
+  outline-offset: 0.12rem;
+}
+
+.balance-chip.arcade-picker strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.arcade-picker strong svg {
+  width: 0.85em;
+  height: 0.85em;
+  flex: 0 0 auto;
+  opacity: 0.55;
 }
 
 .balance-ready__hint {

@@ -1,6 +1,6 @@
 import { characterUnlocked, CHARACTER_COSTS } from '../../utils/dailyChallenges'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, Trophy } from 'lucide-react'
 import balanceShot from '../../assets/games/balance.jpg'
 import learnInstrumentShot from '../../assets/games/learn-instrument.jpg'
 import staffJumperShot from '../../assets/games/staff-jumper.jpg'
@@ -243,7 +243,7 @@ export default function LabsMenu({
                 </span>
                 <strong>{option.name}</strong>
                 <small>{option.instrument}</small>
-                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
+                {!unlocked && <small className="balance-trophy-cost"><Trophy aria-hidden />{CHARACTER_COSTS[option.id]}</small>}
               </Pressable>
             )
           })}
@@ -298,14 +298,16 @@ export default function LabsMenu({
       backLabel="Close Games"
       stat={streak > 0 ? { label: 'Streak', value: `${streak} day` } : null}
       className="balance-arcade--plaza balance-arcade--hall"
+      notice={
+        <>
+          <strong>Beta</strong>
+          These games are still being shaped, so you may hit a few rough edges.
+        </>
+      }
     >
       <h1 className="sr-only">Practice Games</h1>
-      <p className="balance-hall__beta" role="note">
-        <strong>Beta</strong>
-        These games are still being shaped, so you may hit a few rough edges.
-      </p>
 
-      <Pressable>
+      <Pressable
         intensity="soft"
         hapticFeedback={hapticFeedback}
         className="balance-instrument-board"
@@ -402,7 +404,7 @@ export default function LabsMenu({
                 </span>
                 <strong>{option.name}</strong>
                 <small>{option.instrument}</small>
-                {!unlocked && <small>{CHARACTER_COSTS[option.id]} trophies</small>}
+                {!unlocked && <small className="balance-trophy-cost"><Trophy aria-hidden />{CHARACTER_COSTS[option.id]}</small>}
               </Pressable>
             )
           })}

@@ -1,3 +1,4 @@
+import { createHandsFreeHealth } from '../utils/handsFreeHealth'
 import { createHandsFreeSilence } from '../utils/handsFreeSilence'
 import { advanceAutoStart } from '../utils/autoStartGate'
 import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
@@ -31,11 +32,11 @@ const NATIVE_MONITOR_WARMUP_MS = 180
 // arming; the existing pre-roll preserves the onset of a sustained phrase.
 const ARM_QUIET_FRAMES = 3
 const POST_PLAYBACK_WARMUP_MS = 450
-const START_LATCH_MS = 1200
+const START_LATCH_MS = 3500
 const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
 const STALL_RECOVERY_MS = 2200
-const START_FAILURE_CLEAR_MS = 450
+const START_FAILURE_CLEAR_MS = 3000
 const QUIET_EMA_ALPHA = 0.03
 const METRONOME_START_HOLD_MS = 180
 
@@ -153,6 +154,12 @@ export function useAutoSoundRecording({
   onAutoRecordingFinished,
   onMonitorStalled,
 }: UseAutoSoundRecordingOptions) {
+  const healthRef = useRef(createHandsFreeHealth())
+  const [handsFreeNotice, setHandsFreeNotice] = useState<'sensitive' | 'microphone' | 'start' | null>(null)
+  useEffect(() => {
+    healthRef.current.reset()
+    setHandsFreeNotice(null)
+  }, [enabled, volumeThreshold])
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -282,6 +289,10 @@ export function useAutoSoundRecording({
       startFailureTimerRef.current = null
       if (!isRecordingRef.current) {
         autoTriggeredRef.current = false
+        pendingPerformanceGateRef.current = false
+        loudSinceRef.current = null
+        setHandsFreeRecording(false)
+        setHandsFreeNotice('start')
         clearStartLatch()
         void warmRecorderRef.current()
       }
@@ -368,11 +379,17 @@ export function useAutoSoundRecording({
     if (monitorReadyRef.current === ready) return
     monitorReadyRef.current = ready
     setHandsFreeListeningReady(ready)
+    if (ready) setHandsFreeNotice(current => current === 'microphone' ? null : current)
   }
 
   const finishHandsFreeTake = () => {
     if (!isRecordingRef.current || stopRequestedRef.current) return
     stopRequestedRef.current = true
+    const now = performance.now()
+    if (recordingStartedAtRef.current !== null && healthRef.current.finished(now,
+      Math.max(0, now - recordingStartedAtRef.current - silenceMsRef.current))) {
+      setHandsFreeNotice('sensitive')
+    }
     setReplayCountdown(null)
     silenceGateRef.current.reset()
     // Register replay intent before stop delivers the finalized take.
@@ -395,8 +412,9 @@ export function useAutoSoundRecording({
     if (now - recordingStartedAtRef.current < MIN_RECORDING_MS) return false
     const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
     const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
-    const loud = !metronomeTransient &&
-      (metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate)
+    // A masked click is unknown audio, not evidence that the musician stopped.
+    if (metronomeTransient) { silenceGateRef.current.pause(); return false }
+    const loud = metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate
     const decision = silenceGateRef.current.sample(now, loud, silenceMsRef.current, frameMs)
     setReplayCountdown(decision.remainingSeconds)
     if (!decision.stop) return false
@@ -481,6 +499,7 @@ export function useAutoSoundRecording({
 
   useEffect(() => {
     if (isRecording) {
+      setHandsFreeNotice(current => current === 'start' ? null : current)
       if (!wasRecordingRef.current) stopRequestedRef.current = false
       wasRecordingRef.current = true
       clearStartLatch()
@@ -508,7 +527,7 @@ export function useAutoSoundRecording({
   useEffect(() => {
     if (!shouldMonitor) return
     if (isNativeAudioCaptureActiveRef.current?.() === true) return
-    if (isStreamAudioLive(streamRef.current)) return
+    if (isStreamAudioLive(streamRef.current) || isNativeCameraPreviewActive()) return
     if (!isAppInForeground()) return
 
     onMonitorStalledRef.current?.()
@@ -560,7 +579,7 @@ export function useAutoSoundRecording({
       const streamAtSetup = streamRef.current
       const webKitLive = isStreamAudioLive(streamAtSetup)
       const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
-      const path = preserveActiveCapture
+      const path = preserveActiveCapture && (nativeCaptureActive || isNativeCameraPreviewActive())
         ? 'native-tap'
         : resolveHandsFreeMonitorPath({
             webKitLive,
@@ -618,6 +637,11 @@ export function useAutoSoundRecording({
               timestamp: performance.now(),
             }
           })) ?? null
+        if (cancelled) {
+          await nativeTapListener?.remove().catch(() => {})
+          nativeTapListener = null
+          return
+        }
         nativeTapReadyRef.current = nativeTapListener !== null
 
         lastTickAtRef.current = performance.now()
@@ -792,6 +816,9 @@ export function useAutoSoundRecording({
         // ongoing room noise; the musician can always use manual recording.
         if (!armed) {
           quietFramesSeen = metrics.rms < effectiveGateRef.current * 0.9 ? quietFramesSeen + 1 : 0
+          if (healthRef.current.observeArming(now, quietFramesSeen < ARM_QUIET_FRAMES)) {
+            setHandsFreeNotice('sensitive')
+          }
           if (quietFramesSeen < ARM_QUIET_FRAMES) {
             loudSinceRef.current = null
             attackSinceRef.current = null
@@ -806,7 +833,14 @@ export function useAutoSoundRecording({
           silenceSinceRef.current = null
           recordingStartedAtRef.current = null
 
-          tryCommitPendingPerformanceStart()
+          // A pending recorder must not turn an old noise into a later take.
+          if (pendingPerformanceGateRef.current && metrics.rms < effectiveGateRef.current) {
+            pendingPerformanceGateRef.current = false
+            clearStartLatch()
+            loudSinceRef.current = null
+          } else {
+            tryCommitPendingPerformanceStart()
+          }
 
           if (isAutoPreRollCaptureActiveRef.current?.()) {
             const preRollAge = getAutoPreRollAgeMsRef.current?.() ?? 0
@@ -874,7 +908,7 @@ export function useAutoSoundRecording({
       }, WARM_RETRY_MS)
 
       healthTimerRef.current = window.setInterval(() => {
-        if (cancelled || isRecordingRef.current) return
+        if (cancelled) return
 
         const now = performance.now()
         const tickStale = now - lastTickAtRef.current > STALL_RECOVERY_MS
@@ -893,6 +927,10 @@ export function useAutoSoundRecording({
         }
 
         if (streamDead) {
+          setMonitorReady(false)
+          setHandsFreeNotice('microphone')
+          // Report lost audio without tearing down a take that is still saving samples.
+          if (isRecordingRef.current) return
           if (isAppInForeground()) {
             onMonitorStalledRef.current?.()
           }
@@ -905,7 +943,15 @@ export function useAutoSoundRecording({
       }, HEALTH_CHECK_MS)
     }
 
-    void setup()
+    void setup().catch(() => {
+      if (!cancelled) {
+        setMonitorReady(false)
+        setHandsFreeNotice('microphone')
+        teardownMonitor({ preserveActiveCapture: shouldPreserveActiveHandsFreeCapture() })
+      }
+      if (nativeTapListener) { void nativeTapListener.remove().catch(() => {}); nativeTapListener = null }
+      if (acquiredNativeTap) { void releaseNativeAudioTap(); acquiredNativeTap = false }
+    })
 
     return () => {
       cancelled = true
@@ -917,6 +963,7 @@ export function useAutoSoundRecording({
       }
       if (acquiredNativeTap) {
         void releaseNativeAudioTap()
+        acquiredNativeTap = false
       }
     }
   }, [shouldMonitor, streamGeneration, streamRef, monitorEpoch])
@@ -1023,5 +1070,6 @@ export function useAutoSoundRecording({
     restartHandsFreeMonitor,
     replayCountdown: isRecording ? replayCountdown : null,
     finishHandsFreeTake,
+    handsFreeNotice: enabled ? handsFreeNotice : null,
   }
 }

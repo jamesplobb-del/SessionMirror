@@ -5,6 +5,7 @@ export function createHandsFreeSilence() {
   let previousAt: number | null = null
   return {
     reset() { quietMs = 0; previousAt = null },
+    pause() { previousAt = null },
     sample(now: number, loud: boolean, targetMs: number, frameMs: number) {
       if (loud) {
         quietMs = 0

@@ -2469,7 +2469,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !isExperimentalOpen &&
     (ready || nativeHandsFreeCaptureActive)
 
-  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake } =
+  const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake, handsFreeNotice } =
     useAutoSoundRecording({
       enabled: settings.autoSoundRecording,
       monitoringAllowed: autoMonitoringAllowed,
@@ -5296,9 +5296,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (programStatus === 'missing') setTakeDeleteError('This item’s metronome program is unavailable. You can practice normally or choose another program in the routine editor.')
     // Commit running only after the item and durable sitting are ready.
     commitRoutineDay(startRoutineDayStep(routineDayRef.current ?? day, step.id, sessionId, Date.now(), { title: step.title, projectId: itemProjectId }))
-    if (programStatus !== 'ready' && desk?.showMetronome && step.kind !== 'game' && step.kind !== 'free') {
-      void sharedMetronomeEngine.start().catch(() => setTakeDeleteError('Your item is ready. Tap the metronome to start the click.'))
-    }
+    // The desk sets the click up — tempo, meter, widget on screen — but the
+    // player starts it. A click already sounding as the item opens talks over
+    // them before they have the horn up.
     dismissPracticeHub()
     if (itemProjectId && step.referenceQuery && step.kind !== 'game' && step.kind !== 'free') {
       void autoLoadRoutineReference(itemProjectId, step.referenceQuery)
@@ -6046,6 +6046,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   over the hands-free overlay. */}
               <HandsFreeStage
                 phase={handsFreeStageVisiblePhase}
+                movable={recordingMode === 'audio'}
+                notice={handsFreeNotice}
                 replayCountdown={replayCountdown}
                 onFinishTake={finishHandsFreeTake}
                 onNextTake={finishAutoPlayback}

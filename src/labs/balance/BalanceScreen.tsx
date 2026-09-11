@@ -303,6 +303,7 @@ export default function BalanceScreen({
           hapticFeedback={hapticFeedback}
           onBack={() => setRoute('home')}
           onStart={startQuick}
+          onUpdate={game.updateSettings}
           onOptions={() => setRoute('options')}
           onRequestMic={onRequestMicStream}
         />
