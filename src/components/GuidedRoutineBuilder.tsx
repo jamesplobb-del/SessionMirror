@@ -35,7 +35,7 @@ function selectionForRoutine(routine: Routine): Record<string, string> {
 }
 
 export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
-  const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onCancel } = props
+  const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
   const [goal, setGoal] = useState<PracticeGoal>('balanced')
   const [goalMinutes, setGoalMinutes] = useState(20)
@@ -211,13 +211,15 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     if (next) { setDetailId(next.id); move('detail') }
     else move('lineup', true)
   }
-  const saveDraft = () => {
+  const saveDraft = (start: boolean) => {
     if (pendingSetup.length) { configureNext(); return }
     const next = { ...draft, steps: draft.steps.map(step => createStep(step)), name: draft.name.trim() || `${instrumentName} practice`, instrumentId: instrument, updatedAt: Date.now() }
     try {
       if (routine && routine.id !== next.id) storeLibraryRoutine(routine)
       storeLibraryRoutine(next)
-      setDraft(next); setLibrary(loadRoutineLibrary()); onSave(next)
+      setDraft(next); setLibrary(loadRoutineLibrary())
+      if (start && onSaveAndStart) onSaveAndStart(next)
+      else onSave(next)
     } catch { setError('Could not save your routine on this device. Please try again.') }
   }
   const removeFromToday = () => {
@@ -250,16 +252,21 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       openSavedRoutine(result.routine)
     })
   }
+  // A finished lineup goes straight into practice; saving on its own stays one tap away.
+  const canStart = screen === 'lineup' && !pendingSetup.length && Boolean(onSaveAndStart)
+  const editingToday = routine?.id === draft.id
+  const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
+  const secondaryAction = canStart ? { label: editingToday ? 'Save changes' : 'Save for later', run: () => saveDraft(false) } : null
   const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds([]); setLineupReturn('goals'); move('lineup') }
     : screen === 'instrument' ? () => move(instrumentReturn)
     : screen === 'choose' ? configureNext
-    : screen === 'lineup' ? saveDraft
+    : screen === 'lineup' ? () => saveDraft(canStart)
     : screen === 'custom-items' ? () => { setCustomIndex(0); setCustomSteps([]); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); move('custom-tool') }
     : screen === 'custom-tool' ? () => customToolKey === 'none' ? saveCustomTool() : openCustomTools()
     : screen === 'custom-reference' ? () => { if (!customReferenceVideo) setCustomReference(''); saveCustomTool() }
     : screen === 'detail' ? undefined
     : undefined
-  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? `Set up selected · ${pendingSetup.length || draft.steps.length}` : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? customToolKey === 'none' ? 'Save item' : 'Continue to tools' : screen === 'custom-reference' ? customReferenceVideo ? 'Save item' : 'Skip reference & save item' : screen === 'detail' ? 'Done' : 'Continue'
+  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? `Set up selected · ${pendingSetup.length || draft.steps.length}` : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? customToolKey === 'none' ? 'Save item' : 'Continue to tools' : screen === 'custom-reference' ? customReferenceVideo ? 'Save item' : 'Skip reference & save item' : screen === 'detail' ? 'Done' : 'Continue'
   const disabled = screen === 'instrument' ? !instrument : screen === 'choose' || screen === 'lineup' ? !draft.steps.length : screen === 'custom-items' ? !customItems.length : screen === 'custom-tool' ? !customToolKey : false
   const renderTemplate = (template: typeof templates[number]) => <Pressable key={template.id} type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion}
     className="routine-guide-exercise" aria-pressed={isSelected(template.id)} onClick={() => toggle(template.id, () => stepFromTemplate(template, instrument))}>
@@ -433,6 +440,9 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
     {(screen === 'detail' || screen === 'custom-settings') && <div ref={setItemFooterTarget} />}
-    {action && <footer className="routine-guide-footer"><Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable></footer>}
+    {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">
+      {secondaryAction && <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-secondary" disabled={disabled} onClick={secondaryAction.run}>{secondaryAction.label}</Pressable>}
+      <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable>
+    </div></footer>}
   </section>
 }

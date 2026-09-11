@@ -66,6 +66,10 @@ export interface RoutineBuilderProps {
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   onSave: (routine: Routine) => void
+  /** Saves, then opens the routine's next step straight away. */
+  onSaveAndStart?: (routine: Routine) => void
+  /** Today's session of this routine has begun, so Start reads as Continue. */
+  todayStarted?: boolean
   onDelete: () => void
   onCancel: () => void
   /** Lets the hub swap its header title and back arrow. */

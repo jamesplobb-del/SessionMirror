@@ -10006,20 +10006,6 @@ html.app-dark-mode .hands-free-card__stepper {
   line-height: 1.4;
 }
 
-.routine-bar--simple {
-  position: fixed;
-  top: calc(env(safe-area-inset-top) + 80px);
-  left: 12px;
-  right: 12px;
-  width: auto;
-  max-width: 440px;
-  margin: 0 auto;
-  padding: 10px;
-}
-.routine-bar--simple .routine-bar__line { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; }
-.routine-bar--simple .routine-bar__actions { margin-top: 8px; }
-.routine-bar--simple .routine-bar__actions button { min-height: 44px; }
-
 /* Front preview is mirrored; rear preview and its recovery frame are not. */
 .camera-background--rear :is(.camera-preview-canvas--live, .camera-preview-canvas--primed, .camera-preview--live, .camera-preview-placeholder__frame, .camera-preview-frozen-frame) {
   transform: scale(var(--camera-preview-zoom, 1)) !important;

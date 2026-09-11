@@ -268,6 +268,10 @@ html.app-dark-mode .practice-menu-card.practice-menu-card--routine-guide {
 }
 .routine-guide-continue { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(100%, 760px); min-height: 58px; margin: 0 auto; padding: 16px 22px; border: 1px solid #75b8ff50; border-radius: 17px; background: linear-gradient(115deg, #075bd3, #075493 70%, #1347a9); color: #fff; font-size: 15px; font-weight: 650; letter-spacing: -.015em; box-shadow: 0 6px 22px #0875fa30, inset 0 1px 0 #ffffff35; transition: opacity .2s ease; }
 .routine-guide-continue:disabled { opacity: .35; box-shadow: none; }
+.routine-guide-footer__actions { display: flex; gap: 10px; width: min(100%, 760px); margin: 0 auto; }
+.routine-guide-footer__actions .routine-guide-continue { flex: 1 1 auto; min-width: 0; width: auto; margin: 0; }
+.routine-guide-secondary { flex: 0 0 auto; min-height: 58px; padding: 0 18px; border: 1px solid var(--guide-line); border-radius: 17px; color: var(--guide-ink); background: var(--guide-panel); font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+.routine-guide-secondary:disabled { opacity: .35; }
 .routine-guide-suggestion-strip { margin: 10px 0 0; }
 .routine-guide-suggestion-strip h3 { margin-bottom: 10px; font-size: 10px; }
 .routine-guide-suggestion-strip > div { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -333,7 +337,7 @@ html.app-dark-mode .practice-menu-card.practice-menu-card--routine-guide {
   .routine-guide-heading { padding: 16px 0; }
   .routine-guide-heading h2 { font-size: 32px; white-space: normal; }
   .routine-guide-footer { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
-  .routine-guide-continue { min-height: 48px; }
+  .routine-guide-continue, .routine-guide-secondary { min-height: 48px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .routine-guide *, .routine-guide *::before, .routine-guide *::after { transition: none !important; }

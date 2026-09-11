@@ -49,8 +49,6 @@
   border-color: transparent;
 }
 .routine-board__list .routine-row.is-done .routine-row__main { opacity: .55; }
-.routine-bar__resources { display: flex; flex-wrap: wrap; gap: 4px; border-top: 1px solid currentColor; margin: 8px 0; }
-.routine-bar__resources button { flex: 1; min-height: 44px; font-size: 12px; font-weight: 600; }
 
 /* ── Shared bits ─────────────────────────────────────────────────────────── */
 
@@ -1226,18 +1224,23 @@
   background: var(--sm-gold, #f7a600);
 }
 
-/* ── Step bar over the HUD ───────────────────────────────────────────────── */
+/* ── Routine bar ─────────────────────────────────────────────────────────────
+ * Floats over the HUD while a step runs. Drag it by the grip or the title;
+ * the corner handle sets its width, and below 330px it folds to one row.
+ * Tapping it opens the steps as a popover on whichever side has room, so the
+ * bar itself never jumps. Glass recipe from `.focused-post-take-dock`; gold is
+ * the live step, blue is done and the one primary action. */
 
 .routine-bar {
   position: fixed;
   top: 0;
   left: 0;
   z-index: 60;
-  /* Width is state (resizable); position is x/y. Nothing here may set
-   * `transform` — the entry animation owns it. */
+  /* Width is state (resizable) and position is x/y. Nothing here may set
+   * `transform` — framer-motion owns it for the drag and the entry. */
+  display: flex;
   max-width: calc(100vw - 1.5rem);
-  overflow: hidden;
-  touch-action: none;
+  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 1.1rem;
   color: rgba(255, 255, 255, 0.96);
@@ -1250,6 +1253,9 @@
   backdrop-filter: blur(24px) saturate(1.16);
   -webkit-backdrop-filter: blur(24px) saturate(1.16);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Games overlay is z-index 135. The bar has to sit above it. */
@@ -1257,8 +1263,9 @@
   z-index: 138;
 }
 
-/* The audio tools have their own tab bar at the top; sit under it. */
-.routine-bar--audio {
+/* Light surface on the audio tools. */
+.routine-bar--audio,
+.routine-ball--audio {
   color: var(--audio-text-primary, #171a22);
   border-color: var(--audio-divider, rgba(23, 26, 34, 0.1));
   background: var(--audio-surface, rgba(255, 255, 255, 0.96));
@@ -1267,24 +1274,92 @@
   -webkit-backdrop-filter: none;
 }
 
-.routine-bar__line {
+html.app-dark-mode .routine-bar--audio,
+html.app-dark-mode .routine-ball--audio {
+  color: #f8fafc;
+  border-color: rgba(226, 232, 240, 0.12);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.routine-bar.is-dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.routine-bar button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.routine-bar button:focus-visible {
+  outline: 2px solid var(--sm-gold, #f7a600);
+  outline-offset: 2px;
+}
+
+/* Tapping outside the open list closes it and does nothing else. */
+.routine-bar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
+
+.routine-bar-scrim--over-labs {
+  z-index: 137;
+}
+
+/* ── Grip and title row ── */
+
+.routine-bar__grip {
   display: flex;
-  width: 100%;
-  min-height: 2.6rem;
+  width: 3.5rem;
+  height: 1rem;
+  align-self: center;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: -0.3rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: inherit;
+  background: none;
+  opacity: 0.38;
+  cursor: grab;
+  touch-action: none;
+}
+
+.routine-bar__grip svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.routine-bar.is-dragging .routine-bar__grip {
+  opacity: 0.7;
+}
+
+.routine-bar__head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.3rem 0.1rem 0.25rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.routine-bar__toggle {
+  display: flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.35rem 0.6rem 0.35rem 0.7rem;
+  padding: 0.3rem 0.3rem 0.3rem 0.45rem;
   border: 0;
+  border-radius: 0.8rem;
   color: inherit;
   background: transparent;
   text-align: left;
-}
-
-.routine-bar__line > svg {
-  width: 0.85rem;
-  height: 0.85rem;
-  flex: 0 0 auto;
-  opacity: 0.6;
+  touch-action: none;
 }
 
 .routine-bar__step {
@@ -1300,9 +1375,17 @@
 }
 
 .routine-bar__step small {
-  font-size: 0.62rem;
+  font-size: var(--sm-text-caption, 0.7rem);
   font-weight: var(--sm-weight-medium, 600);
   opacity: 0.6;
+}
+
+.routine-bar__text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .routine-bar__title {
@@ -1327,17 +1410,40 @@
   opacity: 1;
 }
 
+.routine-bar__chevron {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+  opacity: 0.55;
+  transition: transform 0.2s ease;
+}
+
+.routine-bar.is-open .routine-bar__chevron {
+  transform: rotate(180deg);
+}
+
+/* One row: the step count joins the clock under the title. */
+.routine-bar.is-compact .routine-bar__text {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+}
+
+.routine-bar.is-compact .routine-bar__title {
+  flex: none;
+}
+
 .routine-bar__track {
   display: block;
   height: 2px;
-  margin: 0 0.7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  margin: 0.15rem 0.8rem 0;
   overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 
-.routine-bar--audio .routine-bar__track {
-  background: rgba(23, 26, 34, 0.1);
+.routine-bar.is-compact .routine-bar__track {
+  margin: 0 0.8rem 0.45rem;
 }
 
 .routine-bar__track i {
@@ -1350,89 +1456,412 @@
   transition: transform 1s linear;
 }
 
-.routine-bar__body {
-  overflow: hidden;
+/* ── Actions ── */
+
+.routine-bar__actions {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  padding: 0.45rem 2.1rem 0.5rem 0.55rem;
 }
 
-.routine-bar__summary {
-  margin: 0.4rem 0.75rem 0;
+.routine-bar__action {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.8rem;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-size: var(--sm-text-label, 0.76rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.routine-bar__action svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.routine-bar__action span {
   overflow: hidden;
-  font-size: var(--sm-text-caption, 0.7rem);
-  opacity: 0.72;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.routine-bar__actions {
-  display: flex;
-  gap: 0.3rem;
-  padding: 0.5rem 0.55rem 0.55rem;
-}
-
-.routine-bar__actions button {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  min-height: 2.6rem;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.2rem;
-  padding: 0.3rem 0.2rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.72rem;
-  color: rgba(235, 242, 250, 0.88);
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 0.62rem;
-  font-weight: var(--sm-weight-medium, 600);
-}
-
-.routine-bar__actions button svg {
-  width: 0.88rem;
-  height: 0.88rem;
-}
-
-.routine-bar__actions button.is-primary {
-  flex: 1.5;
+.routine-bar__action.is-primary {
+  flex: 1.6;
   border-color: transparent;
   color: #fff;
   background: var(--sm-blue, #1598ff);
 }
 
-.routine-bar--audio .routine-bar__actions button {
-  border-color: var(--audio-divider, rgba(23, 26, 34, 0.09));
-  color: var(--audio-text-primary, #171a22);
-  background: rgba(23, 26, 34, 0.035);
+.routine-bar__action:disabled {
+  opacity: 0.45;
 }
 
-.routine-bar--audio .routine-bar__actions button.is-primary {
-  color: #fff;
-  background: var(--audio-blue, #1598ff);
+.routine-bar.is-compact .routine-bar__action {
+  flex: 0 0 2.75rem;
+  padding: 0;
 }
 
-.routine-bar__next {
-  margin: -0.15rem 0.75rem 0.6rem;
+/* The corner: drag it to set the width, tap it to fold the bar into a ball.
+ * The rows leave room for it on the right so it never sits on Done. */
+.routine-bar__resize {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0.2rem;
+  z-index: 1;
+  display: flex;
+  width: 1.9rem;
+  height: 2.75rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 0.3rem 0.3rem 0;
+  border: 0;
+  border-radius: 0.6rem;
+  color: inherit;
+  background: none;
+  opacity: 0.55;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.routine-bar__resize svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.routine-bar.is-compact .routine-bar__head {
+  padding-right: 2.1rem;
+}
+
+/* ── The routine, dropped down from the bar ── */
+
+.routine-bar__panel {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  z-index: 1;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid;
+  border-color: inherit;
+  border-radius: inherit;
+  color: inherit;
+  background: inherit;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+  backdrop-filter: inherit;
+  -webkit-backdrop-filter: inherit;
+  touch-action: pan-y;
+}
+
+.routine-bar__panel--below {
+  top: calc(100% + 0.4rem);
+}
+
+.routine-bar__panel--above {
+  bottom: calc(100% + 0.4rem);
+}
+
+.routine-bar__panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem 0.5rem;
+}
+
+.routine-bar__eyebrow {
+  min-width: 0;
   overflow: hidden;
   font-size: var(--sm-text-caption, 0.7rem);
-  opacity: 0.6;
+  font-weight: var(--sm-weight-medium, 600);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.72;
+}
+
+.routine-bar__panel-status {
+  flex: 0 0 auto;
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.72;
+}
+
+.routine-bar__steps {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0 0.5rem 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.routine-bar__row > button {
+  display: flex;
+  width: 100%;
+  min-height: 2.9rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem 0.35rem 0.5rem;
+  border: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 0.8rem;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.routine-bar__row > button:disabled {
+  opacity: 0.45;
+}
+
+.routine-bar__marker {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1.5px solid color-mix(in srgb, currentColor 34%, transparent);
+  border-radius: 999px;
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+  font-variant-numeric: tabular-nums;
+}
+
+.routine-bar__marker svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  stroke-width: 2.8;
+}
+
+.routine-bar__row-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.1rem;
+}
+
+.routine-bar__row-copy strong {
+  overflow: hidden;
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-medium, 600);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-html.app-dark-mode .routine-bar--audio {
-  color: #f8fafc;
-  border-color: rgba(226, 232, 240, 0.12);
-  background: rgba(15, 23, 42, 0.92);
+.routine-bar__row-copy small {
+  overflow: hidden;
+  font-size: var(--sm-text-caption, 0.7rem);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.68;
 }
 
-html.app-dark-mode .routine-bar--audio .routine-bar__track {
-  background: rgba(255, 255, 255, 0.12);
+.routine-bar__row em {
+  flex: 0 0 auto;
+  padding: 0.14rem 0.45rem;
+  border-radius: 999px;
+  color: #23180a;
+  background: var(--sm-gold, #f7a600);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-style: normal;
+  font-weight: var(--sm-weight-strong, 700);
 }
 
-html.app-dark-mode .routine-bar--audio .routine-bar__actions button {
-  border-color: rgba(255, 255, 255, 0.1);
-  color: rgba(235, 242, 250, 0.88);
-  background: rgba(255, 255, 255, 0.06);
+.routine-bar__row.is-current > button {
+  border-color: var(--sm-gold-border, rgba(247, 166, 0, 0.54));
+  background: var(--sm-gold-soft, rgba(247, 166, 0, 0.14));
+}
+
+.routine-bar__row.is-current .routine-bar__marker {
+  border-color: transparent;
+  color: #23180a;
+  background: var(--sm-gold, #f7a600);
+}
+
+.routine-bar__row.is-done > button {
+  border-color: var(--sm-blue-border, rgba(21, 152, 255, 0.54));
+  background: var(--sm-blue-soft, rgba(21, 152, 255, 0.14));
+}
+
+.routine-bar__row.is-done .routine-bar__marker {
+  border-color: transparent;
+  color: #fff;
+  background: var(--sm-blue, #1598ff);
+}
+
+.routine-bar__row.is-done strong,
+.routine-bar__row.is-skipped strong {
+  opacity: 0.62;
+}
+
+.routine-bar__row.is-skipped .routine-bar__marker {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.routine-bar__panel-actions {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.routine-bar__panel-actions button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 0.75rem;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+}
+
+.routine-bar__panel-actions button:disabled {
+  opacity: 0.45;
+}
+
+.routine-bar__panel-actions svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+}
+
+.routine-bar__panel-actions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Folded: the ball ── */
+
+.routine-ball {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  align-content: center;
+  justify-items: center;
+  gap: 0.12rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.96);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.025)),
+    rgba(8, 13, 21, 0.9);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px) saturate(1.16);
+  -webkit-backdrop-filter: blur(24px) saturate(1.16);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, sans-serif;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.routine-ball.is-dragging {
+  cursor: grabbing;
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.routine-ball:focus-visible {
+  outline: 2px solid var(--sm-gold, #f7a600);
+  outline-offset: 2px;
+}
+
+.routine-ball__ring {
+  position: absolute;
+  inset: 0.18rem;
+  width: calc(100% - 0.36rem);
+  height: calc(100% - 0.36rem);
+  overflow: visible;
+  rotate: -90deg;
+  pointer-events: none;
+}
+
+.routine-ball__ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.routine-ball__track {
+  stroke: color-mix(in srgb, currentColor 16%, transparent);
+}
+
+.routine-ball__progress {
+  stroke: var(--sm-gold, #f7a600);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.routine-ball.is-paused .routine-ball__progress {
+  stroke: currentColor;
+  opacity: 0.35;
+}
+
+.routine-ball__step {
+  font-size: var(--sm-text-value, 0.82rem);
+  font-weight: var(--sm-weight-strong, 700);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.routine-ball__step small {
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-weight: var(--sm-weight-medium, 600);
+  opacity: 0.6;
+}
+
+.routine-ball__time {
+  font-size: var(--sm-text-caption, 0.7rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+.routine-ball.is-over .routine-ball__time {
+  color: var(--sm-gold, #f7a600);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routine-bar__chevron,
+  .routine-bar__track i,
+  .routine-ball__progress {
+    transition: none;
+  }
 }
 
 /* ── Onboarding hand-off ─────────────────────────────────────────────────── */
@@ -1538,99 +1967,4 @@ html.dark .onboarding-lite__routine-choice.is-primary small {
   .routine-add-row {
     grid-template-columns: 1fr;
   }
-
-  .routine-bar__actions button span {
-    font-size: 0.58rem;
-  }
-}
-
-/* ── Drag and resize ─────────────────────────────────────────────────────── */
-
-.routine-bar__grip {
-  display: flex;
-  justify-content: center;
-  padding: 0.18rem 0 0;
-  color: currentColor;
-  opacity: 0.32;
-  cursor: grab;
-}
-
-.routine-bar__grip svg {
-  width: 1rem;
-  height: 0.7rem;
-  rotate: 90deg;
-}
-
-/* Puts the routine down and leaves you where you are. Deliberately quiet: it
- * sits opposite the drag grip and must not compete with Done. */
-.routine-bar__close {
-  position: absolute;
-  top: 0.15rem;
-  right: 0.3rem;
-  display: grid;
-  width: 1.85rem;
-  height: 1.85rem;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: currentColor;
-  opacity: 0.42;
-}
-
-.routine-bar__close svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
-.routine-bar__close:disabled {
-  opacity: 0.2;
-}
-
-.routine-bar.is-dragging {
-  cursor: grabbing;
-  box-shadow:
-    0 22px 48px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.routine-bar.is-dragging .routine-bar__grip {
-  opacity: 0.6;
-}
-
-/* Corner grip. Small on purpose — it must not compete with Done. */
-.routine-bar__resize {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 1.65rem;
-  height: 1.65rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: ew-resize;
-  touch-action: none;
-}
-
-.routine-bar__resize::after {
-  content: '';
-  position: absolute;
-  right: 0.32rem;
-  bottom: 0.32rem;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  border-radius: 0 0 3px 0;
-  opacity: 0.38;
-}
-
-.routine-bar__resize:focus-visible {
-  outline: 2px solid var(--sm-gold, #f7a600);
-  outline-offset: -2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .routine-bar { transition: none; }
 }

@@ -1011,16 +1011,6 @@ html.app-dark-mode .focus-node-marker::before {
   color: inherit;
   font: inherit;
 }
-.routine-bar__remember {
-  background: transparent;
-  border: 0;
-  color: inherit;
-  opacity: .7;
-  padding: 8px 0;
-  font: inherit;
-  font-size: 11px;
-  text-align: left;
-}
 .routine-session-summary { margin-top: 16px; font-size: 12px; line-height: 1.6; }
 .routine-session-summary summary { cursor: pointer; padding: 8px 0; }
 .routine-session-summary ul { padding-left: 16px; }
@@ -1098,12 +1088,6 @@ html.app-dark-mode .focus-node-marker::before {
 .routine-reference-shortcut button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--sm-blue, #1598ff) 30%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--sm-blue, #1598ff) 9%, transparent); color: inherit; font: inherit; font-size: 11px; }
 .routine-reference-shortcut span { flex: 1; text-align: left; }
 .routine-reference-shortcut svg { width: 15px; height: 15px; }
-.routine-bar__more { padding: 0 12px 8px; font-size: 11px; }
-.routine-bar__more summary { min-height: 36px; display: flex; align-items: center; cursor: pointer; opacity: .7; }
-.routine-bar__more .routine-bar__resources { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.routine-bar__more button { min-height: 38px; text-align: left; }
-.routine-bar__actions button { flex-direction: row; gap: 7px; min-height: 44px; font-size: 12px; }
-.routine-bar__actions button.is-primary { flex: 2; }
 
 /* Routine setup: a quiet summary, with configuration opened deliberately. */
 .routine-setup-summary { margin: 12px 0; padding: 18px; border: 1px solid var(--sm-blue-border, #1598ff55); border-radius: 20px; background: linear-gradient(135deg, var(--sm-blue-soft, #1598ff18), transparent); }

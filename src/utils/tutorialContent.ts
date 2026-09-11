@@ -424,9 +424,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Practice Routines',
     body: 'Open Practice Home and choose Build your routine.',
     bullets: [
-      'Choose a preset or add your own exercises',
+      'Choose a preset or add your own exercises, then tap Start routine',
       'Set each exercise’s tools and add an optional reference',
-      'Use Play or Pause to control your practice time',
+      'Drag the routine bar anywhere, and drag its corner to resize it',
+      'Tap the bar to see every exercise, jump to one, or skip ahead',
       'Tap Done & next to continue, or Finish routine on the last exercise',
     ],
   },

@@ -123,6 +123,8 @@ interface PracticeHubProps {
   onOpenRoutineBuilder: (mode: RoutineBuilderMode) => void
   onCloseRoutineBuilder: () => void
   onSaveRoutine: (routine: Routine) => void
+  /** Saves, then opens the routine's next step; rejects if that step cannot open. */
+  onSaveAndStartRoutine: (routine: Routine) => Promise<void>
   onDeleteRoutine: () => void
   onBindRoutineFocus: (projectId: string) => void | Promise<void>
   onCancelRoutineFocus: () => void
@@ -171,6 +173,7 @@ export default function PracticeHub({
   onOpenRoutineBuilder,
   onCloseRoutineBuilder,
   onSaveRoutine,
+  onSaveAndStartRoutine,
   onDeleteRoutine,
   onBindRoutineFocus,
   onCancelRoutineFocus,
@@ -239,6 +242,22 @@ export default function PracticeHub({
       setLaunchError('Could not open this step. Please try again.')
     } finally {
       setStartingRoutineStepId(null)
+    }
+  }
+
+  /** Built and ready: save it, then go straight into its first open step. */
+  const startingSavedRoutineRef = useRef(false)
+  const saveAndStartRoutine = async (next: Routine) => {
+    if (startingSavedRoutineRef.current) return
+    startingSavedRoutineRef.current = true
+    setLaunchError('')
+    try {
+      await onSaveAndStartRoutine(next)
+    } catch {
+      setPage('home')
+      setLaunchError('Your routine is saved, but it could not start. Open Today’s routine to try again.')
+    } finally {
+      startingSavedRoutineRef.current = false
     }
   }
 
@@ -512,6 +531,8 @@ export default function PracticeHub({
                         onSaveRoutine(next)
                         setPage('home')
                       }}
+                      onSaveAndStart={(next) => void saveAndStartRoutine(next)}
+                      todayStarted={Boolean(routine && routineDay?.routineId === routine.id && routineDay.startedAt)}
                       onDelete={() => {
                         onDeleteRoutine()
                         setPage('home')

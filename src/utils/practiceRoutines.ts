@@ -509,6 +509,12 @@ export function nextOpenStep(routine: Routine, day: RoutineDay | null, afterStep
   return ordered.find((step) => !isStepSettled(day, step.id)) ?? null
 }
 
+/** What Start or Continue should open: the step in flight, else the next open one. */
+export function routineResumeStep(routine: Routine, day: RoutineDay | null): RoutineStep | null {
+  const inFlight = day?.activeStepId ?? day?.pausedStepId
+  return routine.steps.find((step) => step.id === inFlight) ?? nextOpenStep(routine, day)
+}
+
 export function routineProgress(routine: Routine, day: RoutineDay | null): {
   done: number
   total: number

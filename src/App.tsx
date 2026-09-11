@@ -277,6 +277,7 @@ import {
   loadRoutineDay,
   nextOpenStep,
   reconcileDay,
+  routineResumeStep,
   savePreferredInstrumentId,
   saveRoutine,
   saveRoutineDay,
@@ -5144,10 +5145,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (next !== routineDayRef.current) commitRoutineDay(next)
   }, [commitRoutineDay, ensureRoutineDay, isPracticeHubOpen])
 
-  const handleSaveRoutine = useCallback(
-    (next: Routine) => {
+  /** Makes `next` today's routine. False when practice is mid-switch and nothing was saved. */
+  const commitSavedRoutine = useCallback(
+    (next: Routine): boolean => {
       triggerLightHaptic(settings.hapticFeedback)
-      if (practiceTransition.current.busy || captureBusyRef.current) return
+      if (practiceTransition.current.busy || captureBusyRef.current) return false
       rememberCurrentPracticeDesk()
       exitRoutineProgram()
       const previous = routineRef.current
@@ -5182,10 +5184,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           setPreferredInstrumentId(next.instrumentId)
         }
       }
-      setRoutineBuilderRequest(null)
+      return true
     },
     [settings.hapticFeedback, updateSettings, rememberCurrentPracticeDesk, commitRoutineDay],
   )
+
+  const handleSaveRoutine = useCallback((next: Routine) => {
+    if (commitSavedRoutine(next)) setRoutineBuilderRequest(null)
+  }, [commitSavedRoutine])
 
   const handleDeleteRoutine = useCallback(() => {
     void runPracticeTransition('delete-routine', async () => {
@@ -5229,10 +5235,32 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [],
   )
 
+  /**
+   * A step's click starts once the step has landed, not in the same moment.
+   * Opening a step can swap camera and Tools, and handleRecordingModeChange then
+   * re-checks the click at 420, 900 and 1500 ms, each check re-asserting the
+   * speaker route while the capture session is still coming up. With the click
+   * already running, every one of those checks becomes a live route change, so
+   * wait them out first — and start nothing for a step that is no longer live.
+   */
+  const routineClickTimerRef = useRef<number | null>(null)
+  const scheduleRoutineClick = useCallback((stepId: string, surfaceChanges: boolean) => {
+    if (routineClickTimerRef.current !== null) window.clearTimeout(routineClickTimerRef.current)
+    routineClickTimerRef.current = window.setTimeout(() => {
+      routineClickTimerRef.current = null
+      const day = routineDayRef.current
+      if (day?.activeStepId !== stepId || day.activeStepStartedAt === null) return
+      if (captureBusyRef.current || document.visibilityState !== 'visible') return
+      if (sharedMetronomeEngine.getSnapshot().playing) return
+      void sharedMetronomeEngine.start().catch(() => setTakeDeleteError('Your item is ready. Tap the metronome to start the click.'))
+    }, surfaceChanges ? 1700 : 600)
+  }, [])
+
   const openRoutineStep = useCallback(async (stepId: string) => {
     let target = routineRef.current
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
+    const surfaceBefore = recordingModeRef.current
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
     const day = ensureRoutineDay(target)
@@ -5305,20 +5333,34 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (programStatus === 'missing') setTakeDeleteError('This item’s metronome program is unavailable. You can practice normally or choose another program in the routine editor.')
     // Commit running only after the item and durable sitting are ready.
     commitRoutineDay(startRoutineDayStep(routineDayRef.current ?? day, step.id, sessionId, Date.now(), { title: step.title, projectId: itemProjectId }))
-    // The desk sets the click up — tempo, meter, widget on screen — but the
-    // player starts it. A click already sounding as the item opens talks over
-    // them before they have the horn up.
+    if (programStatus !== 'ready' && desk?.showMetronome && step.kind !== 'game' && step.kind !== 'free') {
+      const surfaceAfter = step.kind === 'tune' || step.kind === 'metro' ? 'audio' : desk.mode
+      scheduleRoutineClick(step.id, surfaceAfter !== surfaceBefore)
+    }
     dismissPracticeHub()
     if (itemProjectId && step.referenceQuery && step.kind !== 'game' && step.kind !== 'free') {
       void autoLoadRoutineReference(itemProjectId, step.referenceQuery)
     }
   }, [autoLoadRoutineReference, commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleRecordingModeChange,
-    openFocusedPractice, rememberCurrentPracticeDesk, settings.hapticFeedback])
+    openFocusedPractice, rememberCurrentPracticeDesk, scheduleRoutineClick, settings.hapticFeedback])
 
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
   [runPracticeTransition, openRoutineStep])
+
+  /** The builder's Start: save, then open the step Today would offer next. */
+  const handleSaveAndStartRoutine = useCallback(async (next: Routine) => {
+    if (!commitSavedRoutine(next)) throw new Error('Practice is still switching. Try again in a moment.')
+    try {
+      const target = routineRef.current
+      const step = target ? routineResumeStep(target, routineDayRef.current) ?? target.steps[0] : undefined
+      if (step) await handleStartRoutineStep(step.id)
+    } finally {
+      // Cleared only now, so the sheet leaves from the builder rather than flashing Home.
+      setRoutineBuilderRequest(null)
+    }
+  }, [commitSavedRoutine, handleStartRoutineStep])
   const handleDailyPractice = useCallback((plan: DailyChallengePlan) => {
     void runPracticeTransition('daily-practice', async () => {
       const target = resolveDailyPractice(plan, routineRef.current)
@@ -5462,6 +5504,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     } else commitRoutineDay(settleRoutineDayStep(day, target, stepId, 'done'))
   }, [commitRoutineDay, ensureRoutineDay, runPracticeTransition, settings.hapticFeedback, settleRoutineStep])
 
+  /** Moves on without counting the step as done; Today lists it as skipped. */
+  const handleSkipRoutineStep = useCallback((stepId: string) => {
+    triggerLightHaptic(settings.hapticFeedback)
+    settleRoutineStep(stepId, 'skipped')
+  }, [settings.hapticFeedback, settleRoutineStep])
+
+  /** Straight to any step from the bar's list. The step being left keeps its time. */
+  const handleJumpToRoutineStep = useCallback((stepId: string) => {
+    void handleStartRoutineStep(stepId).catch(() =>
+      setTakeDeleteError('Could not open that step. Your routine is safe; try again.'))
+  }, [handleStartRoutineStep])
+
+  const handleEditRoutineFromBar = useCallback(() => {
+    setRoutineBuilderRequest('edit')
+    handleOpenRoutineToday()
+  }, [handleOpenRoutineToday])
+
   /** Pause keeps this sitting resumable and stops the timer, click and drone. */
   const handlePauseRoutine = useCallback(() => {
     if (practiceTransition.current.busy || captureBusyRef.current) return
@@ -5534,10 +5593,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!routine || !routineActiveStep) return null
     return nextOpenStep(routine, routineDay, routineActiveStep.id)
   }, [routine, routineActiveStep, routineDay])
-
-  const routineStepIndex = routine && routineActiveStep
-    ? routine.steps.findIndex((step) => step.id === routineActiveStep.id) + 1
-    : 0
 
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => {
@@ -5696,6 +5751,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
                 onCloseRoutineBuilder={() => setRoutineBuilderRequest(null)}
                 onSaveRoutine={handleSaveRoutine}
+                onSaveAndStartRoutine={handleSaveAndStartRoutine}
                 onDeleteRoutine={handleDeleteRoutine}
                 onBindRoutineFocus={handleBindRoutineFocus}
                 onCancelRoutineFocus={() => setRoutineFocusRequest(null)}
@@ -5713,21 +5769,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 !isRecording &&
                 !isStopping && (
                   <RoutineBar
-                    goalMs={isChallengeRoutine(routine) ? 60_000 : undefined}
+                    routine={routine}
+                    day={routineDay}
                     step={routineActiveStep}
-                    stepIndex={routineStepIndex}
-                    stepCount={routine.steps.length}
                     nextStep={routineNextStep}
+                    goalMs={isChallengeRoutine(routine) ? 60_000 : undefined}
                     startedAt={routineDay?.activeStepStartedAt ?? null}
                     elapsedMs={routineDay?.elapsedMsByStep[routineActiveStep.id] ?? 0}
+                    paused={!routineDay?.activeStepId}
                     busy={practiceTransitionBusy || pendingTakeSaves > 0}
                     audioSurface={recordingMode === 'audio' && !isLabsOpen}
                     overLabs={isLabsOpen}
-                    onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
-                    onOpenToday={handleOpenRoutineToday}
-                    paused={!routineDay?.activeStepId}
-                    onResume={() => handleStartRoutineStep(routineActiveStep.id)}
+                    tunerTransposition={settings.tunerTransposition}
+                    hapticFeedback={settings.hapticFeedback}
+                    onResume={() => handleJumpToRoutineStep(routineActiveStep.id)}
                     onPause={handlePauseRoutine}
+                    onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
+                    onSkip={isChallengeRoutine(routine) ? undefined : () => handleSkipRoutineStep(routineActiveStep.id)}
+                    onJumpToStep={handleJumpToRoutineStep}
+                    onEditRoutine={isChallengeRoutine(routine) ? undefined : handleEditRoutineFromBar}
+                    onOpenToday={handleOpenRoutineToday}
                   />
                 )}
 
