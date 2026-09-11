@@ -5458,7 +5458,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         }
         handleOpenRoutineToday()
       }
-    }).catch(() => {
+    }).catch((error) => {
+      console.warn('[Routine] could not open the next step', error)
       setTakeDeleteError('Could not advance practice. Your saved takes and completed items are safe; try again from Today.')
       handleOpenRoutineToday()
     })
@@ -5541,9 +5542,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const day = routineDayRef.current
       if (day?.activeStepId) commitRoutineDay(checkpointRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
     }
-    const suspend = () => {
+    const suspend = (event?: Event) => {
       const day = routineDayRef.current
       if (!day?.activeStepId) return
+      // iOS also reports "inactive" for a system prompt, Control Center or an
+      // audio-route change while the app never leaves the screen — and opening
+      // a step's tools can cause one. Only a hidden page means the player left;
+      // a real background always hides it and comes back through here.
+      if (document.visibilityState === 'visible') return
+      console.info('[Routine] paused: app left the foreground',
+        (event as CustomEvent<{ reason?: string }> | undefined)?.detail?.reason ?? event?.type ?? 'visibility-hidden')
       commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
       pauseRoutineProgram()
       sharedMetronomeEngine.stop()
