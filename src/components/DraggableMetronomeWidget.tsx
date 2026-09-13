@@ -1,5 +1,5 @@
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { Pause, Play } from 'lucide-react'
+import { Pause, Play, Minus } from 'lucide-react'
 import {
   useCallback,
   useId,
@@ -52,6 +52,7 @@ interface DraggableMetronomeWidgetProps {
   /** Keep the widget visible but prevent a second metronome clock while a native transport owns timing. */
   controlsLocked?: boolean
   onClose?: () => void
+  onCollapse?: () => void
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 288, height: 176 }
@@ -101,6 +102,7 @@ export default function DraggableMetronomeWidget({
   muteDuringPlayback = true,
   controlsLocked = false,
   onClose,
+  onCollapse,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
@@ -516,6 +518,8 @@ export default function DraggableMetronomeWidget({
           />
         ) : null}
 
+        {onCollapse && <button type="button" className="widget-collapse" aria-label="Collapse metronome"
+          onPointerDown={event => event.stopPropagation()} onClick={onCollapse}><Minus aria-hidden /></button>}
         {onClose && (
           <button
             type="button"

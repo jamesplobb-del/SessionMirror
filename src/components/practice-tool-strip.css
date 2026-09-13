@@ -1,0 +1,20 @@
+.practice-tool-strip { position: absolute; top: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 86px); left: 12px; right: 12px; z-index: 38; display: flex; justify-content: flex-start; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; pointer-events: auto; padding: 3px 0; }
+.practice-tool-strip > :first-child { margin-left: auto; }
+.practice-tool-strip > :last-child { margin-right: auto; }
+.app-shell:not(.app-shell--audio-mode) .practice-tool-strip { top: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 180px); }
+.practice-tool-strip button { flex: 0 0 auto; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ffffff30; border-radius: 14px; padding: 0 11px; color: #f1f5ff; background: #101a2bec; box-shadow: 0 2px 8px #0002; font-size: 12px; font-weight: 600; }
+.practice-tool-strip button svg { width: 15px; height: 15px; }
+.practice-tool-strip button i { width: 5px; height: 5px; border-radius: 50%; background: #8391a7; }
+.practice-tool-strip button[data-active=true] i { background: #69b5ff; box-shadow: 0 0 5px #69b5ff70; }
+.practice-tool-strip button[aria-expanded=true] { border-color: #69b5ff; }
+.practice-tool-strip--light button { color: var(--audio-text, #18314f); background: var(--audio-surface, #f4f7fc); border-color: #647e9d45; }
+.practice-tool-strip button:focus-visible { outline: 2px solid #69b5ff; outline-offset: 1px; }
+.practice-tool-strip button:disabled { opacity: .55; }
+.practice-tool-strip::-webkit-scrollbar { display: none; }
+.app-shell:has(.practice-tool-strip button) .audio-mode-home--inplace { padding-top: 44px; }
+.app-shell:has(.practice-tool-strip button) :is(.audio-practice-tuner-layer, .audio-practice-metronome-layer) { padding-top: 44px; }
+/* Keep audio owners mounted when folded, with no invisible hit targets. */
+.practice-widget-folded { visibility: hidden !important; pointer-events: none !important; }
+.practice-widget-folded * { pointer-events: none !important; }
+.widget-collapse { position: absolute; right: 44px; top: 10px; min-width: 32px; min-height: 32px; display: grid; place-items: center; border: 1px solid #ffffff25; border-radius: 50%; background: #152137b0; color: #fff; z-index: 35; }
+.widget-collapse svg { width: 15px; height: 15px; }

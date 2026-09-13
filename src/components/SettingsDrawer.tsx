@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   AudioLines,
   BookOpen,
@@ -542,7 +542,7 @@ function QuickFunctionAccessRow({
 
 /* ------------------------------------------------------------------ drawer */
 
-export default function SettingsDrawer({
+function SettingsDrawer({
   isOpen,
   onClose,
   settings,
@@ -737,17 +737,19 @@ export default function SettingsDrawer({
           <nav className="set-nav" aria-label="Settings sections">
             <div className="set-nav__track">
               {SETTINGS_SECTIONS.map((section) => (
-                <button
+                <Pressable
                   key={section.id}
                   type="button"
                   className="set-nav__button"
                   data-settings-section={section.id}
+                  intensity="soft"
+                  hapticFeedback={settings.hapticFeedback}
                   aria-controls={`settings-section-${section.id}`}
                   aria-current={activeSettingsSection === section.id ? 'page' : undefined}
                   onClick={() => handleSettingsSectionSelect(section.id)}
                 >
                   {section.label}
-                </button>
+                </Pressable>
               ))}
             </div>
           </nav>
@@ -1081,3 +1083,6 @@ export default function SettingsDrawer({
     </>
   )
 }
+
+// Closed sheets and an open Settings menu need not rebuild for recording ticks.
+export default memo(SettingsDrawer)

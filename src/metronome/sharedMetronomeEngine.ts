@@ -21,7 +21,9 @@ import {
   isNativeIosMetronome,
   nativeMetronomeAddBarListener,
   nativeMetronomeAddPulseListener,
+  nativeMetronomeAddStateListener,
   nativeMetronomePrepare,
+  nativeMetronomeIsPlaying,
   nativeMetronomeSetMuted,
   nativeMetronomeStart,
   nativeMetronomeStop,
@@ -252,6 +254,10 @@ class SharedMetronomeEngine {
     if (!this.useNativeAudio || this.nativeListenersAttached) return
     this.nativeListenersAttached = true
 
+    void nativeMetronomeAddStateListener(event => {
+      if (!event.playing && this.snapshot.playing && !this.startInFlight) this.stop()
+    })
+
     void nativeMetronomeAddPulseListener((event) => {
       if (!this.snapshot.playing) return
       this.emitTick({
@@ -425,6 +431,10 @@ class SharedMetronomeEngine {
         this.foregroundTimer = null
       }
 
+      // Native sample-clock playback continues without WebKit timers. Keep the
+      // route and intent intact; ordinary browser tabs retain their old policy.
+      if (this.useNativeAudio) return
+
       if (this.snapshot.playing) {
         this.resumeOnForeground = true
       }
@@ -434,7 +444,13 @@ class SharedMetronomeEngine {
     const onForeground = () => {
       this.isBackgrounded = false
       if (this.useNativeAudio) {
-        this.reconcileAfterInterrupt()
+        // Calls may have stopped native playback while JS was suspended. Read
+        // reality without restarting or resetting the downbeat on app return.
+        const generation = this.controlGeneration
+        void nativeMetronomeIsPlaying().then(playing => {
+          if (generation !== this.controlGeneration || this.isBackgrounded) return
+          if (this.snapshot.playing && playing === false) this.stop()
+        })
         return
       }
       void resumePlaybackAudioContext().finally(() => {
@@ -1305,7 +1321,7 @@ class SharedMetronomeEngine {
             leadSec,
           }),
         )
-        if (startGeneration !== this.controlGeneration || this.isBackgrounded) {
+        if (startGeneration !== this.controlGeneration) {
           await this.enqueueNativeControl(nativeMetronomeStop)
           return false
         }

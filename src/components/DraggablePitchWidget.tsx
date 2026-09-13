@@ -13,6 +13,7 @@ type TunerProps = Omit<
 interface DraggablePitchWidgetProps extends TunerProps {
   boundaryRef: RefObject<HTMLElement | null>
   onClose?: () => void
+  onCollapse?: () => void
   isAudioMode?: boolean
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
@@ -61,6 +62,7 @@ export default function DraggablePitchWidget({
   boundaryRef,
   mediaKey,
   onClose,
+  onCollapse,
   isAudioMode = false,
   liveMicEnabled = true,
   micStreamRef,
@@ -243,6 +245,8 @@ export default function DraggablePitchWidget({
       }}
     >
       <div className="ui-orient-spin relative h-full min-h-0 w-full overflow-hidden rounded-3xl">
+        {onCollapse && <button type="button" className="widget-collapse" aria-label="Collapse tuner"
+          onPointerDown={event => event.stopPropagation()} onClick={onCollapse}>−</button>}
         {onClose && <PitchWidgetCloseButton onClose={onClose} />}
         {tuner}
       </div>

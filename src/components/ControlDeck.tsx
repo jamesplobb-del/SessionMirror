@@ -23,7 +23,6 @@ import StarRating from './StarRating'
 import type { RecordingMode } from '../types'
 import type { PracticeComparisonMode } from '../db/types'
 import { resolveHandsFreePhase } from '../utils/handsFreePhase'
-import { triggerModeSwitchHaptic } from '../utils/haptics'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
 import type { WorkspaceDesk } from '../utils/workspaceDesks'
@@ -617,13 +616,12 @@ function ControlDeck({
               type="button"
               intensity="soft"
               squish={false}
-              haptic={false}
+              haptic="rigid"
               hapticFeedback={hapticFeedback}
               data-tutorial="practice-button"
               className="camera-pill-action camera-practice-button pointer-events-auto"
               disabled={isRecording || isStopping}
               onClick={() => {
-                triggerModeSwitchHaptic(hapticFeedback)
                 onRecordingModeChange('audio')
               }}
               aria-label="Open Tools"
@@ -722,12 +720,11 @@ function ControlDeck({
               type="button"
               intensity="soft"
               squish={false}
-              haptic={false}
+              haptic="rigid"
               hapticFeedback={hapticFeedback}
               className="audio-camera-button pointer-events-auto"
               disabled={isRecording || isStopping}
               onClick={() => {
-                triggerModeSwitchHaptic(hapticFeedback)
                 onRecordingModeChange('video')
               }}
               aria-label="Open Camera"

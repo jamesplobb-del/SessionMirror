@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
+import { postDirectHaptic } from './directHaptics'
 
 const isNative = Capacitor.isNativePlatform()
 const isIOS = isNative && Capacitor.getPlatform() === 'ios'
@@ -28,6 +29,7 @@ if (isNative) {
 /** Keep the native Taptic Engine primed (call after playback / long idle). */
 export function warmHaptics(): void {
   if (isIOS) {
+    if (postDirectHaptic({ kind: 'prepare' })) return
     void BestTakeAudioPlugin.prepareHaptics().catch(() => {})
   }
 }
@@ -81,6 +83,7 @@ function runImpact(
   if (!hapticsEnabled) return
 
   if (isIOS) {
+    if (postDirectHaptic({ kind: 'impact', style, intensity })) return
     const options = intensity === undefined ? { style } : { style, intensity }
     void BestTakeAudioPlugin.hapticImpact(options)
       .catch(() => runCapacitorImpact(style))
@@ -100,6 +103,7 @@ function runNotification(type: 'success' | 'warning' | 'error'): void {
   if (!hapticsEnabled) return
 
   if (isIOS) {
+    if (postDirectHaptic({ kind: 'notification', type })) return
     void BestTakeAudioPlugin.hapticNotification({ type }).catch(() => {}).finally(scheduleHapticReprime)
     return
   }

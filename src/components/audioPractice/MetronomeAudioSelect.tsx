@@ -1,8 +1,8 @@
 import { Check, ChevronDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { triggerLightHaptic } from '../../utils/haptics'
 import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
+import Pressable from '../ui/Pressable'
 
 export interface MetronomeAudioSelectOption<T extends string> {
   value: T
@@ -65,15 +65,15 @@ export default function MetronomeAudioSelect<T extends string>({
     <div ref={rootRef} className={`metronome-audio-select pointer-events-auto ${open ? 'metronome-audio-select--open' : ''}`}>
       <span className="metronome-audio-select__label">{label}</span>
       <div className="metronome-audio-select__field">
-        <button
+        <Pressable
           type="button"
-          className="metronome-audio-select__control interactive-native"
+          className="metronome-audio-select__control"
+          intensity="soft"
           aria-label={selectedOption ? `${ariaLabel}: ${selectedOption.label}` : ariaLabel}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-controls={listboxId}
           onClick={() => {
-            triggerLightHaptic()
             setOpen((visible) => !visible)
           }}
         >
@@ -93,7 +93,7 @@ export default function MetronomeAudioSelect<T extends string>({
               aria-hidden
             />
           </span>
-        </button>
+        </Pressable>
         <AnimatePresence>
           {open && (
             <motion.div
@@ -109,9 +109,9 @@ export default function MetronomeAudioSelect<T extends string>({
             >
               <motion.div
                 className="metronome-audio-select__menu-content"
-                initial={{ y: -7, scale: 0.975 }}
-                animate={{ y: 0, scale: 1 }}
-                exit={{ y: -5, scale: 0.985 }}
+                initial={{ transform: 'translateY(-7px) scale(.975)' }}
+                animate={{ transform: 'translateY(0px) scale(1)' }}
+                exit={{ transform: 'translateY(-5px) scale(.985)' }}
                 transition={iosEaseOut}
                 style={motionGpuLayer}
               >
@@ -130,15 +130,16 @@ export default function MetronomeAudioSelect<T extends string>({
 
                   const selected = option.value === value
                   return (
-                    <button
+                    <Pressable
                       key={option.value}
                       type="button"
                       className={`metronome-audio-select__option ${selected ? 'metronome-audio-select__option--selected' : ''}`}
                       role="option"
                       aria-selected={selected}
+                      intensity="soft"
+                      haptic={selected ? false : 'light'}
                       onClick={() => {
                         if (!selected) {
-                          triggerLightHaptic()
                           onChange(option.value)
                         }
                         setOpen(false)
@@ -158,7 +159,7 @@ export default function MetronomeAudioSelect<T extends string>({
                         </span>
                       </span>
                       {selected && <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />}
-                    </button>
+                    </Pressable>
                   )
                 })}
               </motion.div>

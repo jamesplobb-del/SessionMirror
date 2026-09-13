@@ -71,10 +71,10 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
             className="action-sheet-backdrop fixed inset-0 z-[620] cursor-default touch-none bg-black/45"
             aria-label="Dismiss dialog"
             initial={{ opacity: 0 }}
-            animate={{ opacity: backdropOpacity }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, transitionEnd: motionExitHide }}
             transition={iosFade}
-            style={motionGpuLayer}
+            style={{ ...motionGpuLayer, opacity: backdropOpacity }}
             onClick={onCancel}
           />
 

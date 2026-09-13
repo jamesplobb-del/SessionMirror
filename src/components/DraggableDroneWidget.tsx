@@ -33,6 +33,7 @@ interface DraggableDroneWidgetProps {
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
   onClose?: () => void
+  onCollapse?: () => void
 }
 
 const WIDGET_WIDTH = 268
@@ -59,6 +60,7 @@ export default function DraggableDroneWidget({
   isTakePlaying = false,
   muteDuringPlayback = true,
   onClose,
+  onCollapse,
 }: DraggableDroneWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragControls = useDragControls()
@@ -222,6 +224,8 @@ export default function DraggableDroneWidget({
               dragControls.start(event)
             }}
           />
+          {onCollapse && <button type="button" data-no-drag className="widget-collapse" aria-label="Collapse drone"
+            onPointerDown={event => event.stopPropagation()} onClick={onCollapse}><Minus aria-hidden /></button>}
           {onClose && (
             <button
               type="button"

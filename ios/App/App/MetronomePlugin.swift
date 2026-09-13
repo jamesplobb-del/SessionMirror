@@ -1,5 +1,6 @@
 import Capacitor
 import Foundation
+import UIKit
 
 @objc(MetronomePlugin)
 public class MetronomePlugin: CAPPlugin, CAPBridgedPlugin {
@@ -20,6 +21,7 @@ public class MetronomePlugin: CAPPlugin, CAPBridgedPlugin {
         super.load()
         engine.setEventHandlers(
             pulse: { [weak self] beatIndex, subTickIndex, beatPulseId, audible in
+                guard UIApplication.shared.applicationState != .background else { return }
                 self?.notifyListeners("metronomePulse", data: [
                     "beatIndex": beatIndex,
                     "subTickIndex": subTickIndex,
@@ -28,7 +30,13 @@ public class MetronomePlugin: CAPPlugin, CAPBridgedPlugin {
                 ])
             },
             bar: { [weak self] in
+                guard UIApplication.shared.applicationState != .background else { return }
                 self?.notifyListeners("metronomeBar", data: [:])
+            },
+            state: { [weak self] playing in
+                // Background state is read on return; active UI hears interruptions now.
+                guard UIApplication.shared.applicationState != .background else { return }
+                self?.notifyListeners("metronomeState", data: ["playing": playing])
             }
         )
     }

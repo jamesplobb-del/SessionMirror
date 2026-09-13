@@ -5,6 +5,8 @@ import WebKit
 @objc(PortraitBridgeViewController)
 class PortraitBridgeViewController: CAPBridgeViewController {
     private let nativePreviewHostView = UIView()
+    private let hapticsHandler = ImmediateHapticsHandler()
+    private weak var hapticsContentController: WKUserContentController?
 
     var nativeCameraPreviewContainer: UIView {
         configureNativePreviewHostView()
@@ -21,7 +23,18 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
     override open func capacitorDidLoad() {
         super.capacitorDidLoad()
+        if let controller = webView?.configuration.userContentController,
+           hapticsContentController !== controller {
+            hapticsContentController?.removeScriptMessageHandler(forName: "bestTakeHaptics")
+            controller.add(hapticsHandler, name: "bestTakeHaptics")
+            hapticsContentController = controller
+            hapticsHandler.prepare()
+        }
         configureWebViewForNativePreview()
+    }
+
+    deinit {
+        hapticsContentController?.removeScriptMessageHandler(forName: "bestTakeHaptics")
     }
 
     override open func viewDidLoad() {
@@ -112,5 +125,65 @@ class PortraitBridgeViewController: CAPBridgeViewController {
             webView.underPageBackgroundColor = .black
         }
         view.bringSubviewToFront(webView)
+    }
+}
+
+/// A tiny, one-way UI channel. Capacitor dispatches plugin calls on one serial
+/// queue, where audio route changes can hold up a tap. This handler owns no
+/// WebView/controller references and never performs audio or filesystem work.
+private final class ImmediateHapticsHandler: NSObject, WKScriptMessageHandler {
+    private let impacts: [String: UIImpactFeedbackGenerator] = [
+        "light": UIImpactFeedbackGenerator(style: .light),
+        "medium": UIImpactFeedbackGenerator(style: .medium),
+        "heavy": UIImpactFeedbackGenerator(style: .heavy),
+        "soft": UIImpactFeedbackGenerator(style: .soft),
+        "rigid": UIImpactFeedbackGenerator(style: .rigid),
+    ]
+    private let notification = UINotificationFeedbackGenerator()
+
+    func prepare() {
+        impacts.values.forEach { $0.prepare() }
+        notification.prepare()
+    }
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        // Embedded references (YouTube, etc.) cannot trigger app feedback.
+        guard message.frameInfo.isMainFrame,
+              let url = message.frameInfo.request.url,
+              url.scheme == "capacitor", url.host == "localhost",
+              UIApplication.shared.applicationState == .active,
+              let body = message.body as? [String: Any],
+              let kind = body["kind"] as? String,
+              let sentAt = body["sentAt"] as? Double else { return }
+        let ageMs = Date().timeIntervalSince1970 * 1000 - sentAt
+        // Never replay a backlog of tactile clicks after an interruption.
+        guard ageMs >= -1000, ageMs < 250 else { return }
+
+        switch kind {
+        case "prepare":
+            prepare()
+        case "impact":
+            guard let style = body["style"] as? String,
+                  let generator = impacts[style] else { return }
+            if let intensity = body["intensity"] as? Double, intensity.isFinite {
+                generator.impactOccurred(intensity: CGFloat(max(0, min(1, intensity))))
+            } else {
+                generator.impactOccurred()
+            }
+            generator.prepare()
+        case "notification":
+            let type: UINotificationFeedbackGenerator.FeedbackType
+            switch body["type"] as? String {
+            case "success": type = .success
+            case "warning": type = .warning
+            case "error": type = .error
+            default: return
+            }
+            notification.notificationOccurred(type)
+            notification.prepare()
+        default:
+            break
+        }
     }
 }

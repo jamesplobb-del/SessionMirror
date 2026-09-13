@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { useOptimistic, useTransition, type CSSProperties } from 'react'
 import type { AudioPracticeTab } from '../../types/audioPractice'
 import Pressable from '../ui/Pressable'
 
@@ -23,14 +23,17 @@ export default function AudioPracticeTopTabs({
   activeTab,
   onTabChange,
 }: AudioPracticeTopTabsProps) {
+  const [pending, startTabTransition] = useTransition()
+  const [selectedTab, setSelectedTab] = useOptimistic(activeTab)
   return (
     <nav
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
-      style={{ '--electric-tab-index': Math.max(0,TABS.findIndex(tab => tab.id === activeTab)) } as CSSProperties}
+      aria-busy={pending}
+      style={{ '--electric-tab-index': Math.max(0,TABS.findIndex(tab => tab.id === selectedTab)) } as CSSProperties}
     >
       {TABS.map((tab) => {
-        const isActive = activeTab === tab.id
+        const isActive = selectedTab === tab.id
         return (
           <Pressable
             key={tab.id}
@@ -39,7 +42,14 @@ export default function AudioPracticeTopTabs({
             squish={false}
             haptic="light"
             onClick={() => {
-              if (!isActive) onTabChange(tab.id)
+              if (isActive) return
+              // Paint selection first; a new media panel can mount in an
+              // interruptible render. React reconciles rapid taps/external
+              // routine navigation with the authoritative activeTab prop.
+              startTabTransition(() => {
+                setSelectedTab(tab.id)
+                onTabChange(tab.id)
+              })
             }}
             data-tutorial={`audio-tab-${tab.id}`}
             className={`audio-practice-top-tabs__btn ${isActive ? 'audio-practice-top-tabs__btn--active' : ''}`}

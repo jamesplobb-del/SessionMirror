@@ -4,18 +4,14 @@ import {
   triggerErrorHaptic,
   triggerLightHaptic,
   triggerMediumHaptic,
+  triggerModeSwitchHaptic,
   triggerSuccessHaptic,
   triggerWarningHaptic,
 } from '../../utils/haptics'
 import { NATIVE_SQUISH } from '../../utils/interactiveUx'
-import {
-  iosPressTransition,
-  motionTap,
-  motionTapIcon,
-  motionTapSoft,
-} from '../../utils/motionPresets'
+import { iosPressTransition } from '../../utils/motionPresets'
 
-export type PressableHaptic = 'light' | 'medium' | 'success' | 'warning' | 'error' | false
+export type PressableHaptic = 'light' | 'medium' | 'rigid' | 'success' | 'warning' | 'error' | false
 
 export interface PressableProps extends HTMLMotionProps<'button'> {
   intensity?: 'soft' | 'normal' | 'icon'
@@ -29,6 +25,9 @@ export interface PressableProps extends HTMLMotionProps<'button'> {
 
 function runPressableHaptic(kind: PressableHaptic, enabled: boolean): void {
   switch (kind) {
+    case 'rigid':
+      triggerModeSwitchHaptic(enabled)
+      break
     case 'medium':
       triggerMediumHaptic(enabled)
       break
@@ -46,17 +45,6 @@ function runPressableHaptic(kind: PressableHaptic, enabled: boolean): void {
       break
     default:
       break
-  }
-}
-
-function defaultWhileTap(intensity: 'soft' | 'normal' | 'icon') {
-  switch (intensity) {
-    case 'soft':
-      return motionTapSoft
-    case 'icon':
-      return motionTapIcon
-    default:
-      return motionTap
   }
 }
 
@@ -80,7 +68,7 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
   const reduceMotion = useReducedMotion()
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
-      if (haptic && !event.currentTarget.disabled) {
+      if (haptic && event.isPrimary && event.button === 0 && !event.currentTarget.disabled) {
         runPressableHaptic(haptic, hapticFeedback)
       }
       onPointerDown?.(event)
@@ -102,14 +90,16 @@ const Pressable = forwardRef<HTMLButtonElement, PressableProps>(function Pressab
   const squishClass = squish
     ? NATIVE_SQUISH
     : 'ui-pressable select-none [-webkit-tap-highlight-color:transparent]'
-  const tapMotion = squish ? whileTap ?? defaultWhileTap(intensity) : whileTap
 
   return (
     <motion.button
       ref={ref}
       type={type}
       className={`${squishClass} ${className}`.trim()}
-      whileTap={reduceMotion ? undefined : tapMotion}
+      // Standard presses use CSS :active, which does not wait for Motion's
+      // next JS frame. Explicit custom animations still belong to the caller.
+      data-press-feedback={whileTap ? undefined : squish ? intensity : 'none'}
+      whileTap={reduceMotion ? undefined : whileTap}
       transition={transition ?? iosPressTransition}
       onPointerDown={handlePointerDown}
       onClick={handleClick}

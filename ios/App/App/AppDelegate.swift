@@ -133,6 +133,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     /// Skips while native camera preview/recording is live so we don't stomp the
     /// videoRecording profile and silently drop the movie audio connection.
     private func configurePersistentAudioSession() {
+        // A running click already owns a valid playback session, including
+        // across lock/unlock. Do not reconfigure its route on foreground entry.
+        guard !MetronomeEngine.shared.isPlaying() else { return }
         if CameraSessionGuard.isCameraOrRecordingActive || NativeCameraRecordingEngine.shared.isNativeRecordingActive {
             print("[AVAudioSessionTrace] configurePersistentAudioSession skipped — camera/recording active")
             return

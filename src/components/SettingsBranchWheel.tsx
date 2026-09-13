@@ -19,6 +19,7 @@ import { NATIVE_SQUISH } from '../utils/interactiveUx'
 import { triggerLightHaptic } from '../utils/haptics'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { MAX_WORKSPACE_DESKS, type WorkspaceDesk } from '../utils/workspaceDesks'
+import Pressable from './ui/Pressable'
 
 interface SettingsBranchWheelProps {
   open: boolean
@@ -544,12 +545,14 @@ export default function SettingsBranchWheel({
                         : undefined
 
                   return (
-                    <button
+                    <Pressable
                       key={item.id}
                       type="button"
                       role={item.kind === 'action' ? 'menuitem' : 'menuitemcheckbox'}
                       {...(tutorialTarget ? { 'data-tutorial': tutorialTarget } : {})}
-                      className={`settings-branch-tray__item ${NATIVE_SQUISH} ${
+                      intensity="soft"
+                      hapticFeedback={hapticFeedback}
+                      className={`settings-branch-tray__item ${
                         item.active ? 'settings-branch-tray__item--active' : ''
                       }`}
                       disabled={item.disabled}
@@ -557,7 +560,6 @@ export default function SettingsBranchWheel({
                       aria-label={item.label}
                       {...(item.kind === 'action' ? {} : { 'aria-checked': item.active })}
                       onClick={() => {
-                        triggerLightHaptic()
                         item.onSelect()
                         if (item.kind === 'action') onClose()
                         notifyTutorial?.('branch-widget-selected')
@@ -585,7 +587,7 @@ export default function SettingsBranchWheel({
                         </span>
                         <span className="settings-branch-tray__label">{item.label}</span>
                       </span>
-                    </button>
+                    </Pressable>
                   )
                 })}
               </div>

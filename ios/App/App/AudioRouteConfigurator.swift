@@ -716,6 +716,8 @@ enum AudioRouteConfigurator {
     }
 
     static func deactivateCaptureSessionIfIdle() throws {
+        // Closing capture is independent of the user's running metronome.
+        guard !MetronomeEngine.shared.isPlaying() else { return }
         if CameraSessionGuard.recordingMode == "audio" {
             return
         }
@@ -744,6 +746,10 @@ enum AudioRouteConfigurator {
         CameraSessionGuard.setPreviewActive(false)
         CameraSessionGuard.setRecordingActive(false)
         CameraSessionGuard.setPlaybackRouteActive(false)
+
+        // The native click owns background playback. Capture still tears down,
+        // but deactivating this shared session would silence its render engine.
+        guard !MetronomeEngine.shared.isPlaying() else { return }
 
         let session = AVAudioSession.sharedInstance()
         do {

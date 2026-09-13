@@ -32,6 +32,7 @@ import {
   rhythmCellHint,
 } from '../../metronome/metronomeNotation'
 import { useTutorialAction } from '../../context/TutorialContext'
+import Pressable from '../ui/Pressable'
 import {
   METRONOME_VISUAL_STYLES,
   setMetronomeVisualStyle,
@@ -59,19 +60,17 @@ function PracticeControlButton({
   dataTutorial?: string
 }) {
   return (
-    <button
+    <Pressable
       type="button"
       aria-label={label}
       aria-pressed={active}
       data-tutorial={dataTutorial}
-      onClick={() => {
-        if (haptic === 'light') triggerLightHaptic()
-        onPress()
-      }}
-      className={`metronome-audio-stage__btn pointer-events-auto interactive-native ${active ? 'metronome-audio-stage__btn--active' : ''} ${className}`}
+      haptic={haptic}
+      onClick={onPress}
+      className={`metronome-audio-stage__btn pointer-events-auto ${active ? 'metronome-audio-stage__btn--active' : ''} ${className}`}
     >
       {children}
-    </button>
+    </Pressable>
   )
 }
 

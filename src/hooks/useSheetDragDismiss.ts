@@ -1,5 +1,5 @@
-import { useDragControls, type PanInfo } from 'framer-motion'
-import { useCallback, useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useDragControls, useMotionValue, type PanInfo } from 'framer-motion'
+import { useCallback, useMemo, type PointerEvent as ReactPointerEvent } from 'react'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 import { iosSheetDragTransition } from '../utils/motionPresets'
 
@@ -28,27 +28,22 @@ export function useSheetDragDismiss({
   const prefersReducedMotion = usePrefersReducedMotion()
   const dragActive = enabled && !prefersReducedMotion
   const dragControls = useDragControls()
-  const [backdropOpacity, setBackdropOpacity] = useState(1)
+  // Dragging must not re-render the entire Settings/Vault tree on every move.
+  const backdropOpacity = useMotionValue(1)
 
   const dismissDistance = slideDistance * DISMISS_DISTANCE_RATIO
 
-  useEffect(() => {
-    if (!enabled) {
-      setBackdropOpacity(1)
-    }
-  }, [enabled])
-
   const onDragStart = useCallback(() => {
-    setBackdropOpacity(1)
-  }, [])
+    backdropOpacity.set(1)
+  }, [backdropOpacity])
 
   const onDrag = useCallback(
     (_event: unknown, info: PanInfo) => {
       const offsetY = Math.max(0, info.offset.y)
       const fade = Math.min(MAX_BACKDROP_FADE, offsetY / (slideDistance * BACKDROP_FADE_RATIO))
-      setBackdropOpacity(1 - fade)
+      backdropOpacity.set(1 - fade)
     },
-    [slideDistance],
+    [backdropOpacity, slideDistance],
   )
 
   const onDragEnd = useCallback(
@@ -61,10 +56,10 @@ export function useSheetDragDismiss({
       if (shouldDismiss) {
         onDismiss()
       } else {
-        setBackdropOpacity(1)
+        backdropOpacity.set(1)
       }
     },
-    [dismissDistance, onDismiss],
+    [backdropOpacity, dismissDistance, onDismiss],
   )
 
   const startDrag = useCallback(

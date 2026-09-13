@@ -154,11 +154,12 @@ export default function AnimatedBottomSheet({
             className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${backdropClass} ${zClass ? zClass.backdrop : elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
             aria-label={`Close ${ariaLabel}`}
             initial={{ opacity: 0 }}
-            animate={{ opacity: backdropOpacity }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0, transitionEnd: motionExitHide }}
             transition={backdropTransition}
             style={{
               ...motionGpuLayer,
+              opacity: backdropOpacity,
               pointerEvents: backdropArmed ? 'auto' : 'none',
             }}
             onClick={backdropArmed ? handleDismiss : undefined}
@@ -166,23 +167,35 @@ export default function AnimatedBottomSheet({
 
           <motion.div
             key="sheet-surface"
-            ref={sheetRef}
-            className={`animated-bottom-sheet native-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col overflow-hidden rounded-t-[2rem] transform-gpu ${sheetSurfaceClass} ${zClass ? zClass.sheet : elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
-            role="dialog"
-            aria-modal="true"
-            aria-label={ariaLabel}
+            className={`animated-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col rounded-t-[2rem] ${zClass ? zClass.sheet : elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             style={{
               ...motionGpuLayer,
-              paddingBottom: 'env(safe-area-inset-bottom)',
-              pointerEvents: 'auto',
+              pointerEvents: 'none',
             }}
-            initial={reduceMotion ? {opacity:0,y:0} : useScale ? { opacity: 0, y: slideDistance, scale: 0.965 } : { opacity: 0, y: slideDistance }}
-            animate={useScale ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
-            exit={reduceMotion ? {opacity:0,y:0, transitionEnd: motionExitHide} : useScale ? { opacity: 0, y: slideDistance, scale: 0.98, transitionEnd: motionExitHide } : { opacity: 0, y: slideDistance, transitionEnd: motionExitHide }}
+            // `y`/`scale` are JS-driven in Motion. A full transform can run
+            // through WAAPI while media work is busy. Drag owns an inner
+            // surface so its y value never overwrites this entrance/exit.
+            initial={{ opacity: 0, transform: `translateY(${reduceMotion ? 0 : slideDistance}px) scale(${useScale ? .965 : 1})` }}
+            animate={{ opacity: 1, transform: 'translateY(0px) scale(1)' }}
+            exit={{ opacity: 0, transform: `translateY(${reduceMotion ? 0 : slideDistance}px) scale(${useScale ? .98 : 1})`, transitionEnd: motionExitHide }}
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
-            {...sheetDragProps}
           >
+            <motion.div
+              ref={sheetRef}
+              className={`native-bottom-sheet flex min-h-0 flex-1 flex-col overflow-hidden ${sheetSurfaceClass}`}
+              role="dialog"
+              aria-modal="true"
+              aria-label={ariaLabel}
+              style={{
+                width: '100%',
+                maxHeight: 'inherit',
+                borderRadius: 'inherit',
+                paddingBottom: 'env(safe-area-inset-bottom)',
+                pointerEvents: 'auto',
+              }}
+              {...sheetDragProps}
+            >
             <div className="ui-orient-spin flex min-h-0 flex-1 flex-col overflow-hidden">
               <div
                 {...dragHandleProps}
@@ -192,6 +205,7 @@ export default function AnimatedBottomSheet({
               </div>
               {children}
             </div>
+            </motion.div>
           </motion.div>
         </>
       )}

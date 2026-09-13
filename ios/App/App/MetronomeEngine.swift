@@ -91,6 +91,7 @@ final class MetronomeEngine {
 
     private var pulseHandler: PulseHandler?
     private var barHandler: BarHandler?
+    private var stateHandler: ((Bool) -> Void)?
 
     private var firstClickPerfMs: Double = 0
     private var firstClickHostTimeSec: Double = 0
@@ -100,6 +101,7 @@ final class MetronomeEngine {
     private let speakerBusGain: Float = 48
 
     private var configurationObserver: NSObjectProtocol?
+    private var interruptionObserver: NSObjectProtocol?
 
     /// Serial lane for configuration recovery. Keeps blocking AVAudioSession /
     /// AVAudioEngine calls off the UI thread and off the render path.
@@ -114,6 +116,17 @@ final class MetronomeEngine {
     private var configurationRecoveryGeneration: UInt64 = 0
 
     private init() {
+        // A call or Siri pauses the click in native code even if WebKit is
+        // suspended. Resume is an explicit Play; configuration notifications
+        // must not restart the engine over an interruption.
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(), queue: nil
+        ) { [weak self] notification in
+            guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  raw == AVAudioSession.InterruptionType.began.rawValue else { return }
+            self?.recoveryQueue.async { [weak self] in self?.stop() }
+        }
         // Deliberately NOT queue: .main. Recovery does blocking AVAudioSession
         // and AVAudioEngine work, which must never run on the UI thread — see
         // scheduleConfigurationRecovery.
@@ -133,6 +146,9 @@ final class MetronomeEngine {
     }
 
     deinit {
+        if let interruptionObserver = interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+        }
         if let configurationObserver = configurationObserver {
             NotificationCenter.default.removeObserver(configurationObserver)
         }
@@ -140,10 +156,11 @@ final class MetronomeEngine {
 
     // MARK: - Public API
 
-    func setEventHandlers(pulse: PulseHandler?, bar: BarHandler?) {
+    func setEventHandlers(pulse: PulseHandler?, bar: BarHandler?, state: ((Bool) -> Void)? = nil) {
         stateLock.lock()
         pulseHandler = pulse
         barHandler = bar
+        stateHandler = state
         stateLock.unlock()
     }
 
@@ -212,6 +229,17 @@ final class MetronomeEngine {
         outputPausedForCaptureHandoff = false
         stopSchedulerOnly()
         stopEngine()
+        stateLock.lock()
+        let generation = eventGeneration
+        let handler = stateHandler
+        stateLock.unlock()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.stateLock.lock()
+            let current = self.eventGeneration == generation
+            self.stateLock.unlock()
+            if current { handler?(false) }
+        }
         print("[MetronomeEngine] stopped")
     }
 

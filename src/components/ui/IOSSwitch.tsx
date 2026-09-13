@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion'
 import { iosSpringSnappy } from '../../utils/motionPresets'
-import { triggerLightHaptic } from '../../utils/haptics'
-import { NATIVE_SQUISH } from '../../utils/interactiveUx'
+import Pressable from './Pressable'
 
 interface IOSSwitchProps {
   checked: boolean
@@ -19,29 +18,31 @@ export default function IOSSwitch({
   hapticFeedback = true,
 }: IOSSwitchProps) {
   return (
-    <motion.button
+    <Pressable
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
       disabled={disabled}
+      squish={false}
+      hapticFeedback={hapticFeedback}
       onClick={() => {
-        triggerLightHaptic(hapticFeedback)
         onChange(!checked)
       }}
-      className={`relative mt-1 h-7 w-[3.25rem] shrink-0 rounded-full p-0.5 ${NATIVE_SQUISH} ${
+      className={`relative mt-1 h-7 w-[3.25rem] shrink-0 rounded-full p-0.5 ${
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
       }`}
-      animate={{
+      style={{
         backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
       }}
       transition={iosSpringSnappy}
     >
       <motion.span
         className="block h-6 w-6 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
-        animate={{ x: checked ? 22 : 0 }}
+        initial={false}
+        animate={{ transform: `translateX(${checked ? 22 : 0}px)` }}
         transition={iosSpringSnappy}
       />
-    </motion.button>
+    </Pressable>
   )
 }

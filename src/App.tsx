@@ -262,6 +262,7 @@ import {
   selectPracticeReference,
 } from './utils/practiceReferences'
 import RoutineBar from './components/RoutineBar'
+import PracticeToolStrip, { type PracticeTool } from './components/PracticeToolStrip'
 import { prepareRoutineProgram, pauseRoutineProgram, exitRoutineProgram } from './utils/routineProgram'
 import { PracticeTransitionGate } from './utils/practiceTransitions'
 import { findRoutinePracticeProject } from './db/practiceRepository'
@@ -607,6 +608,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubeExpandTipNonce, setYoutubeExpandTipNonce] = useState(0)
   const [youtubePlayAlongUi, setYoutubePlayAlongUi] = useState(getYoutubePlayAlongUiState)
   const [isSplitView, setIsSplitView] = useState(false)
+  const [expandedPracticeTool, setExpandedPracticeTool] = useState<PracticeTool | null>(null)
+  const collapsePracticeTool = useCallback((tool: PracticeTool) => {
+    setExpandedPracticeTool(null)
+    document.querySelector<HTMLButtonElement>(`.practice-tool-strip [data-tool="${tool}"]`)?.focus()
+  }, [])
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   // The legacy compact/full card state remains available to the existing
@@ -4038,14 +4044,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const metronomeHudSuspended =
     isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen || isPracticeHubOpen || focusPanel !== null
 
-  // Desk widgets live on the record surfaces. The Tools tabs are where the
-  // full tools are, so the widgets step aside there and are back on return.
+  // Keep audio owners mounted even when folded or visiting a full tool tab.
+  // Visibility is independent of sound; the full tool's own pill steps aside.
   const onRecordSurface = recordingMode === 'video' || audioPracticeTab === 'audio'
-  const showFloatingMetronomeWidget = showMetronomeWidget && onRecordSurface
+  const showFloatingMetronomeWidget = showMetronomeWidget
 
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended
 
-  const showFloatingDroneWidget = settings.showDrone && onRecordSurface
+  const showFloatingDroneWidget = settings.showDrone
   const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended
 
   /*
@@ -4227,6 +4233,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const pitchAudioHudLock =
     showPitch &&
+    expandedPracticeTool === 'pitch' &&
     recordingMode === 'audio' &&
     mainAudioPitchSource !== null &&
     hudModalState === 'idle' &&
@@ -4309,6 +4316,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       keepWorkspaceAcrossModeRef.current = false
       return
     }
+    // A routine owns one setup across Camera and Audio. Its compact controls
+    // now exist on both surfaces, so crossing must not silently stop its tools.
+    if (focusedRoutineContextRef.current) return
     if (pitchCommitTimerRef.current !== null) {
       window.clearTimeout(pitchCommitTimerRef.current)
       pitchCommitTimerRef.current = null
@@ -5226,15 +5236,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [handleOpenPracticeHome, isPracticeHubOpen],
   )
 
-  /** A saved choice restores automatically; a new reference needs a deliberate choice. */
-  const autoLoadRoutineReference = useCallback(
-    async (projectId: string, query: string) => {
-      if (!query.trim() || getSelectedReferenceUrl(projectId)) return
-      if (activeProjectIdRef.current === projectId) setFocusPanel('references')
-    },
-    [],
-  )
-
   /**
    * A step's click starts once the step has landed, not in the same moment.
    * Opening a step can swap camera and Tools, and handleRecordingModeChange then
@@ -5261,6 +5262,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
     const surfaceBefore = recordingModeRef.current
+    setExpandedPracticeTool(null)
+    setIsSplitView(false)
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
     const day = ensureRoutineDay(target)
@@ -5338,10 +5341,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       scheduleRoutineClick(step.id, surfaceAfter !== surfaceBefore)
     }
     dismissPracticeHub()
-    if (itemProjectId && step.referenceQuery && step.kind !== 'game' && step.kind !== 'free') {
-      void autoLoadRoutineReference(itemProjectId, step.referenceQuery)
-    }
-  }, [autoLoadRoutineReference, commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
+    // The reference pill opens the existing search with this item's query.
+    // Preparing a step must never open a browser or cover the practice surface.
+  }, [commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleRecordingModeChange,
     openFocusedPractice, rememberCurrentPracticeDesk, scheduleRoutineClick, settings.hapticFeedback])
 
@@ -5555,7 +5557,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         (event as CustomEvent<{ reason?: string }> | undefined)?.detail?.reason ?? event?.type ?? 'visibility-hidden')
       commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
       pauseRoutineProgram()
-      sharedMetronomeEngine.stop()
+      // A steady native metronome continues on the lock screen. Timed programs
+      // pause above because their section changes currently depend on WebKit.
+      if (Capacitor.getPlatform() !== 'ios') sharedMetronomeEngine.stop()
       applyDroneFromDesk(null, 4)
       setIsPracticeHubOpen(true)
     }
@@ -5602,6 +5606,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!routine || !routineActiveStep) return null
     return stepAfter(routine, routineActiveStep.id)
   }, [routine, routineActiveStep])
+
+  useEffect(() => { setExpandedPracticeTool(null) }, [recordingMode, audioPracticeTab, isLabsOpen])
 
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => {
@@ -6030,8 +6036,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               <div
                 className={`pitch-display-layer${
                   pitchHudSuspended ? ' floating-widget-layer--inert' : ''
-                }`}
-                aria-hidden={!showFloatingMainPitch || pitchHudSuspended}
+                }${expandedPracticeTool !== 'pitch' ? ' practice-widget-folded' : ''}`}
+                aria-hidden={!showFloatingMainPitch || pitchHudSuspended || expandedPracticeTool !== 'pitch'}
               >
                 {showMainPitchWidget && (
                   <Suspense fallback={null}>
@@ -6058,6 +6064,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           tunerInstrument={settings.tunerInstrument}
                           tunerTransposition={settings.tunerTransposition}
                           onClose={handleClosePitch}
+                          onCollapse={() => collapsePracticeTool('pitch')}
                         />
                       )}
                     </AnimatePresence>
@@ -6068,8 +6075,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               <div
                 className={`metronome-display-layer${
                   metronomeWidgetInteractive ? '' : ' floating-widget-layer--inert'
-                }`}
-                aria-hidden={!metronomeWidgetInteractive}
+                }${expandedPracticeTool !== 'metronome' ? ' practice-widget-folded' : ''}`}
+                aria-hidden={!metronomeWidgetInteractive || expandedPracticeTool !== 'metronome'}
               >
                 {showFloatingMetronomeWidget && (
                   <Suspense fallback={null}>
@@ -6087,6 +6094,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseMetronome}
+                        onCollapse={() => collapsePracticeTool('metronome')}
                       />
                     </AnimatePresence>
                   </Suspense>
@@ -6096,8 +6104,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               <div
                 className={`drone-display-layer${
                   metronomeHudSuspended ? ' floating-widget-layer--inert' : ''
-                }`}
-                aria-hidden={!droneWidgetInteractive}
+                }${expandedPracticeTool !== 'drone' ? ' practice-widget-folded' : ''}`}
+                aria-hidden={!droneWidgetInteractive || expandedPracticeTool !== 'drone'}
               >
                 <Suspense fallback={null}>
                   <AnimatePresence>
@@ -6113,11 +6121,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseDrone}
+                        onCollapse={() => collapsePracticeTool('drone')}
                       />
                     )}
                   </AnimatePresence>
                 </Suspense>
               </div>
+
+              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !focusedPostTakeId && (
+                <PracticeToolStrip
+                  metronome={settings.showMetronome && !isAudioPracticeMetronomeTab}
+                  drone={settings.showDrone && !isAudioPracticeTunerTab}
+                  pitch={showPitch && onRecordSurface}
+                  reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
+                  referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
+                  light={recordingMode === 'audio'} transposition={settings.tunerTransposition}
+                  muted={takePlaybackActive && settings.muteMetronomeDuringPlayback}
+                  expanded={expandedPracticeTool} disabled={isStopping}
+                  onToggle={tool => { setExpandedPracticeTool(current => current === tool ? null : tool); if (isSplitView) handleExitSplitView() }}
+                  onReference={() => {
+                    setExpandedPracticeTool(null)
+                    if (youtubeUrl) handleToggleSplitView()
+                    else setFocusPanel('references')
+                  }}
+                />
+              )}
 
               {/* Sibling of the rotator, not a child: `.app-ui-rotator` is a
                   positioned z-10 element, so anything nested inside it is
@@ -6154,11 +6182,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     <AnimatePresence>
                       {showPitch && mainVideoPitchSource && (
                         <div
-                          className={
+                          className={`${expandedPracticeTool !== 'pitch' ? 'practice-widget-folded ' : ''}${
                             pitchHudSuspended
                               ? 'floating-widget-layer--inert fixed inset-0 z-[5]'
                               : 'contents'
-                          }
+                          }`}
+                          aria-hidden={expandedPracticeTool !== 'pitch' || pitchHudSuspended}
                         >
                           <DraggablePitchWidget
                             boundaryRef={appShellRef}
@@ -6174,6 +6203,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             tunerInstrument={settings.tunerInstrument}
                             tunerTransposition={settings.tunerTransposition}
                             onClose={handleClosePitch}
+                            onCollapse={() => collapsePracticeTool('pitch')}
                           />
                         </div>
                       )}

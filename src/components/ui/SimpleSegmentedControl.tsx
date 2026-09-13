@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { triggerLightHaptic } from '../../utils/haptics'
+import Pressable from './Pressable'
 
 export interface SimpleSegment<T extends string> {
   id: T
@@ -41,23 +41,24 @@ export default function SimpleSegmentedControl<T extends string>({
       {segments.map((segment) => {
         const active = value === segment.id
         return (
-          <button
+          <Pressable
             key={segment.id}
             type="button"
             role="tab"
             aria-selected={active}
+            intensity="soft"
+            hapticFeedback={hapticFeedback}
             onClick={() => {
-              triggerLightHaptic(hapticFeedback)
               onChange(segment.id)
             }}
-            className={`interactive-native flex-1 ${buttonClass} transition-colors duration-150 ${
+            className={`flex-1 ${buttonClass} transition-colors duration-150 ${
               active
                 ? 'bg-white text-stone-900 shadow-sm ring-1 ring-stone-200/80'
                 : 'text-stone-500 hover:text-stone-700'
             }`}
           >
             {segment.label}
-          </button>
+          </Pressable>
         )
       })}
     </div>

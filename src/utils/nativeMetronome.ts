@@ -42,6 +42,7 @@ interface MetronomePluginType {
     listenerFunc: (event: NativeMetronomePulseEvent) => void,
   ): Promise<PluginListenerHandle>
   addListener(eventName: 'metronomeBar', listenerFunc: () => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'metronomeState', listenerFunc: (event: { playing: boolean }) => void): Promise<PluginListenerHandle>
 }
 
 const MetronomePlugin = registerPlugin<MetronomePluginType>('MetronomePlugin')
@@ -125,14 +126,19 @@ export async function nativeMetronomeSetMuted(muted: boolean): Promise<void> {
   }
 }
 
-export async function nativeMetronomeIsPlaying(): Promise<boolean> {
+export async function nativeMetronomeIsPlaying(): Promise<boolean | null> {
   if (!isNativeIosMetronome()) return false
   try {
     const result = await plugin().isPlaying()
     return result.playing
   } catch {
-    return false
+    // An unavailable bridge response is not proof that native audio stopped.
+    return null
   }
+}
+
+export function nativeMetronomeAddStateListener(listener: (event: { playing: boolean }) => void): Promise<PluginListenerHandle> {
+  return plugin().addListener('metronomeState', listener)
 }
 
 export function nativeMetronomeAddPulseListener(
