@@ -29,15 +29,15 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
     </details>
-    <div className="multitrack-settings-heading"><h2>Choose your layout</h2>
-      <p>Choose how many boxes fill the main picture. Extra boxes sit on top and do not use these spaces.</p></div>
+    <div className="multitrack-settings-heading"><h2>Layout</h2>
+      <p>Extra boxes sit above the main layout.</p></div>
     <div className="multitrack-layout-options" role="group" aria-label="Base layout">
       {MULTITRACK_LAYOUT_PRESETS.map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
         <span className="multitrack-layout-card__preview" style={{ aspectRatio: (session.aspectRatio || '9:16').replace(':', '/'), height: session.aspectRatio === '16:9' ? 36 : 64 }}><LayoutGlyph {...p} /></span>
         <span>{p.label}</span><span className="multitrack-layout-card__check" aria-hidden>{session.layoutId === p.id ? '✓' : ''}</span>
       </button>)}
     </div>
-    <div className="multitrack-settings-heading"><h2>Edit individual boxes</h2><p>These are your recording spaces, not layout choices. Open a box to name it, change its size or choose when it appears. The highlighted space shows its position.</p></div>
+    <div className="multitrack-settings-heading"><h2>Parts</h2></div>
     {session.panels.map((p, i) => p.kind !== 'performance' ? null : <details key={p.id} className="multitrack-part-settings"
       draggable onDragStart={e => e.dataTransfer.setData('text/plain', p.id)} onDragOver={e => e.preventDefault()}
       onDrop={e => { e.preventDefault(); onReorder(e.dataTransfer.getData('text/plain'), p.id) }}>

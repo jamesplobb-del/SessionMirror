@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Quick tools preview</title></head><body><div id="root"></div><script type="module">
+import '/src/main.tsx';
+import { requestQuickFunctionFromApp } from '/src/utils/quickTunerLaunch.ts';
+const tool = new URLSearchParams(location.search).get('tool');
+requestQuickFunctionFromApp(tool === 'metronome' ? 'metronome' : 'tuner');
+</script></body></html>

@@ -3087,84 +3087,72 @@
   }
 }
 
-/* Social composition: identical percentage geometry at every screen size. */
+/* New composition controls inherit the original multitrack palette and chrome. */
 .multitrack-canvas-frame { flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center; overflow: hidden; }
-.multitrack-social-canvas.multitrack-grid { position: relative; flex: none; background: #000; overflow: hidden; }
-.multitrack-social-canvas .multitrack-grid__cell { min-width: 0; min-height: 0; overflow: hidden; border-radius: 0; }
-.multitrack-social-canvas .multitrack-panel { border-radius: 0; }
-.multitrack-overlay-move { position: absolute; left: 6px; top: 6px; z-index: 20; padding: 6px 10px; background: #fff; color: #172e48; border-radius: 8px; touch-action: none; font-size: 11px; font-weight: 700; }
-.multitrack-studio-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
-.multitrack-studio-actions button, .multitrack-project-panel button, .multitrack-layout-options button { min-height: 42px; padding: 8px 12px; border: 1px solid #b7c9dc; border-radius: 12px; color: #16395c; background: #f0f6fc; font-size: 13px; font-weight: 600; }
-.multitrack-studio-actions button:disabled, .multitrack-project-panel button:disabled { opacity: .4; }
-.multitrack-project-panel { display: flex; flex-direction: column; gap: 14px; padding: 16px; color: #193750; }
-.multitrack-project-panel p { font-size: 13px; line-height: 1.5; }
-.multitrack-project-panel label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; }
-.multitrack-project-panel input:not([type=checkbox]):not([type=range]), .multitrack-project-panel select { min-width: 0; width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #bdcddd; background: white; color: #193750; font-size: 16px; }
-.multitrack-layout-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.multitrack-layout-options button[aria-pressed=true] { color: white; background: #235da0; }
-.multitrack-part-settings { display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #f4f7fb; border: 1px solid #d9e2ed; border-radius: 16px; }
-.multitrack-time-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.multitrack-project-panel .multitrack-check { flex-direction: row; align-items: center; font-weight: 400; }
-.multitrack-project-panel input[type=checkbox] { width: 20px; height: 20px; }
-.multitrack-export-preview { width: 100%; max-height: 38vh; background: black; border-radius: 12px; }
-.multitrack-project-panel progress { width: 100%; accent-color: #235da0; }
-@media (max-width: 380px) { .multitrack-layout-options { grid-template-columns: repeat(3, 1fr); } .multitrack-studio-actions { gap: 4px; } .multitrack-studio-actions button { font-size: 11px; padding: 6px 8px; } }
-.multitrack-box-resize { position: absolute; right: 0; bottom: 0; z-index: 25; width: 36px; height: 36px; touch-action: none; color: #fff; background: #235da0; border: 2px solid #fff; border-radius: 8px 0 0 0; font-size: 22px; }
-.multitrack-overlay .multitrack-social-canvas, .multitrack-overlay .multitrack-social-canvas .multitrack-panel { border-radius: 0; box-shadow: none; }
-.multitrack-arrange-hint { font-size: 12px; color: #41576b; line-height: 1.4; flex-shrink: 0; }
-.multitrack-part-settings > summary { cursor: pointer; font-weight: 650; font-size: 15px; }
-.multitrack-part-settings > summary span { font-weight: 400; font-size: 12px; color: #58718a; margin-left: 8px; }
-.multitrack-part-settings[open] > :not(summary) { margin-top: 12px; }
-
-/* Layout previews and recording placeholders share a calm, legible studio style. */
-.multitrack-overlay .multitrack-social-canvas { outline: 1px solid #cfd9e4; }
-.multitrack-social-canvas .multitrack-grid__cell { container-type: inline-size; }
-.multitrack-overlay .multitrack-social-canvas .multitrack-panel--empty {
-  border: 1px solid #d2deec;
-  background: radial-gradient(ellipse at 50% 30%, #f7fbff, #e4edf7);
-  color: #375571;
-  gap: 10px;
-  padding: 10px 5px;
-}
-.multitrack-empty__name { position: absolute; top: 9px; left: 8px; right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 11px; font-weight: 650; letter-spacing: .02em; }
-.multitrack-empty__add { display: grid; place-items: center; width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%; color: #4875a0; background: #ffffffb8; box-shadow: 0 2px 8px #2449700d, inset 0 0 0 1px #ffffff; }
-.multitrack-empty__hint { font-size: 11px; font-weight: 500; white-space: nowrap; color: #5c7690; }
-.multitrack-social-canvas .multitrack-grid__cell.is-extra { box-shadow: 0 4px 18px #142c4d40; outline: 2px solid #fff; outline-offset: -2px; }
-.multitrack-overlay .multitrack-social-canvas .is-extra .multitrack-panel--empty { background: linear-gradient(145deg, #e4efff, #c6dbf7); color: #244f83; }
-.multitrack-social-canvas .multitrack-grid__cell.is-selected { outline: 2px solid #2673ce; outline-offset: -2px; }
+.multitrack-social-canvas.multitrack-grid { position: relative; flex: none; overflow: hidden; }
+.multitrack-social-canvas .multitrack-grid__cell { min-width: 0; min-height: 0; overflow: hidden; padding: .15rem; container-type: inline-size; }
+.multitrack-project-trigger { min-width: 0; text-align: left; }
+.multitrack-project-trigger h1 { display: flex; align-items: center; gap: .5rem; }
+.multitrack-project-trigger h1 svg { flex-shrink: 0; color: #78716c; }
+.multitrack-project-trigger:disabled { opacity: .5; }
+.multitrack-empty__name { position: absolute; top: 9px; left: 8px; right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 11px; font-weight: 500; color: #78716c; }
+.multitrack-empty__hint { margin-top: .5rem; font-size: .875rem; font-weight: 500; white-space: nowrap; }
+.multitrack-social-canvas .multitrack-grid__cell.is-extra { filter: drop-shadow(0 4px 8px #1c191729); }
+.multitrack-social-canvas .multitrack-grid__cell.is-selected { outline: 2px solid #78716c; outline-offset: -2px; border-radius: .85rem; }
 .multitrack-social-canvas .is-selected .multitrack-empty__name { visibility: hidden; }
-.multitrack-overlay-move { left: 3px; top: 3px; padding: 5px 7px; background: #fff; box-shadow: 0 2px 8px #19375322; }
-.multitrack-box-delete { position: absolute; top: 3px; right: 3px; z-index: 26; width: 30px; height: 30px; display: grid; place-items: center; color: #b63040; background: #fff; border: 1px solid #f3d2d8; border-radius: 8px; box-shadow: 0 2px 8px #19375318; }
-.multitrack-box-resize { width: 30px; height: 30px; font-size: 19px; }
+.multitrack-overlay-move, .multitrack-box-resize, .multitrack-box-delete { position: absolute; z-index: 25; display: grid; place-items: center; min-width: 36px; min-height: 36px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #44403c; background: #fff; box-shadow: 0 2px 8px #1c19171a; touch-action: none; }
+.multitrack-overlay-move { top: 5px; left: 5px; padding: 6px 10px; font-size: 11px; font-weight: 600; }
+.multitrack-box-resize { right: 4px; bottom: 4px; font-size: 20px; }
+.multitrack-box-delete { top: 5px; right: 5px; color: #b91c1c; }
+.multitrack-studio-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.multitrack-studio-actions button, .multitrack-project-panel button { min-height: 42px; padding: 8px 14px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #57534e; background: #fafaf9; font-size: 13px; font-weight: 600; }
+.multitrack-studio-actions button:disabled, .multitrack-project-panel button:disabled { opacity: .4; }
+.multitrack-arrange-actions { align-items: center; }
+.multitrack-arrange-actions button:last-child { margin-left: auto; background: #1c1917; color: #fff; }
+.multitrack-arrange-hint { font-size: 12px; color: #78716c; line-height: 1.4; flex-shrink: 0; }
+.multitrack-project-tools { padding-bottom: 0; }
+.multitrack-project-panel { display: flex; flex-direction: column; gap: 18px; padding: 16px; color: #1c1917; }
+.multitrack-project-panel p { font-size: 13px; line-height: 1.5; color: #78716c; }
+.multitrack-project-panel label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #57534e; }
+.multitrack-project-panel input:not([type=checkbox]):not([type=range]), .multitrack-project-panel select { min-width: 0; width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #e7e5e4; background: #fafaf9; color: #1c1917; font-size: 16px; }
+.multitrack-project-panel input[type=range], .multitrack-project-panel input[type=checkbox], .multitrack-project-panel progress { accent-color: #1c1917; }
+.multitrack-project-panel input[type=range] { min-width: 0; width: 100%; }
+.multitrack-project-panel .multitrack-check { flex-direction: row; align-items: center; font-weight: 400; }
+.multitrack-project-panel input[type=checkbox] { width: 20px; height: 20px; flex-shrink: 0; }
+.multitrack-project-panel progress { width: 100%; }
+.multitrack-project-files { border-bottom: 1px solid #e7e5e4; padding-bottom: 14px; }
+.multitrack-project-files > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #57534e; }
+.multitrack-project-files[open] > :not(summary) { margin-top: 14px; }
+.multitrack-settings-heading h2 { margin: 0; font-size: .95rem; font-weight: 600; color: #1c1917; }
+.multitrack-settings-heading p { margin: 5px 0 0; }
+.multitrack-layout-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.multitrack-project-panel .multitrack-layout-card { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px 4px; border-radius: 12px; background: #fafaf9; color: #78716c; font-size: 12px; }
+.multitrack-project-panel .multitrack-layout-card[aria-pressed=true] { background: #1c1917; color: #fff; border-color: #1c1917; }
+.multitrack-layout-card__preview { display: block; max-width: 100%; }
+.multitrack-layout-card__preview .multitrack-layout-strip__cell { background: #d6d3d1; border-radius: 2px; }
+.multitrack-layout-card[aria-pressed=true] .multitrack-layout-strip__cell { background: #fff; }
+.multitrack-layout-card__check { position: absolute; top: 4px; right: 6px; font-size: 12px; }
+.multitrack-part-settings { display: block; padding: 12px; background: #fafaf9; border: 1px solid #e7e5e4; border-radius: 14px; }
+.multitrack-part-settings > summary { cursor: pointer; display: flex; align-items: center; gap: 12px; list-style: none; min-height: 44px; }
+.multitrack-part-settings > summary::-webkit-details-marker { display: none; }
+.multitrack-part-settings .multitrack-part-map { position: relative; display: block; flex-shrink: 0; height: 46px; background: #e7e5e4; overflow: hidden; border-radius: 4px; }
+.multitrack-part-map > span { position: absolute; background: #d6d3d1; border: 1px solid #fff; }
+.multitrack-part-map > .is-highlighted { background: #57534e; }
+.multitrack-part-heading { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; }
+.multitrack-part-heading strong { font-size: 14px; font-weight: 600; color: #44403c; overflow: hidden; text-overflow: ellipsis; }
+.multitrack-part-heading small { font-size: 11px; color: #78716c; }
+.multitrack-part-chevron { font-size: 20px; color: #78716c; }
+.multitrack-part-settings[open] .multitrack-part-chevron { transform: rotate(180deg); }
+.multitrack-part-settings[open] > :not(summary) { margin-top: 12px; }
+.multitrack-time-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.multitrack-export-preview { width: 100%; max-height: 38vh; background: #1c1917; border-radius: 12px; }
+.multitrack-project-panel button:focus-visible, .multitrack-part-settings summary:focus-visible, .multitrack-project-trigger:focus-visible { outline: 2px solid #78716c; outline-offset: 3px; }
 @container (max-width: 105px) {
   .multitrack-empty__hint { display: none; }
-  .multitrack-empty__add { width: 28px; height: 28px; margin-top: 13px; }
+  .multitrack-empty__camera { width: 24px; height: 24px; margin-top: 13px; }
   .multitrack-empty__name { font-size: 10px; left: 6px; top: 7px; }
 }
-.multitrack-project-panel { gap: 20px; padding: 20px; }
-.multitrack-settings-heading h2 { margin: 0; font-size: 20px; line-height: 1.25; font-weight: 700; letter-spacing: -.03em; color: #18344e; }
-.multitrack-settings-heading p { margin: 7px 0 0; color: #5f7387; font-size: 13px; }
-.multitrack-project-files { border-bottom: 1px solid #e0e7ef; padding-bottom: 14px; }
-.multitrack-project-files > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #61778b; }
-.multitrack-project-files[open] > :not(summary) { margin-top: 14px; }
-.multitrack-layout-options { gap: 10px; }
-.multitrack-project-panel .multitrack-layout-card { display: flex; position: relative; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 12px 4px 10px; background: #f7f9fc; border: 1px solid #dce5ee; border-radius: 14px; color: #4d647a; font-size: 12px; }
-.multitrack-project-panel .multitrack-layout-card[aria-pressed=true] { background: #edf5ff; border: 2px solid #3477c6; padding: 11px 3px 9px; color: #235996; box-shadow: 0 3px 12px #2b68b016; }
-.multitrack-layout-card__preview { display: block; height: 64px; max-width: 100%; }
-.multitrack-layout-card__preview .multitrack-layout-strip__cell { background: #bdcddd; border-radius: 2px; }
-.multitrack-layout-card[aria-pressed=true] .multitrack-layout-strip__cell { background: #548bc9; }
-.multitrack-layout-card__check { position: absolute; top: 4px; right: 6px; font-size: 12px; }
-.multitrack-toolbar__chip > .multitrack-layout-strip__glyph { width: 20px; height: 24px; flex-shrink: 0; }
-.multitrack-project-panel .multitrack-part-settings { display: block; background: #fff; border-color: #dce5ee; padding: 12px; }
-.multitrack-part-settings > summary { display: flex; align-items: center; gap: 12px; list-style: none; }
-.multitrack-part-settings > summary::-webkit-details-marker { display: none; }
-.multitrack-part-settings > summary .multitrack-part-map { position: relative; display: block; flex-shrink: 0; height: 46px; margin: 0; background: #edf2f7; overflow: hidden; }
-.multitrack-part-map > span { position: absolute; margin: 0 !important; background: #dae3ec; border: 1px solid #fff; }
-.multitrack-part-map > .is-highlighted { background: #367ac9; }
-.multitrack-part-settings > summary .multitrack-part-heading { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 4px; margin: 0; }
-.multitrack-part-heading strong { font-size: 14px; font-weight: 650; color: #23415d; overflow: hidden; text-overflow: ellipsis; }
-.multitrack-part-heading small { font-size: 11px; color: #73879a; }
-.multitrack-part-chevron { font-size: 20px !important; }
-.multitrack-part-settings[open] .multitrack-part-chevron { transform: rotate(180deg); }
-.multitrack-part-settings[open] { border-color: #8cb3e0; }
-.multitrack-project-panel button:focus-visible, .multitrack-part-settings summary:focus-visible { outline: 2px solid #3477c6; outline-offset: 3px; }
+@media (max-width: 380px) {
+  .multitrack-layout-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .multitrack-project-panel { padding: 12px; }
+}

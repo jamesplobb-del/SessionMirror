@@ -1443,6 +1443,8 @@ function blitGlassStaticLayer(
   return getGlassLayoutMetrics(height, variant === 'audio')
 }
 
+const silkColorUpdates = new WeakMap<HTMLElement, number>()
+
 function drawPitchCanvas(
   canvas: HTMLCanvasElement,
   timeDomain: Float32Array,
@@ -1612,7 +1614,8 @@ function drawPitchCanvas(
     if (visualTrace) appendTunerTrace(visualTrace, now, centsHistory.at(-1) ?? PITCH_SILENCE_FLOOR_CENTS)
     const displayedPoints = visualTrace ? tunerTracePoints(visualTrace.samples, now, width, height) : tracePoints
     const color = drawSilkTuner(ctx, width, height, displayedPoints, visualTrace ? true : active, document.documentElement.classList.contains('app-dark-mode'))
-    if (silkOverlay.style.getPropertyValue('--silk-live') !== color) {
+    if (now - (silkColorUpdates.get(silkOverlay) ?? -Infinity) >= 100 && silkOverlay.style.getPropertyValue('--silk-live') !== color) {
+      silkColorUpdates.set(silkOverlay, now)
       silkOverlay.style.setProperty('--silk-live', color)
       if (!isTunerDiagnosticMode('static-background')) silkOverlay.style.setProperty('--silk-wash', color)
     }

@@ -32,7 +32,7 @@ function QuickMetronomeContent({
   }, [hapticFeedback, onExit, stop])
 
   return (
-    <main className="quick-metronome-screen app-ui-overlay--audio-mode app-ui-overlay--audio-practice-metronome">
+    <main className="quick-metronome-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-metronome">
       <header className="quick-tuner-header">
         <button
           type="button"

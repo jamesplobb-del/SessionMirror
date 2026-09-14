@@ -1298,10 +1298,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               <Pressable type="button" intensity="soft" disabled={isExporting} onClick={onClose} aria-label="Return to Camera Mode" className="multitrack-camera-back">
                 <ChevronLeft className="h-6 w-6" />
               </Pressable>
-              <div className="multitrack-camera-title">
+              <button type="button" className="multitrack-camera-title multitrack-project-trigger" aria-label="Open project and parts" disabled={isRestoring || isExporting || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}>
                 <span><Video className="h-3 w-3" /> Camera Mode</span>
-                <h1 className="text-lg font-semibold">{session.name || 'Multitrack'}</h1>
-              </div>
+                <h1 className="text-lg font-semibold">{session.name || 'Multitrack'} <FolderOpen className="h-4 w-4" /></h1>
+              </button>
               <Pressable
                 type="button"
                 intensity="normal"
@@ -1371,13 +1371,14 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   {layoutSheetAsset ? <span className="multitrack-source-chip__dot" /> : null}
                 </Pressable>
               </div>
-              <div className="multitrack-studio-actions">
-                <button disabled={isExporting || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}>Project & parts</button>
-                <button disabled={!canUndo || isExporting || alignStageOpen} onClick={() => { pauseAllPlayback(); undo() }}>Undo</button>
-                <button disabled={isExporting} onClick={() => handleAddBoxAt(sync.state.currentTime)}>+ Extra box</button>
-                <button disabled={isExporting} aria-pressed={layoutEditing} onClick={() => { pauseAllPlayback(); setAlignStageOpen(false); setLayoutEditing(!layoutEditing) }}>{layoutEditing ? 'Done arranging' : 'Arrange boxes'}</button>
-              </div>
-              {layoutEditing && <p className="multitrack-arrange-hint">Tap a box, then drag Move or its corner to resize. Width and height sliders are in Project & parts.</p>}
+              {layoutEditing && <>
+                <div className="multitrack-studio-actions multitrack-arrange-actions">
+                  <button disabled={!canUndo || isExporting} onClick={() => { pauseAllPlayback(); undo() }}>Undo</button>
+                  <button disabled={isExporting} onClick={() => handleAddBoxAt(sync.state.currentTime)}>+ Extra box</button>
+                  <button onClick={() => setLayoutEditing(false)}>Done arranging</button>
+                </div>
+                <p className="multitrack-arrange-hint">Select a box to move or resize it.</p>
+              </>}
               <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} editable={layoutEditing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
                 streamRef={streamRef} streamGeneration={streamGeneration}
                 nativeLivePreviewActive={nativeLivePreviewActive} nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
@@ -1427,7 +1428,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             ) : (
               <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
                 activeLayoutId={session.layoutId}
-                onSelectLayout={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}
+                onSelectLayout={id => { pauseAllPlayback(); setLayout(id) }}
                 onOpenMixer={() => { pauseAllPlayback(); setActiveSourceSheet('mixer') }}
                 onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
                 onTogglePlay={() => {
@@ -1959,6 +1960,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       </AnimatedBottomSheet>
 
       <AnimatedBottomSheet isOpen={activeSourceSheet === 'project' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Project and parts" elevated elevatedLight zClass={MULTITRACK_SHEET_Z} maxHeightClass="max-h-[85vh]">
+        <div className="multitrack-sheet multitrack-project-tools">
+          <p className="multitrack-sheet__title">Project & parts</p>
+          <div className="multitrack-studio-actions">
+            <button disabled={isExporting} onClick={() => { pauseAllPlayback(); setActiveSourceSheet(null); setAlignStageOpen(false); setLayoutEditing(true) }}>Arrange boxes</button>
+            <button disabled={isExporting} onClick={() => { setActiveSourceSheet(null); handleAddBoxAt(sync.state.currentTime) }}>+ Extra box</button>
+          </div>
+        </div>
         <MultitrackProjectPanel session={session} projects={projects}
           onProject={(id, duplicate) => { pauseAllPlayback(); setAlignStageOpen(false); setRenderedVideo(null); void openProject(id, duplicate) }}
           onUpdate={updateProject} onPanel={updatePanel} onLayout={setLayout} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}

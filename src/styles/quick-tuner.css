@@ -448,3 +448,16 @@
     transition: none;
   }
 }
+
+/* Use the current tool themes while retaining the quick-launch shell layout. */
+.quick-tuner-screen.app-ui-overlay,
+.quick-metronome-screen.app-ui-overlay {
+  display: grid;
+  z-index: 10000;
+  pointer-events: auto;
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 0.75rem)
+    max(1rem, env(safe-area-inset-right, 0px))
+    calc(env(safe-area-inset-bottom, 0px) + 0.85rem)
+    max(1rem, env(safe-area-inset-left, 0px));
+}

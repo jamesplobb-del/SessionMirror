@@ -265,7 +265,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   const permissionMessage = permissionCopy(permission)
 
   return (
-    <main className="quick-tuner-screen app-ui-overlay--audio-mode">
+    <main className="quick-tuner-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-tuner">
       <header className="quick-tuner-header">
         <button
           type="button"
@@ -295,7 +295,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
         <span>{activeTransposition.shortLabel}</span>
       </section>
 
-      <section className="quick-tuner-stage" aria-label="Live tuner">
+      <section className="quick-tuner-stage audio-practice-tuner-shell" aria-label="Live tuner">
         {!permissionChecked ? (
           <div className="quick-tuner-permission">
             <span className="quick-tuner-permission__icon">
@@ -307,6 +307,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
           <>
             <LivePitchTuner
               variant="audio"
+              nativePitchProcessing
               mediaRef={mediaRef}
               enabled={appForeground}
               isPlaying={false}

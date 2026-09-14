@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
-import { Film, MoreHorizontal, Pause, Play, Plus, X } from 'lucide-react'
+import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
@@ -73,8 +73,8 @@ export default function PerformancePanel({
     return (
       <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label={`Add recording to ${displayName || 'box'}`}>
         <span className="multitrack-empty__name">{displayName || 'Box'}</span>
-        <span className="multitrack-empty__add"><Plus size={20} strokeWidth={1.6} /></span>
-        <span className="multitrack-empty__hint">Add recording</span>
+        <Video className="multitrack-empty__camera h-8 w-8 text-stone-400" />
+        <span className="multitrack-empty__hint text-stone-500">Tap to add</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
             {recordingPhase === 'arming'

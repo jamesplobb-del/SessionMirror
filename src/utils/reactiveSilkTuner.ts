@@ -1,8 +1,16 @@
 import { isSilenceFloorSample, TUNING_GREEN_CENTS, TUNING_YELLOW_CENTS } from './pitchUtils'
 
+/** Blend around zone boundaries so tiny pitch changes cannot flash between colors. */
 export function silkPitchColor(cents: number): string {
-  return Math.abs(cents) <= TUNING_GREEN_CENTS ? '#20ed78'
-    : Math.abs(cents) <= TUNING_YELLOW_CENTS ? '#f4c52b' : '#f54c62'
+  const green = [32, 237, 120], yellow = [244, 197, 43], red = [245, 76, 98]
+  const distance = Math.abs(cents)
+  const boundary = distance < (TUNING_GREEN_CENTS + TUNING_YELLOW_CENTS) / 2
+    ? TUNING_GREEN_CENTS : TUNING_YELLOW_CENTS
+  const from = boundary === TUNING_GREEN_CENTS ? green : yellow
+  const to = boundary === TUNING_GREEN_CENTS ? yellow : red
+  const t = Math.max(0, Math.min(1, (distance - boundary + 2) / 4))
+  const blend = t * t * (3 - 2 * t)
+  return '#' + from.map((value, i) => Math.round(value + (to[i] - value) * blend).toString(16).padStart(2, '0')).join('')
 }
 export function silkTunerGeometry(width: number, height: number) {
   const center = height * .51, range = height * .19
@@ -47,12 +55,14 @@ function silkGradient(
   const firstX = run[0].point.x
   const lastX = Math.max(firstX + 1, run[run.length - 1].point.x)
   const gradient = ctx.createLinearGradient(firstX, 0, lastX, 0)
-  const stopStride = Math.max(1, Math.ceil(run.length / 24))
-  for (let runIndex = 0; runIndex < run.length; runIndex += stopStride) {
+  // Use every stored point at its actual x position. A stride tied to the
+  // moving window changed which colors were sampled on every frame, making
+  // even old sections of the line shimmer as they scrolled.
+  for (let runIndex = 0; runIndex < run.length; runIndex += 1) {
     const entry = run[runIndex]
     const age = totalPoints <= 1 ? 1 : entry.index / (totalPoints - 1)
     gradient.addColorStop(
-      run.length <= 1 ? 1 : runIndex / (run.length - 1),
+      Math.max(0, Math.min(1, (entry.point.x - firstX) / (lastX - firstX))),
       colorWithAlpha(silkPitchColor(entry.point.cents), startAlpha + (endAlpha - startAlpha) * age),
     )
   }

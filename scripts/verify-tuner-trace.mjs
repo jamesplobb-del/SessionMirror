@@ -11,6 +11,23 @@ try {
   const config = join(dir,'config.mjs')
   await build({ entryPoints:['src/utils/pitchConfig.ts'], outfile:config, bundle:true, platform:'node', format:'esm' })
   const { PITCH_SILENCE_FLOOR_CENTS: silence } = await import(config)
+  const rendererFile = join(dir,'renderer.mjs')
+  await build({ entryPoints:['src/utils/reactiveSilkTuner.ts'], outfile:rendererFile, bundle:true, platform:'node', format:'esm' })
+  const { silkPitchColor, drawSilkTuner } = await import(rendererFile)
+  const rgb = hex => [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))
+  for (const boundary of [5,15,-5,-15]) {
+    const before=rgb(silkPitchColor(boundary-.01)),after=rgb(silkPitchColor(boundary+.01))
+    assert.ok(before.every((channel,i)=>Math.abs(channel-after[i])<=3),'tiny threshold changes must not flash between zone colors')
+  }
+  const gradients=[]
+  const ctx = new Proxy({}, { get: (_,key) => key==='createLinearGradient' ? () => {
+    const stops=[];gradients.push(stops);return {addColorStop:(offset,color)=>stops.push({offset,color})}
+  } : () => {}, set:()=>true })
+  const points=[0,10,70,100].map((x,i)=>({x,y:100,cents:[4,6,14,16][i],time:x}))
+  drawSilkTuner(ctx,400,300,points,false,false)
+  assert.deepEqual(gradients[0].map(s=>s.offset),[0,.1,.7,1,1],'gradient colors follow actual time positions, not sample indices')
+  assert.equal(gradients[1].length,points.length+1,'all points retain a color stop while scrolling')
+  console.log('PASS: continuous color boundaries and color stops anchored to stored point positions.')
   const trace = createTunerTrace()
   for(let t=0;t<=5000;t+=1000/60) appendTunerTrace(trace,t,18*Math.sin(t/130))
   const saved = JSON.stringify(trace.samples)
