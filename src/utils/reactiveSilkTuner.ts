@@ -22,14 +22,12 @@ const MAX_BRIDGED_GAP_SAMPLES = 3
 /**
  * How much time the live trace shows across the canvas.
  *
- * `LIVING_TRACE_HISTORY_LENGTH` (110) samples at the tuner's 60Hz tick. Pitch
- * history browses the same shape, so it has to span the same window — it used
- * to show 8 seconds in the width the live trace gives 1.8, which squashed the
- * line into something unreadable the moment you scrolled back.
+ * Live and rewind use timestamps on this fixed scale, independent of frame
+ * rate. Kept at the original 110-point / 60Hz duration for familiar spacing.
  */
 export const SILK_TRACE_WINDOW_MS = Math.round((110 / 60) * 1000)
 
-type SilkPoint = { x: number; y: number; cents: number }
+type SilkPoint = { x: number; y: number; cents: number; time?: number }
 type IndexedSilkPoint = { point: SilkPoint; index: number }
 
 function colorWithAlpha(color: string, alpha: number): string {
@@ -123,8 +121,10 @@ export function drawSilkTuner(
       // Only a gap longer than MAX_BRIDGED_GAP_SAMPLES ends the run, so a real
       // rest still reads as a break. This is a drawing decision only: no sample
       // is invented and nothing measured is changed.
+      // Timestamped traces already hold brief dropouts when captured; a
+      // stored silence in that path is a real gap and must stay a gap.
       gap += 1
-      if (gap > MAX_BRIDGED_GAP_SAMPLES) {
+      if (point.time != null || gap > MAX_BRIDGED_GAP_SAMPLES) {
         drawSilkRun(ctx, run, points.length)
         run = []
       }

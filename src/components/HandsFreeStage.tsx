@@ -76,7 +76,7 @@ function HandsFreeStage({
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef: panel.panelRef,
     x, y, positionId: 'hands-free-tools', label: `hands-free${phase ? `, ${PHASE_COPY[phase].title}` : ''}`,
     icon: <Mic aria-hidden />, detail: ballDetail, active: phase === 'recording',
-    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3 })
+    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase) })
   const copy = phase ? PHASE_COPY[phase] : null
   const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
 

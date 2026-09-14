@@ -1,0 +1,138 @@
+[
+  {
+    "check": "drone-transitions",
+    "exit": 0
+  },
+  {
+    "check": "audio-lifecycle",
+    "exit": 0
+  },
+  {
+    "check": "playback-route",
+    "exit": 0
+  },
+  {
+    "check": "handsfree-cycle",
+    "exit": 0
+  },
+  {
+    "check": "handsfree-monitor",
+    "exit": 0
+  },
+  {
+    "check": "metronome-background",
+    "exit": 0
+  },
+  {
+    "check": "metronome-program-review",
+    "exit": 0
+  },
+  {
+    "check": "practice-routines",
+    "exit": 0
+  },
+  {
+    "check": "practice-refinements",
+    "exit": 0
+  },
+  {
+    "check": "routine-program-share",
+    "exit": 0
+  },
+  {
+    "check": "native-plugin-registration",
+    "exit": 0
+  },
+  {
+    "check": "tuner-microphone-ownership",
+    "exit": 0
+  },
+  {
+    "check": "tuner-stability",
+    "exit": 0
+  },
+  {
+    "check": "tuner-history",
+    "exit": 0
+  },
+  {
+    "check": "navigation-response",
+    "exit": 0
+  },
+  {
+    "check": "daily-challenges",
+    "exit": 0
+  },
+  {
+    "check": "daily-challenge-plan",
+    "exit": 0
+  },
+  {
+    "check": "session-extensions",
+    "exit": 0
+  },
+  {
+    "check": "trim-metadata",
+    "exit": 0
+  },
+  {
+    "check": "live-recording-waveform",
+    "exit": 0
+  },
+  {
+    "check": "widget-ball-placement",
+    "exit": 0
+  },
+  {
+    "check": "practice-sounds",
+    "exit": 0
+  },
+  {
+    "check": "reactive-silk",
+    "exit": 0
+  },
+  {
+    "check": "interaction-feedback",
+    "exit": 0
+  },
+  {
+    "check": "camera-gestures",
+    "exit": 0
+  },
+  {
+    "check": "new-features",
+    "exit": 0
+  },
+  {
+    "check": "native-tuner-receiver",
+    "exit": 0
+  },
+  {
+    "check": "feature-guidance",
+    "exit": 0
+  },
+  {
+    "check": "focus-practice",
+    "exit": 0
+  },
+  {
+    "check": "staff-jumper-review",
+    "exit": 0
+  },
+  {
+    "check": "instrument-playability",
+    "exit": 0
+  },
+  {
+    "check": "tuner-diagnostic-mode",
+    "exit": 0
+  },
+  {
+    "check": "multitrack-upgrade",
+    "exit": 0
+  },
+  {
+    "check": "drone-renderer",
+    "exit": 0
+  }
+]

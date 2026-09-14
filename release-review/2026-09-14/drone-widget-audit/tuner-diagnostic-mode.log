@@ -1,0 +1,1 @@
+PASS: normal builds ignore diagnostics; investigation modes persist and switch independently

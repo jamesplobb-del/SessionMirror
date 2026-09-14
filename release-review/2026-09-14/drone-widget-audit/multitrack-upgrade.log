@@ -1,0 +1,4 @@
+PASS: 1385 multitrack assertions (1–12 parts, count-ins, lead-in, seek, timing, layouts, section exports, project restore).
+PASS: exporter payload, floating layer order, timed score, mix, mirror, format, ending and cancellation.
+PASS: real session actions preserve twelve base boxes plus four extras; safe replacement and custom geometry.
+PASS: record/review/retry across twelve boxes, camera rejection, cancellation during camera/transport setup, stale start suppression.

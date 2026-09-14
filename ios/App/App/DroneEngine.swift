@@ -59,6 +59,12 @@ final class DroneEngine {
     }
 
     private var voices: [Int: DroneVoice] = [:]
+    // Owned exclusively by the audio callback; never copy a dictionary per sample.
+    private var renderVoices = (0..<12).map { DroneVoice(pitchClass: $0) }
+    private var renderVolume: Float = 0
+    private var renderTargetVolume: Float = 0
+    private let controlQueue = DispatchQueue(label: "com.besttake.drone.control", qos: .userInitiated)
+    private var recoveryGeneration = 0
     private var octave = 4
     private var requestedVolume: Float = 0.75
     private var masterVolume: Float = DroneEngine.outputVolume(for: 0.75)
@@ -76,12 +82,12 @@ final class DroneEngine {
         engine.attach(sourceNode)
         engine.connect(sourceNode, to: mainMixer, format: renderFormat)
         engine.connect(mainMixer, to: engine.outputNode, format: nil)
-        mainMixer.outputVolume = masterVolume
+        mainMixer.outputVolume = 1
 
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
             self?.handleEngineConfigurationChange()
         }
@@ -107,7 +113,7 @@ final class DroneEngine {
             fadeVoice(pitchClass: pitchClass, to: 0)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.02) { [weak self] in
+        controlQueue.asyncAfter(deadline: .now() + fadeDuration + 0.02) { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
             self.detachIdleVoices()
@@ -145,6 +151,7 @@ final class DroneEngine {
         let activePitchClasses = voices.filter { $0.value.targetGain > 0.001 }.map(\.key).sorted()
         if activePitchClasses == [pitchClass] {
             stateLock.unlock()
+            ensureEngineRunning()
             return true
         }
 
@@ -181,7 +188,6 @@ final class DroneEngine {
         stateLock.lock()
         requestedVolume = max(0, min(1, volume))
         masterVolume = Self.outputVolume(for: requestedVolume)
-        mainMixer.outputVolume = masterVolume
         stateLock.unlock()
     }
 
@@ -224,7 +230,6 @@ final class DroneEngine {
         self.octave = max(0, min(8, octave))
         requestedVolume = max(0, min(1, volume))
         masterVolume = Self.outputVolume(for: requestedVolume)
-        mainMixer.outputVolume = masterVolume
         self.waveform = DroneWaveform.parse(waveform)
         let notes = Set(activeNotes.filter { (0...11).contains($0) })
         for pitchClass in voices.keys where !notes.contains(pitchClass) {
@@ -276,9 +281,24 @@ final class DroneEngine {
     }
 
     private func render(frameCount: AVAudioFrameCount, audioBufferList: UnsafeMutablePointer<AudioBufferList>) -> OSStatus {
-        stateLock.lock()
-        var renderVoices = voices
-        stateLock.unlock()
+        // A real-time callback must never wait for a UI/bridge thread. If a
+        // control update is in progress, keep rendering the previous targets.
+        if stateLock.try() {
+            for pitchClass in 0..<12 {
+                if let voice = voices[pitchClass] {
+                    if renderVoices[pitchClass].currentGain == 0 && voice.targetGain > 0 {
+                        renderVoices[pitchClass].frequency = voice.targetFrequency
+                    }
+                    renderVoices[pitchClass].targetGain = voice.targetGain
+                    renderVoices[pitchClass].targetFrequency = voice.targetFrequency
+                    renderVoices[pitchClass].targetHarmonics = voice.targetHarmonics
+                } else {
+                    renderVoices[pitchClass].targetGain = 0
+                }
+            }
+            renderTargetVolume = masterVolume
+            stateLock.unlock()
+        }
 
         let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
         let channelCount = Int(ablPointer.count)
@@ -293,8 +313,9 @@ final class DroneEngine {
             var mixed: Float = 0
             var totalGain: Float = 0
 
-            for pitchClass in renderVoices.keys {
-                guard var voice = renderVoices[pitchClass] else { continue }
+            for pitchClass in 0..<12 {
+                var voice = renderVoices[pitchClass]
+                if voice.currentGain <= 0 && voice.targetGain <= 0 { continue }
 
                 if voice.currentGain < voice.targetGain {
                     voice.currentGain = min(voice.targetGain, voice.currentGain + fadeStep)
@@ -316,23 +337,22 @@ final class DroneEngine {
             }
 
             // Normalize by fading voice gains, so chord changes do not jump in level.
-            let sample = mixed / max(1, totalGain) * oscillatorHeadroom * speakerBusGain
+            renderVolume += (renderTargetVolume - renderVolume) * timbreSmoothing
+            let sample = mixed / max(1, totalGain) * oscillatorHeadroom * speakerBusGain * renderVolume
             for channel in 0..<channelCount {
                 guard let buffer = ablPointer[channel].mData?.assumingMemoryBound(to: Float.self) else { continue }
                 buffer[frame] = sample
             }
         }
 
-        stateLock.lock()
-        for (pitchClass, renderedVoice) in renderVoices {
-            guard var liveVoice = voices[pitchClass] else { continue }
-            liveVoice.phase = renderedVoice.phase
-            liveVoice.currentGain = renderedVoice.currentGain
-            liveVoice.frequency = renderedVoice.frequency
-            liveVoice.harmonics = renderedVoice.harmonics
-            voices[pitchClass] = liveVoice
+        if stateLock.try() {
+            for pitchClass in 0..<12 {
+                guard var liveVoice = voices[pitchClass] else { continue }
+                liveVoice.currentGain = renderVoices[pitchClass].currentGain
+                voices[pitchClass] = liveVoice
+            }
+            stateLock.unlock()
         }
-        stateLock.unlock()
         return noErr
     }
 
@@ -356,7 +376,7 @@ final class DroneEngine {
     }
 
     private func scheduleDetachIfSilent(pitchClass: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDuration + 0.04) { [weak self] in
+        controlQueue.asyncAfter(deadline: .now() + fadeDuration + 0.04) { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
             guard let voice = self.voices[pitchClass], voice.currentGain <= 0.001, voice.targetGain <= 0.001 else {
@@ -379,13 +399,17 @@ final class DroneEngine {
     }
 
     private func ensureEngineRunning() {
+        controlQueue.async { [weak self] in self?.startEngineIfNeeded() }
+    }
+
+    // All graph/session operations run serially, outside the UI and render locks.
+    private func startEngineIfNeeded() {
         stateLock.lock()
-        if isRunning && engine.isRunning {
-            stateLock.unlock()
-            return
-        }
-        isRunning = false
+        let shouldPlay = voices.contains { $0.value.targetGain > 0.001 }
         stateLock.unlock()
+        guard shouldPlay else { return }
+        if isRunning && engine.isRunning { return }
+        isRunning = false
 
         do {
             try AudioRouteConfigurator.prepareMetronomePlaybackSessionIfNeeded()
@@ -396,6 +420,8 @@ final class DroneEngine {
             stateLock.lock()
             isRunning = true
             let activeNotes = voices.keys.sorted()
+            let requestedVolume = self.requestedVolume
+            let masterVolume = self.masterVolume
             stateLock.unlock()
             print(
                 "[DroneEngine] started activeNotes=\(activeNotes) requestedVolume=\(requestedVolume) " +
@@ -411,25 +437,31 @@ final class DroneEngine {
     }
 
     private func handleEngineConfigurationChange() {
-        stateLock.lock()
-        isRunning = false
-        let hasAudibleVoice = voices.contains { $0.value.currentGain > 0.001 || $0.value.targetGain > 0.001 }
-        stateLock.unlock()
-        guard hasAudibleVoice else {
-            print("[DroneEngine] configuration changed; idle")
-            return
+        controlQueue.async { [weak self] in
+            guard let self else { return }
+            self.recoveryGeneration &+= 1
+            let generation = self.recoveryGeneration
+            self.controlQueue.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                guard let self, generation == self.recoveryGeneration else { return }
+                self.startEngineIfNeeded()
+            }
         }
-        print("[DroneEngine] configuration changed; restarting active drone")
-        ensureEngineRunning()
     }
 
     private func stopEngineIfIdle() {
+        controlQueue.asyncAfter(deadline: .now() + fadeDuration + 0.02) { [weak self] in
+            self?.stopIdleEngine()
+        }
+    }
+
+    private func stopIdleEngine() {
         stateLock.lock()
-        let hasAudibleVoice = voices.contains { $0.value.currentGain > 0.001 || $0.value.targetGain > 0.001 }
+        let hasAudibleVoice = voices.contains { $0.value.targetGain > 0.001 }
         if hasAudibleVoice {
             stateLock.unlock()
             return
         }
+        voices.removeAll(keepingCapacity: true)
         isRunning = false
         stateLock.unlock()
         engine.stop()

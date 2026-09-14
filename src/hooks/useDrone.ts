@@ -65,8 +65,13 @@ function emit(): void {
 }
 
 function commit(next: DronePrefs, persist = true): void {
-  prefs = next
   if (persist) saveDronePrefs(next)
+  if (prefs.enabled === next.enabled && prefs.octave === next.octave &&
+      prefs.volume === next.volume && prefs.waveform === next.waveform &&
+      prefs.lastPitchClass === next.lastPitchClass &&
+      prefs.activeNotes.length === next.activeNotes.length &&
+      prefs.activeNotes.every((note, index) => note === next.activeNotes[index])) return
+  prefs = next
   emit()
 }
 
@@ -182,7 +187,10 @@ function setNotes(pitchClasses: number[], hapticFeedback: boolean): void {
 }
 
 function silence(): void {
-  if (prefs.activeNotes.length === 0 && !prefs.enabled) return
+  if (prefs.activeNotes.length === 0 && !prefs.enabled) {
+    commandSequence += 1 // An explicit stop also cancels a pending playback resume.
+    return
+  }
   runNative({ ...prefs, activeNotes: [], enabled: false }, () => droneStop())
 }
 
@@ -217,6 +225,9 @@ function attachRecoveryListener(): void {
 function restoreOnce(volume: number, waveform: DroneWaveform): void {
   if (restored || !isDroneNativeAvailable()) return
   restored = true
+  // A routine can choose its note before the widget's first effect runs.
+  // Never follow that choice with a startup command that silences the engine.
+  if (commandSequence > 0) return
   const sequence = ++commandSequence
   const saved = loadDronePrefs()
   void droneRestoreState({
@@ -332,4 +343,17 @@ export function applyDroneFromDesk(pitchClass: number | null, octave: number): v
     return
   }
   glissNote(pitchClass, clampedOctave)
+}
+
+/** Resume only if no routine/tool action has replaced this playback pause. */
+export function pauseDroneForPlayback(): (() => void) | null {
+  if (!prefs.enabled || prefs.activeNotes.length === 0) return null
+  const paused = prefs
+  silence()
+  const sequence = commandSequence
+  return () => {
+    if (sequence !== commandSequence) return
+    const next = { ...prefs, activeNotes: paused.activeNotes, octave: paused.octave, enabled: true }
+    runNative(next, () => droneRestoreState(next))
+  }
 }

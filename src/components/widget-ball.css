@@ -1,7 +1,7 @@
 .widget-ball {
   position: absolute; left: 0; top: 0; z-index: 40;
   width: 56px; height: 56px; border-radius: 50%;
-  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px;
   border: 1px solid #83b7ff66; color: #f1f6ff; background: #15243af5;
   box-shadow: 0 5px 18px #0004, inset 0 0 0 3px #8fbaff12;
   touch-action: none; user-select: none; cursor: grab; padding: 5px;
@@ -25,7 +25,7 @@
 .app-shell .floating-widget-layer--inert *,
 .app-shell .pitch-display-layer.floating-widget-layer--inert * { pointer-events: none !important; }
 /* One attached glass tab and a full touch target for every floating tool. */
-.widget-collapse { position:absolute; right:44px; top:-18px; width:44px; height:36px;
+.widget-collapse { position:absolute; right:44px; top:0; width:44px; height:36px;
   display:grid; place-items:center; border:0; border-radius:14px; padding:0;
   background:transparent; color:#eef6ff; z-index:35; touch-action:manipulation; pointer-events:auto; }
 .widget-collapse::before { content:''; position:absolute; inset:5px 0;
@@ -38,4 +38,6 @@
 html.app-dark-mode .app-shell--audio-mode .widget-collapse { color:#eef6ff; }
 html.app-dark-mode .app-shell--audio-mode .widget-collapse::before { background:#243750b3; border-color:#ffffff45; }
 .hands-free-ball-layer { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
-.hands-free-stage .widget-collapse { right: 2px; top: -22px; pointer-events: auto; }
+.hands-free-stage .widget-collapse { right: 4px; top: 0; pointer-events: auto; }
+
+.widget-ball .widget-ball__expand { width:12px; height:10px; opacity:.85; }

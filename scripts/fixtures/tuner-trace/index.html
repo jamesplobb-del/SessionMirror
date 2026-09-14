@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tuner trace regression preview</title><style>
+body{font:15px system-ui;background:#f5f8fa;color:#243f48;margin:24px}main{display:flex;gap:24px;flex-wrap:wrap}.panel:has(.is-browsing)>canvas{visibility:hidden}.panel{width:400px;height:350px;background:white;position:relative;border:1px solid #dce7eb;border-radius:18px;overflow:hidden}canvas{width:100%;height:100%}h2{font-size:16px}button{padding:10px;border-radius:10px;border:1px solid #bccbd6;background:white}
+</style></head><body><h1>Tuner trace comparison</h1><p>Deterministic synthetic readings. Drag the right-hand graph to browse the same stored curve.</p><main><section><h2>Live frame at 5 seconds</h2><div class="panel"><canvas id="reference"></canvas></div></section><section><h2>History — same geometry</h2><div class="panel"><canvas id="background"></canvas><div id="history"></div></div></section></main><script type="module">
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import TunerHistory from '/src/components/audioPractice/TunerHistory.tsx';
+import { createTunerTrace,appendTunerTrace,tunerTracePoints } from '/src/utils/tunerTrace.ts';
+import { drawSilkTuner } from '/src/utils/reactiveSilkTuner.ts';
+import '/src/styles/reactive-silk-tuner.css';
+const trace=createTunerTrace();
+for(let time=0;time<=5000;time+=10)appendTunerTrace(trace,time,21*Math.sin(time/210)+7*Math.sin(time/70));
+for(const id of ['reference','background']){const c=document.getElementById(id);c.width=800;c.height=700;const ctx=c.getContext('2d');ctx.scale(2,2);drawSilkTuner(ctx,400,350,tunerTracePoints(trace.samples,5000,400,350),true,false)}
+createRoot(document.getElementById('history')).render(React.createElement(TunerHistory,{trace:{current:trace},samples:{current:[]},transposition:'concert'}));
+</script></body></html>

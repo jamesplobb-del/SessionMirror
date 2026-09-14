@@ -2826,11 +2826,10 @@ html.app-dark-mode
   box-shadow: inset 0 0 0 2px rgba(247, 166, 0, 0.85);
 }
 
-
-/* Give each take a full-width heading, clear of the share and close controls. */
+/* Keep the original compact card height while making room for complete labels. */
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot {
-  --camera-take-card-height: clamp(5.8rem, 25vw, 6.35rem);
-  padding-top: 1.85rem;
+  --camera-take-thumb-size: clamp(2.2rem, 10vw, 2.5rem);
+  padding-top: 1.55rem;
 }
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-caption {
   position: static;
@@ -2838,7 +2837,7 @@ html.app-dark-mode
 }
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-slot .compact-take-caption__label {
   position: absolute;
-  top: 0.65rem;
+  top: 0.55rem;
   left: 0.5rem;
   width: calc(100% - 4.1rem);
   padding-right: 0;

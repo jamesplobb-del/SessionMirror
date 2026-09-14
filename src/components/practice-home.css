@@ -39,6 +39,7 @@ html .practice-menu-card--electric-edge :is(h2, button, small, strong) {
 }
 html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header {
   position: relative;
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
   min-height: 76px;
@@ -57,7 +58,11 @@ html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll
   max-width: 640px;
 }
 html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-flow {
-  display: flex; flex-direction: column; gap: 12px; min-height: 100%;
+  display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1 0 auto;
+}
+/* Percentage minimum heights on both wrappers added a second screen of space. */
+html .practice-menu-card.practice-menu-card--electric-edge > .practice-menu-scroll > .practice-menu-page {
+  min-height: 0; flex: 1 0 auto;
 }
 .practice-home-instrument {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -71,7 +76,7 @@ html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge 
 .practice-home-instrument-change { display: flex; align-items: center; gap: 3px; flex-shrink: 0; color: #0875cf; font-size: 12px; font-weight: 600; }
 .practice-home-instrument-change svg { width: 14px; height: 14px; }
 .practice-home-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows: minmax(186px, 1.2fr) minmax(128px, 1fr); }
+.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows: minmax(min-content, 1.2fr) minmax(min-content, 1fr); }
 .practice-menu-card--electric-edge .practice-home-launch-button { position: relative; overflow: hidden; isolation: isolate; border-radius: 16px; padding: 23px; }
 .practice-menu-card--electric-edge .practice-home-launch-button.is-primary {
   min-height: 186px; background: linear-gradient(120deg, #0879ec, #0754b2);
@@ -117,17 +122,37 @@ html.app-dark-mode .practice-menu-card--electric-edge .practice-home-launch-butt
 html.app-dark-mode .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background: #1c304a !important; }
 html.app-dark-mode .practice-menu-card--electric-edge .practice-menu-shortcut svg { color: #80caff !important; }
 html.app-dark-mode .practice-menu-card--electric-edge .practice-menu-shortcut:first-child svg { color: #eec15a !important; }
-@media (max-height: 740px) {
-  .practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows: auto auto; flex-grow: 0; }
-  .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height: 142px; padding: 18px; }
-  .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height: 108px; padding: 18px; }
-  .practice-home-instrument { margin-bottom: 0; }
-}
-
 /* Direct destinations sit below the recording and routine actions. */
-.practice-home-links { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0 16px; }
+.practice-home-links { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin:0; }
 .practice-home-links .practice-home-library { margin:0; padding:14px 12px; min-height:70px; background:var(--guide-panel); border:1px solid var(--guide-line); border-radius:20px; text-align:left; }
 .practice-home-links .practice-home-library span { font-size:14px; }
 .practice-home-links small { display:block; font-size:10px; font-weight:500; color:var(--guide-muted); margin-top:4px; }
 .practice-menu-card--electric-edge .practice-home-routine-launch { min-height:115px; }
 .practice-menu-card--electric-edge .practice-home-record-launch { min-height:180px; }
+
+@media (max-height: 760px) {
+  html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header {
+    min-height: 64px; padding: max(10px, env(safe-area-inset-top)) 16px 8px;
+  }
+  html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll {
+    padding: 8px 16px max(12px, env(safe-area-inset-bottom));
+  }
+  html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-flow { gap: 8px; }
+  .practice-menu-card--electric-edge .practice-home-instrument { min-height: 56px; padding: 9px 14px; margin-bottom: 0; }
+  .practice-menu-card--electric-edge .practice-home-launch-actions { gap: 8px; }
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height: 116px; padding: 16px; }
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height: 96px; padding: 16px; }
+  .practice-menu-card--electric-edge .practice-home-launch-copy { gap: 6px; }
+  .practice-menu-card--electric-edge .practice-home-links .practice-home-library { min-height: 62px; padding: 10px; }
+  .practice-menu-card--electric-edge .daily-challenges__disclosure > summary { min-height: 48px; }
+  html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { min-height: 62px; padding: 8px 4px; gap: 5px; }
+}
+
+@media (max-height: 600px) {
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height: 96px; padding: 10px 14px; }
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height: 84px; padding: 10px 14px; }
+  .practice-menu-card--electric-edge .practice-home-launch-copy { gap: 4px; }
+  .practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size: 21px; }
+  .practice-menu-card--electric-edge .practice-home-links .practice-home-library { min-height: 60px; padding: 8px; gap: 6px; }
+  .practice-menu-card--electric-edge .practice-home-links .practice-home-library span { font-size: 13px; }
+}

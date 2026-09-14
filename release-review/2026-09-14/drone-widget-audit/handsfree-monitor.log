@@ -1,0 +1,7 @@
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: slow start, one replay per take, speaker suppression, repeated cycles, noisy-room notice
+PASS: stale pending entrance cancelled and monitor disabled cleanly

@@ -1,3 +1,4 @@
+import { appendTunerTrace, tunerTracePoints, type TunerTrace } from '../utils/tunerTrace'
 import { subscribeNativeTunerPitch, type NativeTunerPitch } from '../utils/nativeTunerPitch'
 import { drawSilkTuner, silkTunerGeometry, silkPitchColor } from '../utils/reactiveSilkTuner'
 import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
@@ -335,6 +336,7 @@ export interface AcceptedPitchFrame {
 }
 
 export interface PitchTrackerOptions {
+  visualTrace?: RefObject<TunerTrace>
   /** Only the full tuner tab opts into native detection; other consumers keep PCM. */
   nativePitchProcessing?: boolean
   source?: PitchTrackerSource
@@ -1451,6 +1453,7 @@ function drawPitchCanvas(
   traceEndBlend: number,
   inTuneHighlight = 0,
   responsiveTrace = false,
+  visualTrace?: TunerTrace,
 ): void {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -1605,7 +1608,10 @@ function drawPitchCanvas(
   )
 
   if (silkOverlay) {
-    const color = drawSilkTuner(ctx, width, height, tracePoints, active, document.documentElement.classList.contains('app-dark-mode'))
+    const now = Date.now()
+    if (visualTrace) appendTunerTrace(visualTrace, now, centsHistory.at(-1) ?? PITCH_SILENCE_FLOOR_CENTS)
+    const displayedPoints = visualTrace ? tunerTracePoints(visualTrace.samples, now, width, height) : tracePoints
+    const color = drawSilkTuner(ctx, width, height, displayedPoints, visualTrace ? true : active, document.documentElement.classList.contains('app-dark-mode'))
     if (silkOverlay.style.getPropertyValue('--silk-live') !== color) {
       silkOverlay.style.setProperty('--silk-live', color)
       if (!isTunerDiagnosticMode('static-background')) silkOverlay.style.setProperty('--silk-wash', color)
@@ -1671,6 +1677,7 @@ function drawPitchCanvasIfDue(
   traceEndBlend: number,
   inTuneHighlight: number,
   responsiveTrace: boolean,
+  visualTrace?: TunerTrace,
 ): void {
   drawPitchCanvas(
     canvas,
@@ -1682,6 +1689,7 @@ function drawPitchCanvasIfDue(
     traceEndBlend,
     inTuneHighlight,
     responsiveTrace,
+    visualTrace,
   )
 }
 
@@ -1721,6 +1729,8 @@ export function useLivePitchTracker(
   canvasTheme: PitchCanvasTheme = 'solid',
   options: PitchTrackerOptions = {},
 ): LivePitchTrackerState {
+  const visualTraceRef = useRef(options.visualTrace)
+  visualTraceRef.current = options.visualTrace
   const nativePitchProcessing = options.nativePitchProcessing ?? false
   const source = options.source ?? 'media'
   const micStreamRef = options.micStreamRef
@@ -2538,6 +2548,7 @@ export function useLivePitchTracker(
             traceBlend,
             0,
             responsiveTrace,
+          visualTraceRef.current?.current,
           )
         }
 
@@ -2573,6 +2584,7 @@ export function useLivePitchTracker(
               traceBlend,
               0,
               responsiveTrace,
+              visualTraceRef.current?.current,
             )
           }
           tickRef.current = realtimeModeRef.current
@@ -2617,6 +2629,7 @@ export function useLivePitchTracker(
             traceBlend,
             bandGlow,
             responsiveTrace,
+          visualTraceRef.current?.current,
           )
         }
         tickRef.current = requestAnimationFrame(tick)
@@ -2976,6 +2989,7 @@ export function useLivePitchTracker(
           traceBlend,
           bandGlow,
           responsiveTrace,
+          visualTraceRef.current?.current,
         )
       }
 

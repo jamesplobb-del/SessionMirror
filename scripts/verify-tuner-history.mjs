@@ -15,7 +15,8 @@ try {
  appendTunerHistory(samples,20,null);assert.equal(samples.length,2,'silence boundary must survive throttling')
  assert.equal(nearestTunerSample(samples,19).pitch,null)
  for(let t=100;t<200000;t+=50)appendTunerHistory(samples,t,pitch)
- assert.ok(samples.length<=2600);assert.ok(samples[0].time>=samples.at(-1).time-120000)
+ // Pruning is intentionally batched once per second to avoid shifting the array on every pitch frame.
+ assert.ok(samples.length<=2600);assert.ok(samples[0].time>=samples.at(-1).time-121000)
  const snapshot=samples.slice();appendTunerHistory(samples,300000,pitch);assert.notEqual(snapshot.at(-1).time,samples.at(-1).time,'browsing snapshot remains anchored while listening')
  console.log('PASS: note preservation, silence, sample rate, bounded retention and anchored history')
 }finally{await rm(dir,{recursive:true,force:true})}

@@ -1,0 +1,4 @@
+Focus practice checks passed: bookmark persistence, project isolation, storage failures, desk restore, URL validation, search filtering, cache, limits, and network failures.
+Practice journal checks passed: real SQLite persistence, new sitting IDs, closed sessions, intentions, focus labels, and project isolation.
+Journal grouping checks passed: attempt numbering, sitting split, day labels, single-sitting days, and the empty run.
+Journal comparison checks passed: async load, previous sitting, explicit choice, deleted baseline, and single take.

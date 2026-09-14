@@ -122,3 +122,25 @@ export function saveWidgetSize(id: string, width: number, height: number): void 
     /* private mode / quota */
   }
 }
+
+/** Pick the closest free slot, including when saved positions collide after rotation. */
+export function findAvailableWidgetBallPosition(
+  width: number, height: number, desired: WidgetPosition, occupied: WidgetPosition[],
+): WidgetPosition {
+  const size = 56
+  const gap = 12
+  const start = clampWidgetPosition(width, height, size, size, desired.x, desired.y)
+  const free = (p: WidgetPosition) => occupied.every(other =>
+    Math.abs(p.x - other.x) >= size + gap || Math.abs(p.y - other.y) >= size + gap)
+  if (free(start)) return start
+  const candidates: WidgetPosition[] = []
+  const maxX = Math.max(12, width - size - 12)
+  const maxY = Math.max(12, height - size - 12)
+  const xs = [start.x, 12, maxX]
+  const ys = [start.y, 12, maxY]
+  for (let x = maxX; x >= 12; x -= size + gap) xs.push(x)
+  for (let y = maxY; y >= 12; y -= size + gap) ys.push(y)
+  for (const x of xs) for (const y of ys) candidates.push({ x, y })
+  candidates.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))
+  return candidates.find(free) ?? start
+}

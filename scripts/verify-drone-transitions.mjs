@@ -21,7 +21,7 @@ const plugin = { name: 'drone-boundaries', setup(b) {
     a.path.endsWith('droneEngine') ? `export const isDroneNativeAvailable = () => true;
       export const droneRestoreState = globalThis.__droneTest.restore, droneStop = globalThis.__droneTest.stop,
       droneStart = globalThis.__droneTest.start, droneGetState = globalThis.__droneTest.getState;
-      export const droneSetOctave = async () => {}, droneSetVolume = async () => {}, droneSetWaveform = async () => {}, droneSoloNote = async () => {}, droneToggleNote = async () => {};` :
+      export const droneSetOctave = async () => {}, droneSetVolume = async () => {}, droneSetWaveform = async () => {}, droneSoloNote = async (pitchClass, octave = 4) => ({ ...globalThis.__droneTest.base, activeNotes: [pitchClass], octave, enabled: true }), droneToggleNote = async () => {};` :
     a.path.endsWith('dronePrefs') ? 'export const loadDronePrefs = () => globalThis.__droneTest.base; export const saveDronePrefs = () => {};' :
     a.path.endsWith('appForeground') ? "export const APP_INTERACTIVE_MEDIA_RECOVERY_EVENT = 'recover'" :
     'export const triggerLightHaptic = () => {};'
@@ -51,4 +51,29 @@ await flush()
 stopping.resolve(base)
 await flush()
 assert.deepEqual(drone.readDroneState().activeNotes, [2], 'Old screen cleanup cannot clear a new drone command')
+// Identical bridge responses must preserve the external store snapshot.
+const stable = drone.getDroneSnapshot()
+controls.setNotes([2])
+await flush()
+assert.equal(drone.getDroneSnapshot(), stable)
+const resume = drone.pauseDroneForPlayback()
+controls.silence() // Ending a routine while already paused must cancel resumption.
+resume?.()
+assert.deepEqual(drone.readDroneState().activeNotes, [])
+controls.setNotes([0, 4, 7])
+await flush()
+const resumeChord = drone.pauseDroneForPlayback()
+resumeChord?.()
+await flush()
+assert.deepEqual(drone.readDroneState().activeNotes, [0, 4, 7])
+
+// A routine may apply its desk before the drone widget mounts for the first time.
+const fresh = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text + '\n// fresh routine mount').toString('base64')}`)
+const beforeRestore = restores
+// Its optimistic state and bridge result must both survive the first mount.
+fresh.applyDroneFromDesk(5, 3)
+fresh.useDrone({ volume: 1, waveform: 'sine' })
+assert.equal(restores, beforeRestore, 'First mount must not send a silent restore after a routine command')
+await flush()
+assert.deepEqual(fresh.readDroneState().activeNotes, [5])
 console.log('Drone checks passed: initial restoration, shared recovery, and stale stop responses preserve newer commands.')

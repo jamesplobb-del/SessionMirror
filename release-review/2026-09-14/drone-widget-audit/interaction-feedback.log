@@ -1,0 +1,2 @@
+PASS: direct UI channel, single pulse, global/per-control preferences, no per-tap queue traffic, old-host and disposed-host fallbacks.
+PASS: repeated drag updates use motion values, short-drag recovery, distance/velocity dismissal, upward and disabled gesture guards.

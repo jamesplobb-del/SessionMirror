@@ -11,7 +11,7 @@ import {
   type RefObject,
 } from 'react'
 import DroneSoundWheel from './audioPractice/DroneSoundWheel'
-import { useDrone } from '../hooks/useDrone'
+import { pauseDroneForPlayback, useDrone } from '../hooks/useDrone'
 import { type DroneWaveform } from '../utils/droneEngine'
 import {
   clampWidgetPosition,
@@ -71,7 +71,7 @@ export default function DraggableDroneWidget({
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
   const positionReadyRef = useRef(false)
-  const resumePitchClassRef = useRef<number | null>(null)
+  const resumeDroneRef = useRef<(() => void) | null>(null)
 
   const drone = useDrone({ volume: 1, waveform: droneWaveform, hapticFeedback })
   const isPresent = useIsPresent()
@@ -155,24 +155,21 @@ export default function DraggableDroneWidget({
     return () => window.removeEventListener('resize', onResize)
   }, [reclampPosition])
 
-  // Same rule as the metronome: quiet while a take plays, back when it ends.
+  // Resume only the note/chord paused by this playback, unless a routine or
+  // another tool has made a newer choice in the meantime.
   useEffect(() => {
-    if (!muteDuringPlayback) return
-    if (isTakePlaying) {
-      if (sounding) {
-        resumePitchClassRef.current = heldPitchClass
-        drone.silence()
-      }
+    if (!visible || !isPresent) {
+      resumeDroneRef.current = null
       return
     }
-    const resume = resumePitchClassRef.current
-    if (resume !== null) {
-      resumePitchClassRef.current = null
-      drone.soloNote(resume)
+    if (isTakePlaying && muteDuringPlayback) {
+      resumeDroneRef.current = pauseDroneForPlayback()
+      return
     }
-    // `drone` is a stable store facade; `sounding`/`heldPitchClass` are read at the moment playback flips.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTakePlaying, muteDuringPlayback])
+    const resume = resumeDroneRef.current
+    resumeDroneRef.current = null
+    resume?.()
+  }, [isTakePlaying, muteDuringPlayback, visible, isPresent])
 
   const handleShellPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -186,7 +183,7 @@ export default function DraggableDroneWidget({
   const toggleSound = useCallback(() => {
     triggerLightHaptic(hapticFeedback)
     if (sounding) {
-      resumePitchClassRef.current = null
+      resumeDroneRef.current = null
       drone.silence()
       return
     }

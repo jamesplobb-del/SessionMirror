@@ -1,3 +1,4 @@
+import { createTunerTrace, type TunerTrace } from '../utils/tunerTrace'
 import TunerHistory from './audioPractice/TunerHistory'
 import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -238,6 +239,7 @@ function LiveAudioTunerPane({
   inTuneGlow = 0,
   coachEnabled = false,
   pitchHistory,
+  visualTrace,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -253,6 +255,7 @@ function LiveAudioTunerPane({
   inTuneGlow?: number
   coachEnabled?: boolean
   pitchHistory?: RefObject<TunerHistorySample[]>
+  visualTrace?: RefObject<TunerTrace>
 }) {
   const notifyTutorial = useTutorialAction()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -396,7 +399,7 @@ function LiveAudioTunerPane({
               }
             />
 
-            {pitchHistory && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} transposition={tunerTransposition} />}
+            {pitchHistory && visualTrace && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} trace={visualTrace} transposition={tunerTransposition} />}
             <div className="pitch-living-canvas__direction" aria-hidden>
               <span>Sharp</span>
               <span>Flat</span>
@@ -637,7 +640,8 @@ function LivePitchTunerAudio({
   nativePitchProcessing?: boolean
 }) {
   const pitchHistoryRef = useRef<TunerHistorySample[]>([])
-  useEffect(() => { pitchHistoryRef.current = [] }, [tunerInstrument, tunerTransposition])
+  const visualTraceRef = useRef<TunerTrace>(createTunerTrace())
+  useEffect(() => { pitchHistoryRef.current = []; visualTraceRef.current = createTunerTrace() }, [tunerInstrument, tunerTransposition])
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const droneAnalysisSuppressUntilRef = useRef(0)
@@ -714,6 +718,7 @@ function LivePitchTunerAudio({
   const liveTrackerOptions = useMemo(
     () => ({
       source: 'microphone' as const,
+      visualTrace: liveMicOnly ? visualTraceRef : undefined,
       nativePitchProcessing: liveMicOnly && nativePitchProcessing,
       micStreamRef,
       continuousScroll: true,
@@ -820,6 +825,7 @@ function LivePitchTunerAudio({
               inTuneGlow={liveTracker.inTuneGlow}
               coachEnabled={liveMicOnly && !(nativePitchProcessing && isTunerDiagnosticMode('no-insights'))}
               pitchHistory={liveMicOnly ? pitchHistoryRef : undefined}
+              visualTrace={liveMicOnly ? visualTraceRef : undefined}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">

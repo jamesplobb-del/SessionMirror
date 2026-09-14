@@ -1,0 +1,59 @@
+
+> besttake@2.3.0 build
+> npm run copy:sql:wasm && tsc -b && vite build
+
+
+> besttake@2.3.0 copy:sql:wasm
+> copyfiles -u 3 node_modules/sql.js/dist/sql-wasm.wasm public/assets
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2863 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/SessionMirror/src/utils/nativeInlineTakeBoxPlayback.ts is dynamically imported by /Users/jameslobb/Documents/SessionMirror/src/utils/takePlaybackAudio.ts but also statically imported by /Users/jameslobb/Documents/SessionMirror/src/App.tsx, /Users/jameslobb/Documents/SessionMirror/src/components/BestTakeBox.tsx, /Users/jameslobb/Documents/SessionMirror/src/components/PipWindow.tsx, /Users/jameslobb/Documents/SessionMirror/src/utils/audioModeNativePlayback.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/SessionMirror/src/utils/generateThumbnail.ts is dynamically imported by /Users/jameslobb/Documents/SessionMirror/src/utils/takeThumbnailCache.ts but also statically imported by /Users/jameslobb/Documents/SessionMirror/src/App.tsx, /Users/jameslobb/Documents/SessionMirror/src/components/ReviewModeOverlay.tsx, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                     1.50 kB │ gzip:   0.61 kB
+dist/assets/learn-instrument-TZdqTN-g.jpg          84.00 kB
+dist/assets/staff-jumper-BOKyMJ_6.jpg              86.75 kB
+dist/assets/balance-B_01WfPR.jpg                   89.63 kB
+dist/assets/OnboardingTutorial-B_s9b81L.css         8.21 kB │ gzip:   2.13 kB
+dist/assets/LearnInstrumentScreen-DGl_-sGm.css     12.19 kB │ gzip:   2.86 kB
+dist/assets/BalanceScreen-BQ8gtPnN.css             43.05 kB │ gzip:   9.60 kB
+dist/assets/App-BjUiBNdv.css                       92.08 kB │ gzip:  16.10 kB
+dist/assets/LabsOverlay-YJ5hUogo.css               94.13 kB │ gzip:  18.16 kB
+dist/assets/index-BO2vzRcr.css                    988.08 kB │ gzip: 148.18 kB
+dist/assets/useVideoPlayback-Bq2UAOBC.js            0.19 kB │ gzip:   0.18 kB
+dist/assets/AnimatedExpand-b4ie9YBt.js              0.37 kB │ gzip:   0.26 kB
+dist/assets/videoDuration-Dwx7ESIe.js               0.46 kB │ gzip:   0.26 kB
+dist/assets/usePinchResize-CocdEA1Q.js              1.81 kB │ gzip:   0.74 kB
+dist/assets/QuickMetronomeScreen-CbEoMcjs.js        2.05 kB │ gzip:   0.88 kB
+dist/assets/CoachMark-CVXBBFl1.js                   3.27 kB │ gzip:   1.46 kB
+dist/assets/DraggablePitchWidget-ChiBfqLQ.js        4.56 kB │ gzip:   2.08 kB
+dist/assets/DraggableDroneWidget-BG3xGdVH.js        5.57 kB │ gzip:   2.18 kB
+dist/assets/OnboardingTutorial-lrWaWQrK.js          6.61 kB │ gzip:   2.40 kB
+dist/assets/DraggableMetronomeWidget-CFCXbFL0.js    9.65 kB │ gzip:   3.73 kB
+dist/assets/SettingsDrawer-DpmHg-F2.js             25.44 kB │ gzip:   8.23 kB
+dist/assets/capacitor-C275Luee.js                  27.14 kB │ gzip:   8.65 kB
+dist/assets/ReviewModeOverlay-yQTRdzpM.js          31.40 kB │ gzip:  10.39 kB
+dist/assets/LearnInstrumentScreen-D9nVRzIR.js      33.90 kB │ gzip:  10.28 kB
+dist/assets/TakeVaultDrawer-DW5LeQgF.js            34.21 kB │ gzip:   9.86 kB
+dist/assets/motion-Db8i3rVk.js                     39.02 kB │ gzip:  13.84 kB
+dist/assets/AudioMetronomeTab-DfKqdswS.js          50.31 kB │ gzip:  14.55 kB
+dist/assets/BalanceScreen-yDs3g3Ap.js              64.17 kB │ gzip:  17.21 kB
+dist/assets/LabsOverlay-DJcvP4ds.js               124.99 kB │ gzip:  39.68 kB
+dist/assets/MultitrackOverlay-0IpLZdjE.js         139.07 kB │ gzip:  41.03 kB
+dist/assets/index-j-p4yU1F.js                     284.26 kB │ gzip:  84.89 kB
+dist/assets/sqlite-CVFbQjhg.js                    338.43 kB │ gzip:  94.05 kB
+dist/assets/vendor-DEpnk2bK.js                    449.80 kB │ gzip: 141.09 kB
+dist/assets/App-DRtqP53a.js                       645.43 kB │ gzip: 183.84 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.94s
