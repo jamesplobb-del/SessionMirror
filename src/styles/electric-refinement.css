@@ -73,9 +73,9 @@ html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-footer,
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-primary,.routine-guide-progress i.is-on) { background:linear-gradient(140deg,#0066ff,#00a8ed); }
 html[data-refinement='depth-electric'] .routine-guide :is(input,select,textarea) { font-family:inherit; border-radius:14px; }
 html[data-refinement='depth-electric'] .routine-bar { border-radius:24px; font-weight:500; }
-html[data-refinement='depth-electric'] :is(.routine-bar--audio,.routine-ball--audio) { background:#f6faffee; border-color:#fff; box-shadow:0 10px 28px #00356920; backdrop-filter:blur(20px); }
+html[data-refinement='depth-electric'] .routine-bar--audio { background:#f6faffee; border-color:#fff; box-shadow:0 10px 28px #00356920; backdrop-filter:blur(20px); }
 /* Dark mode keeps the dark theme's light text on this bar, so it needs the dark surface too. */
-html.app-dark-mode[data-refinement='depth-electric'] :is(.routine-bar--audio,.routine-ball--audio) { background:#0f172aeb; border-color:#e2e8f01f; box-shadow:0 10px 28px #0006; }
+html.app-dark-mode[data-refinement='depth-electric'] .routine-bar--audio { background:#0f172aeb; border-color:#e2e8f01f; box-shadow:0 10px 28px #0006; }
 html[data-refinement='depth-electric'] .routine-bar__action.is-primary { background:linear-gradient(140deg,#0066ff,#00a8ed); color:#fff; border:0; border-radius:16px; }
 /* Tuner-specific options are visually distinct from app Settings. */
 .electric-tuning-new { display:none !important; }

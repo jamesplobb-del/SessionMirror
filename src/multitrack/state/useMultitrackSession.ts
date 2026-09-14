@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { Take } from '../../types'
 import {
   MULTITRACK_LAYOUT_PRESETS,
   MULTITRACK_PANEL_SLOT_IDS,
   createPanelsForLayout,
   getLayoutPreset,
-  mergePanelsIntoLayout,
 } from '../layout/layoutPresets'
 import { createSheetCueId } from '../sheetMusic/sheetMusicTimeline'
 import {
   loadMultitrackSession,
-  saveMultitrackSession,
+  saveMultitrackSession, listMultitrackProjects, selectMultitrackProject,
 } from './multitrackPersistence'
 import type {
   MultitrackBackingTrack,
@@ -32,6 +31,7 @@ const DEFAULT_PRACTICE: MultitrackPracticeSettings = {
 function createInitialSession(): MultitrackSession {
   const preset = getLayoutPreset('two')
   return {
+    projectId: crypto.randomUUID(), name: 'My performance', aspectRatio: '9:16',
     layoutId: preset.id,
     panels: createPanelsForLayout(preset),
     sheetMusic: { kind: 'sheet-music', id: 'music', asset: null },
@@ -43,7 +43,30 @@ function createInitialSession(): MultitrackSession {
 export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolean; takesLoaded?: boolean }) {
   const takes = options?.takes ?? []
   const isOpen = options?.isOpen ?? false
-  const [session, setSession] = useState<MultitrackSession>(createInitialSession)
+  const [session, commitSession] = useState<MultitrackSession>(createInitialSession)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const history = useRef<MultitrackSession[]>([])
+  const lastEditAt = useRef(0)
+  const [canUndo, setCanUndo] = useState(false)
+  const [projects, setProjects] = useState(listMultitrackProjects)
+  const setSession = useCallback((action: SetStateAction<MultitrackSession>) => {
+    const prev = sessionRef.current
+    const next = typeof action === 'function' ? action(prev) : action
+    if (next === prev) return
+    const now = Date.now()
+    if (now - lastEditAt.current > 350 || !history.current.length) history.current = [...history.current.slice(-39), prev]
+    lastEditAt.current = now
+    setCanUndo(true)
+    sessionRef.current = next
+    commitSession(next)
+  }, [])
+  const undo = useCallback(() => {
+    lastEditAt.current = 0
+    const prev = history.current.pop()
+    if (prev) { sessionRef.current = prev; commitSession(prev) }
+    setCanUndo(history.current.length > 0)
+  }, [])
   const hydratedRef = useRef(false)
   const layout = useMemo(() => getLayoutPreset(session.layoutId), [session.layoutId])
 
@@ -57,7 +80,9 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     void loadMultitrackSession(takes).then(restored => {
       if (cancelled) return
       if (restored) {
-        setSession(restored)
+        sessionRef.current = restored
+        commitSession(restored)
+        if (restored.projectId) selectMultitrackProject(restored.projectId)
         setPersistenceNotice(restored.recoveryNotice ?? null)
       }
       hydratedRef.current = true
@@ -71,8 +96,16 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   // Serialize snapshots: a slow file import must not overwrite a later edit.
   useEffect(() => {
     if (!hydrated) return
-    saveQueue.current = saveQueue.current.catch(() => {}).then(() => saveMultitrackSession(session))
-    void saveQueue.current.catch(() => setPersistenceNotice('Workspace could not be saved. Keep it open and reimport the file to retry.'))
+    const timer = window.setTimeout(() => {
+      saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+        await saveMultitrackSession(session)
+        if (session.projectId) selectMultitrackProject(session.projectId)
+        setProjects(listMultitrackProjects())
+        setPersistenceNotice(prev => prev?.startsWith('Workspace could not be saved') ? null : prev)
+      })
+      void saveQueue.current.catch(() => setPersistenceNotice('Workspace could not be saved. Keep it open and try again.'))
+    }, 200)
+    return () => window.clearTimeout(timer)
   }, [session, hydrated])
 
   const setLayout = useCallback((layoutId: string) => {
@@ -80,7 +113,13 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     setSession((prev) => ({
       ...prev,
       layoutId,
-      panels: mergePanelsIntoLayout(preset, prev.panels),
+      panels: (() => {
+        const base = prev.panels.filter(p => p.kind === 'performance' && !p.overlay)
+        const overlays = prev.panels.filter(p => p.kind === 'performance' && p.overlay)
+        const available = MULTITRACK_PANEL_SLOT_IDS.filter(id => !prev.panels.some(p => p.id === id))
+        while (base.length < preset.panelCount && available.length) base.push({ kind: 'performance', id: available.shift()!, take: null })
+        return [...base.map((p, i) => ({ ...p, hidden: i >= preset.panelCount })), ...overlays]
+      })(),
     }))
   }, [])
 
@@ -92,33 +131,63 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
    * Deliberately does not touch the section window — a box only earns one when a
    * clip actually lands in it.
    */
-  const addPerformanceBox = useCallback((): string | null => {
-    const performancePanels = session.panels.filter(
-      (panel): panel is PerformancePanelState => panel.kind === 'performance',
-    )
-    const vacant = performancePanels.find((panel) => panel.take === null)
-    if (vacant) return vacant.id
-
-    const grownPreset = MULTITRACK_LAYOUT_PRESETS.find(
-      (preset) => preset.panelCount === performancePanels.length + 1,
-    )
-    const targetId = MULTITRACK_PANEL_SLOT_IDS[performancePanels.length]
-    if (!grownPreset || !targetId) return null
-
-    setSession((prev) => ({
-      ...prev,
-      layoutId: grownPreset.id,
-      panels: mergePanelsIntoLayout(grownPreset, prev.panels),
-    }))
-    return targetId
-  }, [session.panels])
+  const addPerformanceBox = useCallback((floating = false): string | null => {
+    const current = sessionRef.current
+    const vacant = floating ? current.panels.find(p => p.kind === 'performance' && !!p.overlay && !p.take)
+      : current.panels.find(p => p.kind === 'performance' && !p.overlay && !p.take)
+    const floatingCount = current.panels.filter(p => p.kind === 'performance' && p.overlay).length
+    const id = vacant?.id ?? (floating
+      ? (floatingCount < 4 ? `extra-${crypto.randomUUID()}` : undefined)
+      : MULTITRACK_PANEL_SLOT_IDS.find(id => !current.panels.some(p => p.id === id)))
+    if (!id) return null
+    setSession(prev => {
+      const panel: PerformancePanelState = { kind: 'performance', id, take: null,
+        ...(floating ? { sectionAudio: true, overlay: { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } } : {}) }
+      const panels = vacant ? prev.panels.map(p => p.id === id ? panel : p) : [...prev.panels, panel]
+      const count = panels.filter(p => p.kind === 'performance' && !p.hidden && !p.overlay).length
+      const preset = MULTITRACK_LAYOUT_PRESETS.find(p => p.panelCount === count)
+      return { ...prev, panels, layoutId: preset?.id ?? prev.layoutId }
+    })
+    return id
+  }, [setSession])
 
   const assignTakeToPanel = useCallback((panelId: string, take: Take | null) => {
-    setSession((prev) => ({
-      ...prev,
-      panels: prev.panels.map((panel) => (panel.id === panelId && panel.kind === 'performance' ? { ...panel, take } : panel)),
-    }))
-  }, [])
+    setSession(prev => ({ ...prev, panels: prev.panels.map(panel => {
+      if (panel.id !== panelId || panel.kind !== 'performance') return panel
+      if (panel.take?.id === take?.id) return { ...panel, take }
+      // A replacement has its own timing. Keep its visual placement and name only.
+      return { kind: 'performance', id: panel.id, take, label: panel.label,
+        hidden: panel.hidden, overlay: panel.overlay, frame: panel.frame, sectionAudio: panel.overlay ? true : undefined }
+    }) }))
+  }, [setSession])
+
+  const updatePanel = useCallback((id: string, patch: Partial<PerformancePanelState>) => {
+    setSession(prev => ({ ...prev, panels: prev.panels.map(p => p.id === id && p.kind === 'performance' ? { ...p, ...patch } : p) }))
+  }, [setSession])
+  const updateProject = useCallback((patch: Partial<MultitrackSession>) => setSession(prev => ({ ...prev, ...patch })), [setSession])
+  const reorderPanel = useCallback((id: string, beforeId: string) => {
+    setSession(prev => {
+      const panels = [...prev.panels]; const index = panels.findIndex(p => p.id === id)
+      if (index < 0 || id === beforeId) return prev
+      const [panel] = panels.splice(index, 1)
+      panels.splice(Math.max(0, panels.findIndex(p => p.id === beforeId)), 0, panel)
+      return { ...prev, panels }
+    })
+  }, [setSession])
+  const openProject = useCallback(async (id?: string, duplicate = false) => {
+    try {
+      await saveQueue.current.catch(() => {})
+      await saveMultitrackSession(sessionRef.current)
+      const next = id ? await loadMultitrackSession(takes, id) : duplicate
+        ? { ...sessionRef.current, projectId: crypto.randomUUID(), name: `${sessionRef.current.name || 'Performance'} copy` }
+        : createInitialSession()
+      if (!next) throw new Error('Project is missing')
+      await saveMultitrackSession(next)
+      selectMultitrackProject(next.projectId!)
+      sessionRef.current = next; commitSession(next); history.current = []; setCanUndo(false)
+      setProjects(listMultitrackProjects()); setPersistenceNotice(null)
+    } catch { setPersistenceNotice('Could not switch projects. Your current performance is still open.') }
+  }, [takes])
 
   const setPanelVolume = useCallback((panelId: string, volume: number) => {
     setSession((prev) => ({
@@ -239,7 +308,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   return {
-    session,
+    session, projects, openProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
     persistenceNotice,
     isRestoring: !hydrated,
     layout,

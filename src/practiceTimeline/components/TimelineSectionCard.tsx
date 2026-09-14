@@ -66,7 +66,6 @@ export default function TimelineSectionCard({
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture?.(event.pointerId)
     swipeStartRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -90,6 +89,8 @@ export default function TimelineSectionCard({
     )
     if (offset <= 0 && !deleteRevealed) return
 
+    // Keep ordinary taps on their buttons; capture only an actual swipe.
+    if (!swipeConsumedRef.current) event.currentTarget.setPointerCapture?.(event.pointerId)
     event.preventDefault()
     setSwiping(true)
     setSwipeOffset(offset)
@@ -107,7 +108,9 @@ export default function TimelineSectionCard({
     swipeOffsetRef.current = 0
     setSwiping(false)
     swipeStartRef.current = null
-    event.currentTarget.releasePointerCapture?.(event.pointerId)
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
     if (nextRevealed && !deleteRevealed) triggerLightHaptic()
   }
 
@@ -147,8 +150,13 @@ export default function TimelineSectionCard({
         onPointerCancel={handlePointerEnd}
         onDragStart={() => onDragStart(index)}
         onDragEnd={onDragEnd}
+        onClickCapture={(event) => {
+          if (!swipeConsumedRef.current) return
+          swipeConsumedRef.current = false
+          event.preventDefault()
+          event.stopPropagation()
+        }}
         onClick={() => {
-          if (swipeConsumedRef.current) swipeConsumedRef.current = false
           if (deleteRevealed) closeDelete()
         }}
       >

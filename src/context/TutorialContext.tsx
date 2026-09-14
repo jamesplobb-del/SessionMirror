@@ -1,3 +1,4 @@
+import { reportFeatureAction } from '../utils/featureGuidance'
 import {
   createContext,
   useCallback,
@@ -133,6 +134,7 @@ export function TutorialProvider({
 
   const markCoachMark = useCallback(
     (id: TutorialActionId) => {
+      reportFeatureAction(id)
       if (!activeCoachMark || activeCoachMark.advance !== id) return
       advanceCoachMark(activeCoachMark)
     },

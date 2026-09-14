@@ -4,7 +4,7 @@ import Pressable from '../../components/ui/Pressable'
 import { MULTITRACK_LAYOUT_PRESETS } from '../layout/layoutPresets'
 
 /** Tiny live preview of a layout preset — a mini CSS grid of filled cells. */
-function LayoutGlyph({ areas, columns, rows }: { areas: string[]; columns: string; rows: string }) {
+export function LayoutGlyph({ areas, columns, rows }: { areas: string[]; columns: string; rows: string }) {
   const cellNames = [...new Set(areas.flatMap((row) => row.trim().split(/\s+/)))].filter(
     (name) => name !== '.',
   )
@@ -74,23 +74,10 @@ export default function MultitrackToolbar(props: {
         aria-label="Seek"
       />
       <div className="multitrack-toolbar__row2">
-        <div className="multitrack-layout-strip" role="radiogroup" aria-label="Layout">
-          {MULTITRACK_LAYOUT_PRESETS.map((preset) => (
-            <Pressable
-              key={preset.id}
-              type="button"
-              intensity="soft"
-              role="radio"
-              aria-checked={activeLayoutId === preset.id}
-              aria-label={preset.label}
-              onClick={() => onSelectLayout(preset.id)}
-              className={`multitrack-layout-strip__item ${
-                activeLayoutId === preset.id ? 'multitrack-layout-strip__item--active' : ''
-              }`}
-            >
-              <LayoutGlyph areas={preset.areas} columns={preset.columns} rows={preset.rows} />
-            </Pressable>
-          ))}
+        <div className="multitrack-layout-strip" aria-label="Layout">
+          <Pressable type="button" intensity="soft" className="multitrack-toolbar__chip" onClick={() => onSelectLayout(activeLayoutId)} aria-label="Choose layout">
+            <LayoutGlyph {...(MULTITRACK_LAYOUT_PRESETS.find(p => p.id === activeLayoutId) ?? MULTITRACK_LAYOUT_PRESETS[0])} /> Layout
+          </Pressable>
         </div>
         {onOpenAlign && (
           <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Editor">

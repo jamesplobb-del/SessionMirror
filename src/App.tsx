@@ -1,3 +1,5 @@
+import FeatureGuidance from './components/FeatureGuidance'
+import { confirmFeatureAction, reportFeatureAction } from './utils/featureGuidance'
 import { queueAudioEnhancement } from './utils/enhancementQueue'
 import { recordPlannedRoutine, resolveDailyPractice, isChallengeRoutine, type DailyChallengePlan } from './utils/dailyChallengePlan'
 import ChallengeRewardNotice from './components/ChallengeRewardNotice'
@@ -39,12 +41,7 @@ import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/us
 import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
-import {
-  loadFocusDesk,
-  saveFocusDesk,
-  summarizeDesk,
-  type DeskSnapshot,
-} from './utils/workspaceDesks'
+import type { DeskSnapshot } from './utils/workspaceDesks'
 import { shareTakeToSystem } from './utils/shareTakeVideo'
 import { useAutoSoundRecording } from './hooks/useAutoSoundRecording'
 import { pausePitchGraphsForMedia } from './hooks/useLivePitchTracker'
@@ -149,7 +146,6 @@ import {
   listBestTakeHistory,
   listPracticeItemStates,
   getPracticeItemState,
-  type PracticeComparisonMode,
   listProjects,
   saveLibraryAudioItem,
   saveTake,
@@ -250,11 +246,8 @@ import {
   saveTakeMarkers,
 } from './practiceTimeline/recording/timelineMarkers'
 import TunerTakePillRow from './components/audioPractice/TunerTakePillRow'
-import PracticeHub, {
-  type FocusedPracticeSelection,
-} from './components/PracticeHub'
-import FocusedPracticeCue from './components/FocusedPracticeCue'
-import FocusedPracticeHistory from './components/FocusedPracticeHistory'
+import PracticeHub from './components/PracticeHub'
+
 import YoutubeUrlDialog from './components/YoutubeUrlDialog'
 import { PracticeReferenceContext } from './context/PracticeReferenceContext'
 import {
@@ -262,7 +255,7 @@ import {
   selectPracticeReference,
 } from './utils/practiceReferences'
 import RoutineBar from './components/RoutineBar'
-import PracticeToolStrip, { type PracticeTool } from './components/PracticeToolStrip'
+import PracticeToolStrip from './components/PracticeToolStrip'
 import { prepareRoutineProgram, pauseRoutineProgram, exitRoutineProgram } from './utils/routineProgram'
 import { PracticeTransitionGate } from './utils/practiceTransitions'
 import { findRoutinePracticeProject } from './db/practiceRepository'
@@ -286,7 +279,7 @@ import {
   type Routine,
   type RoutineDay,
 } from './utils/practiceRoutines'
-import type { RoutineBuilderMode, RoutineFocusRequest } from './components/RoutineBuilder'
+import type { RoutineBuilderMode } from './components/RoutineBuilder'
 import {
   AudioModePlaybackProvider,
   audioModePlaybackControlsRef,
@@ -365,6 +358,11 @@ const MultitrackOverlay = lazy(() => import('./multitrack/components/MultitrackO
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
+
+interface RoutinePracticeSelection {
+  projectId: string
+  focusArea: string
+}
 
 interface AppBootSnapshot {
   projects: Project[]
@@ -554,11 +552,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // Returning players land on Practice Home on the first rendered frame. The
   // recorder can initialize underneath without flashing before Home appears.
   const [isPracticeHubOpen, setIsPracticeHubOpen] = useState(() => isOnboardingComplete())
-  const [focusedPractice, setFocusedPractice] = useState<FocusedPracticeSelection | null>(null)
-  const [focusPanel, setFocusPanel] = useState<'references' | 'history' | null>(null)
-  const [focusedCueOpen, setFocusedCueOpen] = useState(false)
-  const [focusedPostTakeId, setFocusedPostTakeId] = useState<string | null>(null)
-  const [focusedPostTakeReviewed, setFocusedPostTakeReviewed] = useState(false)
+  const [focusedPractice, setFocusedPractice] = useState<RoutinePracticeSelection | null>(null)
+  const [focusPanel, setFocusPanel] = useState<'references' | null>(null)
   const [focusedPracticeSessionId, setFocusedPracticeSessionId] = useState<string | null>(null)
   const [focusedReferenceTakeId, setFocusedReferenceTakeId] = useState<string | null>(null)
   const focusedPreviousChallengerRef = useRef<string | null>(null)
@@ -608,11 +603,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubeExpandTipNonce, setYoutubeExpandTipNonce] = useState(0)
   const [youtubePlayAlongUi, setYoutubePlayAlongUi] = useState(getYoutubePlayAlongUiState)
   const [isSplitView, setIsSplitView] = useState(false)
-  const [expandedPracticeTool, setExpandedPracticeTool] = useState<PracticeTool | null>(null)
-  const collapsePracticeTool = useCallback((tool: PracticeTool) => {
-    setExpandedPracticeTool(null)
-    document.querySelector<HTMLButtonElement>(`.practice-tool-strip [data-tool="${tool}"]`)?.focus()
-  }, [])
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   // The legacy compact/full card state remains available to the existing
@@ -630,8 +620,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return stored ? loadRoutineDay(stored) : null
   })
   const [routineBuilderRequest, setRoutineBuilderRequest] = useState<RoutineBuilderMode | null>(null)
-  /** A focus step with no practice item yet: the hub asks, then binds it. */
-  const [routineFocusRequest, setRoutineFocusRequest] = useState<RoutineFocusRequest | null>(null)
   const [preferredInstrumentId, setPreferredInstrumentId] = useState<string | null>(() =>
     loadPreferredInstrumentId(),
   )
@@ -760,7 +748,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const appShellRef = useRef<HTMLDivElement>(null)
   const activeProjectIdRef = useRef<string | null>(null)
   activeProjectIdRef.current = activeProjectId
-  const focusedPracticeRef = useRef<FocusedPracticeSelection | null>(focusedPractice)
+  const focusedPracticeRef = useRef<RoutinePracticeSelection | null>(focusedPractice)
   focusedPracticeRef.current = focusedPractice
   const focusedPracticeSessionIdRef = useRef<string | null>(focusedPracticeSessionId)
   focusedPracticeSessionIdRef.current = focusedPracticeSessionId
@@ -1660,13 +1648,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         setPendingTakeSaves(pendingTakeSavesRef.current.size)
       }
       if (focusedAtCapture?.projectId === projectId) {
-        setFocusedPostTakeId(takeId)
-        setFocusedPostTakeReviewed(false)
         // The session remembers the room it was played in; resume restores it.
         if (liveDeskSnapshotRef.current) {
           const day = routineDayRef.current
           if (day?.activeStepId) commitRoutineDay(checkpointRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
-          else if (!focusedRoutineContextRef.current) saveFocusDesk(projectId, liveDeskSnapshotRef.current)
         }
       }
 
@@ -1840,6 +1825,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           })
 
           markTakePersisted()
+          if (activeProjectIdRef.current === projectId) reportFeatureAction('take-saved')
           if (intentionAtCapture) {
             const latestState = practiceItemStatesRef.current.find(
               (state) => state.projectId === projectId,
@@ -2055,7 +2041,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           })
       })().catch((error) => {
         if (!takePersisted) {
-          setFocusedPostTakeId(current => current === takeId ? null : current)
           setTakeDeleteError('This take could not be saved to the library. Its recording file has not been deleted. Please export it from the current take card before leaving.')
         }
         console.error('[Recording] take finalization failed', {
@@ -2986,14 +2971,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     updateSettings,
   ])
 
-  const handleFocusedPostTakeRetry = useCallback(() => {
-    if (practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
-    setFocusedCueOpen(false)
-    setFocusedPostTakeId(null)
-    setFocusedPostTakeReviewed(false)
-    handleToggleRecord()
-  }, [handleToggleRecord])
-
   const handleAutoSoundRecordingChange = useCallback(
     (enabled: boolean) => {
       autoSoundRecordingEnabledRef.current = enabled
@@ -3104,15 +3081,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [handleAutoSoundRecordingChange, updateSettings],
   )
 
-  /** Focus picks the piece; the desk it was last played on comes with it. */
-  const restoreFocusDesk = useCallback(
-    (projectId: string) => {
-      const desk = loadFocusDesk(projectId)
-      if (desk) applyDeskSnapshot({ ...desk, showTakeCards: true })
-    },
-    [applyDeskSnapshot],
-  )
-
   /* ---- Share from the card ----------------------------------------------
    * One verb for both kinds of take: the system sheet. It carries Messages,
    * Files and AirDrop, and for a video it is also where "Save Video" lives —
@@ -3177,7 +3145,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     focusedPracticeSessionIdRef.current = null
     setFocusedPractice(null)
     setFocusedPracticeSessionId(null)
-    setFocusedPostTakeId(null)
   }, [commitRoutineDay])
 
   useEffect(() => {
@@ -3335,8 +3302,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
   }, [])
 
-  const openFocusedPractice = useCallback(
-    async (projectId: string, options?: { routineId: string; stepId: string; resumeSessionId: string | null; desk: DeskSnapshot | null }) => {
+  const openRoutinePracticeSession = useCallback(
+    async (projectId: string, options: { routineId: string; stepId: string; resumeSessionId: string | null; desk: DeskSnapshot | null }) => {
       const focusArea = (await listProjects()).find(project => project.id === projectId)?.name
       if (focusArea === undefined) throw new Error('This practice item was deleted. Choose another item.')
       const previousSessionId = focusedPracticeSessionIdRef.current
@@ -3359,10 +3326,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         projectId,
         focusArea,
         comparison: priorState?.comparison ?? (getSelectedReferenceUrl(projectId) ? 'reference-track' : 'current-best'),
-        routineId: options?.routineId,
-        routineStepId: options?.stepId,
-        resumeSessionId: options ? options.resumeSessionId : (focusedPracticeRef.current?.projectId === projectId ? previousSessionId
-          : priorState && new Date(priorState.lastOpenedAt).toDateString() === new Date().toDateString() ? priorState.lastSessionId : null),
+        routineId: options.routineId,
+        routineStepId: options.stepId,
+        resumeSessionId: options.resumeSessionId,
         replaceSessionId: previousSessionId,
       })
       setPracticeItemStates((current) => [
@@ -3370,17 +3336,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         ...current.filter((item) => item.projectId !== state.projectId),
       ])
       focusedPracticeSessionIdRef.current = session.id
-      focusedRoutineContextRef.current = options ? { routineId: options.routineId, stepId: options.stepId } : null
+      focusedRoutineContextRef.current = { routineId: options.routineId, stepId: options.stepId }
       setFocusedSoloReview(false)
       setFocusedPracticeSessionId(session.id)
       setFocusedReferenceTakeId(referenceTakeId)
-      setFocusedPostTakeId(null)
-      setFocusedPostTakeReviewed(false)
       triggerLightHaptic(settings.hapticFeedback)
       focusedPracticeRef.current = { projectId, focusArea }
       setFocusedPractice({ projectId, focusArea })
-      if (options) { if (options.desk) applyDeskSnapshot({ ...options.desk, showTakeCards: true }) }
-      else restoreFocusDesk(projectId)
+      if (options.desk) applyDeskSnapshot({ ...options.desk, showTakeCards: true })
       return session.id
     },
     [
@@ -3389,20 +3352,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       prepareFocusedComparisonAnalysis,
       projects,
       resolveSessionReference,
-      restoreFocusDesk,
       applyDeskSnapshot,
       settings.hapticFeedback,
       updateSettings,
     ],
   )
-
-  const handleStartFocusedPractice = useCallback((projectId: string) => runPracticeTransition(`focus:${projectId}`, async () => {
-    exitRoutineProgram()
-    await openFocusedPractice(projectId)
-    dismissPracticeHub()
-  }), [runPracticeTransition, openFocusedPractice, dismissPracticeHub])
-
-  const handleResumeFocusedPractice = handleStartFocusedPractice
 
   /**
    * Games sit on top of whatever is live. A focused sitting is suspended, not
@@ -3841,7 +3795,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!desk) return
     const day = routineDayRef.current
     if (day?.activeStepId) commitRoutineDay(checkpointRoutineDay(day, Date.now(), desk))
-    else if (focusedPracticeRef.current && !focusedRoutineContextRef.current) saveFocusDesk(focusedPracticeRef.current.projectId, desk)
   }, [commitRoutineDay])
 
   const handleQuickSettingsOpenChange = useCallback((open: boolean) => {
@@ -4007,9 +3960,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const mainAudioPitchSource = useMemo((): MainAudioPitchSource | null => {
-    // Audio mode uses the dedicated Tuner tab — no floating pitch overlay.
-    return null
-  }, [])
+    if (!pitchTrackerActive || recordingMode !== 'audio' || audioPracticeTab !== 'audio') return null
+    return { mediaRef: liveMicPlaceholderRef, take: null, isPlaying: true,
+      mediaKey: 'main-audio-live', liveMicOnly: true }
+  }, [pitchTrackerActive, recordingMode, audioPracticeTab])
 
   const mainVideoPitchSource = useMemo(() => {
     if (!pitchTrackerActive || recordingMode !== 'video') return null
@@ -4045,14 +3999,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     isVaultOpen || isSettingsOpen || isReviewOpen || isExperimentalOpen || isPracticeHubOpen || focusPanel !== null
 
   // Keep audio owners mounted even when folded or visiting a full tool tab.
-  // Visibility is independent of sound; the full tool's own pill steps aside.
+  // Visibility is independent of sound; the full tool's own widget steps aside.
   const onRecordSurface = recordingMode === 'video' || audioPracticeTab === 'audio'
   const showFloatingMetronomeWidget = showMetronomeWidget
 
-  const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended
+  const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended && !(recordingMode === 'audio' && audioPracticeTab === 'metronome')
 
   const showFloatingDroneWidget = settings.showDrone
-  const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended
+  const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended && !(recordingMode === 'audio' && audioPracticeTab === 'tuner')
 
   /*
    * First-run placement for the desk widgets. Camera keeps the take tiles
@@ -4231,13 +4185,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     nativeLivePreviewActive,
   ])
 
-  const pitchAudioHudLock =
-    showPitch &&
-    expandedPracticeTool === 'pitch' &&
-    recordingMode === 'audio' &&
-    mainAudioPitchSource !== null &&
-    hudModalState === 'idle' &&
-    !pitchHudSuspended
+  // The floating tuner must leave recording and workspace controls accessible.
+  const pitchAudioHudLock = false
 
   const metronomeAudioHudLock =
     recordingMode === 'audio' &&
@@ -4347,27 +4296,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => window.clearTimeout(timer)
   }, [currentPlaybackActive, isRecording])
 
-  /** The session name plus take count, for the line at the top of the desk. */
-  // `takes` is the active project's list; a Focus session is always the active project.
-  const focusedTakeCount =
-    focusedPractice && focusedPractice.projectId === activeProjectId ? takes.length : 0
-
-  /** What Practice Home shows under the Focus card: the desk that session restores. */
-  const focusDeskSummary = useMemo(() => {
-    if (!isPracticeHubOpen) return null
-    const projectId =
-      focusedPractice?.projectId ?? practiceItemStates[0]?.projectId ?? activeProjectId ?? null
-    if (!projectId) return null
-    const desk = loadFocusDesk(projectId)
-    return desk ? summarizeDesk(desk, settings.tunerTransposition) : null
-  }, [
-    activeProjectId,
-    focusedPractice?.projectId,
-    isPracticeHubOpen,
-    practiceItemStates,
-    settings.tunerTransposition,
-  ])
-
   useEffect(() => {
     if (!settings.showTakeCards) {
       if (!autoPlaybackTakeId && !autoPlaybackPlaying && !handsFreePlaybackPending) {
@@ -4445,7 +4373,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         setFocusedReferenceTakeId(id)
       }
       if (activeProjectIdRef.current) {
-        void setProjectBestTake(activeProjectIdRef.current, id).then(refreshBestTakeHistory)
+        void setProjectBestTake(activeProjectIdRef.current, id).then(() => {
+          refreshBestTakeHistory()
+          reportFeatureAction('best-take-pinned')
+        }).catch(() => setTakeDeleteError('Best Take could not be remembered. Try pinning it again.'))
       }
     },
     [
@@ -4592,70 +4523,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     beforePlay: () => { stopAutoPlaybackAudio(); pausePipVideos(); audioModePlaybackControlsRef.pause?.(); pauseRoutineProgram() },
   })
 
-  const handleFocusedComparisonChange = useCallback((comparison: PracticeComparisonMode) => {
-    const projectId = focusedPracticeRef.current?.projectId
-    if (!projectId || practiceTransition.current.busy) return
-    const next = practiceItemStatesRef.current.map(state => state.projectId === projectId ? { ...state, comparison } : state)
-    practiceItemStatesRef.current = next
-    setPracticeItemStates(next)
-    setFocusedPostTakeReviewed(false)
-    void updatePracticeItemState(projectId, { comparison }).catch(() => setTakeDeleteError('Could not remember the comparison choice. Your takes are saved.'))
-  }, [])
-
-  const handleFocusedPostTakeListen = useCallback(() => {
-    if (!focusedPostTakeId || practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
-    if (!takesRef.current.some(take => take.id === focusedPostTakeId)) return
-    deferHudMediaPause()
-    pauseRoutineProgram()
-    pauseYoutubeProxy(youtubeIframeRef.current)
-    challengerUserDismissedRef.current = false
-    pendingChallengerIdRef.current = focusedPostTakeId
-    setChallengerId(focusedPostTakeId)
-    setFocusedSoloReview(true)
-    setFocusedReferenceTakeId(null)
-    handleOpenCompareReview('challenger')
-  }, [deferHudMediaPause, focusedPostTakeId, handleOpenCompareReview])
-
-  const handleFocusedPostTakeReview = useCallback(() => {
-    if (!focusedPostTakeId || practiceTransition.current.busy || pendingTakeSavesRef.current.size > 0) return
-    const projectId = focusedPracticeRef.current?.projectId
-    if (!projectId) return
-    const mode = practiceItemStatesRef.current.find(state => state.projectId === projectId)?.comparison ?? 'current-best'
-    const referenceUrl = getSelectedReferenceUrl(projectId)
-    if (mode === 'reference-track' && !referenceUrl && benchmarkBinding?.source !== 'library') {
-      deferHudMediaPause()
-      setFocusPanel('references')
-      return
-    }
-    deferHudMediaPause()
-    challengerUserDismissedRef.current = false
-    pendingChallengerIdRef.current = focusedPostTakeId
-    setChallengerId(focusedPostTakeId)
-    setFocusedPostTakeReviewed(true)
-    // Both camera and audio use the existing review/split players and media ownership.
-    if (mode === 'reference-track' && referenceUrl) {
-      setYoutubeUrl(referenceUrl)
-      setYoutubeAutoPlayOnLoad(false)
-      showTakeCardsRef.current = true
-      updateSettings({ showTakeCards: true })
-      if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
-      setIsSplitView(true)
-    } else {
-      // Retain the bookmark in the library, but remove YouTube from this comparison surface.
-      pauseYoutubeProxy(youtubeIframeRef.current)
-      setYoutubeUrl(null)
-      setIsSplitView(false)
-      const current = takesRef.current.find(take => take.id === focusedPostTakeId)
-      const previous = takesRef.current.filter(take => take.id !== focusedPostTakeId && (!current || take.timestamp <= current.timestamp))
-        .sort((a, b) => b.timestamp - a.timestamp)[0]
-      setFocusedSoloReview(mode === 'previous-take' ? !previous : mode !== 'reference-track' && (!benchmarkId || benchmarkId === focusedPostTakeId))
-      setFocusedReferenceTakeId(mode === 'previous-take' ? previous?.id ?? null
-        : mode === 'reference-track' ? null : benchmarkId !== focusedPostTakeId ? benchmarkId : null)
-      handleOpenCompareReview('challenger')
-    }
-  }, [benchmarkBinding?.source, benchmarkId, deferHudMediaPause, focusedPostTakeId,
-    handleAudioPracticeTabChange, handleOpenCompareReview, updateSettings])
-
   const handleCloseReview = useCallback(() => {
     startTransition(() => {
       setReviewSlot(null)
@@ -4746,16 +4613,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setTakes((prev) => prev.map((take) => (take.id === id ? { ...take, ...updates } : take)))
     void updateVaultTake(id, updates)
   }, [])
-
-  /** Rate step of the record/reflect loop — one tap, right after the take. */
-  const handleFocusedPostTakeRate = useCallback(
-    (rating: number) => {
-      if (!focusedPostTakeId) return
-      triggerLightHaptic(settings.hapticFeedback)
-      handleUpdateTake(focusedPostTakeId, { rating })
-    },
-    [focusedPostTakeId, handleUpdateTake, settings.hapticFeedback],
-  )
 
   const handleDeleteTakes = useCallback(
     async (ids: string[]) => {
@@ -4877,12 +4734,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [focusedPractice, practiceItemStates],
   )
 
-  const focusedPostTakeRating = useMemo(
-    () =>
-      focusedPostTakeId ? takes.find((take) => take.id === focusedPostTakeId)?.rating ?? 0 : 0,
-    [focusedPostTakeId, takes],
-  )
-
   useEffect(() => {
     if (focusedPractice || practiceTransition.current.busy) return
     const sessionId = focusedPracticeSessionIdRef.current
@@ -4890,31 +4741,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setFocusedPracticeSessionId(null)
       void endPracticeSession(sessionId).catch(() => setTakeDeleteError('Could not close this practice sitting. Your takes are still saved.'))
     }
-    setFocusedCueOpen(false)
-    setFocusedPostTakeId(null)
-    setFocusedPostTakeReviewed(false)
   }, [focusedPractice])
-
-  useEffect(() => {
-    if (!focusedPostTakeId) return
-    if (takes.some((take) => take.id === focusedPostTakeId)) return
-    setFocusedPostTakeId(null)
-    setFocusedPostTakeReviewed(false)
-  }, [focusedPostTakeId, takes])
-
-  const handleFocusedPracticeIntentionChange = useCallback(
-    (pendingIntention: string) => {
-      const projectId = focusedPracticeRef.current?.projectId
-      if (!projectId) return
-      const next = practiceItemStatesRef.current.map(state => state.projectId === projectId ? { ...state, pendingIntention } : state)
-      practiceItemStatesRef.current = next
-      setPracticeItemStates(next)
-      void updatePracticeItemState(projectId, { pendingIntention }).catch((error) => {
-        console.warn('[FocusedPractice] note persistence failed', error)
-      })
-    },
-    [],
-  )
 
   const handleFocusedLoopRangeChange = useCallback(
     (loopStartSeconds: number | null, loopEndSeconds: number | null) => {
@@ -5094,12 +4921,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSubmitYoutube = useCallback((embedUrl: string) => {
     if (activeProjectIdRef.current) {
       try { selectPracticeReference(activeProjectIdRef.current, embedUrl) }
-      catch { setTakeDeleteError('Reference loaded, but it could not be remembered for this focus.') }
+      catch { setTakeDeleteError('Reference loaded, but it could not be remembered for this routine item.') }
     }
     setFocusedReferenceTakeId(null)
     setFocusedSoloReview(false)
     if (focusedPracticeRef.current) {
-      handleFocusedComparisonChange('reference-track')
       showTakeCardsRef.current = true
       updateSettings({ showTakeCards: true })
       if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
@@ -5113,7 +4939,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setShowYoutubeHeadphonesTip(!focusedPracticeRef.current)
     setYoutubeExpandTipNonce((current) => current + 1)
     setShowYoutubeExpandTip(!focusedPracticeRef.current)
-  }, [handleAudioPracticeTabChange, handleFocusedComparisonChange, pausePipVideos, updateSettings])
+  }, [handleAudioPracticeTabChange, pausePipVideos, updateSettings])
 
   const handleClearYoutube = useCallback(() => {
     if (activeProjectIdRef.current) {
@@ -5200,7 +5026,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
 
   const handleSaveRoutine = useCallback((next: Routine) => {
-    if (commitSavedRoutine(next)) setRoutineBuilderRequest(null)
+    if (commitSavedRoutine(next)) {
+      setRoutineBuilderRequest(null)
+      confirmFeatureAction('Routine updated')
+    }
   }, [commitSavedRoutine])
 
   const handleDeleteRoutine = useCallback(() => {
@@ -5224,7 +5053,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       sharedMetronomeEngine.stop()
       applyDroneFromDesk(null, 4)
       setRoutineBuilderRequest(null)
-      setRoutineFocusRequest(null)
     }).catch(() => setTakeDeleteError('Could not close this routine. Your saved practice is safe.'))
   }, [commitRoutineDay, rememberCurrentPracticeDesk, runPracticeTransition])
 
@@ -5262,7 +5090,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
     const surfaceBefore = recordingModeRef.current
-    setExpandedPracticeTool(null)
     setIsSplitView(false)
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
@@ -5277,7 +5104,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setIsVaultOpen(false)
     setQuickSettingsOpen(false)
     setShowPitch(false)
-    setRoutineFocusRequest(null)
 
     // Explicit IDs are identity. Two instruments playing "Long tones" must never
     // acquire each other's recordings or references through a name-only match.
@@ -5302,7 +5128,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         try { selectPracticeReference(project.id, buildYoutubeProxyUrl(step.referenceVideoId)) }
         catch { setTakeDeleteError('Could not load this item’s saved reference. You can still choose one from Find a reference.') }
       }
-      sessionId = await openFocusedPractice(project.id, {
+      sessionId = await openRoutinePracticeSession(project.id, {
         routineId: target.id, stepId: step.id,
         resumeSessionId: day.sessionIdsByStep[step.id]?.at(-1) ?? null,
         desk: desk && (step.kind === 'tune' || step.kind === 'metro') ? { ...desk, mode: 'audio' } : desk,
@@ -5315,7 +5141,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setFocusedPractice(null)
       setFocusedPracticeSessionId(null)
       setFocusedReferenceTakeId(null)
-      setFocusedPostTakeId(null)
       // A checklist/game is not a recording sitting and must not inherit its reference audio.
       setYoutubeUrl(null)
       applyDroneFromDesk(null, 4)
@@ -5345,7 +5170,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Preparing a step must never open a browser or cover the practice surface.
   }, [commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleRecordingModeChange,
-    openFocusedPractice, rememberCurrentPracticeDesk, scheduleRoutineClick, settings.hapticFeedback])
+    openRoutinePracticeSession, rememberCurrentPracticeDesk, scheduleRoutineClick, settings.hapticFeedback])
 
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
@@ -5395,37 +5220,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   routineResumeRef.current = handleStartRoutineStep
 
-  /** A focus step meets its practice item for the first time. */
-  const handleBindRoutineFocus = useCallback(
-    async (projectId: string) => {
-      const request = routineFocusRequest
-      if (!request) return
-      setRoutineFocusRequest(null)
-      setRoutine((current) => {
-        if (!current) return current
-        return {
-          ...current,
-          updatedAt: Date.now(),
-          steps: current.steps.map((step) =>
-            step.id === request.stepId ? { ...step, projectId } : step,
-          ),
-        }
-      })
-      // The ref is read by handleStartRoutineStep; make sure it sees the binding.
-      const target = routineRef.current
-      if (target) {
-        routineRef.current = {
-          ...target,
-          steps: target.steps.map((step) =>
-            step.id === request.stepId ? { ...step, projectId } : step,
-          ),
-        }
-      }
-      await handleStartRoutineStep(request.stepId)
-    },
-    [handleStartRoutineStep, routineFocusRequest],
-  )
-
   const settleRoutineStep = useCallback((stepId: string, outcome: 'done' | 'skipped') => {
     void runPracticeTransition(`settle:${stepId}`, async () => {
       const target = routineRef.current
@@ -5444,8 +5238,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       focusedRoutineContextRef.current = null
       setFocusedPractice(null)
       setFocusedPracticeSessionId(null)
-      setFocusedPostTakeId(null)
-      setFocusedPostTakeReviewed(false)
       sharedMetronomeEngine.stop()
       applyDroneFromDesk(null, 4)
       deferHudMediaPause()
@@ -5497,7 +5289,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           focusedPracticeSessionIdRef.current = null
           setFocusedPractice(null)
           setFocusedPracticeSessionId(null)
-          setFocusedPostTakeId(null)
         }
       }).catch(() => setTakeDeleteError('Could not finish this item. Try again from Today.'))
       return
@@ -5538,6 +5329,31 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     deferHudMediaPause()
   }, [commitRoutineDay, deferHudMediaPause, settings.hapticFeedback])
 
+  const handleCloseRoutine = useCallback(() => {
+    void runPracticeTransition('close-routine', async () => {
+      rememberCurrentPracticeDesk()
+      const day = routineDayRef.current
+      if (day) commitRoutineDay({
+        ...pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current),
+        pausedStepId: null,
+      })
+      exitRoutineProgram()
+      sharedMetronomeEngine.stop()
+      applyDroneFromDesk(null, 4)
+      deferHudMediaPause()
+      const sessionId = focusedPracticeSessionIdRef.current
+      focusedPracticeRef.current = null
+      focusedPracticeSessionIdRef.current = null
+      focusedRoutineContextRef.current = null
+      setFocusedPractice(null)
+      setFocusedPracticeSessionId(null)
+      setFocusedReferenceTakeId(null)
+      setLabsRoute(null)
+      restoreRoutineAfterChallenge()
+      if (sessionId) await endPracticeSession(sessionId)
+    }).catch(() => setTakeDeleteError('Could not finish closing this practice session. Your saved routine and takes are safe.'))
+  }, [commitRoutineDay, deferHudMediaPause, rememberCurrentPracticeDesk, restoreRoutineAfterChallenge, runPracticeTransition])
+
   // Save active time periodically. Backgrounding pauses accounting rather than
   // counting hours away; returning asks the player to resume explicitly.
   useEffect(() => {
@@ -5576,26 +5392,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [commitRoutineDay])
 
-  const handleFinishFocusedPractice = useCallback(() => {
-    void runPracticeTransition('finish-focus', async () => {
-      rememberCurrentPracticeDesk()
-      exitRoutineProgram()
-      const sessionId = focusedPracticeSessionIdRef.current
-      if (sessionId) await endPracticeSession(sessionId)
-      focusedPracticeRef.current = null
-      focusedPracticeSessionIdRef.current = null
-      focusedRoutineContextRef.current = null
-      setFocusedPractice(null)
-      setFocusedPracticeSessionId(null)
-      setFocusedPostTakeId(null)
-      setFocusedPostTakeReviewed(false)
-      sharedMetronomeEngine.stop()
-      applyDroneFromDesk(null, 4)
-      deferHudMediaPause()
-      setIsPracticeHubOpen(true)
-    }).catch(() => setTakeDeleteError('Could not finish this sitting yet. Your saved takes are safe; try again.'))
-  }, [deferHudMediaPause, rememberCurrentPracticeDesk, runPracticeTransition])
-
   const routineActiveStep = useMemo(() => {
     const id = routineDay?.activeStepId ?? routineDay?.pausedStepId
     if (!routine || !id) return null
@@ -5607,7 +5403,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return stepAfter(routine, routineActiveStep.id)
   }, [routine, routineActiveStep])
 
-  useEffect(() => { setExpandedPracticeTool(null) }, [recordingMode, audioPracticeTab, isLabsOpen])
 
   const handleToggleSplitView = useCallback(() => {
     setIsSplitView((current) => {
@@ -5682,6 +5477,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   return (
     <PracticeReferenceContext.Provider value={{ projectId: activeProjectId ?? undefined, query: routineActiveStep?.referenceQuery || activeProject?.name || '', autoSearch: Boolean(routineActiveStep?.referenceQuery) }}>
       <ChallengeRewardNotice />
+      <FeatureGuidance
+        paused={showOnboardingTutorial || !isOnboardingComplete() || isPracticeHubOpen ||
+          isSettingsOpen || isVaultOpen || isReviewOpen || isLabsOpen || multitrackOpen ||
+          isExperimentalOpen || handsFreeCardOpen || focusPanel !== null ||
+          isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
+          handsFreePlaybackPending || practiceSessionActive || pipDragState.isDragging || Boolean(takeDeleteError)}
+        feedbackPaused={showOnboardingTutorial || isRecording || isStopping || takePlaybackActive ||
+          handsFreePlaybackPending || isLabsOpen || Boolean(takeDeleteError)}
+        workspaceOpen={quickSettingsOpen}
+        handsFreeEnabled={settings.autoSoundRecording}
+        isRecording={isRecording}
+      />
     <TutorialProvider
       active={showOnboardingTutorial || isPracticeHubOpen}
       enabled={tutorialTourEnabled}
@@ -5714,40 +5521,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               />
 
               {focusPanel === 'references'  && <YoutubeUrlDialog open onClose={() => setFocusPanel(null)} onSubmit={handleSubmitYoutube} />}
-              {focusPanel === 'history' && focusedPractice && <FocusedPracticeHistory
-                name={focusedPractice.focusArea} takes={takes}
-                onClose={() => setFocusPanel(null)}
-                onListen={(take) => {
-                  setFocusPanel(null)
-                  handleOpenVaultTake(take)
-                }}
-                onCompare={(takeId, referenceId) => {
-                  setFocusPanel(null)
-                  pauseYoutubeProxy(youtubeIframeRef.current)
-                  setYoutubeUrl(null)
-                  setFocusedSoloReview(false)
-                  setFocusedReferenceTakeId(referenceId)
-                  challengerUserDismissedRef.current = false
-                  setChallengerId(takeId)
-                  handleOpenCompareReview('challenger')
-                }}
-              />}
               <PracticeHub
                 isOpen={isPracticeHubOpen}
                 projects={projects}
-                activeProject={activeProject}
                 takes={takes}
-                bestTakeHistory={bestTakeHistory}
-                focusedPractice={focusedPractice}
-                practiceItemStates={practiceItemStates}
-                focusDeskSummary={focusDeskSummary}
                 tunerTransposition={settings.tunerTransposition}
                 hapticFeedback={settings.hapticFeedback}
                 onClose={handleClosePracticeHub}
                 onOpenQuickPractice={() => { handlePauseRoutine(); handleOpenQuickPractice() }}
-                onStartFocusedPractice={(projectId) => { handlePauseRoutine(); return handleStartFocusedPractice(projectId) }}
-                onResumeFocusedPractice={(projectId) => { handlePauseRoutine(); return handleResumeFocusedPractice(projectId) }}
-                onCreatePracticeItem={handleCreateProject}
                 onOpenGames={handleOpenPracticeGames}
                 onDailyPractice={handleDailyPractice}
                 onDailyGame={handleDailyGame}
@@ -5757,7 +5538,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 routine={routine}
                 routineDay={routineDay}
                 routineBuilderRequest={routineBuilderRequest}
-                routineFocusRequest={routineFocusRequest}
                 instrumentId={preferredInstrumentId}
                 liveDeskSnapshot={liveDeskSnapshot}
                 onSelectInstrument={handleSelectInstrument}
@@ -5768,13 +5548,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onSaveRoutine={handleSaveRoutine}
                 onSaveAndStartRoutine={handleSaveAndStartRoutine}
                 onDeleteRoutine={handleDeleteRoutine}
-                onBindRoutineFocus={handleBindRoutineFocus}
-                onCancelRoutineFocus={() => setRoutineFocusRequest(null)}
               />
 
               {routine &&
                 routineActiveStep &&
-                !focusedPostTakeId &&
                 !isPracticeHubOpen &&
                 !isReviewOpen &&
                 !isVaultOpen &&
@@ -5799,36 +5576,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     hapticFeedback={settings.hapticFeedback}
                     onResume={() => handleJumpToRoutineStep(routineActiveStep.id)}
                     onPause={handlePauseRoutine}
+                    onClose={handleCloseRoutine}
                     onDone={() => handleCompleteRoutineStep(routineActiveStep.id)}
                     onSkip={isChallengeRoutine(routine) ? undefined : () => handleSkipRoutineStep(routineActiveStep.id)}
                     onJumpToStep={handleJumpToRoutineStep}
                     onEditRoutine={isChallengeRoutine(routine) ? undefined : handleEditRoutineFromBar}
                     onOpenToday={handleOpenRoutineToday}
-                  />
-                )}
-
-              {focusedPractice &&
-                focusedPracticeState &&
-                !isPracticeHubOpen &&
-                focusPanel === null &&
-                !isReviewOpen &&
-                !isExperimentalOpen &&
-                !isRecording &&
-                !isStopping && (
-                  <FocusedPracticeCue
-                    open={focusedCueOpen}
-                    value={focusedPracticeState.pendingIntention}
-                    hapticFeedback={settings.hapticFeedback}
-                    onOpenChange={(open) => {
-                      setFocusedCueOpen(open)
-                      // Closing the note attaches it to the take you just heard —
-                      // a reflection, not just a cue queued for next time.
-                      if (!open && focusedPostTakeId) {
-                        const reflection = focusedPracticeState.pendingIntention.trim()
-                        if (reflection) handleUpdateTake(focusedPostTakeId, { notes: reflection })
-                      }
-                    }}
-                    onChange={handleFocusedPracticeIntentionChange}
                   />
                 )}
 
@@ -6036,8 +5789,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               <div
                 className={`pitch-display-layer${
                   pitchHudSuspended ? ' floating-widget-layer--inert' : ''
-                }${expandedPracticeTool !== 'pitch' ? ' practice-widget-folded' : ''}`}
-                aria-hidden={!showFloatingMainPitch || pitchHudSuspended || expandedPracticeTool !== 'pitch'}
+                }`}
+                aria-hidden={!showFloatingMainPitch || pitchHudSuspended}
               >
                 {showMainPitchWidget && (
                   <Suspense fallback={null}>
@@ -6051,7 +5804,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           mediaKey={mainAudioPitchSource.mediaKey}
                           takeName={mainAudioPitchSource.take?.name}
                           label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
-                          isAudioMode
+                          pitchSource="microphone"
+                          positionId="main-pitch-audio"
                           liveMicEnabled={
                             (settings.liveMicTunerEnabled ||
                               mainAudioPitchSource.liveMicOnly === true) &&
@@ -6064,7 +5818,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           tunerInstrument={settings.tunerInstrument}
                           tunerTransposition={settings.tunerTransposition}
                           onClose={handleClosePitch}
-                          onCollapse={() => collapsePracticeTool('pitch')}
+                          collapseResetKey={routineActiveStep?.id}
+                          visible={!pitchHudSuspended}
                         />
                       )}
                     </AnimatePresence>
@@ -6075,8 +5830,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               <div
                 className={`metronome-display-layer${
                   metronomeWidgetInteractive ? '' : ' floating-widget-layer--inert'
-                }${expandedPracticeTool !== 'metronome' ? ' practice-widget-folded' : ''}`}
-                aria-hidden={!metronomeWidgetInteractive || expandedPracticeTool !== 'metronome'}
+                }`}
+                aria-hidden={!metronomeWidgetInteractive}
               >
                 {showFloatingMetronomeWidget && (
                   <Suspense fallback={null}>
@@ -6094,7 +5849,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseMetronome}
-                        onCollapse={() => collapsePracticeTool('metronome')}
+                        collapseResetKey={routineActiveStep?.id}
+                        visible={metronomeWidgetInteractive}
                       />
                     </AnimatePresence>
                   </Suspense>
@@ -6103,9 +5859,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               <div
                 className={`drone-display-layer${
-                  metronomeHudSuspended ? ' floating-widget-layer--inert' : ''
-                }${expandedPracticeTool !== 'drone' ? ' practice-widget-folded' : ''}`}
-                aria-hidden={!droneWidgetInteractive || expandedPracticeTool !== 'drone'}
+                  droneWidgetInteractive ? '' : ' floating-widget-layer--inert'
+                }`}
+                aria-hidden={!droneWidgetInteractive}
               >
                 <Suspense fallback={null}>
                   <AnimatePresence>
@@ -6121,26 +5877,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         isTakePlaying={takePlaybackActive}
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseDrone}
-                        onCollapse={() => collapsePracticeTool('drone')}
+                        collapseResetKey={routineActiveStep?.id}
+                        visible={droneWidgetInteractive}
                       />
                     )}
                   </AnimatePresence>
                 </Suspense>
               </div>
 
-              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !focusedPostTakeId && (
+              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && (
                 <PracticeToolStrip
-                  metronome={settings.showMetronome && !isAudioPracticeMetronomeTab}
-                  drone={settings.showDrone && !isAudioPracticeTunerTab}
-                  pitch={showPitch && onRecordSurface}
                   reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
                   referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
-                  light={recordingMode === 'audio'} transposition={settings.tunerTransposition}
-                  muted={takePlaybackActive && settings.muteMetronomeDuringPlayback}
-                  expanded={expandedPracticeTool} disabled={isStopping}
-                  onToggle={tool => { setExpandedPracticeTool(current => current === tool ? null : tool); if (isSplitView) handleExitSplitView() }}
+                  light={recordingMode === 'audio'} disabled={isStopping}
                   onReference={() => {
-                    setExpandedPracticeTool(null)
                     if (youtubeUrl) handleToggleSplitView()
                     else setFocusPanel('references')
                   }}
@@ -6153,7 +5903,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   over the hands-free overlay. */}
               <HandsFreeStage
                 phase={handsFreeStageVisiblePhase}
-                movable={recordingMode === 'audio'}
+                movable
                 notice={handsFreeNotice}
                 replayCountdown={replayCountdown}
                 onFinishTake={finishHandsFreeTake}
@@ -6161,7 +5911,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 elapsed={elapsed}
                 onLightBackground={recordingMode === 'audio'}
                 placement={handsFreeStagePlacement}
-                onTapForSettings={() => setHandsFreeCardOpen(true)}
+                onTapForSettings={() => {
+                  reportFeatureAction('hands-free-settings-opened')
+                  setHandsFreeCardOpen(true)
+                }}
               />
               <HandsFreeSettingsCard
                 open={handsFreeCardOpen && hudModalState === 'idle'}
@@ -6182,12 +5935,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     <AnimatePresence>
                       {showPitch && mainVideoPitchSource && (
                         <div
-                          className={`${expandedPracticeTool !== 'pitch' ? 'practice-widget-folded ' : ''}${
+                          className={`${
                             pitchHudSuspended
                               ? 'floating-widget-layer--inert fixed inset-0 z-[5]'
                               : 'contents'
                           }`}
-                          aria-hidden={expandedPracticeTool !== 'pitch' || pitchHudSuspended}
+                          aria-hidden={pitchHudSuspended}
                         >
                           <DraggablePitchWidget
                             boundaryRef={appShellRef}
@@ -6203,7 +5956,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             tunerInstrument={settings.tunerInstrument}
                             tunerTransposition={settings.tunerTransposition}
                             onClose={handleClosePitch}
-                            onCollapse={() => collapsePracticeTool('pitch')}
+                            collapseResetKey={routineActiveStep?.id}
+                            visible={!pitchHudSuspended}
                           />
                         </div>
                       )}
@@ -6259,16 +6013,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       : undefined,
                   }}
                 >
-                  {focusedPractice && isRecording && !isSplitView && !quickSettingsOpen && (
-                    <div className="session-line" aria-live="polite">
-                      <span className="session-line__pill">
-                        <span className="session-line__focus">{focusedPractice.focusArea}</span>
-                        <span className="session-line__take">
-                          {focusedTakeCount === 0 ? 'first take' : `take ${focusedTakeCount}`}
-                        </span>
-                      </span>
-                    </div>
-                  )}
 
                   {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && (
                     <div data-tutorial="audio-mode-tabs">
@@ -6345,6 +6089,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       >
                         <div data-tutorial="audio-take-cards">
                           <AudioModeHome
+                            onRecord={handleToggleRecord}
+                            recordDisabled={isStopping || practiceTransitionBusy || pendingTakeSaves > 0}
                             isRecording={isRecording}
                             elapsed={elapsed}
                             ready={ready}
@@ -6557,42 +6303,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         expandViewActive={isSplitView}
                         onToggleExpandView={handleToggleSplitView}
                         onOpenMultitrack={handleOpenMultitrack}
-                        focusedPracticeName={focusedPractice?.focusArea}
-                        routineStepActive={Boolean(routineActiveStep)}
-                        focusedAttemptCount={takes.filter(take => take.practiceSessionId === focusedPracticeSessionId && Boolean(focusedPracticeSessionId)).length}
-                        onOpenFocusReferences={() => { deferHudMediaPause(); setFocusPanel('references') }}
-                        onOpenFocusHistory={focusedRoutineContextRef.current ? undefined : () => { deferHudMediaPause(); setFocusPanel('history') }}
-                        practiceTransitionBusy={practiceTransitionBusy || pendingTakeSaves > 0}
-                        focusedTakeSaving={pendingTakeSaves > 0}
                         referenceControls={focusedPractice && youtubeUrl && isSplitView && !isRecording && !isStopping
                           ? <ReferencePassageControls key={`${focusedPractice.projectId}:${parseYoutubeVideoId(youtubeUrl)}`} controls={referencePassage} /> : undefined}
-                        focusedComparison={focusedPracticeState?.comparison}
-                        onFocusedComparisonChange={handleFocusedComparisonChange}
-                        focusedHasReference={Boolean(focusedPractice && getSelectedReferenceUrl(focusedPractice.projectId)) || benchmarkBinding?.source === 'library'}
-                        focusedHasBest={Boolean(benchmarkId && benchmarkId !== focusedPostTakeId)}
-                        focusedHasPrevious={takes.some(take => take.id !== focusedPostTakeId)}
-                        focusedPostTakeActive={Boolean(focusedPostTakeId)}
-                        focusedPostTakeReviewed={focusedPostTakeReviewed}
-                        focusedPostTakeHasNote={Boolean(
-                          focusedPracticeState?.pendingIntention.trim(),
-                        )}
-                        focusedPostTakeRating={focusedPostTakeRating}
-                        focusedRecordingGoal={
-                          focusedPracticeState?.pendingIntention.trim() ?? ''
-                        }
-                        focusedFinishLabel={routineNextStep ? 'Done & next' : 'Finish item'}
-                        onFocusedPostTakeListen={handleFocusedPostTakeListen}
-                        onFocusedPostTakeReview={handleFocusedPostTakeReview}
-                        onFocusedPostTakeNote={() => setFocusedCueOpen(true)}
-                        onFocusedPostTakeRate={handleFocusedPostTakeRate}
-                        onFocusedPostTakeRetry={handleFocusedPostTakeRetry}
-                        onFocusedPostTakeDismiss={() => {
-                          if (routineActiveStep) {
-                            handleCompleteRoutineStep(routineActiveStep.id)
-                            return
-                          }
-                          handleFinishFocusedPractice()
-                        }}
                         handsFreeRecording={handsFreeRecording}
                         handsFreeListeningReady={handsFreeListeningReady}
                         handsFreePlaybackPending={handsFreePlaybackPending || autoPlaybackPlaying}
@@ -6604,7 +6316,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         dragDeleteActive={pipDragState.isDragging}
                         dragOverDelete={pipDragState.overDelete}
                         pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
-                        pitchToggleVisible={recordingMode === 'video'}
+                        pitchToggleVisible={onRecordSurface}
                         showTakeCards={hudQuickSettings.showTakeCards}
                         onPitchTrackerChange={handlePitchTrackerSettingChange}
                         onShowTakeCardsChange={handleShowTakeCardsSettingChange}

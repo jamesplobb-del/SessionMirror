@@ -128,7 +128,6 @@ export function normalizeSection(section: LegacySection): TimelineSection {
     patternRepeat: patternSteps?.length
       ? sanitizePatternRepeat(rest.patternRepeat, patternSteps)
       : undefined,
-    advanced: sanitizeAdvanced(rest.advanced, Math.max(1, rest.bars * repeatCount)),
   }
 
   const withPattern = patternSteps?.length ? normalizePatternSectionTempo(normalized) : normalized

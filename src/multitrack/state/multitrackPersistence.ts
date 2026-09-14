@@ -1,6 +1,6 @@
 import { persistAsset, restoreAsset } from './multitrackAssets'
 import type { Take } from '../../types'
-import { createPanelsForLayout, getLayoutPreset } from '../layout/layoutPresets'
+import { MULTITRACK_PANEL_SLOT_IDS, getLayoutPreset } from '../layout/layoutPresets'
 import type {
   MultitrackBackingTrack,
   MultitrackPracticeSettings,
@@ -14,9 +14,24 @@ function bounded(value: unknown, fallback: number, min: number, max: number): nu
 }
 
 const STORAGE_KEY = 'sm.multitrack.session.v1'
+const PROJECTS_KEY = 'sm.multitrack.projects.v2'
+const ACTIVE_KEY = 'sm.multitrack.active.v2'
+export interface MultitrackProjectSummary { id: string; name: string; updatedAt: number }
+export function listMultitrackProjects(): MultitrackProjectSummary[] {
+  try { return JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? '[]') } catch { return [] }
+}
+function storageKey(id?: string) { return id ? `${STORAGE_KEY}.${id}` : STORAGE_KEY }
+export function selectMultitrackProject(id: string) { localStorage.setItem(ACTIVE_KEY, id) }
+
 
 interface PersistedMultitrackSession {
   layoutId: string
+  projectId?: string
+  name?: string
+  aspectRatio?: MultitrackSession['aspectRatio']
+  endSec?: number
+  panelIds?: string[]
+  panelDetails?: Array<Pick<import('../types').PerformancePanelState, 'label' | 'frame' | 'overlay' | 'hidden' | 'timelineOffsetMs' | 'sectionAudio'>>
   /** Take id per performance panel slot, aligned with the layout's panel order. */
   panelTakeIds: (string | null)[]
   /** Mixer state per panel slot, aligned with panelTakeIds. */
@@ -38,6 +53,12 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
     )
     const persisted: PersistedMultitrackSession = {
       layoutId: session.layoutId,
+      projectId: session.projectId,
+      name: session.name,
+      aspectRatio: session.aspectRatio,
+      endSec: session.endSec,
+      panelIds: performancePanels.map(p => p.id),
+      panelDetails: performancePanels.map(p => ({ frame: p.frame, sectionAudio: p.sectionAudio, label: p.label, overlay: p.overlay, hidden: p.hidden, timelineOffsetMs: p.timelineOffsetMs })),
       panelTakeIds: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.take?.id ?? null : null,
       ),
@@ -69,21 +90,29 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
         }))),
       },
     }
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
+    window.localStorage.setItem(storageKey(session.projectId), JSON.stringify(persisted))
+    if (session.projectId) {
+      const projects = listMultitrackProjects().filter(p => p.id !== session.projectId)
+      projects.unshift({ id: session.projectId, name: session.name || 'Untitled performance', updatedAt: Date.now() })
+      localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects))
+    }
   } catch (error) {
     throw new Error('Could not save this workspace. Keep it open and try again.', { cause: error })
   }
 }
 
-export async function loadMultitrackSession(takes: Take[]): Promise<MultitrackSession | null> {
+export async function loadMultitrackSession(takes: Take[], projectId?: string): Promise<MultitrackSession | null> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
+    const raw = window.localStorage.getItem(storageKey(projectId ?? localStorage.getItem(ACTIVE_KEY) ?? undefined))
     if (!raw) return null
     const persisted = JSON.parse(raw) as Partial<PersistedMultitrackSession>
     if (!persisted || typeof persisted.layoutId !== 'string') return null
 
     const preset = getLayoutPreset(persisted.layoutId)
-    const panels = createPanelsForLayout(preset)
+    const count = Math.min(16, Math.max(preset.panelCount, persisted.panelTakeIds?.length ?? 0))
+    const panels: import('../types').PerformancePanelState[] = Array.from({ length: count }, (_, i) => ({
+      kind: 'performance', id: persisted.panelIds?.[i] ?? MULTITRACK_PANEL_SLOT_IDS[i], take: null,
+    }))
     const takeById = new Map(takes.map((take) => [take.id, take]))
 
     let performanceIndex = 0
@@ -97,6 +126,7 @@ export async function loadMultitrackSession(takes: Take[]): Promise<MultitrackSe
       const section = persisted.panelSections?.[performanceIndex]
       panels[i] = {
         ...panel,
+        ...persisted.panelDetails?.[performanceIndex],
         // Takes deleted since last session are silently dropped.
         take: takeId ? takeById.get(takeId) ?? null : null,
         ...(typeof volume === 'number' ? { volume: bounded(volume, 1, 0, 1) } : null),
@@ -152,16 +182,22 @@ export async function loadMultitrackSession(takes: Take[]): Promise<MultitrackSe
 
     return {
       layoutId: preset.id,
+      projectId: persisted.projectId ?? crypto.randomUUID(),
+      name: persisted.name ?? 'My performance',
+      aspectRatio: ['9:16', '16:9', '1:1'].includes(persisted.aspectRatio ?? '') ? persisted.aspectRatio : '9:16',
+      endSec: typeof persisted.endSec === 'number' ? bounded(persisted.endSec, 1, .1, 86400) : undefined,
       panels,
       sheetMusic,
       ...(missingAssets ? { recoveryNotice: 'Some imported files are missing. Reimport your backing audio or sheet music.' } : {}),
       practice: {
+        meter: typeof persisted.practice?.meter === 'string' && /^(?:[1-9]|1[0-2])\/(?:2|4|8|16)$/.test(persisted.practice.meter) ? persisted.practice.meter : '4/4',
+        clickSound: typeof persisted.practice?.clickSound === 'string' ? persisted.practice.clickSound : 'classic',
         showMetronome: typeof persisted.practice?.showMetronome === 'boolean' ? persisted.practice.showMetronome : false,
         showPitch: typeof persisted.practice?.showPitch === 'boolean' ? persisted.practice.showPitch : false,
         practiceOverlayEnabled: typeof persisted.practice?.practiceOverlayEnabled === 'boolean' ? persisted.practice.practiceOverlayEnabled : true,
         clickEnabled: typeof persisted.practice?.clickEnabled === 'boolean' ? persisted.practice.clickEnabled : true,
         countInBars: Math.round(bounded(persisted.practice?.countInBars, 1, 0, 8)),
-        bpm: bounded(persisted.practice?.bpm, 120, 30, 300),
+        bpm: Math.round(bounded(persisted.practice?.bpm, 120, 40, 300)),
       },
       backing,
     }

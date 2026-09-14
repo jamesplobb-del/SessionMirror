@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
-import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
+import { Film, MoreHorizontal, Pause, Play, Plus, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
@@ -10,6 +10,7 @@ import MultitrackCapturePanel from './MultitrackCapturePanel'
 
 export default function PerformancePanel({
   panel,
+  displayName,
   isRecordingTarget,
   recordingPhase,
   streamRef,
@@ -25,6 +26,7 @@ export default function PerformancePanel({
   onRegisterMedia,
 }: {
   panel: PerformancePanelState
+  displayName?: string
   isRecordingTarget: boolean
   recordingPhase: MultitrackRecordingPhase
   streamRef?: RefObject<MediaStream | null>
@@ -69,9 +71,10 @@ export default function PerformancePanel({
 
   if (!panel.take) {
     return (
-      <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label="Add to this tile">
-        <Video className="h-8 w-8 text-stone-400" />
-        <span className="mt-2 text-sm font-medium text-stone-500">Tap to add</span>
+      <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label={`Add recording to ${displayName || 'box'}`}>
+        <span className="multitrack-empty__name">{displayName || 'Box'}</span>
+        <span className="multitrack-empty__add"><Plus size={20} strokeWidth={1.6} /></span>
+        <span className="multitrack-empty__hint">Add recording</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
             {recordingPhase === 'arming'
@@ -96,6 +99,7 @@ export default function PerformancePanel({
       return
     }
     try {
+      media.style.opacity = '1'
       media.currentTime = 0
     } catch {
       /* media may still be loading */
@@ -148,7 +152,7 @@ export default function PerformancePanel({
         <X className="h-3.5 w-3.5" />
       </Pressable>
       <div className="multitrack-panel__overlay">
-        <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.take.name || 'Performance'}</span></div>
+        <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.label || panel.take.name || 'Performance'}</span></div>
         <div className="multitrack-panel__actions">
           <Pressable
             type="button"

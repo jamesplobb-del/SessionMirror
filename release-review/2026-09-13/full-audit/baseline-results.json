@@ -1,0 +1,117 @@
+[
+  {
+    "name": "instrument-playability",
+    "exit": 0,
+    "seconds": 0.4
+  },
+  {
+    "name": "practice-routines",
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "routine-program-share",
+    "exit": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "metronome-program-review",
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "metronome-background",
+    "exit": 0,
+    "seconds": 0.09
+  },
+  {
+    "name": "practice-refinements",
+    "exit": 0,
+    "seconds": 0.12
+  },
+  {
+    "name": "session-extensions",
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "focus-practice",
+    "exit": 0,
+    "seconds": 0.28
+  },
+  {
+    "name": "audio-lifecycle",
+    "exit": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "handsfree-cycle",
+    "exit": 0,
+    "seconds": 0.07
+  },
+  {
+    "name": "handsfree-monitor",
+    "exit": 0,
+    "seconds": 0.13
+  },
+  {
+    "name": "playback-route",
+    "exit": 0,
+    "seconds": 0.07
+  },
+  {
+    "name": "drone-transitions",
+    "exit": 0,
+    "seconds": 0.07
+  },
+  {
+    "name": "tuner-stability",
+    "exit": 0,
+    "seconds": 0.55
+  },
+  {
+    "name": "tuner-history",
+    "exit": 1,
+    "seconds": 0.1
+  },
+  {
+    "name": "staff-jumper-review",
+    "exit": 0,
+    "seconds": 0.32
+  },
+  {
+    "name": "daily-challenges",
+    "exit": 0,
+    "seconds": 0.06
+  },
+  {
+    "name": "daily-challenge-plan",
+    "exit": 0,
+    "seconds": 0.09
+  },
+  {
+    "name": "practice-sounds",
+    "exit": 0,
+    "seconds": 6.11
+  },
+  {
+    "name": "native-plugin-registration",
+    "exit": 0,
+    "seconds": 0.21
+  },
+  {
+    "name": "navigation-response",
+    "exit": 0,
+    "seconds": 0.14
+  },
+  {
+    "name": "trim-metadata",
+    "exit": 0,
+    "seconds": 0.05
+  },
+  {
+    "name": "live-recording-waveform",
+    "exit": 0,
+    "seconds": 0.3
+  }
+]

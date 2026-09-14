@@ -247,7 +247,10 @@ final class MultitrackTransportEngine {
                     completionHandler: nil
                 )
 
+                // If the movie begins before its first audio sample, preserve that
+                // short silent head instead of pulling audio earlier on the timeline.
                 let sourceDelaySec = max(0, prepared.source.timelineDelaySec)
+                    + max(0, prepared.timelineOriginSec - prepared.source.sourceInSec)
                 let sourceHostTime = performanceHostTime + AVAudioTime.hostTime(forSeconds: sourceDelaySec)
                 prepared.node.play(at: AVAudioTime(hostTime: sourceHostTime))
                 audibleSourceCount += 1

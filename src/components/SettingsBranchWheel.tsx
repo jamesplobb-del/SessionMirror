@@ -1,3 +1,4 @@
+import { confirmFeatureAction, reportFeatureAction } from '../utils/featureGuidance'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AudioLines,
@@ -531,7 +532,7 @@ export default function SettingsBranchWheel({
                   </div>
                 </form>
               ) : (
-              <div className="settings-branch-tray__grid">
+              <div className="settings-branch-tray__grid" data-guidance="workspace-tools">
                 {branchItems.map((item) => {
                   const tutorialTarget =
                     item.id === 'pitch-analysis'
@@ -561,6 +562,11 @@ export default function SettingsBranchWheel({
                       {...(item.kind === 'action' ? {} : { 'aria-checked': item.active })}
                       onClick={() => {
                         item.onSelect()
+                        if (item.id === 'hands-free') {
+                          reportFeatureAction(item.active ? 'hands-free-disabled' : 'hands-free-enabled')
+                        } else if (item.kind !== 'action') {
+                          confirmFeatureAction('Workspace updated')
+                        }
                         if (item.kind === 'action') onClose()
                         notifyTutorial?.('branch-widget-selected')
                       }}

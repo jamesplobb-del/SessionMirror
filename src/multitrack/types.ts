@@ -13,13 +13,22 @@ export interface SheetMusicAsset {
   contentMode?: 'fill' | 'fit'
   framePosition?: 'top' | 'bottom' | 'left' | 'right'
   frameScale?: number
+  scrollEndY?: number
+  scrollDurationSec?: number
 }
 
 export interface PerformancePanelState {
   kind: 'performance'
   id: string
   take: Take | null
-  /** Mixer state — playback balance only (export stays unity gain for now). */
+  label?: string
+  hidden?: boolean
+  /** Project-local timing; the source recording in the Vault is never modified. */
+  timelineOffsetMs?: number
+  /** Floating parts sit above the base layout without moving the music. */
+  frame?: { xPercent: number; yPercent: number; widthPercent: number; heightPercent: number }
+  overlay?: { xPercent: number; yPercent: number; widthPercent: number; heightPercent: number }
+  /** Mixer state shared by preview, monitoring and export. */
   volume?: number
   muted?: boolean
   /** Trim: timeline 0 maps to trimStartSec into the take; trimEndSec caps it. */
@@ -30,6 +39,7 @@ export interface PerformancePanelState {
    * between these timeline seconds — the remaining boxes reflow to fill the
    * canvas outside it. Both unset means the box is present for the whole song.
    */
+  sectionAudio?: boolean
   sectionStartSec?: number
   sectionEndSec?: number
 }
@@ -70,6 +80,8 @@ export interface MultitrackLayoutPreset {
 }
 
 export interface MultitrackPracticeSettings {
+  meter?: string
+  clickSound?: string
   showMetronome: boolean
   showPitch: boolean
   practiceOverlayEnabled: boolean
@@ -83,7 +95,13 @@ export type MultitrackBackingTrack =
   | { kind: 'audio'; src: string; fileName: string; mimeType: string; volume: number }
   | { kind: 'youtube'; embedUrl: string; label: string; volume: number }
 
+export type MultitrackAspectRatio = '9:16' | '16:9' | '1:1'
+
 export interface MultitrackSession {
+  projectId?: string
+  name?: string
+  aspectRatio?: MultitrackAspectRatio
+  endSec?: number
   recoveryNotice?: string
   layoutId: string
   panels: MultitrackPanelState[]

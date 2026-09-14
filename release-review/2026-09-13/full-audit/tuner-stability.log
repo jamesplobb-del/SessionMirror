@@ -1,0 +1,42 @@
+{
+  "simulatedHours": 8,
+  "inputFps": 120,
+  "maxCandidateSamples": 640,
+  "historySamples": 2420,
+  "measurements": [
+    {
+      "hour": 0,
+      "heapMiB": 5.33
+    },
+    {
+      "hour": 1,
+      "heapMiB": 10.56
+    },
+    {
+      "hour": 2,
+      "heapMiB": 13.77
+    },
+    {
+      "hour": 3,
+      "heapMiB": 8.75
+    },
+    {
+      "hour": 4,
+      "heapMiB": 10.94
+    },
+    {
+      "hour": 5,
+      "heapMiB": 20.25
+    },
+    {
+      "hour": 6,
+      "heapMiB": 14.68
+    },
+    {
+      "hour": 7,
+      "heapMiB": 8.84
+    }
+  ],
+  "observations": 1
+}
+PASS: 8-hour accelerated tuner buffer soak

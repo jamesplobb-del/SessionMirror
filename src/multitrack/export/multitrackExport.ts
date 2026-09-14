@@ -4,13 +4,13 @@ import type { Take } from '../../types'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
 import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAssetCache'
-import { computeMultitrackLayoutRects, type LayoutRectPercent } from '../layout/layoutRects'
-import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
-import { sheetCueWindows, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
+import { type LayoutRectPercent } from '../layout/layoutRects'
+import { panelOffsetMs, sourceWindow } from '../synchronization/projectTiming'
+import { compositionRects } from '../layout/composition'
+import { sheetCueWindows, sheetYAt } from '../sheetMusic/sheetMusicTimeline'
 import type { MultitrackLayoutPreset, MultitrackSession, PerformancePanelState } from '../types'
 
 const MULTITRACK_EXPORT_DIR = 'multitrack-export-assets'
-const MULTITRACK_EXPORT_ASPECT_RATIO = '9:16'
 
 export type MultitrackExportFailureReason =
   | 'missing_takes'
@@ -18,6 +18,7 @@ export type MultitrackExportFailureReason =
   | 'render_failed'
   | 'share_failed'
   | 'unsupported'
+  | 'cancelled'
 
 export type MultitrackExportResult =
   | { ok: true; renderedPath: string; durationSeconds: number; backingSkipped?: 'youtube' }
@@ -25,10 +26,13 @@ export type MultitrackExportResult =
 
 export interface MultitrackExportOptions {
   share?: boolean
+  signal?: AbortSignal
+  onProgress?: (progress: number) => void
 }
 
 async function fetchBlob(url: string): Promise<Blob> {
   const response = await fetch(url)
+  if (!response.ok) throw new Error('An imported file could not be read')
   return response.blob()
 }
 
@@ -50,17 +54,14 @@ export async function exportMultitrackSession(
   }
 
   const performancePanels = session.panels.filter(
-    (panel): panel is PerformancePanelState => panel.kind === 'performance' && panel.take !== null,
+    (panel): panel is PerformancePanelState => panel.kind === 'performance' && !panel.hidden && panel.take !== null,
   )
   if (performancePanels.length === 0) {
     return { ok: false, reason: 'missing_takes' }
   }
 
-  const { panelRects, musicRect } = computeMultitrackLayoutRects(
-    layout,
-    sheetLayoutAsset(session.sheetMusic),
-  )
-
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return { ok: false, reason: 'missing_takes' }
+  const { panelRects, musicRect } = compositionRects(session, layout, 0)
   const windows = sectionExportWindows(session, layout, durationSeconds)
   const sources: Array<{
     id: string
@@ -72,15 +73,28 @@ export async function exportMultitrackSession(
     timelineOffsetMs?: number
     volume?: number
     muted?: boolean
+    mirror?: boolean
+    sourceInSec: number
+    sourceOutSec: number
+    insertAtSec: number
+    sectionStartSec?: number
+    sectionEndSec?: number
   }> = []
   for (const panel of performancePanels) {
-    const rect = panelRects[panel.id]
+    const rect = windows.find(w => w.panelRects[panel.id])?.panelRects[panel.id] ?? panel.overlay ?? panelRects[panel.id]
+    // Audio-only section behavior remains valid when a part is visually absent.
     if (!rect) continue
+    const clip = sourceWindow(panel.trimStartSec ?? 0, panel.trimEndSec ?? panel.take!.duration ?? 0,
+      panelOffsetMs(panel, session.practice.bpm), 0, durationSeconds)
+    if (!clip) continue
     const path = await resolveNativeFileUri(panel.take as Take).catch(() => null)
     if (!path) return { ok: false, reason: 'missing_file' }
-    const timelineOffsetMs = timelineOffsetMsForTake(panel.take!, session.practice.bpm)
+    const timelineOffsetMs = panelOffsetMs(panel, session.practice.bpm)
     sources.push({
       id: panel.id,
+      mirror: panel.take?.mirrorPlayback === true,
+      sourceInSec: clip.sourceInSec, sourceOutSec: clip.sourceOutSec, insertAtSec: clip.timelineDelaySec,
+      ...(panel.sectionAudio ? { sectionStartSec: panel.sectionStartSec, sectionEndSec: panel.sectionEndSec } : {}),
       path,
       rect,
       layoutWindows: windows.map(window => ({ startSec: window.startSec, endSec: window.endSec, rect: window.panelRects[panel.id] ?? null })),
@@ -104,6 +118,9 @@ export async function exportMultitrackSession(
     y: number
     scale: number
     contentMode: 'fill' | 'fit'
+    occlusionRects?: LayoutRectPercent[]
+    scrollEndY?: number
+    scrollDurationSec?: number
   }
   let sheetMusic: ExportSheetLayer | null = null
   let sheetMusicCues: Array<ExportSheetLayer & { startSec: number; endSec?: number }> | undefined
@@ -111,7 +128,16 @@ export async function exportMultitrackSession(
   let backingSkipped: 'youtube' | undefined
 
   let renderedPath: string
+  const exportId = crypto.randomUUID()
+  let listener: { remove: () => Promise<void> } | undefined
+  const cancel = () => { void BestTakeAudioPlugin.cancelMultitrackExport({ exportId }) }
   try {
+    if (options.signal?.aborted) return { ok: false, reason: 'cancelled' }
+    listener = await BestTakeAudioPlugin.addListener('multitrackExportProgress', event => {
+      if (event.exportId === exportId) options.onProgress?.(event.progress)
+    })
+    options.signal?.addEventListener('abort', cancel)
+
     // Every screenshot on the music panel's timeline is written out with the
     // window it owns, so the render cuts line to line exactly as the canvas did.
     const cueWindows = musicRect ? sheetCueWindows(session.sheetMusic) : []
@@ -135,10 +161,15 @@ export async function exportMultitrackSession(
         fileType: isPdf ? 'pdf' : 'image',
         rect: layoutWindow.musicRect,
         x: asset.x ?? 0.5,
-        y: asset.y ?? 0.5,
+        y: sheetYAt(asset, startSec - window.startSec),
+        ...(asset.scrollEndY !== undefined ? {
+          scrollEndY: sheetYAt(asset, endSec - window.startSec),
+          scrollDurationSec: Math.min(endSec - startSec, Math.max(.1, (asset.scrollDurationSec ?? 10) - (startSec - window.startSec))),
+        } : {}),
         scale: asset.scale ?? 1,
         contentMode: isPdf ? 'fit' : (asset.contentMode ?? 'fill'),
         startSec, endSec,
+        occlusionRects: session.panels.flatMap(p => p.kind === 'performance' && (p.overlay || p.frame) && layoutWindow.panelRects[p.id] ? [layoutWindow.panelRects[p.id]] : []),
         })
       }
     }
@@ -154,7 +185,7 @@ export async function exportMultitrackSession(
         scale: first.scale,
         contentMode: first.contentMode,
       }
-      if (layers.length > 1) sheetMusicCues = layers
+      sheetMusicCues = layers
     }
 
     if (session.backing.kind === 'audio') {
@@ -173,10 +204,12 @@ export async function exportMultitrackSession(
       backingSkipped = 'youtube'
     }
 
+    if (options.signal?.aborted) return { ok: false, reason: 'cancelled' }
     const rendered = await BestTakeAudioPlugin.renderMultitrackVideo({
-      aspectRatio: MULTITRACK_EXPORT_ASPECT_RATIO,
+      exportId,
+      aspectRatio: session.aspectRatio ?? '9:16',
       durationSeconds,
-      sources,
+      sources: [...sources].reverse().sort((a, b) => Number(!!session.panels.find(p => p.id === b.id && p.kind === 'performance' && p.overlay)) - Number(!!session.panels.find(p => p.id === a.id && p.kind === 'performance' && p.overlay))),
       gridRects: windows.length > 1 ? [] : Object.values(panelRects),
       sheetMusic,
       ...(sheetMusicCues ? { sheetMusicCues } : null),
@@ -186,7 +219,10 @@ export async function exportMultitrackSession(
     durationSeconds = rendered.durationSeconds ?? durationSeconds
   } catch (error) {
     console.warn('[Multitrack] export render failed', error)
-    return { ok: false, reason: 'render_failed' }
+    return { ok: false, reason: options.signal?.aborted ? 'cancelled' : 'render_failed' }
+  } finally {
+    options.signal?.removeEventListener('abort', cancel)
+    await listener?.remove()
   }
 
   if (options.share) {

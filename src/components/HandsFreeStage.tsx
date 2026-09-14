@@ -1,7 +1,10 @@
-import { memo } from 'react'
+import WidgetCollapseButton from './WidgetCollapseButton'
+import { memo, useRef } from 'react'
+import { useMotionValue } from 'framer-motion'
+import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useHandsFreePanelLayout } from '../hooks/useHandsFreePanelLayout'
 import '../styles/hands-free-panel.css'
-import { Settings2, GripHorizontal, MoveDiagonal2 } from 'lucide-react'
+import { Settings2, GripHorizontal, MoveDiagonal2, Mic } from 'lucide-react'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
 /**
@@ -64,12 +67,25 @@ function HandsFreeStage({
   onTapForSettings,
 }: HandsFreeStageProps) {
   const panel = useHandsFreePanelLayout(movable)
+  const boundaryRef = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
+  const ballDetail = phase === 'recording' ? formatElapsed(elapsed)
+    : phase === 'countdown' ? `${replayCountdown ?? 0}s`
+    : phase === 'playback' ? 'Listen' : phase === 'saving' ? 'Saving' : phase === 'preparing' ? 'Mic…' : 'Ready'
+  const fold = useCollapsibleWidget({ boundaryRef, widgetRef: panel.panelRef,
+    x, y, positionId: 'hands-free-tools', label: `hands-free${phase ? `, ${PHASE_COPY[phase].title}` : ''}`,
+    icon: <Mic aria-hidden />, detail: ballDetail, active: phase === 'recording',
+    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3 })
   const copy = phase ? PHASE_COPY[phase] : null
   const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
 
-  return (
+  return (<>
+    <div ref={boundaryRef} className="hands-free-ball-layer" aria-hidden={!phase}>
+      {phase && fold.ball}
+    </div>
     <div
-      className={`hands-free-stage ${movable ? 'hands-free-stage--movable' : ''} hands-free-stage--${placement} ${
+      className={`hands-free-stage ${fold.collapsed ? 'widget-is-collapsed' : ''} ${movable ? 'hands-free-stage--movable' : ''} hands-free-stage--${placement} ${
         phase ? `hands-free-stage--${phase}` : ''
       } ${
         // The chip carries its own dark backing, so the light-backdrop palette
@@ -79,7 +95,7 @@ function HandsFreeStage({
       role="status"
       aria-live="polite"
       aria-atomic
-      aria-hidden={!phase}
+      aria-hidden={!phase || fold.collapsed}
       data-phase={phase ?? 'off'}
     >
       <div className="hands-free-stage__wash" aria-hidden />
@@ -87,6 +103,11 @@ function HandsFreeStage({
 
       <div className="hands-free-stage__center" ref={panel.panelRef}
         style={movable ? { position: 'absolute', left: panel.layout.x, top: panel.layout.y, width: panel.layout.width } : undefined}>
+        <WidgetCollapseButton label="hands-free" onCollapse={() => {
+          const rect = panel.panelRef.current?.getBoundingClientRect()
+          if (rect) { x.set(rect.left); y.set(rect.top) }
+          fold.collapse()
+        }} />
         {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><GripHorizontal aria-hidden />Move</button>}
         <span className="hands-free-stage__pulse" aria-hidden />
         <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
@@ -128,7 +149,7 @@ function HandsFreeStage({
           </button>
         )}
       </div>
-    </div>
+    </div></>
   )
 }
 

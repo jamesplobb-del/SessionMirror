@@ -1,0 +1,1 @@
+PASS: 20 overlapping sheet requests coalesce; rapid Tools/Camera changes settle correctly; native failure retries without repeated WebView layout changes.

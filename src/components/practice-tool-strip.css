@@ -13,8 +13,3 @@
 .practice-tool-strip::-webkit-scrollbar { display: none; }
 .app-shell:has(.practice-tool-strip button) .audio-mode-home--inplace { padding-top: 44px; }
 .app-shell:has(.practice-tool-strip button) :is(.audio-practice-tuner-layer, .audio-practice-metronome-layer) { padding-top: 44px; }
-/* Keep audio owners mounted when folded, with no invisible hit targets. */
-.practice-widget-folded { visibility: hidden !important; pointer-events: none !important; }
-.practice-widget-folded * { pointer-events: none !important; }
-.widget-collapse { position: absolute; right: 44px; top: 10px; min-width: 32px; min-height: 32px; display: grid; place-items: center; border: 1px solid #ffffff25; border-radius: 50%; background: #152137b0; color: #fff; z-index: 35; }
-.widget-collapse svg { width: 15px; height: 15px; }

@@ -1,27 +1,18 @@
 import VaultCount from './VaultCount'
 import {
-  Bookmark,
   Camera,
   ChevronDown,
-  History,
   House,
   Layers3,
-  MessageSquareText,
   Mic,
-  Play,
-  RotateCcw,
-  ScanSearch,
   Settings,
-  SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, type ReactNode, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
 import Pressable from './ui/Pressable'
-import StarRating from './StarRating'
 import type { RecordingMode } from '../types'
-import type { PracticeComparisonMode } from '../db/types'
 import { resolveHandsFreePhase } from '../utils/handsFreePhase'
 import { HUD_SOLID_BTN } from '../utils/interactiveUx'
 import type { SettingsBranchLayoutMode } from '../utils/settingsBranchLayout'
@@ -43,31 +34,7 @@ interface ControlDeckProps {
   expandViewActive?: boolean
   onToggleExpandView?: () => void
   onOpenMultitrack?: () => void
-  focusedPracticeName?: string
-  routineStepActive?: boolean
-  focusedAttemptCount?: number
-  onOpenFocusReferences?: () => void
-  onOpenFocusHistory?: () => void
-  focusedComparison?: PracticeComparisonMode
-  onFocusedComparisonChange?: (mode: PracticeComparisonMode) => void
-  focusedHasReference?: boolean
-  focusedHasBest?: boolean
-  focusedHasPrevious?: boolean
   referenceControls?: ReactNode
-  focusedTakeSaving?: boolean
-  practiceTransitionBusy?: boolean
-  focusedPostTakeActive?: boolean
-  focusedPostTakeReviewed?: boolean
-  focusedPostTakeHasNote?: boolean
-  focusedPostTakeRating?: number
-  focusedRecordingGoal?: string
-  focusedFinishLabel?: string
-  onFocusedPostTakeListen?: () => void
-  onFocusedPostTakeReview?: () => void
-  onFocusedPostTakeNote?: () => void
-  onFocusedPostTakeRate?: (rating: number) => void
-  onFocusedPostTakeRetry?: () => void
-  onFocusedPostTakeDismiss?: () => void
   handsFreeRecording?: boolean
   handsFreeListeningReady?: boolean
   handsFreePlaybackPending?: boolean
@@ -146,31 +113,7 @@ function ControlDeck({
   expandViewActive = false,
   onToggleExpandView,
   onOpenMultitrack,
-  focusedPracticeName,
-  routineStepActive = false,
-  focusedAttemptCount = 0,
-  onOpenFocusReferences,
-  onOpenFocusHistory,
-  focusedComparison = 'current-best',
-  onFocusedComparisonChange,
-  focusedHasReference = false,
-  focusedHasBest = false,
-  focusedHasPrevious = false,
   referenceControls,
-  focusedTakeSaving = false,
-  practiceTransitionBusy = false,
-  focusedPostTakeActive = false,
-  focusedPostTakeReviewed = false,
-  focusedPostTakeHasNote = false,
-  focusedPostTakeRating = 0,
-  focusedRecordingGoal = '',
-  focusedFinishLabel = 'Finish item',
-  onFocusedPostTakeListen,
-  onFocusedPostTakeReview,
-  onFocusedPostTakeNote,
-  onFocusedPostTakeRate,
-  onFocusedPostTakeRetry,
-  onFocusedPostTakeDismiss,
   handsFreeRecording = false,
   handsFreeListeningReady = false,
   handsFreePlaybackPending = false,
@@ -383,7 +326,7 @@ function ControlDeck({
         isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
       }`}
     >
-      {onOpenVault && !isRecording && !isStopping && !focusedPostTakeActive && (
+      {onOpenVault && !isRecording && !isStopping && (
         <VaultHandle onOpen={onOpenVault} revision={vaultRevision} concealed={branchActive} />
       )}
       <SettingsBranchWheel
@@ -426,145 +369,8 @@ function ControlDeck({
         onTunerTakePillsChange={(show) => onTunerTakePillsChange?.(show)}
       />
 
-      {focusedPracticeName && !routineStepActive && !focusedPostTakeActive && !isRecording && !isStopping && (
-        <section className="focus-session-strip" aria-label="Current practice focus">
-          <header>
-            <span className="focus-strip-id">
-              <strong>{focusedPracticeName}</strong>
-            </span>
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              className="focus-strip-finish"
-              disabled={practiceTransitionBusy}
-              onClick={onFocusedPostTakeDismiss}
-            >
-              Finish
-            </Pressable>
-          </header>
-
-          <Pressable
-            type="button"
-            intensity="soft"
-            haptic="light"
-            hapticFeedback={hapticFeedback}
-            className={`focus-strip-intention ${focusedRecordingGoal.trim() ? 'is-set' : ''}`}
-            onClick={onFocusedPostTakeNote}
-          >
-            <MessageSquareText aria-hidden />
-            <span>
-              {focusedRecordingGoal.trim() || 'One adjustment for the next take'}
-            </span>
-          </Pressable>
-
-          <div className="focus-strip-actions">
-            {onOpenFocusHistory && <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              className="is-primary"
-              onClick={onOpenFocusHistory}
-            >
-              <History aria-hidden />
-              <span>Progress</span>
-              {focusedAttemptCount > 0 && (
-                <em className="focus-strip-count">{focusedAttemptCount}</em>
-              )}
-            </Pressable>}
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              onClick={onOpenFocusReferences}
-            >
-              <Bookmark aria-hidden />
-              <span>Reference</span>
-            </Pressable>
-            <Pressable
-              type="button"
-              intensity="soft"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              onClick={() => (branchActive ? closeBranch() : openBranch())}
-            >
-              <SlidersHorizontal aria-hidden />
-              <span>Tools</span>
-            </Pressable>
-          </div>
-        </section>
-      )}
-      {isRecording && focusedRecordingGoal.trim() && (
-        <div className="focused-recording-goal" role="status">
-          <MessageSquareText aria-hidden />
-          <span>Goal</span>
-          <strong>{focusedRecordingGoal.trim()}</strong>
-        </div>
-      )}
-
       {referenceControls}
-      {focusedPostTakeActive && !isRecording && !isStopping ? (
-        <section className="focused-post-take-dock" aria-label="Focused practice next steps">
-          <header>
-            <div>
-              <span>{focusedPracticeName}</span>
-              <strong role="status">{focusedTakeSaving ? 'Saving take…' : 'Take saved'}</strong>
-            </div>
-            <Pressable
-              type="button"
-              intensity="icon"
-              haptic="light"
-              hapticFeedback={hapticFeedback}
-              disabled={practiceTransitionBusy}
-              onClick={onFocusedPostTakeDismiss}
-              aria-label={routineStepActive ? 'Finish this item and continue' : 'Done for now'}
-            >
-              {routineStepActive ? focusedFinishLabel : 'Finish'}
-            </Pressable>
-          </header>
-          <div className="focused-post-take-actions focused-post-take-actions--listen">
-            <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-              disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeListen}>
-              <Play aria-hidden /><span>Listen to take</span>
-            </Pressable>
-            <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-              className="is-primary" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeRetry}>
-              <RotateCcw aria-hidden /><span>Try again</span>
-            </Pressable>
-          </div>
-          <details className="focus-post-take-compare">
-            <summary><ScanSearch aria-hidden />Compare this take</summary>
-            {onFocusedComparisonChange && <div className="practice-compare-choice" role="group" aria-label="Compare this take with">
-              {(['current-best', 'previous-take', 'reference-track'] as const).map(mode => <button type="button" key={mode}
-                disabled={practiceTransitionBusy || focusedTakeSaving || (mode === 'previous-take' && !focusedHasPrevious) || (mode === 'current-best' && !focusedHasBest)}
-                aria-pressed={focusedComparison === mode || (focusedComparison === 'yesterday' && mode === 'current-best')}
-                onClick={() => onFocusedComparisonChange(mode)}>
-                {mode === 'current-best' ? 'My best' : mode === 'previous-take' ? 'Previous take' : 'Reference'}
-              </button>)}
-            </div>}
-            <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving}
-              onClick={onFocusedPostTakeReview}>
-              {focusedComparison === 'reference-track' && !focusedHasReference ? 'Find a reference'
-                : (focusedComparison === 'current-best' || focusedComparison === 'yesterday') && !focusedHasBest ? 'Listen to this take'
-                : focusedPostTakeReviewed ? 'Open comparison again' : 'Open comparison'}
-            </button>
-            {onOpenFocusHistory && <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onOpenFocusHistory}>
-              <History aria-hidden />Compare with earlier sessions
-            </button>}
-          </details>
-          <details className="focus-optional-rating">
-            <summary>Note & rating · optional</summary>
-            <button type="button" className="focus-comparison-open" disabled={practiceTransitionBusy || focusedTakeSaving} onClick={onFocusedPostTakeNote}>
-              <MessageSquareText aria-hidden />{focusedPostTakeHasNote ? 'Edit adjustment' : 'One adjustment for next time'}
-            </button>
-            <StarRating rating={focusedPostTakeRating} onChange={(value) => { if (!practiceTransitionBusy && !focusedTakeSaving) onFocusedPostTakeRate?.(value) }} size="md" />
-          </details>
-
-        </section>
-      ) : isCameraPresentation ? (
+      {isCameraPresentation ? (
         <div className="camera-control-deck__main-row">
           <div className="camera-control-pill">
             <Pressable
@@ -761,11 +567,11 @@ function VaultHandle({ onOpen, revision, concealed = false }: { onOpen: () => vo
       style={{ visibility: concealed ? 'hidden' : undefined }}
       aria-hidden={concealed || undefined}
       tabIndex={concealed ? -1 : undefined}
-      aria-label="Open TakeVault"
+      aria-label="Open Take library"
       onClick={onOpen}
     >
       <i aria-hidden />
-      <span className="electric-vault-label"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="2"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/></svg>Vault<VaultCount revision={revision} /><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></span>
+      <span className="electric-vault-label"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="5" rx="2"/><path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M10 12h4"/></svg>Take library<VaultCount revision={revision} /><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></span>
     </button>
   )
 }

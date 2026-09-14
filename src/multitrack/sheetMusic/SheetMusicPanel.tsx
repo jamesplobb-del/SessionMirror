@@ -3,7 +3,7 @@ import { FileImage, Move, SlidersHorizontal, Trash2, Upload } from 'lucide-react
 import Pressable from '../../components/ui/Pressable'
 import type { SheetMusicAsset, SheetMusicPanelState } from '../types'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from './sheetMusicUtils'
-import { sheetCueWindows } from './sheetMusicTimeline'
+import { sheetCueWindows, sheetYAt } from './sheetMusicTimeline'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -77,24 +77,7 @@ export default function SheetMusicPanel({
     startDistance: 0,
   })
 
-  // Revoke the uploaded file's blob URL once no cue references it any more
-  // (replaced, removed, or the panel unmounts) to avoid leaking memory.
-  useEffect(() => {
-    const uploaded = uploadedAssetUrlRef.current
-    if (!uploaded) return
-    if (cueWindows.some((window) => window.asset.src === uploaded)) return
-    URL.revokeObjectURL(uploaded)
-    uploadedAssetUrlRef.current = null
-  }, [cueWindows])
-
-  useEffect(() => {
-    return () => {
-      if (uploadedAssetUrlRef.current) {
-        URL.revokeObjectURL(uploadedAssetUrlRef.current)
-        uploadedAssetUrlRef.current = null
-      }
-    }
-  }, [])
+  // Imported images remain available to workspace Undo after this panel closes.
 
   useEffect(() => {
     if (!activeAsset || gestureRef.current.points.size > 0) return
@@ -140,7 +123,7 @@ export default function SheetMusicPanel({
   const contentMode = isPdf ? 'fit' : (asset.contentMode ?? 'fill')
   const contentStyle = {
     '--sheet-x': `${(draftTransform.x - 0.5) * 70}%`,
-    '--sheet-y': `${(draftTransform.y - 0.5) * 70}%`,
+    '--sheet-y': `${((activeAsset.scrollEndY === undefined ? draftTransform.y : sheetYAt(activeAsset, currentTimeSec - activeCue.startSec)) - 0.5) * 70}%`,
     '--sheet-scale': draftTransform.scale,
   } as CSSProperties
 

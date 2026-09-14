@@ -1,5 +1,7 @@
+import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { Pause, Play, Minus } from 'lucide-react'
+import { Pause, Play, Music2 } from 'lucide-react'
+import { useCollapsibleWidget } from './useCollapsibleWidget'
 import {
   useCallback,
   useId,
@@ -52,7 +54,8 @@ interface DraggableMetronomeWidgetProps {
   /** Keep the widget visible but prevent a second metronome clock while a native transport owns timing. */
   controlsLocked?: boolean
   onClose?: () => void
-  onCollapse?: () => void
+  collapseResetKey?: string
+  visible?: boolean
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 288, height: 176 }
@@ -102,7 +105,8 @@ export default function DraggableMetronomeWidget({
   muteDuringPlayback = true,
   controlsLocked = false,
   onClose,
-  onCollapse,
+  collapseResetKey,
+  visible = true,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
@@ -465,9 +469,15 @@ export default function DraggableMetronomeWidget({
     togglePlay()
   }, [playing, togglePlay])
 
-  return (
+  const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
+    positionId, label: 'metronome', icon: <Music2 aria-hidden />, detail: `${bpm} BPM`,
+    active: playing && !(isTakePlaying && muteDuringPlayback), resetKey: collapseResetKey, visible })
+
+  return (<>
+    {fold.ball}
     <motion.div
       ref={widgetRef}
+      aria-hidden={fold.collapsed}
       drag={canShellDrag}
       dragControls={dragControls}
       dragListener={shellDragListener}
@@ -479,9 +489,9 @@ export default function DraggableMetronomeWidget({
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
       onDragEnd={persistPosition}
-      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
+      className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
       style={{
@@ -494,6 +504,7 @@ export default function DraggableMetronomeWidget({
         minHeight: MIN_WIDGET_SIZE.height,
       }}
     >
+      <WidgetCollapseButton label="metronome" onCollapse={fold.collapse} />
       <div
         className="ui-orient-spin metronome-widget relative h-full min-h-0 w-full rounded-3xl"
         aria-label="Metronome. Pinch to resize. Double-tap empty space to reset size."
@@ -517,9 +528,6 @@ export default function DraggableMetronomeWidget({
             aria-hidden
           />
         ) : null}
-
-        {onCollapse && <button type="button" className="widget-collapse" aria-label="Collapse metronome"
-          onPointerDown={event => event.stopPropagation()} onClick={onCollapse}><Minus aria-hidden /></button>}
         {onClose && (
           <button
             type="button"
@@ -664,6 +672,6 @@ export default function DraggableMetronomeWidget({
         </div>
         </fieldset>
       </div>
-    </motion.div>
+    </motion.div></>
   )
 }

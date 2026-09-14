@@ -52,7 +52,7 @@ export function useHandsFreePanelLayout(enabled: boolean) {
       y: live.current.y + (event.key.includes('Up') || event.key.includes('Down') ? delta : 0),
     }, true)
   }
-  return { panelRef, layout, controls: (resize: boolean) => ({
+  return { panelRef, layout, moveTo: (position: { x: number; y: number }) => apply({ ...live.current, ...position }, true), controls: (resize: boolean) => ({
     onPointerDown: (e: PointerEvent<HTMLButtonElement>) => start(e, resize),
     onPointerMove: move, onPointerUp: end, onPointerCancel: end, onLostPointerCapture: end,
     onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => keyboard(e, resize),

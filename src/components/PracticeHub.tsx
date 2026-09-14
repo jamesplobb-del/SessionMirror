@@ -1,6 +1,6 @@
 import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
 import DailyChallenges from './DailyChallenges'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -26,7 +26,7 @@ import {
   type TunerTranspositionId,
 } from '../utils/tunerTransposition'
 import { loadMetronomePrefs, type MetronomePrefs } from '../utils/metronomeConfig'
-import type { BestTakeHistoryEntry, PracticeItemState, Project } from '../db'
+import type { Project } from '../db'
 import type { Take } from '../types'
 import type { DeskSnapshot } from '../utils/workspaceDesks'
 import {
@@ -43,21 +43,12 @@ import {
 import {
   type BuilderView,
   type RoutineBuilderMode,
-  type RoutineFocusRequest,
 } from './RoutineBuilder'
 import GuidedRoutineBuilder from './GuidedRoutineBuilder'
 import RoutineProgressSummary from './RoutineProgressSummary'
 import './practice-home.css'
 
-/** A session is the specific thing being worked on — an excerpt, solo, or
- * technique. It's just a Project: its name IS the focus, and it accumulates
- * takes over as many sittings as it takes to get right. */
-export interface FocusedPracticeSelection {
-  projectId: string
-  focusArea: string
-}
 
-const DAY_MS = 86_400_000
 const SITTING_WAVE_BARS = 15
 
 function SittingWave({ compact = false }: { compact?: boolean }) {
@@ -71,49 +62,27 @@ function SittingWave({ compact = false }: { compact?: boolean }) {
 }
 
 /** How long a practice item has been sitting, in the words a player uses. */
-function describeLastOpened(timestamp: number): string {
-  if (!timestamp) return 'Not started'
-  const startOfDay = (date: Date) =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(timestamp))) / DAY_MS)
-  if (days <= 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days`
-  if (days < 14) return 'Last week'
-  return `${Math.floor(days / 7)} weeks`
-}
 
 interface PracticeHubProps {
   isOpen: boolean
   projects: Project[]
-  activeProject: Project | null
   takes: Take[]
-  bestTakeHistory: BestTakeHistoryEntry[]
-  focusedPractice: FocusedPracticeSelection | null
-  practiceItemStates: PracticeItemState[]
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   onClose: () => void
   onOpenQuickPractice: () => void
-  onStartFocusedPractice: (projectId: string) => void | Promise<void>
-  onResumeFocusedPractice: (projectId: string) => void | Promise<void>
-  onCreatePracticeItem: (name: string) => Promise<Project>
   onOpenGames: () => void
   onDailyPractice: (plan: DailyChallengePlan) => void
   onDailyGame: (plan: DailyChallengePlan) => void
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
-  /** The desk a Focus session will restore — one literal line under its card. */
-  focusDeskSummary?: string | null
 
   /* ---- Daily routine ---- */
   routine: Routine | null
   routineDay: RoutineDay | null
   /** Non-null opens the builder in that mode when the sheet shows. */
   routineBuilderRequest: RoutineBuilderMode | null
-  /** A focus step waiting for a practice item; the setup page binds it. */
-  routineFocusRequest: RoutineFocusRequest | null
   instrumentId: string | null
   liveDeskSnapshot: DeskSnapshot
   onSelectInstrument: (instrumentId: string) => void
@@ -126,11 +95,9 @@ interface PracticeHubProps {
   /** Saves, then opens the routine's next step; rejects if that step cannot open. */
   onSaveAndStartRoutine: (routine: Routine) => Promise<void>
   onDeleteRoutine: () => void
-  onBindRoutineFocus: (projectId: string) => void | Promise<void>
-  onCancelRoutineFocus: () => void
 }
 
-type HubPage = 'home' | 'focused-setup' | 'routine' | 'instrument' | 'today'
+type HubPage = 'home' | 'routine' | 'instrument' | 'today'
 
 const BUILDER_TITLE: Record<BuilderView, string> = {
   presets: 'Start from a preset',
@@ -142,28 +109,19 @@ const BUILDER_TITLE: Record<BuilderView, string> = {
 export default function PracticeHub({
   isOpen,
   projects,
-  activeProject,
-  bestTakeHistory,
-  focusedPractice,
-  practiceItemStates,
   tunerTransposition,
   hapticFeedback,
   onClose,
   onOpenQuickPractice,
-  onStartFocusedPractice,
-  onResumeFocusedPractice,
-  onCreatePracticeItem,
+  onOpenVault,
   onOpenGames,
   onDailyPractice,
   onDailyGame,
-  onOpenVault,
   onOpenTuner,
   onOpenMetronome,
-  focusDeskSummary = null,
   routine,
   routineDay,
   routineBuilderRequest,
-  routineFocusRequest,
   instrumentId,
   liveDeskSnapshot,
   onSelectInstrument,
@@ -175,8 +133,6 @@ export default function PracticeHub({
   onSaveRoutine,
   onSaveAndStartRoutine,
   onDeleteRoutine,
-  onBindRoutineFocus,
-  onCancelRoutineFocus,
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const reducedMotion = useReducedMotion()
@@ -184,35 +140,24 @@ export default function PracticeHub({
   const pageRef = useRef<HubPage>(page)
   pageRef.current = page
   const [builderView, setBuilderView] = useState<BuilderView>('edit')
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    focusedPractice?.projectId ?? activeProject?.id ?? '',
-  )
   const [launchError, setLaunchError] = useState('')
-  const [startingFocusedPractice, setStartingFocusedPractice] = useState(false)
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
-  const [newPracticeItemName, setNewPracticeItemName] = useState('')
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
-    setPage(routineBuilderRequest ? 'routine' : routineFocusRequest ? 'focused-setup' : 'home')
+    setPage(routineBuilderRequest ? 'routine' : 'home')
     setLaunchError('')
     setMetronomePrefs(loadMetronomePrefs())
-    const resumeProjectId = focusedPractice?.projectId ?? practiceItemStates[0]?.projectId
-    setSelectedProjectId(resumeProjectId ?? activeProject?.id ?? '')
   }, [isOpen])
 
-  // The builder or a focus request can arrive while the sheet is already up.
+  // A builder request can arrive while the sheet is already up.
   useEffect(() => {
     if (!isOpen) return
     if (routineBuilderRequest) setPage('routine')
     else if (pageRef.current === 'routine') setPage('home')
   }, [routineBuilderRequest]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!isOpen) return
-    if (routineFocusRequest) setPage('focused-setup')
-  }, [routineFocusRequest]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * The builder body needs both the page and the request; the header only
@@ -224,11 +169,6 @@ export default function PracticeHub({
 
   const closeBuilder = () => {
     onCloseRoutineBuilder()
-    setPage('home')
-  }
-
-  const leaveFocusedSetup = () => {
-    if (routineFocusRequest) onCancelRoutineFocus()
     setPage('home')
   }
 
@@ -300,11 +240,6 @@ export default function PracticeHub({
     }
   }, [isOpen, onClose])
 
-  const projectBestCount = useMemo(
-    () => bestTakeHistory.filter((entry) => entry.projectId === activeProject?.id).length,
-    [activeProject?.id, bestTakeHistory],
-  )
-
   const instrumentProfile = instrumentId ? getInstrumentProfile(instrumentId) : undefined
   const tunerKey = getTunerTransposition(
     instrumentProfile?.tunerTransposition ?? tunerTransposition,
@@ -312,44 +247,6 @@ export default function PracticeHub({
   const homeSubtitle = instrumentProfile
     ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(instrumentProfile.soundVolumeThreshold)}`
     : 'Sets the tuner, written pitch, and gate'
-  /**
-   * The bench: every practice item that has actually been opened, most recent
-   * first. `lastOpenedAt` is the only honest ordering — a project's createdAt
-   * says nothing about whether it is live work.
-   */
-  const bench = useMemo(() => {
-    return practiceItemStates
-      .map((state) => {
-        const project = projects.find((item) => item.id === state.projectId)
-        if (!project) return null
-        return {
-          project,
-          intention: state.pendingIntention,
-          age: describeLastOpened(state.lastOpenedAt),
-          bestCount: bestTakeHistory.filter(
-            (entry) => entry.projectId === project.id && entry.isCurrentBest,
-          ).length,
-        }
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
-      .sort((a, b) => {
-        const aAt = practiceItemStates.find((s) => s.projectId === a.project.id)?.lastOpenedAt ?? 0
-        const bAt = practiceItemStates.find((s) => s.projectId === b.project.id)?.lastOpenedAt ?? 0
-        return bAt - aAt
-      })
-  }, [bestTakeHistory, practiceItemStates, projects])
-
-  const resumeProject = projects.find(
-    (project) => project.id === (focusedPractice?.projectId ?? bench[0]?.project.id),
-  )
-  const routineProjectIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const step of routine?.steps ?? []) {
-      if (step.projectId) ids.add(step.projectId)
-    }
-    return ids
-  }, [routine])
-  const onBench = bench.find((item) => !routineProjectIds.has(item.project.id)) ?? null
   const homeDay = routineDay?.routineId === routine?.id ? routineDay : null
   const homeProgress = routine ? routineProgress(routine, homeDay) : null
   const homeNext = routine ? routine.steps.find(item => item.id === (homeDay?.activeStepId ?? homeDay?.pausedStepId)) ?? nextOpenStep(routine, homeDay) : null
@@ -357,41 +254,6 @@ export default function PracticeHub({
     : homeProgress?.complete || !homeNext ? 'Routine complete'
     : homeDay?.startedAt ? 'Continue your routine' : 'Start your routine'
 
-  const resumePractice = async (projectId?: string) => {
-    const targetId = projectId ?? onBench?.project.id ?? resumeProject?.id
-    if (!targetId || startingFocusedPractice) return
-    setStartingFocusedPractice(true)
-    setLaunchError('')
-    try {
-      await onResumeFocusedPractice(targetId)
-    } catch {
-      setLaunchError('Could not resume practice. Please try again.')
-    } finally {
-      setStartingFocusedPractice(false)
-    }
-  }
-
-  const startFocusedPractice = async () => {
-    if ((!selectedProjectId && !newPracticeItemName.trim()) || startingFocusedPractice) return
-    setStartingFocusedPractice(true)
-    setLaunchError('')
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    try {
-      let projectId = selectedProjectId
-      if (newPracticeItemName.trim()) {
-        const project = await onCreatePracticeItem(newPracticeItemName.trim())
-        projectId = project.id
-        setSelectedProjectId(project.id)
-        setNewPracticeItemName('')
-      }
-      // A routine step asked for a piece: bind it and let the step open.
-      if (routineFocusRequest) await onBindRoutineFocus(projectId)
-      else await onStartFocusedPractice(projectId)
-    } catch { setLaunchError('Could not open this practice item. Please try again.') }
-    finally {
-      setStartingFocusedPractice(false)
-    }
-  }
 
   if (typeof document === 'undefined') return null
 
@@ -416,7 +278,7 @@ export default function PracticeHub({
 
           <motion.section
             ref={dialogRef}
-            className={`practice-menu-card ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
+            className={`practice-menu-card ${activePage === 'home' ? 'practice-menu-card--electric-edge' : ''} ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby={activePage === 'routine' ? undefined : 'practice-menu-title'}
@@ -440,7 +302,7 @@ export default function PracticeHub({
                         ? closeBuilder
                         : activePage === 'instrument'
                           ? () => setPage('home')
-                          : leaveFocusedSetup
+                          : () => setPage('home')
                     }
                     className="practice-menu-icon-button"
                     aria-label="Back"
@@ -453,45 +315,23 @@ export default function PracticeHub({
               </div>
 
               <div className="practice-menu-title-block">
-                <span>BestTake</span>
                 {activePage === 'home' ? (
-                  <h2 id="practice-menu-title">
-                    <Pressable
-                      type="button"
-                      intensity="soft"
-                      haptic="light"
-                      hapticFeedback={hapticFeedback}
-                      className="practice-menu-instrument-title"
-                      aria-label={
-                        instrumentProfile
-                          ? `${instrumentProfile.label}. Change instrument.`
-                          : 'Choose your instrument'
-                      }
-                      onClick={() => setPage('instrument')}
-                    >
-                      <span>{instrumentHeading(instrumentId)}</span>
-                      <ChevronDown aria-hidden />
-                    </Pressable>
+                  <h2 id="practice-menu-title" className="practice-home-brand">
+                    <img src="/icons/signal.svg" alt="" aria-hidden />
+                    BestTake
                   </h2>
                 ) : (
-                  <h2 id="practice-menu-title">
-                    {activePage === 'focused-setup'
-                      ? 'Choose what to practice'
-                      : activePage === 'routine'
-                        ? BUILDER_TITLE[builderView]
-                        : activePage === 'today' ? 'Today’s routine' : 'Instrument'}
-                  </h2>
+                  <>
+                    <span>BestTake</span>
+                    <h2 id="practice-menu-title">
+                      {activePage === 'routine'
+                          ? BUILDER_TITLE[builderView]
+                          : activePage === 'today' ? 'Today’s routine' : 'Instrument'}
+                    </h2>
+                  </>
                 )}
-                {activePage === 'home' && <p>{homeSubtitle}</p>}
                 {activePage === 'instrument' && (
                   <p>Sets tuner, written pitch, and the gate</p>
-                )}
-                {activePage === 'focused-setup' && (
-                  <p>
-                    {routineFocusRequest
-                      ? `For your routine step · ${routineFocusRequest.title}`
-                      : 'One focus. All your attempts, together.'}
-                  </p>
                 )}
                 {activePage === 'routine' && builderView === 'edit' && (
                   <p>Each step opens the right tool, already set.</p>
@@ -547,70 +387,6 @@ export default function PracticeHub({
                       onViewChange={setBuilderView}
                     />
                   </motion.div>
-                ) : activePage === 'focused-setup' ? (
-                  <motion.div
-                    key="focused-setup"
-                    className="practice-menu-page"
-                    initial={{ opacity: 0, x: 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8 }}
-                    transition={iosFade}
-                  >
-                    <section className="practice-menu-section">
-                      <h3>What are you working on?</h3>
-                      <p className="practice-menu-note">
-                        Choose an excerpt or name a new one. Your reference, desk, and takes stay with it across practice days.
-                      </p>
-                      <div className="practice-menu-form">
-                        <label className="practice-menu-field">
-                          <span>Continue an existing focus</span>
-                          <select
-                            value={selectedProjectId}
-                            onChange={(event) => { setSelectedProjectId(event.target.value); setNewPracticeItemName('') }}
-                          >
-                            {projects.map((project) => (
-                              <option key={project.id} value={project.id}>
-                                {project.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <div className="practice-menu-create-item">
-                          <input
-                            value={newPracticeItemName}
-                            onChange={(event) => setNewPracticeItemName(event.target.value)}
-                            placeholder="Or name a new one — measures 12–20…"
-                            aria-label="Name a new practice focus"
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') void startFocusedPractice()
-                            }}
-                          />
-
-                        </div>
-                      </div>
-                    </section>
-
-                    <Pressable
-                      type="button"
-                      intensity="soft"
-                      haptic="light"
-                      hapticFeedback={hapticFeedback}
-                      className="practice-menu-primary"
-                      disabled={(!selectedProjectId && !newPracticeItemName.trim()) || startingFocusedPractice}
-                      onClick={() => void startFocusedPractice()}
-                    >
-                      {startingFocusedPractice
-                        ? 'Opening recorder…'
-                        : routineFocusRequest
-                          ? newPracticeItemName.trim()
-                            ? 'Create & use for this step'
-                            : 'Use for this step'
-                          : newPracticeItemName.trim()
-                            ? 'Create & start practice'
-                            : 'Start practicing'}
-                    </Pressable>
-                  </motion.div>
                 ) : activePage === 'instrument' ? (
                   <motion.div
                     key="instrument"
@@ -636,8 +412,6 @@ export default function PracticeHub({
                       hapticFeedback={hapticFeedback} startingStepId={startingRoutineStepId} onOpenItemHistory={onOpenItemHistory}
                       onStartStep={(stepId) => void startRoutineStep(stepId)} onToggleStep={onToggleRoutineStep}
                       onEdit={() => onOpenRoutineBuilder('edit')} />
-                    {onBench && <button className="practice-home-library" disabled={startingFocusedPractice}
-                      onClick={() => void resumePractice(onBench.project.id)}>Continue {onBench.project.name}{focusDeskSummary ? ` · ${focusDeskSummary}` : ''}</button>}
                   </div>
                 ) : (
                   <motion.div
@@ -649,41 +423,32 @@ export default function PracticeHub({
                     transition={iosFade}
                   >
                     <section className="practice-menu-focus-flow">
+                      <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
+                        className="practice-home-instrument" onClick={() => setPage('instrument')}
+                        aria-label={instrumentProfile ? `${instrumentProfile.label}. Change instrument.` : 'Choose your instrument'}
+                        aria-describedby="practice-home-instrument-description">
+                        <span className="practice-home-instrument-copy">
+                          <small>Your instrument</small>
+                          <strong>{instrumentId ? instrumentHeading(instrumentId) : 'Choose instrument'}</strong>
+                        </span>
+                        <span className="practice-home-instrument-change">Change <ChevronDown aria-hidden /></span>
+                      </Pressable>
+                      <span id="practice-home-instrument-description" className="practice-home-sr-only">{homeSubtitle}</span>
                       <div className="practice-home-launch-actions" aria-label="Start practicing">
-                        <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-                          className="practice-home-launch-button is-primary" disabled={startingRoutineStepId !== null}
-                          onClick={() => {
-                            if (!routine?.steps.length) onOpenRoutineBuilder('build')
-                            else if (homeNext && !homeProgress?.complete) void startRoutineStep(homeNext.id)
-                            else setPage('today')
-                          }}>
-                          <span className="practice-home-launch-copy">
-                            <small>{routine?.steps.length ? routine.name : 'Your practice plan'}</small>
-                            <strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong>
-                            <em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Choose a goal. We’ll get your tools ready.'}</em>
-                          </span><ChevronRight aria-hidden />
+                        <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-primary practice-home-record-launch" onClick={onOpenQuickPractice}>
+                          <span className="practice-home-launch-copy"><small>Your next great take</small><strong>Record & compare</strong><em>Play. Listen back. Keep your best.</em></span><ChevronRight aria-hidden />
+                          <svg className="practice-home-signal-detail" viewBox="0 0 180 55" fill="none" aria-hidden><path d="M0 28h20l5-7 6 14 7-25 8 36 8-29 7 20 6-9h23l5-12 6 25 8-34 8 43 8-27 6 12 5-7h39" stroke="currentColor" strokeWidth="1.6" /></svg>
                         </Pressable>
-                        <Pressable
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          hapticFeedback={hapticFeedback}
-                          className="practice-home-launch-button is-quick"
-                          onClick={onOpenQuickPractice}
-                        >
-                          <span className="practice-home-launch-copy">
-                            <small>Camera or audio</small>
-                            <strong>Quick start</strong>
-                            <em>Open the recorder and play</em>
-                          </span>
-                          <ChevronRight aria-hidden />
-                        </Pressable>
-
+                        <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-quick practice-home-routine-launch" disabled={startingRoutineStepId !== null} onClick={() => {
+                          if (!routine?.steps.length) onOpenRoutineBuilder('build')
+                          else if (homeNext && !homeProgress?.complete) void startRoutineStep(homeNext.id)
+                          else setPage('today')
+                        }}><span className="practice-home-launch-copy"><small>{routine?.name || 'A little structure, when you want it'}</small><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Start with a ready-to-play plan'}</em></span><ChevronRight aria-hidden /></Pressable>
                       </div>
-
-                      <button className="practice-home-library" onClick={() => onOpenRoutineBuilder('build')}>
-                        <span>Your routines</span><ChevronRight aria-hidden />
-                      </button>
+                      <div className="practice-home-links">
+                        <button className="practice-home-library" onClick={onOpenVault}><span>Take library<small>Recordings & best takes</small></span><ChevronRight aria-hidden /></button>
+                        <button className="practice-home-library" onClick={() => onOpenRoutineBuilder('build')}><span>Your routines<small>Plans & exercises</small></span><ChevronRight aria-hidden /></button>
+                      </div>
 
                       <DailyChallenges routine={routine} day={routineDay} instrumentId={instrumentId}
                         onPractice={onDailyPractice} onGame={onDailyGame} />
@@ -711,30 +476,6 @@ export default function PracticeHub({
                           </svg>
                           <strong>Games</strong>
                           <small>3 to play</small>
-                        </Pressable>
-                        <Pressable
-                          type="button"
-                          intensity="soft"
-                          haptic="light"
-                          hapticFeedback={hapticFeedback}
-                          className="practice-menu-shortcut"
-                          onClick={onOpenVault}
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={1.9}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden
-                          >
-                            <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                            <circle cx="12" cy="12" r="3.2" />
-                            <path d="M12 5.6v3.2" />
-                          </svg>
-                          <strong>Vault</strong>
-                          <small>{projectBestCount > 0 ? `${projectBestCount} best` : 'All takes'}</small>
                         </Pressable>
                         <Pressable
                           type="button"

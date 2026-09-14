@@ -1450,8 +1450,8 @@ button.compact-take-caption:active {
   padding: 0;
   border: 0.5px solid rgba(255, 207, 92, 0.5);
   border-radius: 999px;
-  background: rgba(18, 16, 10, 0.44);
-  color: #f7ae1c;
+  background: rgba(115, 78, 8, 0.65);
+  color: #ffe39b;
   box-shadow:
     0 0.2rem 0.5rem rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 225, 154, 0.16);
@@ -2826,3 +2826,22 @@ html.app-dark-mode
   box-shadow: inset 0 0 0 2px rgba(247, 166, 0, 0.85);
 }
 
+
+/* Give each take a full-width heading, clear of the share and close controls. */
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot {
+  --camera-take-card-height: clamp(5.8rem, 25vw, 6.35rem);
+  padding-top: 1.85rem;
+}
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-caption {
+  position: static;
+  padding-right: 0;
+}
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-slot .compact-take-caption__label {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.5rem;
+  width: calc(100% - 4.1rem);
+  padding-right: 0;
+  font-size: 0.7rem;
+  line-height: 1.1;
+}

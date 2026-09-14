@@ -23,6 +23,7 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
     override open func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(OfferCodesPlugin())
         if let controller = webView?.configuration.userContentController,
            hapticsContentController !== controller {
             hapticsContentController?.removeScriptMessageHandler(forName: "bestTakeHaptics")

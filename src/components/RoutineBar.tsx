@@ -27,8 +27,10 @@ import {
   Pencil,
   Play,
   SkipForward,
+  X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import RoutineProgramControls from './RoutineProgramControls'
 import { triggerLightHaptic } from '../utils/haptics'
 import { iosDragRelease, iosSpringSnappy } from '../utils/motionPresets'
 import {
@@ -71,6 +73,7 @@ interface RoutineBarProps {
   hapticFeedback: boolean
   onResume: () => void
   onPause: () => void
+  onClose: () => void
   onDone: () => void
   /** Left out where skipping means nothing, like the one-step daily challenge. */
   onSkip?: () => void
@@ -103,8 +106,8 @@ const MAX_WIDTH = 560
 const DEFAULT_WIDTH = 384
 /** Narrower than this the bar folds to one row and its buttons drop their words. */
 const COMPACT_BELOW = 330
-/** Matches `.routine-ball` (3.5rem). */
-const BALL_SIZE = 56
+/** Matches `.routine-ball` (4rem). */
+const BALL_SIZE = 64
 /** First run sits just above the control deck, where the bar used to be pinned. */
 const DEFAULT_BOTTOM_GAP = 124
 /** A press on the corner that travels less than this is a tap, and folds the bar. */
@@ -212,6 +215,7 @@ export default function RoutineBar({
   hapticFeedback,
   onResume,
   onPause,
+  onClose,
   onDone,
   onSkip,
   onJumpToStep,
@@ -570,6 +574,7 @@ export default function RoutineBar({
             />
           )}
         </svg>
+        <span className="routine-ball__label">Routine</span>
         <span className="routine-ball__step">
           {index}
           <small>/{count}</small>
@@ -685,6 +690,18 @@ export default function RoutineBar({
             <ChevronDown className="routine-bar__chevron" aria-hidden />
           </button>
           {compact && actions}
+          <button
+            type="button"
+            className="routine-bar__close"
+            aria-label="Close routine"
+            title="End this routine session"
+            disabled={busy}
+            data-no-drag
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onClose}
+          >
+            <X aria-hidden />
+          </button>
         </div>
 
         {targetMs > 0 && (
@@ -694,6 +711,10 @@ export default function RoutineBar({
         )}
 
         {!compact && <div className="routine-bar__actions">{actions}</div>}
+
+        {step.programId && step.kind !== 'game' && step.kind !== 'free' && (
+          <RoutineProgramControls key={step.id} programId={step.programId} disabled={Boolean(busy || paused)} />
+        )}
 
         {/* One element in both layouts: a drag that narrows the bar into a
             single row must not lose the handle it started on. */}

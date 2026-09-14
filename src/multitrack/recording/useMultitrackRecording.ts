@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import type { MultitrackRecordingPhase } from '../types'
 
@@ -69,6 +69,9 @@ export function useMultitrackRecording(options: {
   const [targetPanelId, setTargetPanelId] = useState<string | null>(null)
   const [countInRemaining, setCountInRemaining] = useState(0)
   const activeRef = useRef(false)
+  const generationRef = useRef(0)
+  const runQueue = useRef(Promise.resolve())
+  const resolveWaitRef = useRef<(() => void) | null>(null)
   const captureActiveRef = useRef(false)
   const timerRef = useRef<number | null>(null)
   const countdownIntervalRef = useRef<number | null>(null)
@@ -79,6 +82,7 @@ export function useMultitrackRecording(options: {
   const getRecordingTiming = useCallback(() => timingRef.current, [])
 
   const clearTimers = useCallback(() => {
+    resolveWaitRef.current?.(); resolveWaitRef.current = null
     if (timerRef.current !== null) {
       window.clearTimeout(timerRef.current)
       timerRef.current = null
@@ -90,6 +94,7 @@ export function useMultitrackRecording(options: {
   }, [])
 
   const cancel = useCallback(() => {
+    generationRef.current += 1
     activeRef.current = false
     if (captureActiveRef.current) {
       captureActiveRef.current = false
@@ -133,7 +138,8 @@ export function useMultitrackRecording(options: {
     const delayMs = Math.max(0, epochMs - Date.now())
     if (delayMs <= 0) return
     await new Promise<void>((resolve) => {
-      timerRef.current = window.setTimeout(resolve, delayMs)
+      resolveWaitRef.current = resolve
+      timerRef.current = window.setTimeout(() => { resolveWaitRef.current = null; resolve() }, delayMs)
     })
   }, [])
 
@@ -147,12 +153,15 @@ export function useMultitrackRecording(options: {
     const countInBars = Math.max(0, Math.min(8, Math.round(settings?.countInBars ?? 1)))
     const clickEnabled = settings?.clickEnabled !== false
 
+    const generation = ++generationRef.current
+    const isCurrent = () => activeRef.current && generation === generationRef.current
     activeRef.current = true
     setTargetPanelId(panelId)
     setCountInRemaining(0)
     setPhase('arming')
 
-    void (async () => {
+    runQueue.current = runQueue.current.catch(() => {}).then(async () => {
+      if (!isCurrent()) return
       sharedMetronomeEngine.stop()
       onPrepareRecording?.(panelId)
 
@@ -164,7 +173,7 @@ export function useMultitrackRecording(options: {
         armError = error
         armed = false
       }
-      if (!activeRef.current) {
+      if (!isCurrent()) {
         // Arming may finish after the user closed/cancelled. Tear down anything
         // the asynchronous native prepare completed in the meantime.
         sharedMetronomeEngine.stop()
@@ -172,7 +181,7 @@ export function useMultitrackRecording(options: {
         return
       }
       if (!armed) {
-        if (activeRef.current) {
+        if (isCurrent()) {
           fail(recordingErrorMessage(
             armError,
             "The monitor mix couldn't load. Check your takes and try again.",
@@ -184,14 +193,15 @@ export function useMultitrackRecording(options: {
       // Capture is confirmed before the native transport receives its future
       // start anchor. Recorder startup latency can no longer consume count-in.
       const micStarted = (await onStartMicRecording?.()) ?? true
+      const captureConfirmedEpochMs = Date.now()
       if (micStarted !== false) captureActiveRef.current = true
-      if (micStarted !== false && !activeRef.current) {
+      if (micStarted !== false && !isCurrent()) {
         captureActiveRef.current = false
         onAbortMicRecording?.()
         return
       }
       if (micStarted === false) {
-        if (activeRef.current) fail("Recording couldn't start. Check the camera and try again.")
+        if (isCurrent()) fail("Recording couldn't start. Check the camera and try again.")
         return
       }
 
@@ -203,8 +213,9 @@ export function useMultitrackRecording(options: {
         transportError = error
         transport = null
       }
-      if (!transport || !activeRef.current) {
-        if (activeRef.current) {
+      if (!transport || !isCurrent()) {
+        if (transport && !isCurrent()) onStopTransport?.()
+        if (isCurrent()) {
           fail(recordingErrorMessage(
             transportError,
             "The synchronized monitor couldn't start. Try again.",
@@ -213,8 +224,9 @@ export function useMultitrackRecording(options: {
         return
       }
 
+      if (!isCurrent()) return
       const beatMs = Math.max(1, transport.beatDurationSec * 1000)
-      const estimatedSourceInMs = Math.max(0, transport.performanceEpochMs - Date.now())
+      const estimatedSourceInMs = Math.max(0, transport.performanceEpochMs - captureConfirmedEpochMs)
       timingRef.current = {
         recordingBpm: bpm,
         performanceStartBeat: transport.countInBeats + 1,
@@ -227,6 +239,7 @@ export function useMultitrackRecording(options: {
         console.warn('[MultitrackRecording] auxiliary monitor scheduling failed', error)
       }
 
+      if (!isCurrent()) return
       if (transport.countInBeats > 0) {
         setPhase('count-in')
         const updateCountdown = () => {
@@ -241,7 +254,7 @@ export function useMultitrackRecording(options: {
       }
 
       await waitUntil(transport.performanceEpochMs)
-      if (!activeRef.current) return
+      if (!isCurrent()) return
 
       if (countdownIntervalRef.current !== null) {
         window.clearInterval(countdownIntervalRef.current)
@@ -252,13 +265,17 @@ export function useMultitrackRecording(options: {
       try {
         await onPerformanceStart?.()
       } catch {
-        if (activeRef.current) fail("The monitor mix couldn't begin. Try again.")
+        if (isCurrent()) fail("The monitor mix couldn't begin. Try again.")
         return
       }
-      if (!activeRef.current) return
+      if (!isCurrent()) return
       onCountInComplete?.(panelId)
-    })()
+    }).catch(error => { if (isCurrent()) fail(recordingErrorMessage(error, 'Recording could not start. Please try again.')) })
   }, [fail, onAbortMicRecording, onArmPlayback, onCountInComplete, onPerformanceStart, onPrepareRecording, onStartMicRecording, onStartTransport, onStopTransport, onTransportScheduled, waitUntil])
+
+  const cancelRef = useRef(cancel)
+  cancelRef.current = cancel
+  useEffect(() => () => cancelRef.current(), [])
 
   return {
     phase,

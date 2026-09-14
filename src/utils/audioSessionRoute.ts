@@ -262,7 +262,9 @@ export interface BestTakeAudioPluginType {
     excluded: boolean
   }): Promise<{ excluded: boolean }>
   /** Composites N synced videos into one grid + optional sheet-music overlay + mixed audio. */
+  cancelMultitrackExport(options: { exportId: string }): Promise<void>
   renderMultitrackVideo(options: {
+    exportId?: string
     aspectRatio: string
     durationSeconds: number
     sources: Array<{
@@ -273,6 +275,12 @@ export interface BestTakeAudioPluginType {
       trimStartSec?: number
       trimEndSec?: number
       timelineOffsetMs?: number
+      mirror?: boolean
+      sourceInSec?: number
+      sourceOutSec?: number
+      insertAtSec?: number
+      sectionStartSec?: number
+      sectionEndSec?: number
       volume?: number
       muted?: boolean
     }>
@@ -292,6 +300,9 @@ export interface BestTakeAudioPluginType {
      * line. When present these replace the static `sheetMusic` layer.
      */
     sheetMusicCues?: Array<{
+      occlusionRects?: NativeRectPercent[]
+      scrollEndY?: number
+      scrollDurationSec?: number
       path: string
       fileType: string
       rect: NativeRectPercent
@@ -405,6 +416,7 @@ export interface BestTakeAudioPluginType {
   prepareHaptics(): Promise<void>
   /** Open this app's page in iOS Settings so denied permissions can be recovered. */
   openAppSettings(): Promise<void>
+  addListener(eventName: 'multitrackExportProgress', listenerFunc: (data: { exportId: string; progress: number }) => void): Promise<PluginListenerHandle>
   addListener(
     eventName: 'audioRouteChanged',
     listenerFunc: (data: AudioRouteSnapshot) => void,

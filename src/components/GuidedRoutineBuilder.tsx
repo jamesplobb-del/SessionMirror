@@ -37,6 +37,7 @@ function selectionForRoutine(routine: Routine): Record<string, string> {
 export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
+  const [showReorder, setShowReorder] = useState(false)
   const [goal, setGoal] = useState<PracticeGoal>('balanced')
   const [goalMinutes, setGoalMinutes] = useState(20)
   const [screen, setScreen] = useState<Screen>(() => {
@@ -96,7 +97,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const detail = draft.steps.find(item => item.id === detailId)
   const total = draft.steps.reduce((sum, step) => sum + step.minutes, 0)
   const titles: Record<Screen, string> = {
-    routines: 'Your\nroutines.', goals: 'What would you like\nto build?', instrument: 'What do you play?', choose: 'Add an exercise.', lineup: 'Your practice\nlineup.',
+    routines: 'Your\nroutines.', goals: 'What would you like\nto build?', instrument: 'What do you play?', choose: 'Add an exercise.', lineup: 'Ready when\nyou are.',
     'custom-settings': 'Set up your tools.', 'custom-reference': 'Add a reference.', 'custom-items': 'Build your own.', 'custom-tool': customItems[customIndex] ?? 'Choose a tool.', detail: detail?.title ?? 'Your exercise', library: 'Build your\nroutine.',
   }
   const subtitles: Record<Screen, string> = {
@@ -151,7 +152,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setUseCurrent(false)
     setLibraryReturn('routines'); setLineupReturn('library')
     setInstrumentReturn('library'); setChangingInstrument(false)
-    move('instrument')
+    move(instrument ? 'library' : 'instrument')
   }
   const openSavedRoutine = (item: Routine) => {
     setDraft(item); setInstrument(item.instrumentId); setSelection(selectionForRoutine(item))
@@ -257,7 +258,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const editingToday = routine?.id === draft.id
   const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
   const secondaryAction = canStart ? { label: editingToday ? 'Save changes' : 'Save for later', run: () => saveDraft(false) } : null
-  const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds([]); setLineupReturn('goals'); move('lineup') }
+  const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('goals'); move('lineup') }
     : screen === 'instrument' ? () => move(instrumentReturn)
     : screen === 'choose' ? configureNext
     : screen === 'lineup' ? () => saveDraft(canStart)
@@ -391,19 +392,19 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           {screen === 'lineup' && <>
             <label className="routine-guide-field routine-guide-field--name">Routine name<input id="guide-routine-name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
             <div className="routine-guide-lineup-meta">{draft.steps.length} exercises <span>·</span> {formatMinutes(total)}</div>
-            <p className="routine-swipe-hint">Swipe left on an exercise to remove it.</p>
+            <p className="routine-guide-ready-note">{pendingSetup.length ? null : <Check size={16} aria-hidden />}{pendingSetup.length ? 'Set up the remaining exercises before starting.' : 'Ready to start. Tap an exercise to adjust.'}</p>
             <ol className="routine-guide-lineup">
               {draft.steps.map((step, index) => <SwipeRoutineItem key={step.id} title={step.title} onRemove={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}>
                 <span className="routine-guide-number">{String(index + 1).padStart(2, '0')}</span>
                 <button type="button" className="routine-guide-item" onClick={() => { setDetailId(step.id); move('detail') }}><strong>{step.title}</strong><small>{summarizeStep(step, tunerTransposition)}</small></button>
-                <div className="routine-guide-reorder">
+                {showReorder ? <div className="routine-guide-reorder">
                   {[-1, 1].map(delta => <button key={delta} type="button" aria-label={`Move ${step.title} ${delta === -1 ? 'up' : 'down'}`} disabled={index + delta < 0 || index + delta >= draft.steps.length} onClick={() => setDraft(current => {
                     const steps = [...current.steps]; [steps[index], steps[index + delta]] = [steps[index + delta], steps[index]]; return { ...current, steps }
                   })}>{delta === -1 ? <ArrowUp aria-hidden /> : <ArrowDown aria-hidden />}</button>)}
-                </div>
+                </div> : <ChevronRight aria-hidden className="routine-guide-edit-exercise" />}
               </SwipeRoutineItem>)}
             </ol>
-            <button type="button" className="routine-guide-text" onClick={() => move('choose', true)}>＋ Add an exercise</button>
+            <div className="routine-guide-lineup-actions"><button type="button" className="routine-guide-text" onClick={() => move('choose', true)}>＋ Add an exercise</button><button type="button" className="routine-guide-text" aria-pressed={showReorder} onClick={() => setShowReorder(value=>!value)}>{showReorder ? 'Done reordering' : 'Reorder exercises'}</button></div>
             {routine?.id === draft.id && <button type="button" className="routine-guide-text" onClick={removeFromToday}>Remove from today · keep in library</button>}
           </>}
           {screen === 'custom-items' && <div className="routine-guide-custom-items">
@@ -433,7 +434,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           {screen === 'library' && <>
             <button type="button" className="routine-guide-own routine-guide-own--hero" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items, order them, then choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
             <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>A practice plan for your instrument and available time</small></span><ArrowRight aria-hidden /></button>
-            <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds([]); setLineupReturn('library'); setDetailId(next.steps[0]?.id ?? null); move(next.steps.length ? 'detail' : 'lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
+            <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); setDetailId(null); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
           </>}
         </motion.div>
       </AnimatePresence>

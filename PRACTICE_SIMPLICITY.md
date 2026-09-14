@@ -6,14 +6,18 @@ start folded; their exercises and character collection are inside the disclosure
 The existing tools remain at the bottom. Dedicated Home classes avoid the old
 experimental theme rules that made the two actions compete visually.
 
-Metronome, drone, and floating tuner start as labeled pills. Their existing
-widgets remain mounted so collapsing does not stop sound, reset position, or
-lose playback-muting ownership. One panel expands at a time; its minus control
-collapses it and returns keyboard focus to the pill. Close retains its existing
-remove/stop behavior. Routine step and main tab changes fold the panels.
+Metronome, drone, floating tuner, and hands-free start as separate 56px balls.
+They spawn in distinct positions on the right. Tap a ball to expand its existing
+panel; minus folds it again. Panels expand independently. Their existing widgets
+remain mounted so folding does not stop sound or lose playback-muting ownership.
+Balls support touch dragging and arrow keys; user-placed positions are remembered
+for the viewport. Reopening unfolds beside the ball, clamped to the screen.
+Keyboard focus follows collapse/expand, and folded controls are hidden from both
+touch and accessibility. Close retains its existing remove/stop behavior.
+New routine steps start folded. Hands-free shows its phase/timer in the ball.
 Changing between Camera and Audio during a routine preserves the same tools.
-The main tuner/metronome screen remains prominent, with supporting tools compact.
-Audio take cards reserve space for the pills rather than letting them overlap.
+Both recording modes expose a floating tuner through Workspace. The dedicated
+Tuner and Metronome tabs keep their full interfaces without a duplicate widget.
 
 A routine reference query no longer opens a dialog on launch. The Find reference
 pill opens the existing YouTube search/link interface, with the exercise query.
@@ -45,7 +49,7 @@ Apple references:
   against a controlled native boundary: background continuity, unlock without a
   duplicate start, Stop, interruption, delayed Start and stale foreground read.
 - Production web build and unsigned generic-iOS compilation (no simulator).
-- Local browser: Home at 390×844, saved routine launch, metronome/drone folded
-  state and one-at-a-time expansion without changing their playing state.
+- Local browser at 390×844: independent ball expansion/folding, tuner access in
+  Audio and Camera, position clamping, and retained drone playback state.
 - Phone listening check still required: start a steady beat, lock for several
   minutes, switch apps, return, Stop, and repeat with an audio interruption.

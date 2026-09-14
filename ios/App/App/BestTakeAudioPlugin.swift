@@ -37,6 +37,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "trimTakeMedia", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderCreatorStudioVideo", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "renderMultitrackVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelMultitrackExport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepareMultitrackMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startMultitrackTransport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopMultitrackTransport", returnType: CAPPluginReturnPromise),
@@ -777,7 +778,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     /// space. The crop prevents cover-scaled pixels from bleeding into a neighbor.
     private func multitrackVideoGeometry(
         track: AVAssetTrack,
-        targetRect: CGRect
+        targetRect: CGRect,
+        mirror: Bool = false
     ) -> (transform: CGAffineTransform, cropRect: CGRect) {
         let (normalize, orientedSize) = normalizedTrackOrientation(track)
         let sourceAspect = orientedSize.width / max(orientedSize.height, 1)
@@ -809,6 +811,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 translationX: targetRect.origin.x,
                 y: targetRect.origin.y
             ))
+        if mirror {
+            return (transform.concatenating(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: 2 * targetRect.midX, ty: 0)), naturalCrop)
+        }
         return (transform, naturalCrop)
     }
 
@@ -1100,7 +1105,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    private var multitrackExports: [String: AVAssetExportSession] = [:]
+
+    @objc func cancelMultitrackExport(_ call: CAPPluginCall) {
+        if let id = call.getString("exportId") { multitrackExports[id]?.cancelExport() }
+        call.resolve()
+    }
+
     @objc func renderMultitrackVideo(_ call: CAPPluginCall) {
+        let exportId = call.getString("exportId") ?? UUID().uuidString
         let aspectRatio = call.getString("aspectRatio") ?? "9:16"
         let renderSize = creatorStudioRenderSize(for: aspectRatio)
         let durationHint = call.getDouble("durationSeconds") ?? 0
@@ -1154,15 +1167,26 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             
             let assetSeconds = CMTimeGetSeconds(asset.duration)
-            let clampedEnd = min(trimEndSec ?? assetSeconds, assetSeconds)
-            let clampedStart = max(0, min(adjustedTrimStart, max(0, clampedEnd - 0.05)))
-            let trimmedSeconds = max(0.05, clampedEnd - clampedStart)
+            let requestedIn = (source["sourceInSec"] as? NSNumber)?.doubleValue ?? adjustedTrimStart
+            let requestedOut = (source["sourceOutSec"] as? NSNumber)?.doubleValue ?? trimEndSec ?? assetSeconds
+            if let insert = (source["insertAtSec"] as? NSNumber)?.doubleValue {
+                offsetInsertTime = CMTime(seconds: max(0, insert), preferredTimescale: 600)
+            }
+            let clampedStart = max(0, requestedIn)
+            let availableEnd = min(requestedOut, assetSeconds)
+            let allowedDuration = durationHint > 0 ? max(0, durationHint - CMTimeGetSeconds(offsetInsertTime)) : assetSeconds
+            let trimmedSeconds = min(availableEnd - clampedStart, allowedDuration)
+            // Fully trimmed/late clips contribute no artificial tail frame.
+            if !trimmedSeconds.isFinite || trimmedSeconds <= 0 { continue }
             let sourceTimeRange = CMTimeRange(
                 start: CMTime(seconds: clampedStart, preferredTimescale: 600),
                 duration: CMTime(seconds: trimmedSeconds, preferredTimescale: 600)
             )
             do {
-                try compositionVideo.insertTimeRange(sourceTimeRange, of: videoTrack, at: offsetInsertTime)
+                let videoRange = CMTimeRangeGetIntersection(sourceTimeRange, otherRange: videoTrack.timeRange)
+                if videoRange.duration <= .zero { continue }
+                let videoInsertTime = CMTimeAdd(offsetInsertTime, CMTimeSubtract(videoRange.start, sourceTimeRange.start))
+                try compositionVideo.insertTimeRange(videoRange, of: videoTrack, at: videoInsertTime)
             } catch {
                 call.reject("A panel video could not be added to the export", nil, error)
                 return
@@ -1173,7 +1197,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
             let targetRect = multitrackRectFrame(rectDict, renderSize: renderSize)
             let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideo)
-            let geometry = multitrackVideoGeometry(track: videoTrack, targetRect: targetRect)
+            let geometry = multitrackVideoGeometry(track: videoTrack, targetRect: targetRect, mirror: (source["mirror"] as? Bool) ?? false)
             layerInstruction.setCropRectangle(geometry.cropRect, at: .zero)
             layerInstruction.setTransform(geometry.transform, at: .zero)
             if let windows = source["layoutWindows"] as? [[String: Any]] {
@@ -1182,7 +1206,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     let time = CMTime(seconds: max(0, start), preferredTimescale: 600)
                     if let rect = window["rect"] as? [String: Any] {
                         let frame = multitrackRectFrame(rect, renderSize: renderSize)
-                        let placement = multitrackVideoGeometry(track: videoTrack, targetRect: frame)
+                        let placement = multitrackVideoGeometry(track: videoTrack, targetRect: frame, mirror: (source["mirror"] as? Bool) ?? false)
                         layerInstruction.setCropRectangle(placement.cropRect, at: time)
                         layerInstruction.setTransform(placement.transform, at: time)
                         layerInstruction.setOpacity(1, at: time)
@@ -1208,9 +1232,16 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     preferredTrackID: kCMPersistentTrackID_Invalid
                 ) else { continue }
                 do {
-                    try compositionAudio.insertTimeRange(sourceTimeRange, of: audioTrack, at: offsetInsertTime)
+                    let audioRange = CMTimeRangeGetIntersection(sourceTimeRange, otherRange: audioTrack.timeRange)
+                    if audioRange.duration <= .zero { continue }
+                    let audioInsertTime = CMTimeAdd(offsetInsertTime, CMTimeSubtract(audioRange.start, sourceTimeRange.start))
+                    try compositionAudio.insertTimeRange(audioRange, of: audioTrack, at: audioInsertTime)
                     let parameters = AVMutableAudioMixInputParameters(track: compositionAudio)
-                    parameters.setVolume(sourceVolume, at: .zero)
+                    let sectionStart = (source["sectionStartSec"] as? NSNumber)?.doubleValue ?? 0
+                    let sectionEnd = (source["sectionEndSec"] as? NSNumber)?.doubleValue
+                    parameters.setVolume(sectionStart > 0 ? 0 : sourceVolume, at: .zero)
+                    if sectionStart > 0 { parameters.setVolume(sourceVolume, at: CMTime(seconds: sectionStart, preferredTimescale: 600)) }
+                    if let end = sectionEnd { parameters.setVolume(0, at: CMTime(seconds: end, preferredTimescale: 600)) }
                     audioParameters.append(parameters)
                 } catch {
                     call.reject("A panel audio track could not be added to the export", nil, error)
@@ -1222,6 +1253,14 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         guard !layerInstructions.isEmpty else {
             call.reject("None of the panel videos could be read")
             return
+        }
+
+        if durationHint.isFinite && durationHint > 0 {
+            let targetEnd = CMTime(seconds: durationHint, preferredTimescale: 600)
+            if targetEnd > composition.duration {
+                composition.insertEmptyTimeRange(CMTimeRange(start: composition.duration, end: targetEnd))
+            }
+            longestDuration = targetEnd
         }
 
         if let backingDict = call.getObject("backingAudio"),
@@ -1328,7 +1367,41 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 y: sheetViewport.bounds.midY + (y - 0.5) * 0.7 * sheetViewport.bounds.height
             )
             sheetLayer.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+            if let endY = (dict["scrollEndY"] as? NSNumber)?.doubleValue {
+                let roll = CABasicAnimation(keyPath: "position.y")
+                roll.fromValue = sheetLayer.position.y
+                roll.toValue = sheetViewport.bounds.midY + (endY - 0.5) * 0.7 * sheetViewport.bounds.height
+                roll.duration = max(0.1, (dict["scrollDurationSec"] as? NSNumber)?.doubleValue ?? 10)
+                roll.beginTime = AVCoreAnimationBeginTimeAtZero + (window?.start ?? 0)
+                roll.isRemovedOnCompletion = false
+                roll.fillMode = .both
+                sheetLayer.add(roll, forKey: "sheetRoll")
+            }
             sheetViewport.addSublayer(sheetLayer)
+            // Let floating video parts cover the score, although score images
+            // are burned in by Core Animation after the video composition.
+            if let occlusions = dict["occlusionRects"] as? [[String: Any]], !occlusions.isEmpty {
+                var visible = [sheetViewport.bounds]
+                for rect in occlusions {
+                    let frame = multitrackRectFrame(rect, renderSize: renderSize)
+                        .offsetBy(dx: -sheetFrame.minX, dy: -sheetFrame.minY)
+                    visible = visible.flatMap { region -> [CGRect] in
+                        let cut = region.intersection(frame)
+                        if cut.isNull || cut.isEmpty { return [region] }
+                        return [
+                            CGRect(x: region.minX, y: region.minY, width: region.width, height: cut.minY - region.minY),
+                            CGRect(x: region.minX, y: cut.maxY, width: region.width, height: region.maxY - cut.maxY),
+                            CGRect(x: region.minX, y: cut.minY, width: cut.minX - region.minX, height: cut.height),
+                            CGRect(x: cut.maxX, y: cut.minY, width: region.maxX - cut.maxX, height: cut.height)
+                        ].filter { !$0.isEmpty }
+                    }
+                }
+                let maskPath = UIBezierPath()
+                for region in visible { maskPath.append(UIBezierPath(rect: region)) }
+                let mask = CAShapeLayer()
+                mask.path = maskPath.cgPath
+                sheetViewport.mask = mask
+            }
 
             if let window = window, sheetTimelineDuration > 0 {
                 // A hard opacity step (not a fade) reproduces the canvas cut.
@@ -1345,6 +1418,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     keyTimes.append(NSNumber(value: endFraction))
                 }
                 keyTimes.append(1)
+                values.append(values.last ?? 1)
 
                 let animation = CAKeyframeAnimation(keyPath: "opacity")
                 animation.calculationMode = .discrete
@@ -1362,7 +1436,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         let sheetMusicCues = call.getArray("sheetMusicCues", JSObject.self) ?? []
-        if sheetMusicCues.count > 1 {
+        if !sheetMusicCues.isEmpty {
             for cueAny in sheetMusicCues {
                 let cue = cueAny as [String: Any]
                 let startSec = (cue["startSec"] as? NSNumber)?.doubleValue ?? 0
@@ -1399,9 +1473,16 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         exportSession.outputURL = outputURL
 
         print("[Multitrack] native render start sources=\(layerInstructions.count) aspect=\(aspectRatio) durationHint=\(durationHint)")
+        multitrackExports[exportId] = exportSession
+        let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+            self?.notifyListeners("multitrackExportProgress", data: ["exportId": exportId, "progress": exportSession.progress])
+        }
         exportSession.exportAsynchronously {
             DispatchQueue.main.async {
+                progressTimer.invalidate()
+                self.multitrackExports.removeValue(forKey: exportId)
                 if exportSession.status == .completed {
+                    self.notifyListeners("multitrackExportProgress", data: ["exportId": exportId, "progress": 1])
                     print("[Multitrack] native render complete path=\(outputURL.path)")
                     call.resolve([
                         "success": true,
@@ -1409,6 +1490,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                         "durationSeconds": CMTimeGetSeconds(longestDuration)
                     ])
                 } else if let error = exportSession.error {
+                    try? FileManager.default.removeItem(at: outputURL)
                     print("[Multitrack] native render failed: \(error.localizedDescription)")
                     call.reject("Multitrack render failed", error.localizedDescription)
                 } else {

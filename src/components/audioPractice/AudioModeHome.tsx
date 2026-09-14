@@ -11,9 +11,12 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { LoaderCircle, Pause, Play, RotateCw, Share, Star, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { LoaderCircle, Pause, Play, RotateCw, Share, Pin, X } from 'lucide-react'
 import Pressable from '../ui/Pressable'
+import './recording-flow.css'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
+import { useDragToPin } from '../../hooks/useDragToPin'
 import { useAudioModeTakeItem } from '../../hooks/useAudioModeTakeItem'
 import type { AudioModePlaybackItem } from '../../context/AudioModePlaybackContext'
 import { useLiveRecordingWaveform } from '../../hooks/useLiveRecordingWaveform'
@@ -376,6 +379,10 @@ function AudioWaveform({
 }
 
 interface AudioModeTakeCardProps {
+  bestTargetRef: RefObject<HTMLElement | null>
+  dragEnabled?: boolean
+  dropHovered?: boolean
+  onDropHover?: (hovered: boolean) => void
   label: string
   tone: 'current' | 'best'
   take: Take | null
@@ -405,6 +412,10 @@ interface AudioModeTakeCardProps {
 }
 
 function AudioModeTakeCard({
+  bestTargetRef,
+  dragEnabled = false,
+  dropHovered = false,
+  onDropHover,
   label,
   tone,
   take,
@@ -440,6 +451,22 @@ function AudioModeTakeCard({
   const isPreparing = readiness?.status === 'preparing'
   const preparationFailed = readiness?.status === 'error'
   const playable = hasMedia && !isPreparing && !preparationFailed
+  const canDrag = tone === 'current' && playable && dragEnabled && Boolean(onFavorite)
+  const { ghost, dragSourceProps } = useDragToPin({
+    sourceTakeId: take?.id ?? null,
+    dropTargetRef: bestTargetRef,
+    enabled: canDrag,
+    activationMode: 'move',
+    dragThresholdPx: 16,
+    hapticFeedback,
+    onPin: () => onFavorite?.(),
+    onTap: () => { if (onOpen) openTake(onOpen) },
+  })
+  const overBest = ghost?.overPin ?? false
+  useEffect(() => {
+    onDropHover?.(overBest)
+    return () => onDropHover?.(false)
+  }, [onDropHover, overBest])
   const knownDurationSeconds = readiness?.durationSeconds ?? take?.duration ?? durationSeconds
   const waveformDurationSeconds =
     Number.isFinite(knownDurationSeconds) && (knownDurationSeconds ?? 0) > 0
@@ -542,21 +569,23 @@ function AudioModeTakeCard({
 
   return (
     <article
+      ref={tone === 'best' ? bestTargetRef : undefined}
+      {...(canDrag ? dragSourceProps : {})}
       className={`audio-mode-take-card audio-mode-take-card--${tone} ${
         hasMedia ? '' : 'audio-mode-take-card--empty'
       } ${isPreparing ? 'audio-mode-take-card--preparing' : ''} ${
         preparationFailed ? 'audio-mode-take-card--error' : ''
       } ${stage ? 'audio-mode-take-card--stage' : ''} ${
         stage && isRecording ? 'audio-mode-take-card--recording' : ''
-      }`}
+      } ${canDrag ? 'audio-mode-take-card--draggable' : ''} ${ghost ? 'audio-mode-take-card--dragging' : ''} ${dropHovered ? 'audio-mode-take-card--drop-hover' : ''}`}
       onClick={() => {
-        if (playable && onOpen) openTake(onOpen)
+        if (!canDrag && playable && onOpen) openTake(onOpen)
       }}
     >
       <div className="audio-mode-take-card__chrome">
-        <span className="audio-mode-take-card__pill">{label}</span>
+        <span className="audio-mode-take-card__pill">{dropHovered ? 'Release to pin' : label}</span>
         <div className="audio-mode-take-card__actions">
-          {tone === 'current' && playable ? (
+          {tone === 'current' && playable && onFavorite ? (
             <Pressable
               type="button"
               intensity="icon"
@@ -568,7 +597,7 @@ function AudioModeTakeCard({
               className="audio-mode-take-card__mini-btn audio-mode-take-card__mini-btn--best"
               aria-label="Pin Current Take as Best Take"
             >
-              <Star className="h-4 w-4 fill-current" />
+              <Pin className="h-3.5 w-3.5" aria-hidden /><span>Best Take</span>
             </Pressable>
           ) : null}
           {hasMedia && playable && onShare ? (
@@ -690,6 +719,12 @@ function AudioModeTakeCard({
           )}
         </div>
       </div>
+      {ghost ? createPortal(
+        <div className="audio-take-drag-ghost" aria-hidden="true"
+          style={{ left: ghost.x, top: ghost.y }}>
+          <Pin size={16} /><span>{ghost.overPin ? 'Release to pin' : 'Current Take'}</span>
+        </div>, document.body,
+      ) : null}
     </article>
   )
 }
@@ -703,6 +738,8 @@ interface AudioModeHomeProps {
   challengerTake: Take | null
   benchmarkTake: Take | null
   libraryBenchmarkPlayback: LibraryPlaybackReference | null
+  onRecord?: () => void
+  recordDisabled?: boolean
   onExpandBenchmark?: () => void
   onExpandChallenger?: () => void
   onPinCurrentAsBest?: () => void
@@ -724,6 +761,8 @@ function AudioModeHome({
   challengerTake,
   benchmarkTake,
   libraryBenchmarkPlayback,
+  onRecord,
+  recordDisabled = false,
   onExpandBenchmark,
   onExpandChallenger,
   onPinCurrentAsBest,
@@ -735,6 +774,8 @@ function AudioModeHome({
   onRetryTakePreparation,
   hapticFeedback = true,
 }: AudioModeHomeProps) {
+  const bestTargetRef = useRef<HTMLElement | null>(null)
+  const [dropHovered, setDropHovered] = useState(false)
   // Each card knows the other's playback item so hold-to-A/B can jump between them.
   const bestItem = useAudioModeTakeItem({
     tone: 'best',
@@ -744,8 +785,24 @@ function AudioModeHome({
   const currentItem = useAudioModeTakeItem({ tone: 'current', take: challengerTake }).playbackItem
   return (
     <section className="audio-mode-home audio-mode-home--inplace pointer-events-auto">
+      {!benchmarkTake && !challengerTake && !libraryBenchmarkPlayback && !isRecording ? (
+        <div className="audio-first-take">
+          <div className="audio-first-take__brand"><img src="/icons/signal.svg" alt="" /><span>BestTake</span></div>
+          <h1>Record your first take.</h1>
+          <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback}
+            className="audio-first-take__record" onClick={onRecord} disabled={recordDisabled}>
+            <span aria-hidden />Record
+          </Pressable>
+        </div>
+      ) : <>
+      <div className="audio-compare-heading">
+        <h1>{isRecording ? 'Recording' : (benchmarkTake || libraryBenchmarkPlayback) && challengerTake ? 'Compare takes' : challengerTake ? 'Listen back' : 'Your next take'}</h1>
+        <p>{isRecording ? 'Stop when you’re ready to listen.' : challengerTake ? 'Drag Current Take onto Best Take.' : 'Record again to compare.'}</p>
+      </div>
       <div className="audio-mode-take-stack">
         <AudioModeTakeCard
+          bestTargetRef={bestTargetRef}
+          dropHovered={dropHovered}
           label="Best Take"
           tone="best"
           take={benchmarkTake}
@@ -759,14 +816,17 @@ function AudioModeHome({
             benchmarkTake ? () => onRetryTakePreparation?.(benchmarkTake.id) : undefined
           }
           hapticFeedback={hapticFeedback}
-          emptyHint="Star a take to set your benchmark"
+          emptyHint="Pin a take to set your best"
         />
         <AudioModeTakeCard
+          bestTargetRef={bestTargetRef}
+          dragEnabled={!isRecording && !recordDisabled && challengerTake?.id !== benchmarkTake?.id}
+          onDropHover={setDropHovered}
           label="Current Take"
           tone="current"
           take={challengerTake}
           onOpen={onExpandChallenger}
-          onFavorite={onPinCurrentAsBest}
+          onFavorite={!isRecording && !recordDisabled ? onPinCurrentAsBest : undefined}
           onClear={onClearChallenger}
           onShare={challengerTake ? onShareChallenger : undefined}
           abPartnerItem={bestItem}
@@ -789,6 +849,7 @@ function AudioModeHome({
           }
         />
       </div>
+      </>}
     </section>
   )
 }

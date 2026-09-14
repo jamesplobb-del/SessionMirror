@@ -1,0 +1,505 @@
+{
+  "profiles": [
+    {
+      "id": "recorder",
+      "label": "Soprano recorder",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "c_octave_up",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "trumpet",
+      "label": "Trumpet",
+      "family": "Brass",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "french-horn",
+      "label": "French horn",
+      "family": "Brass",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "f",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "trombone",
+      "label": "Trombone",
+      "family": "Brass",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "euphonium",
+      "label": "Euphonium / baritone",
+      "family": "Brass",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb_octave",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "tuba",
+      "label": "Tuba",
+      "family": "Brass",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "flute",
+      "label": "Flute",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "piccolo",
+      "label": "Piccolo",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "c_octave_up",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "clarinet",
+      "label": "Clarinet (B♭)",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "bass-clarinet",
+      "label": "Bass clarinet",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb_octave",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "soprano-sax",
+      "label": "Soprano sax",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "alto-sax",
+      "label": "Alto sax",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "eb",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "tenor-sax",
+      "label": "Tenor sax",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "bb_octave",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "bari-sax",
+      "label": "Baritone sax",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "eb_octave",
+      "soundVolumeThreshold": 34,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "oboe",
+      "label": "Oboe",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "bassoon",
+      "label": "Bassoon",
+      "family": "Woodwind",
+      "tunerInstrument": "winds",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 24,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 3300
+    },
+    {
+      "id": "violin",
+      "label": "Violin",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "viola",
+      "label": "Viola",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "cello",
+      "label": "Cello",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "double-bass",
+      "label": "Double bass",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "c_octave_down",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "guitar",
+      "label": "Guitar",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "c_octave_down",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "bass-guitar",
+      "label": "Bass guitar",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "c_octave_down",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "ukulele",
+      "label": "Ukulele",
+      "family": "Strings",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "voice",
+      "label": "Voice",
+      "family": "Voice & keys",
+      "tunerInstrument": "voice",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 65,
+      "detectorMaxHz": 1100
+    },
+    {
+      "id": "piano",
+      "label": "Piano / keys",
+      "family": "Voice & keys",
+      "tunerInstrument": "strings",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 38,
+      "detectorMaxHz": 1700
+    },
+    {
+      "id": "other",
+      "label": "Something else",
+      "family": "Voice & keys",
+      "tunerInstrument": "voice",
+      "tunerTransposition": "concert",
+      "soundVolumeThreshold": 16,
+      "detectorMinHz": 65,
+      "detectorMaxHz": 1100
+    }
+  ],
+  "lessons": [
+    {
+      "id": "flute",
+      "clef": "treble",
+      "transposition": 0,
+      "beginnerNotes": [
+        "B♭4",
+        "C5",
+        "D5",
+        "E♭5",
+        "F5",
+        "G5",
+        "A5",
+        "B♭5"
+      ],
+      "chromaticNotes": 37
+    },
+    {
+      "id": "bb-clarinet",
+      "clef": "treble",
+      "transposition": -2,
+      "beginnerNotes": [
+        "C4",
+        "D4",
+        "E4",
+        "F4",
+        "G4",
+        "A4",
+        "B4",
+        "C5"
+      ],
+      "chromaticNotes": 33
+    },
+    {
+      "id": "alto-sax",
+      "clef": "treble",
+      "transposition": -9,
+      "beginnerNotes": [
+        "G4",
+        "A4",
+        "B4",
+        "C5",
+        "D5",
+        "E5",
+        "F♯5",
+        "G5"
+      ],
+      "chromaticNotes": 33
+    },
+    {
+      "id": "tenor-sax",
+      "clef": "treble",
+      "transposition": -14,
+      "beginnerNotes": [
+        "C4",
+        "D4",
+        "E4",
+        "F4",
+        "G4",
+        "A4",
+        "B4",
+        "C5"
+      ],
+      "chromaticNotes": 33
+    },
+    {
+      "id": "bb-trumpet",
+      "clef": "treble",
+      "transposition": -2,
+      "beginnerNotes": [
+        "C4",
+        "D4",
+        "E4",
+        "F4",
+        "G4",
+        "A4",
+        "B4",
+        "C5"
+      ],
+      "chromaticNotes": 31
+    },
+    {
+      "id": "french-horn",
+      "clef": "treble",
+      "transposition": -7,
+      "beginnerNotes": [
+        "F4",
+        "G4",
+        "A4",
+        "B♭4",
+        "C5",
+        "D5",
+        "E5",
+        "F5"
+      ],
+      "chromaticNotes": 32
+    },
+    {
+      "id": "trombone",
+      "clef": "bass",
+      "transposition": 0,
+      "beginnerNotes": [
+        "B♭2",
+        "C3",
+        "D3",
+        "E♭3",
+        "F3",
+        "G3",
+        "A3",
+        "B♭3"
+      ],
+      "chromaticNotes": 31
+    },
+    {
+      "id": "baritone",
+      "clef": "bass",
+      "transposition": 0,
+      "beginnerNotes": [
+        "B♭2",
+        "C3",
+        "D3",
+        "E♭3",
+        "F3",
+        "G3",
+        "A3",
+        "B♭3"
+      ],
+      "chromaticNotes": 31
+    },
+    {
+      "id": "tuba",
+      "clef": "bass",
+      "transposition": 0,
+      "beginnerNotes": [
+        "B♭1",
+        "C2",
+        "D2",
+        "E♭2",
+        "F2",
+        "G2",
+        "A2",
+        "B♭2"
+      ],
+      "chromaticNotes": 31
+    },
+    {
+      "id": "soprano-recorder",
+      "clef": "treble",
+      "transposition": 12,
+      "beginnerNotes": [
+        "C4",
+        "D4",
+        "E4",
+        "F4",
+        "G4",
+        "A4",
+        "B4",
+        "C5"
+      ],
+      "chromaticNotes": 25
+    }
+  ],
+  "trumpetUpperRegister": [
+    {
+      "id": "tpt-chr-80",
+      "writtenMidi": 80,
+      "writtenLabel": "A♭5",
+      "staff": {
+        "letter": "A",
+        "octave": 5,
+        "accidental": "b"
+      },
+      "fingering": {
+        "kind": "valves",
+        "pressed": [
+          "valve-1"
+        ]
+      },
+      "recipe": "Valve 1.",
+      "detail": "Let the air do the work — the valves only change the tubing."
+    },
+    {
+      "id": "tpt-chr-81",
+      "writtenMidi": 81,
+      "writtenLabel": "A5",
+      "staff": {
+        "letter": "A",
+        "octave": 5
+      },
+      "fingering": {
+        "kind": "valves",
+        "pressed": [
+          "valve-2"
+        ]
+      },
+      "recipe": "Valve 2.",
+      "detail": "Let the air do the work — the valves only change the tubing."
+    },
+    {
+      "id": "tpt-chr-82",
+      "writtenMidi": 82,
+      "writtenLabel": "B♭5",
+      "staff": {
+        "letter": "B",
+        "octave": 5,
+        "accidental": "b"
+      },
+      "fingering": {
+        "kind": "valves",
+        "pressed": []
+      },
+      "recipe": "Open — no valves down.",
+      "detail": "Let the air do the work — the valves only change the tubing."
+    }
+  ],
+  "excludedTunerExamples": [
+    {
+      "id": "bass-guitar",
+      "concertMidi": 23,
+      "hz": 30.86770632850775,
+      "inBounds": false
+    },
+    {
+      "id": "piano",
+      "concertMidi": 21,
+      "hz": 27.5,
+      "inBounds": false
+    },
+    {
+      "id": "piano",
+      "concertMidi": 108,
+      "hz": 4186.009044809578,
+      "inBounds": false
+    },
+    {
+      "id": "piccolo",
+      "concertMidi": 108,
+      "hz": 4186.009044809578,
+      "inBounds": false
+    }
+  ]
+}

@@ -1,7 +1,5 @@
 import type { MultitrackSession, MultitrackLayoutPreset } from '../types'
-import { activePanelIdsAt } from '../layout/sectionVisibility'
-import { computeMultitrackLayoutRects } from '../layout/layoutRects'
-import { sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
+import { compositionRects } from '../layout/composition'
 
 /** The same visibility and grid model as the live canvas, sampled at every section boundary. */
 export function sectionExportWindows(session: MultitrackSession, layout: MultitrackLayoutPreset, duration: number) {
@@ -15,6 +13,6 @@ export function sectionExportWindows(session: MultitrackSession, layout: Multitr
   const times = [...boundaries].sort((a, b) => a - b)
   return times.slice(0, -1).map((startSec, i) => ({
     startSec, endSec: times[i + 1],
-    ...computeMultitrackLayoutRects(layout, sheetLayoutAsset(session.sheetMusic), activePanelIdsAt(session.panels, startSec)),
+    ...compositionRects(session, layout, startSec),
   }))
 }

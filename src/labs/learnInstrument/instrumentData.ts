@@ -659,8 +659,9 @@ function brassFingerings(
   return { valves, slides }
 }
 
-/** Written open partials for the B♭ trumpet. */
-const TRUMPET_PARTIALS = [60, 67, 72, 76, 79, 82, 84]
+/** Written open partials for the B♭ trumpet; omit the flat seventh harmonic
+ * so A♭5, A5 and B♭5 use the standard 2–3, 1–2 and 1 fingerings. */
+const TRUMPET_PARTIALS = [60, 67, 72, 76, 79, 84]
 /** Concert open partials for trombone, baritone and euphonium. */
 const LOW_BRASS_PARTIALS = [46, 53, 58, 62, 65, 70, 72]
 /** Concert open partials for the BB♭ tuba, an octave below. */

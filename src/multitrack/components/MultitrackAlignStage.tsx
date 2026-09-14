@@ -5,7 +5,7 @@ import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
 import { extractNativeWaveformPeaks } from '../../utils/nativeWaveform'
-import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
+import { panelOffsetMs } from '../synchronization/projectTiming'
 import { hasSectionWindow } from '../layout/sectionVisibility'
 import { sheetCueWindows } from '../sheetMusic/sheetMusicTimeline'
 
@@ -334,11 +334,11 @@ export default function MultitrackAlignStage({
       next[panel.id] = {
         panelId: panel.id,
         takeId: panel.take.id,
-        label: panel.take.name || 'Performance',
+        label: panel.label || panel.take.name || 'Performance',
         filePath: panel.take.filePath,
         videoUrl: panel.take.videoUrl,
         duration: sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0,
-        offsetMs: timelineOffsetMsForTake(panel.take, bpm),
+        offsetMs: panelOffsetMs(panel, bpm),
         trimStart: panel.trimStartSec ?? 0,
         trimEnd: panel.trimEndSec,
         windowed: hasSectionWindow(panel),
@@ -368,7 +368,7 @@ export default function MultitrackAlignStage({
         continue
       }
       if (next[panel.id]?.takeId === panel.take.id) continue
-      const offsetMs = timelineOffsetMsForTake(panel.take, bpm)
+      const offsetMs = panelOffsetMs(panel, bpm)
       const trimStart = panel.trimStartSec ?? 0
       // The overlay stands its reconcile effect down while this editor is open,
       // so a clip that arrives now has to seed the transport itself — otherwise
@@ -378,7 +378,7 @@ export default function MultitrackAlignStage({
       const arrived: AlignClipState = {
         panelId: panel.id,
         takeId: panel.take.id,
-        label: panel.take.name || 'Performance',
+        label: panel.label || panel.take.name || 'Performance',
         filePath: panel.take.filePath,
         videoUrl: panel.take.videoUrl,
         duration: sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0,
@@ -702,7 +702,7 @@ export default function MultitrackAlignStage({
           onClick={() => onAddBox(playheadSec)}
         >
           <Plus className="h-4 w-4" />
-          Add box here
+          Add extra box here
         </Pressable>
         <Pressable
           type="button"

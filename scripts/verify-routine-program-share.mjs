@@ -8,7 +8,7 @@ const dir=await mkdtemp(join(tmpdir(),'program-share-'))
 const data=new Map()
 globalThis.localStorage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)}
 try {
- await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage';`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
+ await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage'; export * from './src/practiceTimeline/storage/routineFile';`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
  const m=await import(pathToFileURL(join(dir,'test.mjs')))
  const program=m.saveTimeline({...m.createEmptyTimeline('Tempo ladder'),sections:[m.createDefaultSection({bpm:92,meter:'6/8',bars:8}),m.createDefaultSection({bpm:112,meter:'4/4',bars:4})]})
  const routine=m.createRoutine('Warm up',[m.createStep({title:'Long tones',kind:'metro',programId:program.id}),m.createStep({title:'Repeat',kind:'metro',programId:program.id})],null)
@@ -27,5 +27,23 @@ try {
  assert.equal(m.parsePracticePlanFile(JSON.stringify(old)).routine.steps[0].programId,null)
  const malformed=JSON.parse(file);malformed.programs[program.id]={bad:true}
  assert.equal(m.parsePracticePlanFile(JSON.stringify(malformed)).ok,false)
- console.log('PASS: linked programs share once, import with fresh IDs, retain meter/tempo, preserve active program, handle legacy and malformed files')
+ for (const [patternRepeat, repeatCount, measure] of [
+   [{kind:'cycles',cycles:8},1,12],
+   [{kind:'cycles',cycles:8},2,28],
+   [{kind:'totalMeasures',measures:20},1,18],
+ ]) {
+   const mixed=m.saveTimeline({...m.createEmptyTimeline('Mixed meter'),sections:[m.createDefaultSection({
+     bars:4,repeatCount,patternSteps:[{id:'a',meter:'4/4',subdivision:'off',bars:1},{id:'b',meter:'3/4',subdivision:'off',bars:1}],patternRepeat,
+     advanced:{tempoMarkers:[{id:'late',measure,beat:2,bpm:132}]},
+   })]})
+   const standalone=m.parseRoutineFile(m.buildRoutineFile(mixed));assert.ok(standalone.ok)
+   const plan=m.createRoutine('Pattern',[m.createStep({title:'Pattern exercise',kind:'metro',programId:mixed.id})],null)
+   const imported=m.importPracticePlanFromText(m.buildPracticePlanFile(plan));assert.ok(imported.ok)
+   const attached=m.getTimelineById(imported.routine.steps[0].programId)
+   for(const restored of [standalone.routine,attached]) {
+     const pin=restored.sections[0].advanced.tempoMarkers[0]
+     assert.deepEqual([pin.measure,pin.beat,pin.bpm],[measure,2,132],'Mixed-meter tempo pin must survive standalone and embedded imports')
+   }
+ }
+ console.log('PASS: linked programs share once, import with fresh IDs, retain meter/tempo and mixed-meter pins, preserve active program, handle legacy and malformed files')
 }finally{await rm(dir,{recursive:true,force:true})}

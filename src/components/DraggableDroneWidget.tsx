@@ -1,5 +1,7 @@
+import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useDragControls, useMotionValue, useIsPresent } from 'framer-motion'
-import { Minus, Plus, Square, Play } from 'lucide-react'
+import { Minus, Plus, Square, Play, AudioLines } from 'lucide-react'
+import { useCollapsibleWidget } from './useCollapsibleWidget'
 import {
   useCallback,
   useEffect,
@@ -33,7 +35,8 @@ interface DraggableDroneWidgetProps {
   isTakePlaying?: boolean
   muteDuringPlayback?: boolean
   onClose?: () => void
-  onCollapse?: () => void
+  collapseResetKey?: string
+  visible?: boolean
 }
 
 const WIDGET_WIDTH = 268
@@ -60,7 +63,8 @@ export default function DraggableDroneWidget({
   isTakePlaying = false,
   muteDuringPlayback = true,
   onClose,
-  onCollapse,
+  collapseResetKey,
+  visible = true,
 }: DraggableDroneWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragControls = useDragControls()
@@ -189,9 +193,15 @@ export default function DraggableDroneWidget({
     drone.soloNote(heldPitchClass)
   }, [drone, hapticFeedback, heldPitchClass, sounding])
 
-  return (
+  const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
+    positionId, label: 'drone', icon: <AudioLines aria-hidden />, detail: `Drone ${written.label}`,
+    active: sounding, resetKey: collapseResetKey, ballSlot: 1, visible })
+
+  return (<>
+    {fold.ball}
     <motion.div
       ref={widgetRef}
+      aria-hidden={fold.collapsed}
       drag
       dragControls={dragControls}
       dragListener={false}
@@ -200,15 +210,16 @@ export default function DraggableDroneWidget({
       dragConstraints={boundaryRef}
       onPointerDown={handleShellPointerDown}
       onDragEnd={persistPosition}
-      className={`drone-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${
+      className={`drone-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${
         sounding ? 'drone-widget-draggable--sounding' : ''
       }`}
       initial={{ opacity: 0, scale: 0.96 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.96, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
       style={{ x: dragX, y: dragY, touchAction: 'none', width: WIDGET_WIDTH, pointerEvents: isPresent ? 'auto' : 'none' }}
     >
+      <WidgetCollapseButton label="drone" onCollapse={fold.collapse} />
       <div
         className="ui-orient-spin drone-widget relative w-full rounded-3xl"
         aria-label={`Drone ${written.noteName}${sounding ? ', sounding' : ', silent'}. Drag to move.`}
@@ -224,8 +235,6 @@ export default function DraggableDroneWidget({
               dragControls.start(event)
             }}
           />
-          {onCollapse && <button type="button" data-no-drag className="widget-collapse" aria-label="Collapse drone"
-            onPointerDown={event => event.stopPropagation()} onClick={onCollapse}><Minus aria-hidden /></button>}
           {onClose && (
             <button
               type="button"
@@ -313,6 +322,6 @@ export default function DraggableDroneWidget({
           />
         </div>
       </div>
-    </motion.div>
+    </motion.div></>
   )
 }

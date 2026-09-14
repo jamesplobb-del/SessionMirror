@@ -1,0 +1,54 @@
+[
+  {
+    "name": "mixed-meter late tempo marker roundtrip",
+    "expectedMeasure": 12,
+    "actualMeasure": 4,
+    "effectiveBars": 16,
+    "warnings": []
+  },
+  {
+    "name": "all standard meters basic roundtrip",
+    "passed": true,
+    "cases": 33
+  },
+  {
+    "name": "untrusted meter __proto__",
+    "ok": true,
+    "meter": "__proto__",
+    "warnings": []
+  },
+  {
+    "name": "untrusted meter constructor",
+    "ok": true,
+    "meter": "constructor",
+    "warnings": []
+  },
+  {
+    "name": "untrusted meter toString",
+    "ok": true,
+    "meter": "toString",
+    "warnings": []
+  },
+  {
+    "name": "practice plan with missing attachment",
+    "ok": true,
+    "programId": null,
+    "warnings": null
+  },
+  {
+    "name": "attached program warning propagation",
+    "ok": true,
+    "importedMeter": "4/4",
+    "warnings": null
+  },
+  {
+    "name": "standalone import storage full",
+    "threw": "Quota exceeded"
+  },
+  {
+    "name": "plan import rollback on library write failure",
+    "ok": false,
+    "error": "Could not save this routine and its programs. Please check available storage and try again.",
+    "unchanged": true
+  }
+]

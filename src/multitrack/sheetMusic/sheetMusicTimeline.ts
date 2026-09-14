@@ -92,3 +92,11 @@ export function sheetLayoutAsset(panel: SheetMusicPanelState): SheetMusicAsset |
 export function createSheetCueId(): string {
   return `cue-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
+
+/** A timed roll within a screenshot; subsequent screenshots still cut at their cue. */
+export function sheetYAt(asset: SheetMusicAsset, elapsedSec: number): number {
+  const start = asset.y ?? .5
+  if (asset.scrollEndY === undefined) return start
+  const fraction = Math.max(0, Math.min(1, elapsedSec / Math.max(.1, asset.scrollDurationSec ?? 10)))
+  return start + (asset.scrollEndY - start) * fraction
+}

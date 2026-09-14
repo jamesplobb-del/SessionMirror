@@ -1,3 +1,4 @@
+import { readGuidancePreferences, resetFeatureGuides, setFeatureTipsEnabled, confirmFeatureAction, GUIDANCE_PREFERENCES_EVENT } from '../utils/featureGuidance'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   AudioLines,
@@ -31,6 +32,7 @@ import HelpSheet from './HelpSheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
 import { useTutorialAction } from '../context/TutorialContext'
+import { redeemOfferCode } from '../utils/offerCodes'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -556,6 +558,29 @@ function SettingsDrawer({
   onOpenQuickMetronome,
 }: SettingsDrawerProps) {
   const notifyTutorial = useTutorialAction()
+  const redeemingCode = useRef(false)
+  const [codeBusy, setCodeBusy] = useState(false)
+  const [codeError, setCodeError] = useState<string | null>(null)
+  const handleRedeemCode = async () => {
+    if (redeemingCode.current) return
+    redeemingCode.current = true
+    setCodeBusy(true)
+    setCodeError(null)
+    try {
+      await redeemOfferCode()
+    } catch (error) {
+      setCodeError(error instanceof Error ? error.message : 'Could not open code redemption. Please try again.')
+    } finally {
+      redeemingCode.current = false
+      setCodeBusy(false)
+    }
+  }
+  const [featureTipsEnabled, setFeatureTipsPreference] = useState(() => readGuidancePreferences().enabled)
+  useEffect(() => {
+    const sync = () => setFeatureTipsPreference(readGuidancePreferences().enabled)
+    window.addEventListener(GUIDANCE_PREFERENCES_EVENT, sync)
+    return () => window.removeEventListener(GUIDANCE_PREFERENCES_EVENT, sync)
+  }, [])
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
   const [activeQuickFunctionSetup, setActiveQuickFunctionSetup] =
     useState<QuickFunctionSetup | null>(null)
@@ -772,18 +797,6 @@ function SettingsDrawer({
               />
             </SettingsGroup>
 
-            <SettingsGroup
-              title="Storage"
-              footer="Takes stay on this device either way. Video fills iCloud fast — turn this off if your storage is tight."
-            >
-              <SwitchRow
-                icon={CloudUpload}
-                tint={TINT.blue}
-                label="Back Up Takes to iCloud"
-                checked={settings.backUpTakesToIcloud}
-                onChange={(checked) => onUpdate({ backUpTakesToIcloud: checked })}
-              />
-            </SettingsGroup>
           </SettingsSection>
 
           <SettingsSection id="recording" title="Recording">
@@ -976,6 +989,15 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="help" title="Help">
+            <SettingsGroup title="Promo codes" footer="Have a code? Redeem it securely with the App Store. Any offer price is shown before you confirm.">
+              <LinkRow
+                icon={Sparkles}
+                tint={TINT.purple}
+                label={codeBusy ? 'Opening App Store…' : 'Redeem a code'}
+                onClick={() => { void handleRedeemCode() }}
+              />
+            </SettingsGroup>
+            {codeError ? <p className="set-group__footer" role="alert">{codeError}</p> : null}
             {onOpenLabs ? (
               <SettingsGroup footer="Pitch-controlled games for warm-ups. They never touch recording or playback.">
                 <LinkRow
@@ -995,12 +1017,44 @@ function SettingsDrawer({
               </SettingsGroup>
             ))}
 
+            <SettingsGroup footer="Short guides appear when you first use a feature. You can skip any guide.">
+              <SwitchRow
+                icon={BookOpen}
+                tint={TINT.blue}
+                label="Feature tips"
+                checked={featureTipsEnabled}
+                onChange={setFeatureTipsEnabled}
+              />
+              <LinkRow
+                icon={RotateCcw}
+                tint={TINT.blue}
+                label="Reset feature guides"
+                onClick={() => {
+                  resetFeatureGuides()
+                  confirmFeatureAction('Guides will appear as you use each feature')
+                }}
+              />
+            </SettingsGroup>
+
             <SettingsGroup>
               <LinkRow
                 icon={BookOpen}
                 tint={TINT.blue}
                 label="Replay the Welcome Tour"
                 onClick={handleResetTutorials}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup
+              title="Storage"
+              footer="When enabled, takes can be restored with this iPhone's iCloud backup. Video may use significant iCloud storage."
+            >
+              <SwitchRow
+                icon={CloudUpload}
+                tint={TINT.blue}
+                label="Include Takes in iCloud Backup"
+                checked={settings.backUpTakesToIcloud}
+                onChange={(checked) => onUpdate({ backUpTakesToIcloud: checked })}
               />
             </SettingsGroup>
 

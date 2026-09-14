@@ -499,8 +499,8 @@ export default function MultitrackRecordingStage({
               </div>
             </label>
             <MultitrackClickSettings
-              bpm={practice.bpm}
-              onBpmChange={(bpm) => onPracticeChange({ bpm })}
+              practice={practice}
+              onChange={onPracticeChange}
             />
           </div>
         </div>

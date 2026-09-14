@@ -58,9 +58,9 @@ export interface AppSettings {
   /**
    * Include recorded takes in the device's iCloud backup.
    *
-   * On by default: takes are irreplaceable, and silently not backing up
-   * someone's recordings is the worse failure. Users with a full iCloud tier
-   * can turn it off — video adds up faster than the free 5GB allows.
+   * Off by default because video takes can fill an iCloud plan quickly. Users
+   * can opt in when restoring these recordings with an iPhone backup matters
+   * more to them than the storage cost.
    */
   backUpTakesToIcloud: boolean
 }
@@ -85,7 +85,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   excludeYoutubeFromRecording: false,
   micInputPreference: 'iphone',
   captureProfile: 'natural',
-  backUpTakesToIcloud: true,
+  backUpTakesToIcloud: false,
 }
 
 function parseDroneWaveform(value: unknown): DroneWaveform {

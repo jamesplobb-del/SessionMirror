@@ -1,0 +1,37 @@
+[
+  {
+    "name": "tuner-diagnostic-mode",
+    "exit": 0,
+    "seconds": 0.23
+  },
+  {
+    "name": "tuner-microphone-ownership",
+    "exit": 0,
+    "seconds": 0.23
+  },
+  {
+    "name": "reactive-silk",
+    "exit": 0,
+    "seconds": 0.23
+  },
+  {
+    "name": "interaction-feedback",
+    "exit": 0,
+    "seconds": 0.09
+  },
+  {
+    "name": "camera-gestures",
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "native-tuner-receiver",
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "feature-guidance",
+    "exit": 0,
+    "seconds": 0.08
+  }
+]

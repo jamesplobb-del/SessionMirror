@@ -12,13 +12,16 @@ export const MULTITRACK_LAYOUT_PRESETS: MultitrackLayoutPreset[] = [
   { id: 'seven', label: '7 boxes', panelCount: 7, areas: ['a b c', 'd e f', 'g g g'], columns: '1fr 1fr 1fr', rows: '1fr 1fr 1fr' },
   { id: 'eight', label: '8 boxes', panelCount: 8, areas: ['a a b b c c', 'd d e e f f', 'g g g h h h'], columns: 'repeat(6, 1fr)', rows: '1fr 1fr 1fr' },
   { id: 'nine', label: '9 boxes', panelCount: 9, areas: ['a b c', 'd e f', 'g h i'], columns: '1fr 1fr 1fr', rows: '1fr 1fr 1fr' },
+  { id: 'ten', label: '10 boxes', panelCount: 10, areas: ['a b c', 'd e f', 'g h i', 'j j j'], columns: 'repeat(3, 1fr)', rows: 'repeat(4, 1fr)' },
+  { id: 'eleven', label: '11 boxes', panelCount: 11, areas: ['a a b b c c', 'd d e e f f', 'g g h h i i', 'j j j k k k'], columns: 'repeat(6, 1fr)', rows: 'repeat(4, 1fr)' },
+  { id: 'twelve', label: '12 boxes', panelCount: 12, areas: ['a b c', 'd e f', 'g h i', 'j k l'], columns: 'repeat(3, 1fr)', rows: 'repeat(4, 1fr)' },
 ]
 
 export function getLayoutPreset(id: string): MultitrackLayoutPreset {
   return MULTITRACK_LAYOUT_PRESETS.find((preset) => preset.id === id) ?? MULTITRACK_LAYOUT_PRESETS[0]
 }
 
-export const MULTITRACK_PANEL_SLOT_IDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] as const
+export const MULTITRACK_PANEL_SLOT_IDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'] as const
 
 export function createPanelsForLayout(preset: MultitrackLayoutPreset): MultitrackPanelState[] {
   return MULTITRACK_PANEL_SLOT_IDS
@@ -40,19 +43,10 @@ export function mergePanelsIntoLayout(
       .filter((panel) => panel.kind === 'performance')
       .map((panel) => [panel.id, panel] as const),
   )
-  return createPanelsForLayout(preset).map((panel) => {
-    if (panel.kind !== 'performance') return panel
-    const existing = previousById.get(panel.id)
-    if (!existing || existing.kind !== 'performance') return panel
-    return {
-      ...panel,
-      take: existing.take,
-      volume: existing.volume,
-      muted: existing.muted,
-      trimStartSec: existing.trimStartSec,
-      trimEndSec: existing.trimEndSec,
-      sectionStartSec: existing.sectionStartSec,
-      sectionEndSec: existing.sectionEndSec,
-    }
-  })
+  const ids = new Set([...createPanelsForLayout(preset).map(p => p.id), ...previousById.keys()])
+  return [...ids].map((id, index) => ({
+    kind: 'performance' as const, id, take: null,
+    ...previousById.get(id),
+    hidden: index >= preset.panelCount,
+  }))
 }

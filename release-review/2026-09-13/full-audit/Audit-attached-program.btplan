@@ -1,0 +1,87 @@
+{
+  "format": "besttake.practice-plan",
+  "version": 1,
+  "app": "BestTake",
+  "exportedAt": 1789315814616,
+  "routine": {
+    "id": "routine-mu00fqoo-8tu89",
+    "name": "Audit attached",
+    "instrumentId": "trumpet",
+    "steps": [
+      {
+        "id": "step-mu00fqon-sp63c",
+        "title": "Program",
+        "minutes": 5,
+        "kind": "metro",
+        "topic": "other",
+        "desk": null,
+        "projectId": null,
+        "referenceQuery": "",
+        "referenceVideoId": null,
+        "programId": "timeline-1789315814613-v58efhg",
+        "gameRoute": null
+      }
+    ],
+    "createdAt": 1789315814616,
+    "updatedAt": 1789315814616
+  },
+  "programs": {
+    "timeline-1789315814613-v58efhg": {
+      "format": "besttake.practice-routine",
+      "version": 1,
+      "app": "BestTake",
+      "exportedAt": 1789315814616,
+      "routine": {
+        "id": "timeline-1789315814613-v58efhg",
+        "name": "Audit sequence",
+        "sections": [
+          {
+            "id": "section-1789315814612-1",
+            "title": "New Section",
+            "bars": 4,
+            "bpm": 80,
+            "meter": "4/4",
+            "subdivision": "auto",
+            "repeatCount": 1,
+            "patternSteps": [
+              {
+                "id": "a",
+                "meter": "4/4",
+                "subdivision": "off",
+                "bars": 1
+              },
+              {
+                "id": "b",
+                "meter": "3/4",
+                "subdivision": "off",
+                "bars": 1
+              }
+            ],
+            "patternRepeat": {
+              "kind": "cycles",
+              "cycles": 8
+            },
+            "advanced": {
+              "tempoMarkers": [
+                {
+                  "id": "late",
+                  "measure": 4,
+                  "beat": 1,
+                  "bpm": 132
+                }
+              ]
+            }
+          }
+        ],
+        "favorite": false,
+        "settings": {
+          "countInBars": 0,
+          "countInWhen": "start",
+          "loopTrack": false
+        },
+        "createdAt": 1789315814612,
+        "updatedAt": 1789315814615
+      }
+    }
+  }
+}

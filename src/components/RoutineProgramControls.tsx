@@ -18,7 +18,7 @@ export default function RoutineProgramControls({ programId, disabled, onOpen }: 
         setStarting(true); setError('')
         void toggleRoutineProgram(programId).then(ok => { if (!ok) setError('Could not start the program. Try again.') })
           .catch(() => setError('Could not start the program. Try again.')).finally(() => setStarting(false))
-      }} aria-label={playing ? 'Pause program' : 'Play program'}>{playing ? <Pause aria-hidden /> : <Play aria-hidden />}</button>
+      }} aria-label={playing ? 'Pause program' : 'Play program'}>{playing ? <Pause aria-hidden /> : <Play aria-hidden />} {playing ? 'Pause' : 'Play'}</button>
       {onOpen && <button type="button" disabled={disabled} onClick={onOpen} aria-label="Open program details"><ListMusic aria-hidden /></button>}
     </>}
     {error && <p role="alert">{error}</p>}

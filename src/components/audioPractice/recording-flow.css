@@ -1,0 +1,44 @@
+/* Empty recording and comparison guidance use the existing audio theme. */
+.audio-first-take {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; min-height:0; gap:30px; padding:24px 16px;
+  text-align:center; color:var(--audio-text-primary);
+}
+.audio-first-take__brand { display:flex; flex-direction:column; align-items:center; gap:12px; }
+.audio-first-take__brand img { width:84px; height:84px; }
+.audio-first-take__brand span { font-size:23px; font-weight:700; letter-spacing:-.8px; }
+.audio-first-take h1 { margin:0; font-size:23px; font-weight:600; letter-spacing:-.6px; line-height:1.2; }
+.audio-first-take__record {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  min-width:170px; min-height:54px; padding:14px 28px; border:0; border-radius:18px;
+  background:var(--audio-blue); color:white; font-size:16px; font-weight:650;
+}
+.audio-first-take__record > span { width:13px; height:13px; border:3px solid currentColor; border-radius:50%; }
+.audio-first-take__record:focus-visible { outline:3px solid var(--audio-blue); outline-offset:5px; }
+.audio-compare-heading { flex-shrink:0; padding:8px 8px 13px; }
+.audio-compare-heading h1 { margin:0 0 6px; color:var(--audio-text-primary); font-size:24px; font-weight:650; letter-spacing:-.7px; line-height:1.15; }
+.audio-compare-heading p { margin:0; color:var(--audio-text-secondary); font-size:12px; line-height:1.45; }
+.audio-mode-home:has(.audio-compare-heading) { display:flex; flex-direction:column; gap:0; }
+.audio-mode-home:has(.audio-compare-heading) .audio-mode-take-stack { flex:1; min-height:0; }
+.audio-mode-home--inplace .audio-mode-take-card__mini-btn--best {
+  display:inline-flex!important; flex-direction:row; align-items:center; justify-content:center;
+  width:auto!important; min-width:80px; padding-inline:9px; gap:5px; border-radius:999px;
+  background:#fff0bd!important; color:#75510b!important; border:1px solid #dba72d!important;
+}
+.audio-mode-take-card__mini-btn--best span { font-size:10px; font-weight:650; white-space:nowrap; }
+@media(max-height:540px) { .audio-first-take { gap:15px; } .audio-first-take__brand { flex-direction:row; } .audio-first-take__brand img { width:44px; height:44px; } }
+
+html.app-dark-mode .audio-mode-home--inplace .audio-mode-take-card__mini-btn--best { background:#493c1e!important; color:#ffdc7b!important; }
+
+.audio-mode-take-card--draggable { cursor:grab; -webkit-touch-callout:none; }
+.audio-mode-take-card--dragging { cursor:grabbing; }
+.audio-mode-home--inplace .audio-mode-take-card--drop-hover {
+  outline:3px solid #eab947; outline-offset:-3px;
+}
+.audio-take-drag-ghost {
+  position:fixed; z-index:10000; pointer-events:none;
+  display:flex; align-items:center; gap:8px; padding:12px 16px;
+  transform:translate(-50%, -120%); border:1px solid #eab947; border-radius:14px;
+  background:#fff0bd!important; color:#75510b!important; border:1px solid #dba72d!important; box-shadow:0 8px 24px #0003;
+  font-size:13px; font-weight:600; white-space:nowrap;
+}

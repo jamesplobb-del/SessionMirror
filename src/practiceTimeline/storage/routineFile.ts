@@ -12,6 +12,7 @@ import {
 } from '../../utils/metronomeConfig'
 import { createSectionId, createTimelineId } from '../sectionDefaults'
 import { normalizeTimeline } from '../timelineNormalize'
+import { effectiveBars } from '../timeSignatureLogic'
 import type {
   CountInWhen,
   MeterPatternStep,
@@ -379,7 +380,7 @@ function parseSection(
     meter,
     pulseModeId,
     feelId,
-    Math.max(1, bars * repeatCount),
+    Math.max(1, effectiveBars(section)),
     warn,
   )
   if (advanced) section.advanced = advanced

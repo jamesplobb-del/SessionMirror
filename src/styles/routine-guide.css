@@ -705,3 +705,10 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
   .practice-home-build-routine { padding-inline: 17px; }
   .practice-home-action-icon { width: 46px; height: 46px; border-radius: 15px; }
 }
+
+/* Compact, ready-to-start routine overview. */
+.routine-guide-ready-note{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.5;background:var(--guide-selected);color:var(--guide-ink);padding:12px;border-radius:14px;margin:8px 0 16px}.routine-guide-ready-note svg{flex-shrink:0;margin-top:2px}
+.routine-guide:has(.routine-guide-ready-note) .routine-guide-heading{padding:14px 0 16px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-heading h2{font-size:31px;white-space:normal;margin:8px 0 9px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-heading p{font-size:12px}
+.routine-guide:has(.routine-guide-ready-note) .routine-guide-field--name{margin-bottom:13px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-field--name input{min-height:50px;padding:12px 14px;margin-top:6px;font-size:18px!important}
+.routine-guide:has(.routine-guide-ready-note) .routine-guide-lineup-meta{padding-bottom:2px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-ready-note{font-size:11px;padding:10px;margin-bottom:12px}
+.routine-guide:has(.routine-guide-ready-note) .routine-guide-lineup>li{min-height:0}.routine-guide:has(.routine-guide-ready-note) .routine-swipe-content{min-height:76px;padding:9px 12px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item{min-height:54px;padding:5px 0}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item strong{font-size:15px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item small{font-size:10px;margin-top:4px}.routine-guide-edit-exercise{width:14px!important;color:var(--guide-muted)}.routine-guide-lineup-actions{display:flex;justify-content:space-between;gap:8px}.routine-guide-lineup-actions .routine-guide-text{margin:4px 0 0;font-size:11px}

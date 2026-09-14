@@ -1,4 +1,7 @@
+import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useMotionValue } from 'framer-motion'
+import { Gauge } from 'lucide-react'
+import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
@@ -13,7 +16,8 @@ type TunerProps = Omit<
 interface DraggablePitchWidgetProps extends TunerProps {
   boundaryRef: RefObject<HTMLElement | null>
   onClose?: () => void
-  onCollapse?: () => void
+  collapseResetKey?: string
+  visible?: boolean
   isAudioMode?: boolean
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
@@ -62,7 +66,8 @@ export default function DraggablePitchWidget({
   boundaryRef,
   mediaKey,
   onClose,
-  onCollapse,
+  collapseResetKey,
+  visible = true,
   isAudioMode = false,
   liveMicEnabled = true,
   micStreamRef,
@@ -185,6 +190,10 @@ export default function DraggablePitchWidget({
     saveWidgetPosition(resolvedPositionId, dragX.get(), dragY.get())
   }, [dragX, dragY, isAudioMode, resolvedPositionId])
 
+  const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
+    positionId: resolvedPositionId, label: 'tuner', icon: <Gauge aria-hidden />, detail: 'Tuner',
+    active: tunerProps.enabled !== false, resetKey: collapseResetKey, ballSlot: 2, visible })
+
   const tuner = (
     <LivePitchTuner
       variant={isAudioMode ? 'audio' : 'widget'}
@@ -217,10 +226,12 @@ export default function DraggablePitchWidget({
     )
   }
 
-  return (
+  return (<>
+    {fold.ball}
     <motion.div
       key={mediaKey}
       ref={widgetRef}
+      aria-hidden={fold.collapsed}
       drag={!pinching}
       dragMomentum={false}
       dragElastic={0.04}
@@ -230,9 +241,9 @@ export default function DraggablePitchWidget({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      className={`pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 touch-none ${pinching ? 'pitch-widget-draggable--pinching' : ''}`}
+      className={`pitch-widget-draggable pointer-events-auto absolute left-0 top-0 z-20 touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${pinching ? 'pitch-widget-draggable--pinching' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
       style={{
@@ -244,12 +255,11 @@ export default function DraggablePitchWidget({
         minHeight: widgetSize.height,
       }}
     >
+      <WidgetCollapseButton label="tuner" onCollapse={fold.collapse} />
       <div className="ui-orient-spin relative h-full min-h-0 w-full overflow-hidden rounded-3xl">
-        {onCollapse && <button type="button" className="widget-collapse" aria-label="Collapse tuner"
-          onPointerDown={event => event.stopPropagation()} onClick={onCollapse}>−</button>}
         {onClose && <PitchWidgetCloseButton onClose={onClose} />}
         {tuner}
       </div>
-    </motion.div>
+    </motion.div></>
   )
 }

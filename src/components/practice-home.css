@@ -23,3 +23,111 @@
   .practice-home-launch-button.is-primary { min-height: 116px; padding: 18px; }
   .practice-home-launch-button.is-quick { min-height: 92px; padding: 16px 18px; }
 }
+
+/* Approved Electric Edge home. These rules only apply to the home page;
+   instrument setup and the routine builder keep their own layouts. */
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge {
+  --guide-ink: #182e49;
+  --guide-muted: #65778e;
+  --guide-line: #dce4ef;
+  --guide-panel: #fff;
+  color: var(--guide-ink);
+  background: #f6f9fe !important;
+}
+html .practice-menu-card--electric-edge :is(h2, button, small, strong) {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+}
+html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-height: 76px;
+  padding: max(18px, env(safe-area-inset-top)) 22px 12px;
+  border: 0;
+  background: transparent;
+}
+.practice-menu-card--electric-edge .practice-menu-header-slot--end { position: absolute; right: 20px; }
+html .practice-menu-card--electric-edge .practice-home-brand {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  color: var(--guide-ink); font-size: 25px; font-weight: 700; letter-spacing: -.8px; margin: 0;
+}
+.practice-home-brand img { width: 38px; height: 38px; }
+html .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll {
+  padding: 10px 22px max(24px, env(safe-area-inset-bottom));
+  max-width: 640px;
+}
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-flow {
+  display: flex; flex-direction: column; gap: 12px; min-height: 100%;
+}
+.practice-home-instrument {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-shrink: 0; width: 100%; min-height: 70px; padding: 13px 17px; margin-bottom: 7px;
+  text-align: left; color: var(--guide-ink); background: #edf6ff;
+  border: 1px solid #badcf6; border-radius: 14px;
+}
+.practice-home-instrument-copy { display: grid; gap: 5px; min-width: 0; }
+.practice-home-instrument-copy small { color: var(--guide-muted); font-size: 10px; font-weight: 600; letter-spacing: .3px; }
+.practice-home-instrument-copy strong { font-size: 22px; font-weight: 650; line-height: 1.15; letter-spacing: -.6px; overflow-wrap: anywhere; }
+.practice-home-instrument-change { display: flex; align-items: center; gap: 3px; flex-shrink: 0; color: #0875cf; font-size: 12px; font-weight: 600; }
+.practice-home-instrument-change svg { width: 14px; height: 14px; }
+.practice-home-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows: minmax(186px, 1.2fr) minmax(128px, 1fr); }
+.practice-menu-card--electric-edge .practice-home-launch-button { position: relative; overflow: hidden; isolation: isolate; border-radius: 16px; padding: 23px; }
+.practice-menu-card--electric-edge .practice-home-launch-button.is-primary {
+  min-height: 186px; background: linear-gradient(120deg, #0879ec, #0754b2);
+  border: 1px solid #3ca4ee; box-shadow: inset 0 2px #76deff, 0 10px 25px #006fe420;
+}
+.practice-menu-card--electric-edge .practice-home-launch-button.is-quick {
+  min-height: 128px; background: var(--guide-panel); border-left: 3px solid #e9b441;
+}
+.practice-menu-card--electric-edge .practice-home-launch-copy { gap: 10px; }
+.practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size: clamp(23px, 6.3vw, 29px); }
+.practice-menu-card--electric-edge .practice-home-launch-copy small { letter-spacing: .4px; }
+.practice-menu-card--electric-edge .practice-home-launch-button > .practice-home-signal-detail {
+  position: absolute; width: 160px; height: 48px; right: -10px; bottom: -8px;
+  color: #97eafa; opacity: .24; z-index: -1; pointer-events: none;
+}
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-tools {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;
+  padding: 0; border: 0 !important; background: transparent !important; box-shadow: none !important;
+}
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+  min-height: 81px; padding: 12px 4px; border: 0; border-radius: 12px;
+  background: #e9f1fc !important; color: var(--guide-ink); box-shadow: none;
+}
+html .practice-menu-card--electric-edge .practice-menu-shortcut svg {
+  width: 25px !important; height: 25px !important; padding: 0 !important; color: #0875ec !important;
+  background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+}
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .daily-challenges,
+html.app-dark-mode[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .daily-challenges {
+  background: transparent !important; border: 0 !important; border-radius: 0; box-shadow: none !important;
+}
+html .practice-menu-card--electric-edge .practice-menu-shortcut:first-child svg { color: #bc8316 !important; }
+.practice-menu-card--electric-edge .practice-menu-shortcut strong { font-size: 11px; }
+.practice-menu-card--electric-edge .practice-menu-shortcut small { display: none; }
+html.app-dark-mode .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge {
+  --guide-ink: #edf4ff; --guide-muted: #9aacc5; --guide-line: #304159; --guide-panel: #1b2a40;
+  background: #101b2c !important;
+}
+html.app-dark-mode .practice-menu-card--electric-edge .practice-home-instrument { background: #183551; border-color: #2c5778; }
+html.app-dark-mode .practice-menu-card--electric-edge .practice-home-instrument-change { color: #80caff; }
+html.app-dark-mode .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { background: linear-gradient(120deg, #0965c5, #14457a); }
+html.app-dark-mode .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background: #1c304a !important; }
+html.app-dark-mode .practice-menu-card--electric-edge .practice-menu-shortcut svg { color: #80caff !important; }
+html.app-dark-mode .practice-menu-card--electric-edge .practice-menu-shortcut:first-child svg { color: #eec15a !important; }
+@media (max-height: 740px) {
+  .practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows: auto auto; flex-grow: 0; }
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height: 142px; padding: 18px; }
+  .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height: 108px; padding: 18px; }
+  .practice-home-instrument { margin-bottom: 0; }
+}
+
+/* Direct destinations sit below the recording and routine actions. */
+.practice-home-links { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0 16px; }
+.practice-home-links .practice-home-library { margin:0; padding:14px 12px; min-height:70px; background:var(--guide-panel); border:1px solid var(--guide-line); border-radius:20px; text-align:left; }
+.practice-home-links .practice-home-library span { font-size:14px; }
+.practice-home-links small { display:block; font-size:10px; font-weight:500; color:var(--guide-muted); margin-top:4px; }
+.practice-menu-card--electric-edge .practice-home-routine-launch { min-height:115px; }
+.practice-menu-card--electric-edge .practice-home-record-launch { min-height:180px; }
