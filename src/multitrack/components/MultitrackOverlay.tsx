@@ -1379,7 +1379,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 </div>
                 <p className="multitrack-arrange-hint">Select a box to move or resize it.</p>
               </>}
-              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} editable={layoutEditing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
+              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} editable={layoutEditing || alignStageOpen} interactionDisabled={isExporting || recording.phase !== 'idle' || sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
                 streamRef={streamRef} streamGeneration={streamGeneration}
                 nativeLivePreviewActive={nativeLivePreviewActive} nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
                 countInRemaining={recording.countInRemaining} recordingElapsed={elapsed}
@@ -1417,11 +1417,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   }
                   void playAllFromStart(sync.state.currentTime)
                 }}
+                onEditStart={pauseAllPlayback}
                 onAddBox={handleAddBoxAt}
                 onRecordBox={handleRecordBoxAt}
                 onAddImage={handleAddImageAt}
                 onMoveImage={moveSheetCue}
                 onRemoveImage={handleRemoveSheetImage}
+                onRestoreSheetMusic={sheetMusic => updateProject({ sheetMusic })}
                 onSectionChange={setPanelSection}
                 onDone={handleSaveAlignChanges}
               />

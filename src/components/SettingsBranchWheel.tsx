@@ -558,7 +558,7 @@ export default function SettingsBranchWheel({
                       }`}
                       disabled={item.disabled}
                       title={item.disabled ? 'Stop the take to change hands-free' : undefined}
-                      aria-label={item.label}
+                      aria-label={item.id === 'multitrack' ? 'Multitrack Beta' : item.label}
                       {...(item.kind === 'action' ? {} : { 'aria-checked': item.active })}
                       onClick={() => {
                         item.onSelect()
@@ -591,7 +591,7 @@ export default function SettingsBranchWheel({
                             <MetronomeIcon />
                           )}
                         </span>
-                        <span className="settings-branch-tray__label">{item.label}</span>
+                        <span className="settings-branch-tray__label">{item.label}{item.id === 'multitrack' && <span className="ml-1.5 inline-block rounded border border-current px-1 py-0.5 align-middle text-[9px] font-semibold leading-none opacity-75">Beta</span>}</span>
                       </span>
                     </Pressable>
                   )

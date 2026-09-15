@@ -111,14 +111,8 @@ export default function PerformancePanel({
   }
 
   return (
-    <Pressable
-      type="button"
-      intensity="soft"
-      squish={false}
-      onClick={toggleQuickPlayback}
-      className={`multitrack-panel multitrack-panel--performance ${isRecordingTarget ? 'multitrack-panel--recording' : ''}`}
-      aria-label={quickPlaying ? 'Pause take' : 'Play take'}
-    >
+    <div className={`multitrack-panel multitrack-panel--performance ${isRecordingTarget ? 'multitrack-panel--recording' : ''}`}>
+      <button type="button" className="multitrack-panel__play-surface" onClick={toggleQuickPlayback} aria-label={quickPlaying ? 'Pause take' : 'Play take'} />
       <TakeVideoPlayer
         filePath={panel.take.filePath}
         videoUrl={panel.take.videoUrl}
@@ -142,6 +136,7 @@ export default function PerformancePanel({
       <Pressable
         type="button"
         intensity="icon"
+        data-box-control
         className="multitrack-panel__remove"
         aria-label="Remove video"
         onClick={(event) => {
@@ -162,6 +157,7 @@ export default function PerformancePanel({
               toggleQuickPlayback()
             }}
             aria-label={quickPlaying ? 'Pause take' : 'Play take'}
+            data-box-control
             className="multitrack-panel__action"
           >
             {quickPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -174,12 +170,13 @@ export default function PerformancePanel({
               onTap()
             }}
             aria-label="Tile options"
+            data-box-control
             className="multitrack-panel__action"
           >
             <MoreHorizontal className="h-4 w-4" />
           </Pressable>
         </div>
       </div>
-    </Pressable>
+    </div>
   )
 }

@@ -56,14 +56,14 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
         {!p.take && <button onClick={() => onRecord(p.id, time)}>Record here</button>}
       </div>
       {p.overlay && <>
-        <div className="multitrack-studio-actions">{['Top left', 'Top right', 'Bottom left', 'Bottom right'].map((label, n) => <button key={label} onClick={() => onPanel(p.id, { overlay: { ...p.overlay!, xPercent: n % 2 ? 98 - p.overlay!.widthPercent : 2, yPercent: n >= 2 ? 98 - p.overlay!.heightPercent : 2 } })}>{label}</button>)}</div>
+        <div className="multitrack-studio-actions">{['Top left', 'Top right', 'Bottom left', 'Bottom right'].map((label, n) => <button key={label} onClick={() => onPanel(p.id, { overlay: { ...p.overlay!, xPercent: n % 2 ? Math.max(0, 98 - p.overlay!.widthPercent) : Math.min(2, 100 - p.overlay!.widthPercent), yPercent: n >= 2 ? Math.max(0, 98 - p.overlay!.heightPercent) : Math.min(2, 100 - p.overlay!.heightPercent) } })}>{label}</button>)}</div>
 
       </>}
       <div className="multitrack-time-fields">
         {(['widthPercent', 'heightPercent'] as const).map(dimension => {
           const rect = p.overlay ?? p.frame ?? rects[p.id] ?? { xPercent: 0, yPercent: 0, widthPercent: 50, heightPercent: 50 }
           const isWidth = dimension === 'widthPercent'
-          return <label key={dimension}>{isWidth ? 'Width' : 'Height'} · {Math.round(rect[dimension])}%<input type="range" min={10} max={100} value={rect[dimension]} aria-label={`Part ${i + 1} ${isWidth ? 'width' : 'height'}`} onChange={e => {
+          return <label key={dimension}>{isWidth ? 'Width' : 'Height'} · {Math.round(rect[dimension])}%<input type="range" min={5} max={100} value={rect[dimension]} aria-label={`Part ${i + 1} ${isWidth ? 'width' : 'height'}`} onChange={e => {
             const size = Number(e.target.value)
             const next = { ...rect, [dimension]: size, [isWidth ? 'xPercent' : 'yPercent']: Math.min(rect[isWidth ? 'xPercent' : 'yPercent'], 100 - size) }
             onPanel(p.id, p.overlay ? { overlay: next } : { frame: next })

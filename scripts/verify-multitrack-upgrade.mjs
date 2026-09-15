@@ -160,7 +160,11 @@ try {
   for(let n=0;n<4;n++) {
     const extra=project.addPerformanceBox(true)
     assert.ok(extra.startsWith('extra-'))
-    project.assignTakeToPanel(extra,{id:'extra-take-'+n,duration:20})
+    if (n === 0) project.updatePanel(extra,{overlay:{xPercent:7,yPercent:9,widthPercent:23,heightPercent:31}})
+    if (n === 1) {
+      assert.equal(latest().panels.filter(p=>p.overlay).length,2,'adding again creates a distinct empty extra')
+      assert.deepEqual(latest().panels.find(p=>p.overlay).overlay,{xPercent:7,yPercent:9,widthPercent:23,heightPercent:31},'adding another extra preserves existing geometry')
+    }
   }
   assert.equal(latest().panels.filter(p=>!p.overlay).length,12,'extra boxes do not consume base layout slots')
   assert.equal(latest().panels.length,16,'twelve base boxes plus four extra boxes')

@@ -854,9 +854,6 @@ function BestTakeBox({
                   isFill ? 'flex-none pt-2' : 'flex-1 pt-7'
                 }`}
               >
-                <p className={`text-center leading-snug ${isFill ? 'text-xs' : 'text-[8px]'}`}>
-                  Drag Current Take here or upload.
-                </p>
               </div>
               <div className="pip-empty-state__actions flex shrink-0">
                 {onUpload && (

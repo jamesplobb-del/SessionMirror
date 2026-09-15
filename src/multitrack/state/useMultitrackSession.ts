@@ -133,7 +133,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
    */
   const addPerformanceBox = useCallback((floating = false): string | null => {
     const current = sessionRef.current
-    const vacant = floating ? current.panels.find(p => p.kind === 'performance' && !!p.overlay && !p.take)
+    const vacant = floating ? undefined
       : current.panels.find(p => p.kind === 'performance' && !p.overlay && !p.take)
     const floatingCount = current.panels.filter(p => p.kind === 'performance' && p.overlay).length
     const id = vacant?.id ?? (floating

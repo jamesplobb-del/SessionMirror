@@ -12,17 +12,18 @@ const decode = (text: string) => text.replace(/&amp;/g, '&').replace(/&#39;/g, "
  * row to load it. This used to be two tabs plus a separate paste form with its
  * own submit button, which meant four ways in and no obvious one.
  */
-export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, savedAsTab = false }: {
+export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, savedAsTab = false, useContextSuggestion = true }: {
   onSelect: (url: string) => void
   suggestedQuery?: string
   placeholder?: string
   selectionHelp?: string
   savedAsTab?: boolean
+  useContextSuggestion?: boolean
 }) {
   const searchId = useId()
   const [view, setView] = useState<'search' | 'saved'>('search')
   const { query: initialQuery, projectId, autoSearch } = useContext(PracticeReferenceContext)
-  const [query, setQuery] = useState(initialQuery)
+  const [query, setQuery] = useState(useContextSuggestion ? initialQuery : '')
   const [results, setResults] = useState<PracticeReference[]>([])
   const [saved, setSaved] = useState(() => loadReferenceLibrary().items)
   const [linkName, setLinkName] = useState('')
@@ -51,7 +52,7 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
   }
 
   useEffect(() => {
-    if (autoSearch && initialQuery.trim().length >= 2 && !parseYoutubeVideoId(initialQuery)) void search()
+    if (useContextSuggestion && autoSearch && initialQuery.trim().length >= 2 && !parseYoutubeVideoId(initialQuery)) void search()
     // Initial suggestions only; later searches are submitted by the musician.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

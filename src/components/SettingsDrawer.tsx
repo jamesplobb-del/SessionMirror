@@ -33,6 +33,7 @@ import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorial
 import { resetTutorials } from '../utils/onboardingTutorial'
 import { useTutorialAction } from '../context/TutorialContext'
 import { redeemOfferCode } from '../utils/offerCodes'
+import BugReportLink from './BugReportLink'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -989,6 +990,9 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="help" title="Help">
+            <SettingsGroup title="Support" footer="Opens an email draft for you to review and send. If your email app doesn’t open, email jamesplobb@gmail.com.">
+              <BugReportLink email="jamesplobb@gmail.com" instrument={activeInstrument.label} />
+            </SettingsGroup>
             <SettingsGroup title="Promo codes" footer="Have a code? Redeem it securely with the App Store. Any offer price is shown before you confirm.">
               <LinkRow
                 icon={Sparkles}

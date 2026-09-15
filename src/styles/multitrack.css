@@ -3100,10 +3100,8 @@
 .multitrack-social-canvas .multitrack-grid__cell.is-extra { filter: drop-shadow(0 4px 8px #1c191729); }
 .multitrack-social-canvas .multitrack-grid__cell.is-selected { outline: 2px solid #78716c; outline-offset: -2px; border-radius: .85rem; }
 .multitrack-social-canvas .is-selected .multitrack-empty__name { visibility: hidden; }
-.multitrack-overlay-move, .multitrack-box-resize, .multitrack-box-delete { position: absolute; z-index: 25; display: grid; place-items: center; min-width: 36px; min-height: 36px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #44403c; background: #fff; box-shadow: 0 2px 8px #1c19171a; touch-action: none; }
-.multitrack-overlay-move { top: 5px; left: 5px; padding: 6px 10px; font-size: 11px; font-weight: 600; }
+.multitrack-box-resize { position: absolute; z-index: 25; display: grid; place-items: center; min-width: 36px; min-height: 36px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #44403c; background: #fff; box-shadow: 0 2px 8px #1c19171a; touch-action: none; }
 .multitrack-box-resize { right: 4px; bottom: 4px; font-size: 20px; }
-.multitrack-box-delete { top: 5px; right: 5px; color: #b91c1c; }
 .multitrack-studio-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
 .multitrack-studio-actions button, .multitrack-project-panel button { min-height: 42px; padding: 8px 14px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #57534e; background: #fafaf9; font-size: 13px; font-weight: 600; }
 .multitrack-studio-actions button:disabled, .multitrack-project-panel button:disabled { opacity: .4; }
@@ -3156,3 +3154,28 @@
   .multitrack-layout-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .multitrack-project-panel { padding: 12px; }
 }
+
+/* Direct manipulation stays independent of the recording controls underneath. */
+.multitrack-grid__cell.is-editable { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.multitrack-grid__cell.is-editable:active { cursor: grabbing; }
+.multitrack-box-resize { width: 28px; height: 28px; min-width: 28px; min-height: 28px; border-radius: 50%; background: transparent; border: 0; box-shadow: none; }
+.multitrack-box-resize::after { content: ''; width: 10px; height: 10px; border-radius: 3px; background: #fff; border: 1px solid #57534e; box-shadow: 0 1px 3px #0003; }
+.multitrack-box-resize--nw { left: 0; top: 0; right: auto; bottom: auto; cursor: nwse-resize; }
+.multitrack-box-resize--ne { right: 0; top: 0; left: auto; bottom: auto; cursor: nesw-resize; }
+.multitrack-box-resize--sw { left: 0; bottom: 0; right: auto; top: auto; cursor: nesw-resize; }
+.multitrack-box-resize--se { right: 0; bottom: 0; left: auto; top: auto; cursor: nwse-resize; }
+.multitrack-editor-content { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.multitrack-editor-content[inert] { opacity: .6; }
+
+/* Selection actions live outside clipped cells and above all media layers. */
+.multitrack-canvas-frame { position: relative; }
+.multitrack-box-resize { max-width: 50%; max-height: 50%; min-width: 0; min-height: 0; }
+.multitrack-box-tools { position: absolute; z-index: 30; top: 4px; right: 4px; display: flex; gap: 4px; padding: 4px; border: 1px solid #e7e5e4; border-radius: 999px; background: #fafaf9ed; box-shadow: 0 2px 8px #1c19171a; }
+.multitrack-box-tools button { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 999px; color: #44403c; touch-action: none; }
+.multitrack-box-tools button:focus-visible { outline: 2px solid #78716c; }
+
+.multitrack-box-tools svg { display: block; width: 18px; height: 18px; flex: none; overflow: visible; }
+.multitrack-box-tools .multitrack-box-tools__delete { display: flex; align-items: center; justify-content: center; gap: 6px; width: auto; min-width: 86px; padding: 0 12px; color: #b91c1c; background: #fef2f2; font-size: 12px; font-weight: 600; }
+
+.multitrack-panel__play-surface { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; }
+.multitrack-panel__overlay { z-index: 2; }

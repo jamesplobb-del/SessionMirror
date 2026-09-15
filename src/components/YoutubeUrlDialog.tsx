@@ -248,7 +248,7 @@ export default function YoutubeUrlDialog({ open, onClose, onSubmit }: YoutubeUrl
               </button>
             </div>
 
-            <PracticeReferenceBrowser key={projectId ?? 'library'} onSelect={(url) => {
+            <PracticeReferenceBrowser key={projectId ?? 'library'} useContextSuggestion={false} onSelect={(url) => {
               releaseInputFocus()
               setYoutubeDialogOpen(false)
               onSubmit(url)
