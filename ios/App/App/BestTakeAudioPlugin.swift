@@ -1058,6 +1058,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let bpm = call.getDouble("bpm") ?? 120
         let beatsPerBar = call.getInt("beatsPerBar") ?? 4
         let countInBars = call.getInt("countInBars") ?? 1
+        let playbackCountOff = call.getBool("playbackCountOff") ?? false
         let clickEnabled = call.getBool("clickEnabled") ?? true
         let soundId = call.getString("soundId") ?? "classic"
 
@@ -1068,7 +1069,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     beatsPerBar: beatsPerBar,
                     countInBars: countInBars,
                     clickEnabled: clickEnabled,
-                    soundId: soundId
+                    soundId: soundId,
+                    playbackCountOff: playbackCountOff
                 )
                 self.nativeCameraEngine.setMultitrackPerformanceAnchor(
                     hostTimeSec: result.captureAlignmentHostTimeSec

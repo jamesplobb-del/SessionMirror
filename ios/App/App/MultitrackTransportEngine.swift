@@ -155,6 +155,7 @@ final class MultitrackTransportEngine {
         countInBars: Int,
         clickEnabled: Bool,
         soundId: String,
+        playbackCountOff: Bool = false,
         leadSec: Double = 0.30
     ) throws -> StartResult {
         try controlQueue.sync {
@@ -201,8 +202,17 @@ final class MultitrackTransportEngine {
                 soundId: soundId
             )
             clickBuffer = bar
-            clickNode.volume = clickEnabled ? 1 : 0
-            clickNode.scheduleBuffer(bar, at: nil, options: [.loops], completionHandler: nil)
+            clickNode.volume = (clickEnabled || safeCountInBars > 0) ? 1 : 0
+            if playbackCountOff {
+                clickNode.scheduleBuffer(bar, at: nil, options: [], completionHandler: nil)
+            } else if clickEnabled {
+                clickNode.scheduleBuffer(bar, at: nil, options: [.loops], completionHandler: nil)
+            } else {
+                // Count-in only: finite buffers end on the performance downbeat.
+                for _ in 0..<safeCountInBars {
+                    clickNode.scheduleBuffer(bar, at: nil, options: [], completionHandler: nil)
+                }
+            }
             clickNode.play(at: firstClickTime)
 
             var audibleSourceCount = 0
@@ -251,7 +261,8 @@ final class MultitrackTransportEngine {
                 // short silent head instead of pulling audio earlier on the timeline.
                 let sourceDelaySec = max(0, prepared.source.timelineDelaySec)
                     + max(0, prepared.timelineOriginSec - prepared.source.sourceInSec)
-                let sourceHostTime = performanceHostTime + AVAudioTime.hostTime(forSeconds: sourceDelaySec)
+                let sourceEpoch = playbackCountOff ? firstClickHostTime : performanceHostTime
+                let sourceHostTime = sourceEpoch + AVAudioTime.hostTime(forSeconds: sourceDelaySec)
                 prepared.node.play(at: AVAudioTime(hostTime: sourceHostTime))
                 audibleSourceCount += 1
             }

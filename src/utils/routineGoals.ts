@@ -3,7 +3,7 @@ import { createRoutine, type RoutineTopic } from './practiceRoutines'
 
 export const PRACTICE_GOALS = [
   { id: 'balanced', title: 'Build a daily habit', detail: 'A balanced mix of fundamentals and music.' },
-  { id: 'sound', title: 'Develop my sound', detail: 'Tone, control, and a musical application.' },
+  { id: 'sound', title: 'Work on tone', detail: 'Long tones, flexibility, and a phrase of music.' },
   { id: 'technique', title: 'Make technique easier', detail: 'Coordination, articulation, and focused repetition.' },
   { id: 'music', title: 'Prepare a piece', detail: 'Warm up, isolate a passage, then put it in context.' },
 ] as const
@@ -16,7 +16,7 @@ const topics: Record<PracticeGoal, RoutineTopic[]> = {
 }
 
 /** Uses the existing instrument catalog; no cross-instrument fallback exercises. */
-export function buildGoalRoutine(instrumentId: string | null, goal: PracticeGoal, minutes: number) {
+export function buildGoalRoutine(instrumentId: string | null, goal: PracticeGoal, minutes?: number) {
   const available = getStepTemplates(instrumentId).filter(item => item.kind !== 'free' && item.kind !== 'game')
   const selected = available.filter(item => item.topic === 'warmup').slice(0, 1)
   for (const topic of topics[goal]) {
@@ -24,6 +24,10 @@ export function buildGoalRoutine(instrumentId: string | null, goal: PracticeGoal
     if (item) selected.push(item)
   }
   if (!selected.length && available[0]) selected.push(available[0])
+  if (minutes === undefined) {
+    return createRoutine(PRACTICE_GOALS.find(item => item.id === goal)?.title ?? 'My practice',
+      selected.map(template => stepFromTemplate(template, instrumentId)), instrumentId)
+  }
   const total = Number.isFinite(minutes) ? Math.min(90, Math.max(selected.length, Math.round(minutes))) : 20
   const plan = selected.map((template, index) => ({ ...stepFromTemplate(template, instrumentId),
     minutes: Math.floor(total / selected.length) + (index < total % selected.length ? 1 : 0) }))

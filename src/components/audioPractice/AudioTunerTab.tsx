@@ -269,8 +269,14 @@ export default function AudioTunerTab({
       const nativeActive = await runTunerRecovery()
       if (cancelled) return
       setMicSessionReady(nativeActive)
-      if (nativeActive) setMicLiveEpoch((epoch) => epoch + 1)
-      else setShowRecoveryPrompt(true)
+      if (nativeActive) {
+        setMicLiveEpoch((epoch) => epoch + 1)
+      } else {
+        // A failed recovery must leave connecting so the bounded retry effect
+        // can run again after first-launch permission/capture transitions.
+        setSourceHealth('stalled')
+        setShowRecoveryPrompt(true)
+      }
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
     return () => {

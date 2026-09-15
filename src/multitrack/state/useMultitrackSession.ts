@@ -99,7 +99,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     const timer = window.setTimeout(() => {
       saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
         await saveMultitrackSession(session)
-        if (session.projectId) selectMultitrackProject(session.projectId)
+        if (session.projectId && sessionRef.current.projectId === session.projectId) selectMultitrackProject(session.projectId)
         setProjects(listMultitrackProjects())
         setPersistenceNotice(prev => prev?.startsWith('Workspace could not be saved') ? null : prev)
       })
@@ -188,6 +188,25 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
       setProjects(listMultitrackProjects()); setPersistenceNotice(null)
     } catch { setPersistenceNotice('Could not switch projects. Your current performance is still open.') }
   }, [takes])
+
+  const importProject = useCallback(async (next: MultitrackSession) => {
+    await saveQueue.current.catch(() => {})
+    await saveMultitrackSession(sessionRef.current)
+    const keys = [`sm.multitrack.session.v1.${next.projectId}`, 'sm.multitrack.projects.v2', 'sm.multitrack.active.v2']
+    const previous = keys.map(key => localStorage.getItem(key))
+    try {
+      await saveMultitrackSession(next)
+      selectMultitrackProject(next.projectId!)
+    } catch (error) {
+      keys.forEach((key, index) => {
+        try { const value = previous[index]; if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) } catch { /* Preserve the original storage error. */ }
+      })
+      throw error
+    }
+    sessionRef.current = next; commitSession(next)
+    history.current = []; setCanUndo(false)
+    setProjects(listMultitrackProjects()); setPersistenceNotice(null)
+  }, [])
 
   const setPanelVolume = useCallback((panelId: string, volume: number) => {
     setSession((prev) => ({
@@ -308,7 +327,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   return {
-    session, projects, openProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
+    session, projects, openProject, importProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
     persistenceNotice,
     isRestoring: !hydrated,
     layout,

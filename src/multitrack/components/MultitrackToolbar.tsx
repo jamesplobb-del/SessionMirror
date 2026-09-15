@@ -33,6 +33,7 @@ export default function MultitrackToolbar(props: {
   onSelectLayout: (id: string) => void
   onOpenMixer: () => void
   onOpenAlign?: () => void
+  onOpenLayout?: () => void
   onTogglePlay: () => void
   onRestart: () => void
   onSeek: (t: number) => void
@@ -45,6 +46,7 @@ export default function MultitrackToolbar(props: {
     onSelectLayout,
     onOpenMixer,
     onOpenAlign,
+    onOpenLayout,
     onTogglePlay,
     onRestart,
     onSeek,
@@ -92,6 +94,7 @@ export default function MultitrackToolbar(props: {
             </Pressable>
           ))}
         </div>
+        {onOpenLayout && <Pressable type="button" intensity="soft" onClick={onOpenLayout} className="multitrack-toolbar__chip" aria-label="Layout settings">Layout</Pressable>}
         {onOpenAlign && (
           <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Editor">
             <SlidersHorizontal className="h-4 w-4" />

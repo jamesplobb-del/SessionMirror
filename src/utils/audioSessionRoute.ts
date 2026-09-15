@@ -331,6 +331,7 @@ export interface BestTakeAudioPluginType {
     countInBars: number
     clickEnabled: boolean
     soundId: string
+    playbackCountOff?: boolean
   }): Promise<NativeMultitrackTransportStartResult>
   stopMultitrackTransport(): Promise<{ stopped: boolean }>
   setNativeExperimentalAudioMode(options: {

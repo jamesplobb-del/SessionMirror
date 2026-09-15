@@ -35,6 +35,12 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeName</key><string>BestTake Multitrack Project</string>
+			<key>CFBundleTypeRole</key><string>Editor</string>
+			<key>LSHandlerRank</key><string>Owner</string>
+			<key>LSItemContentTypes</key><array><string>com.besttake.app.multitrack</string></array>
+		</dict>
+		<dict>
 			<key>CFBundleTypeName</key>
 			<string>BestTake Practice Routine</string>
 			<key>CFBundleTypeRole</key>
@@ -61,6 +67,15 @@
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
+		<dict>
+			<key>UTTypeIdentifier</key><string>com.besttake.app.multitrack</string>
+			<key>UTTypeDescription</key><string>BestTake Multitrack Project</string>
+			<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+			<key>UTTypeTagSpecification</key><dict>
+				<key>public.filename-extension</key><array><string>btmulti</string></array>
+				<key>public.mime-type</key><string>application/octet-stream</string>
+			</dict>
+		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
 			<string>com.besttake.app.practice-plan</string>

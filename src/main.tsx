@@ -22,6 +22,7 @@ import { registerAppForegroundLifecycle } from './utils/appForeground'
 import { initializeQuickTunerLaunch } from './utils/quickTunerLaunch'
 import { initCrashReporting } from './utils/crashReporting'
 import { initializeRoutineFileOpen } from './practiceTimeline/storage/routineFileOpen'
+import { initializeMultitrackFileOpen } from './multitrack/state/multitrackFileOpen'
 import { installFakeMediaDevices } from './utils/fakeMediaDevices'
 
 document.documentElement.dataset.refinement = 'depth-electric'
@@ -43,6 +44,7 @@ async function bootstrap() {
   // Not awaited — a routine tapped in Messages surfaces through its own
   // store once ready, and shouldn't hold up first paint.
   void initializeRoutineFileOpen()
+  void initializeMultitrackFileOpen().catch(error => console.warn('Project file opening unavailable', error))
 
   createRoot(rootEl).render(
     <StrictMode>

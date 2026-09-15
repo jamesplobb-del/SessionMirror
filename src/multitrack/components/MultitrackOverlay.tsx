@@ -35,8 +35,11 @@ import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { Capacitor } from '@capacitor/core'
-import { panelOffsetMs, panelEndSec, sourceWindow } from '../synchronization/projectTiming'
+import { panelOffsetMs, panelEndSec, sourceWindow, playbackCountOffSec, playbackStartPosition } from '../synchronization/projectTiming'
+import { multitrackTransport } from '../synchronization/multitrackTransport'
 import MultitrackProjectPanel from './MultitrackProjectPanel'
+import { readMultitrackFile, shareMultitrackFile } from '../state/multitrackFile'
+import { consumeMultitrackFile, getPendingMultitrackFile, subscribeMultitrackFile } from '../state/multitrackFileOpen'
 import { timelineOffsetMsForTake } from '../synchronization/multitrackBeatSchedule'
 import type { MultitrackRecordingStopOptions } from '../../utils/takeStorage'
 import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
@@ -64,14 +67,6 @@ import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOver
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
 const MULTITRACK_MONITOR_CACHE_DIR = 'multitrack-monitor-assets'
-/**
- * Lead-in before the downbeat on Play All. Starting exactly on the first note
- * clips its attack and gives the ear nothing to place it against; half a second
- * of the room before the entry is what makes an articulation audible.
- * Takes play their own pre-downbeat material here — anything with nothing to
- * play (a backing track, a part overdubbed later) simply waits out the gap.
- */
-const PLAY_ALL_PREROLL_SEC = 0.5
 
 const SHEET_FRAME_OPTIONS = [
   { value: 'top', label: 'Above', detail: 'Full-width row above the videos' },
@@ -192,7 +187,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   /** Timeline second the next recording starts at (the align stage's "+" flow). */
   const recordStartSecRef = useRef(0)
   const {
-    session, projects, openProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
+    session, projects, openProject, importProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
     layout,
     setLayout,
     addPerformanceBox,
@@ -214,6 +209,32 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   useEffect(() => { setRenderedVideo(null) }, [session])
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
+  const [projectFileBusy, setProjectFileBusy] = useState(false)
+  const projectFileBusyRef = useRef(false)
+  const handleProjectFile = async (file?: File | string) => {
+    if (projectFileBusyRef.current || isRestoring || recording.phase !== 'idle' || isExporting) return
+    projectFileBusyRef.current = true; setProjectFileBusy(true)
+    pauseAllPlayback()
+    let imported: Awaited<ReturnType<typeof readMultitrackFile>> | undefined
+    try {
+      if (file) {
+        let source: Blob
+        if (typeof file === 'string') {
+          const response = await fetch(Capacitor.convertFileSrc(file))
+          if (!response.ok) throw new Error('Could not read the received project file.')
+          source = await response.blob()
+        } else source = file
+        imported = await readMultitrackFile(source)
+        await importProject(imported.session)
+        setRenderedVideo(null); setAlignStageOpen(false); setActiveSourceSheet(null)
+        void showAlert({ title: 'Project opened', message: 'Your friend’s parts are ready. Record in an empty box, then share the project file back.', tone: 'success' })
+      } else await shareMultitrackFile(session)
+    } catch (error) {
+      imported?.dispose()
+      const message = error instanceof Error ? error.message : 'Could not open or share this project.'
+      if (!/cancel|dismiss|abort/i.test(message)) void showAlert({ title: 'Project file', message, tone: 'error' })
+    } finally { projectFileBusyRef.current = false; setProjectFileBusy(false) }
+  }
   const nativeGridPlaybackActiveRef = useRef(false)
   const nativeGridPlaybackPreparingRef = useRef(false)
   const nativeGridPlaybackGenerationRef = useRef(0)
@@ -567,16 +588,24 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     return sources
   }, [session.backing, session.panels, session.endSec, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
 
-  const playAllFromStart = useCallback(async (startAt = 0) => {
+  const playAllFromStart = useCallback(async (requestedStart = 0) => {
+    const duration = session.endSec ?? Math.max(sync.state.duration,
+      ...session.panels.map(p => p.kind === 'performance' && !p.hidden ? panelEndSec(p, session.practice.bpm) : 0))
+    const startAt = playbackStartPosition(requestedStart, duration)
     sync.pause()
     pauseBacking()
     await stopNativeGridPlayback()
     sync.setExcludePanelId(null)
     sync.setReferencePanelIds(null)
+    const preRollSec = startAt > 0 ? 0 : playbackCountOffSec(session.practice.bpm)
 
     if (!isNativeMultitrackTransportAvailable()) {
-      const started = await sync.playAllFromUserGesture()
-      if (started) await playBackingFromStart()
+      const generation = nativeGridPlaybackGenerationRef.current
+      const started = startAt > 0 ? await sync.play() : await sync.playAllFromUserGesture(preRollSec)
+      if (started) {
+        const delay = Math.max(0, -multitrackTransport.rawPosition() * 1000)
+        window.setTimeout(() => { if (generation === nativeGridPlaybackGenerationRef.current) void playBackingFromStart() }, delay)
+      }
       return started
     }
 
@@ -588,7 +617,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // iOS Play All uses one native AVAudioEngine graph for every take (and
       // uploaded backing audio). This avoids WebKit's multiple-media-element
       // limit and gives every source the same sample clock.
-      const sources = await buildNativeMonitorSources(null, false, startAt > 0 ? startAt : -PLAY_ALL_PREROLL_SEC)
+      const sources = await buildNativeMonitorSources(null, false, startAt > 0 ? startAt : -preRollSec)
       if (generation !== nativeGridPlaybackGenerationRef.current) return false
 
       const prepared = await prepareNativeMultitrackMonitor(sources)
@@ -604,9 +633,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       )
       const transport = await startNativeMultitrackTransport({
         bpm: session.practice.bpm,
-        beatsPerBar,
-        countInBars: 0,
-        clickEnabled: false,
+        beatsPerBar: preRollSec > 0 ? 4 : beatsPerBar,
+        countInBars: preRollSec > 0 ? 1 : 0,
+        clickEnabled: preRollSec > 0,
+        playbackCountOff: preRollSec > 0,
         soundId: session.practice.clickSound ?? snapshot.soundId,
       })
       if (!transport || generation !== nativeGridPlaybackGenerationRef.current) {
@@ -615,17 +645,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       }
 
       nativeGridPlaybackActiveRef.current = true
-      // Sources begin at performanceEpochMs, which is now the head of the
-      // lead-in — timeline zero (the downbeat) lands a lead-in later, and
-      // anything joining the mix has to aim there, not at the audio's start.
-      const downbeatEpochMs = transport.performanceEpochMs + (startAt > 0 ? 0 : PLAY_ALL_PREROLL_SEC * 1000)
+      // During a count-off, sources roll from firstClickEpochMs; timeline zero
+      // stays pinned to performanceEpochMs. Backing audio waits for zero.
+      const downbeatEpochMs = transport.performanceEpochMs
       if (session.backing.kind === 'youtube') {
         seekYoutubeProxy(backingYoutubeIframeRef.current, Math.max(0, startAt))
         await scheduleYoutubeBackingStart(downbeatEpochMs)
       }
       const visualsStarted = await sync.startVisualPlaybackAtEpoch(
-        transport.performanceEpochMs,
-        startAt > 0 ? startAt : -PLAY_ALL_PREROLL_SEC,
+        preRollSec > 0 ? transport.firstClickEpochMs : transport.performanceEpochMs,
+        startAt > 0 ? startAt : -preRollSec,
       )
       if (!visualsStarted || generation !== nativeGridPlaybackGenerationRef.current) {
         await stopNativeGridPlayback()
@@ -655,7 +684,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     pauseBacking,
     playBackingFromStart,
     scheduleYoutubeBackingStart,
-    session.backing.kind,
+    session.backing.kind, session.endSec, session.panels,
     session.practice.bpm, session.practice.meter, session.practice.clickSound,
     showAlert,
     stopNativeGridPlayback,
@@ -738,7 +767,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         },
         { resetBeat: true },
       )
-      const started = await sharedMetronomeEngine.start()
+      const started = clickEnabled || countInBars > 0 ? await sharedMetronomeEngine.start() : true
       if (!started) return null
       const beatDurationSec = 60 / bpm
       const countInBeats = beatsPerBar * countInBars
@@ -775,6 +804,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // the exact downbeat. YouTube cannot join that native graph, so it remains
       // an explicitly best-effort preview source.
       if (!nativeTransportActiveRef.current) {
+        if (!session.practice.clickEnabled || monitorMutesRef.current.has('click')) sharedMetronomeEngine.stop()
         await sync.startPrepared()
       } else {
         await sync.startVisualPlaybackAtEpoch(recordingPerformanceEpochRef.current, recordStartSecRef.current, true)
@@ -1076,6 +1106,14 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     (panel) => panel.kind === 'performance' && !panel.hidden && panel.take !== null,
   )
   const shareDisabled = !hasAnyTake || isExporting || recording.phase !== 'idle'
+  const incomingProjectHandler = useRef<() => void>(() => {})
+  incomingProjectHandler.current = () => {
+    if (!isOpen || isRestoring || projectFileBusyRef.current || recording.phase !== 'idle' || isExporting || !getPendingMultitrackFile()) return
+    const url = consumeMultitrackFile()!
+    void handleProjectFile(url)
+  }
+  useEffect(() => subscribeMultitrackFile(() => incomingProjectHandler.current()), [])
+  useEffect(() => { incomingProjectHandler.current() }, [isOpen, isRestoring, projectFileBusy, recording.phase, isExporting])
 
   useEffect(() => {
     // While the timeline editor is open it owns the live offsets and trims —
@@ -1291,6 +1329,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   return createPortal(
     <>
+      {projectFileBusy && <div className="multitrack-file-busy" role="alert" aria-live="polite"><strong>Preparing project file…</strong><span>Keeping your recordings and layout together.</span></div>}
       <AnimatePresence>
         {isOpen && (
           <motion.div ref={shellRef} key="mt-overlay" className="multitrack-overlay multitrack-overlay--camera-mode" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={iosSpringSnappy} style={motionGpuLayer} role="dialog" aria-modal="true">
@@ -1428,8 +1467,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onDone={handleSaveAlignChanges}
               />
             ) : (
+              <>{sync.state.isPlaying && sync.state.preRollRemaining > 0 && <div className="multitrack-playback-count" role="status">Count in · {Math.min(4, Math.ceil(sync.state.preRollRemaining / (60 / session.practice.bpm)))}</div>}
               <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
                 activeLayoutId={session.layoutId}
+                onOpenLayout={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}
                 onSelectLayout={id => { pauseAllPlayback(); setLayout(id) }}
                 onOpenMixer={() => { pauseAllPlayback(); setActiveSourceSheet('mixer') }}
                 onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
@@ -1444,7 +1485,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                     pauseAllPlayback()
                   }
                   sync.seek(time)
-                }} />
+                }} /></>
             )}
             {!activePanel ? (
               <MultitrackPracticeOverlay
@@ -1970,6 +2011,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           </div>
         </div>
         <MultitrackProjectPanel session={session} projects={projects}
+          onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} fileBusy={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
           onProject={(id, duplicate) => { pauseAllPlayback(); setAlignStageOpen(false); setRenderedVideo(null); void openProject(id, duplicate) }}
           onUpdate={updateProject} onPanel={updatePanel} onLayout={setLayout} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}
           onRecord={(id, time) => { setActiveSourceSheet(null); handleRecordBoxAt(id, time) }} time={sync.state.currentTime} />
@@ -1985,6 +2027,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       >
         <div className="multitrack-sheet">
           <p className="multitrack-sheet__title">Finish & share</p>
+          <div className="multitrack-project-panel">
+            <button disabled={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'} onClick={() => void handleProjectFile()}>{projectFileBusy ? 'Preparing project…' : 'Collaborate · Share project'}</button>
+            <p>Send an editable multitrack file so someone else can add their parts and send it back.</p>
+            <label>Open a shared project<input type="file" accept=".btmulti" disabled={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void handleProjectFile(file) }} /></label>
+          </div>
           <div className="multitrack-project-panel">
             <label>Video format<select disabled={isExporting} value={session.aspectRatio ?? '9:16'} onChange={e => updateProject({ aspectRatio: e.target.value as '9:16' | '16:9' | '1:1' })}>
               <option value="9:16">Portrait · Reels / Stories</option><option value="16:9">Landscape</option><option value="1:1">Square</option>

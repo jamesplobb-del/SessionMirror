@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { RefObject } from 'react'
 import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
@@ -24,6 +25,8 @@ export default function PerformancePanel({
   onTap,
   onRemoveTake,
   onRegisterMedia,
+  controlsHost,
+  onSelect,
 }: {
   panel: PerformancePanelState
   displayName?: string
@@ -40,6 +43,8 @@ export default function PerformancePanel({
   onTap: () => void
   onRemoveTake: () => void
   onRegisterMedia: (panelId: string, element: HTMLMediaElement | null) => void
+  controlsHost?: HTMLElement | null
+  onSelect?: () => void
 }) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const [quickPlaying, setQuickPlaying] = useState(false)
@@ -112,7 +117,7 @@ export default function PerformancePanel({
 
   return (
     <div className={`multitrack-panel multitrack-panel--performance ${isRecordingTarget ? 'multitrack-panel--recording' : ''}`}>
-      <button type="button" className="multitrack-panel__play-surface" onClick={toggleQuickPlayback} aria-label={quickPlaying ? 'Pause take' : 'Play take'} />
+      <button type="button" className="multitrack-panel__play-surface" onClick={() => { onSelect?.(); toggleQuickPlayback() }} aria-label={quickPlaying ? 'Pause take' : 'Play take'} />
       <TakeVideoPlayer
         filePath={panel.take.filePath}
         videoUrl={panel.take.videoUrl}
@@ -133,11 +138,13 @@ export default function PerformancePanel({
         onCanPlay={(event) => onRegisterMedia(panel.id, event.currentTarget)}
         onEnded={() => setQuickPlaying(false)}
       />
+      {controlsHost && createPortal(<>
+      <span className="multitrack-take-controls__name">{displayName || panel.take.name}</span>
       <Pressable
         type="button"
         intensity="icon"
         data-box-control
-        className="multitrack-panel__remove"
+        className="multitrack-take-controls__button"
         aria-label="Remove video"
         onClick={(event) => {
           event.stopPropagation()
@@ -146,9 +153,7 @@ export default function PerformancePanel({
       >
         <X className="h-3.5 w-3.5" />
       </Pressable>
-      <div className="multitrack-panel__overlay">
-        <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.label || panel.take.name || 'Performance'}</span></div>
-        <div className="multitrack-panel__actions">
+        <div className="multitrack-take-controls__actions">
           <Pressable
             type="button"
             intensity="soft"
@@ -158,7 +163,7 @@ export default function PerformancePanel({
             }}
             aria-label={quickPlaying ? 'Pause take' : 'Play take'}
             data-box-control
-            className="multitrack-panel__action"
+            className="multitrack-take-controls__button"
           >
             {quickPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </Pressable>
@@ -171,11 +176,14 @@ export default function PerformancePanel({
             }}
             aria-label="Tile options"
             data-box-control
-            className="multitrack-panel__action"
+            className="multitrack-take-controls__button"
           >
             <MoreHorizontal className="h-4 w-4" />
           </Pressable>
         </div>
+      </>, controlsHost)}
+      <div className="multitrack-panel__overlay">
+        <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.label || panel.take.name || 'Performance'}</span></div>
       </div>
     </div>
   )

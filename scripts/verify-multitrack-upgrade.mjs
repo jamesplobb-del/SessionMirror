@@ -6,11 +6,25 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 const dir = await mkdtemp(join(tmpdir(), 'multitrack-check-'))
 try {
-  await build({ stdin: { contents: `export * from './src/multitrack/layout/layoutPresets'; export * from './src/multitrack/layout/composition'; export * from './src/multitrack/export/sectionExport'; export * from './src/multitrack/synchronization/projectTiming'; export * from './src/multitrack/synchronization/multitrackBeatSchedule'; export * from './src/multitrack/state/multitrackPersistence';`, resolveDir: process.cwd(), loader: 'ts' }, outfile: join(dir, 'model.mjs'), bundle: true, platform: 'node', format: 'esm' })
+  await build({ stdin: { contents: `export * from './src/multitrack/layout/layoutPresets'; export * from './src/multitrack/layout/composition'; export * from './src/multitrack/export/sectionExport'; export * from './src/multitrack/synchronization/projectTiming'; export * from './src/multitrack/synchronization/multitrackBeatSchedule'; export * from './src/multitrack/state/multitrackPersistence';`, resolveDir: process.cwd(), loader: 'ts' }, outfile: join(dir, 'model.mjs'), bundle: true, platform: 'node', format: 'esm', define: {'import.meta.env':'{}'} })
   const m = await import(pathToFileURL(join(dir, 'model.mjs')))
   let checks = 0
   const check = (actual, expected, label) => { assert.deepEqual(actual, expected, label); checks++ }
   const near = (actual, expected, label) => { assert.ok(Math.abs(actual - expected) < .000001, `${label}: ${actual} vs ${expected}`); checks++ }
+  for (const bpm of [40,60,120,240,300]) {
+    const lead = m.playbackCountOffSec(bpm)
+    near(lead, 4*60/bpm, 'count-off is four beats at project tempo')
+    for (const capturedHead of [lead/2,lead,lead+.18]) {
+      const window = m.sourceWindow(0,20,capturedHead*1000,-lead)
+      near(window.timelineDelaySec + capturedHead - window.sourceInSec,lead,'all parts keep their downbeat after the same lead-in')
+      assert.ok(window.sourceInSec < capturedHead-.04,'source includes the initial articulation before the downbeat')
+    }
+  }
+  check(m.playbackStartPosition(20,20),0,'Play all replays a completed mix instead of hiding every finished clip')
+  check(m.playbackStartPosition(19.98,20),0,'final frame rounding replays')
+  check(m.playbackStartPosition(25,20),0,'shortened project replays from stale playhead')
+  check(m.playbackStartPosition(8,20),8,'pause/resume preserves middle of song')
+  check(m.playbackStartPosition(8,0),8,'unknown duration does not force restart')
   const takes = Array.from({ length: 12 }, (_, i) => ({ id: `take-${i}`, duration: 32, timelineOffsetMs: 2300 + i * 13 }))
   const panels = m.createPanelsForLayout(m.getLayoutPreset('twelve')).map((p,i) => ({ ...p, take: takes[i] }))
   const session = { projectId: 'test-project', name: 'Twelve parts', aspectRatio: '9:16', layoutId: 'twelve', panels, sheetMusic: { kind: 'sheet-music', id: 'music', asset: null }, backing: { kind: 'none', volume: .85 }, practice: { bpm: 120, clickEnabled: true, countInBars: 1 } }

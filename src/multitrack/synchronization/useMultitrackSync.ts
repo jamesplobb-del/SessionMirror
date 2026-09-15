@@ -69,7 +69,7 @@ export function useMultitrackSync() {
    * while the timeline is still held at zero. Element slaving stands down until
    * then — the loop would otherwise "correct" the lead-in straight back out.
    */
-  const prerollUntilRef = useRef(0)
+  const [preRollRemaining, setPreRollRemaining] = useState(0)
   /** performance.now() of the last corrective seek per panel (see cooldowns). */
   const lastReseekAtRef = useRef<Map<string, number>>(new Map())
   /** Timeline position playback was prepared/started at (used to anchor the transport). */
@@ -371,7 +371,7 @@ export function useMultitrackSync() {
       playNow.push([panelId, el])
     }
 
-    setCurrentTime(startTime)
+    setCurrentTime(Math.max(0, startTime))
 
     try {
       await preparePlaybackRoute({ suspendCamera: false })
@@ -588,7 +588,7 @@ export function useMultitrackSync() {
     transportLockedRef.current = true
     pendingStartRef.current.clear()
     preparedStartRef.current = startTime
-    prerollUntilRef.current = 0
+    setPreRollRemaining(Math.max(0, -startTime))
     multitrackTransport.arm(Math.max(0, startTime))
     prepareVisualAtStart(startTime)
     setCurrentTime(Math.max(0, startTime))
@@ -627,8 +627,7 @@ export function useMultitrackSync() {
       pendingStartRef.current.size > 0
     if (started) {
       const timelineNow = startTime + (Date.now() - epochMs) / 1000
-      const prerollMs = Math.max(0, -timelineNow * 1000)
-      if (prerollMs > 0) prerollUntilRef.current = performance.now() + prerollMs
+      setPreRollRemaining(Math.max(0, -timelineNow))
       multitrackTransport.startAtClockTime(multitrackTransport.now() - timelineNow)
 
     } else {
@@ -752,7 +751,7 @@ export function useMultitrackSync() {
     return playElements(getEntries(), startTime)
   }, [currentTime, getEntries, getMasterEntry, playElements, trimFor, offsetFor])
 
-  const playAllFromUserGesture = useCallback(async () => {
+  const playAllFromUserGesture = useCallback(async (preRollSec = 0) => {
     // Full reset — chase mode from recording leaves transport in a state that
     // blocks normal grouped playback if we only seek without clearing it.
     referencePanelIdsRef.current = null
@@ -776,7 +775,8 @@ export function useMultitrackSync() {
     setCurrentTime(0)
 
     try {
-      return await playElements(getEntries(), 0)
+      setPreRollRemaining(preRollSec)
+      return await playElements(getEntries(), -preRollSec)
     } catch (error) {
       console.error('[useMultitrackSync] playAllFromUserGesture failed', error)
       setIsPlaying(false)
@@ -789,7 +789,7 @@ export function useMultitrackSync() {
     chaseModeRef.current = false
     visualOnlyModeRef.current = false
     visualPlaybackGenerationRef.current += 1
-    prerollUntilRef.current = 0
+    setPreRollRemaining(0)
     lastReseekAtRef.current.clear()
     pendingStartRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
@@ -879,11 +879,11 @@ export function useMultitrackSync() {
       }
 
       if (entries.length > 0 || chasing || recordingPreview) {
-        let timeline = multitrackTransport.position()
+        let timeline = multitrackTransport.rawPosition()
         if (masterEntry) {
           const [masterId, master] = masterEntry
           // Reference position = the longest take's spot inside its trimmed window.
-          const refPos = Math.max(0, master.currentTime - trimFor(masterId).start - offsetFor(masterId))
+          const refPos = master.currentTime - trimFor(masterId).start - offsetFor(masterId)
           const masterProgressing = !master.paused && !master.ended && master.currentTime > 0
 
           // Lock the transport onto real playback once it's actually progressing
@@ -896,13 +896,13 @@ export function useMultitrackSync() {
             }
           } else if (
             masterProgressing &&
-            Math.abs(multitrackTransport.position() - refPos) > TRANSPORT_RELOCK_SEC
+            Math.abs(multitrackTransport.rawPosition() - refPos) > TRANSPORT_RELOCK_SEC
           ) {
             multitrackTransport.reanchor(refPos)
           }
 
           // Playback follows the transport — never the other way around.
-          timeline = transportLockedRef.current ? multitrackTransport.position() : refPos
+          timeline = transportLockedRef.current ? multitrackTransport.rawPosition() : refPos
         }
         const projectEnd = projectRulesRef.current.endSec
         if (!chasing && !recordingPreview && projectEnd !== undefined && timeline >= projectEnd) {
@@ -913,7 +913,8 @@ export function useMultitrackSync() {
         if (!visualOnly) applyMixStateToAll()
         if (tickNow - lastUiTimeUpdateRef.current >= UI_TIME_UPDATE_INTERVAL_MS) {
           lastUiTimeUpdateRef.current = tickNow
-          setCurrentTime(timeline)
+          setCurrentTime(Math.max(0, timeline))
+          setPreRollRemaining(Math.max(0, -timeline))
         }
 
         const allDone = entries.every(
@@ -944,11 +945,9 @@ export function useMultitrackSync() {
           return
         }
 
-        const inPreroll = tickNow < prerollUntilRef.current
         for (const [panelId, el] of entries) {
-          // During the lead-in the timeline reads zero while the media are
-          // deliberately ahead of it. Leave every element alone until it ends.
-          if (inPreroll) break
+          // Use signed time: clips with shorter recorded count-offs can join
+          // during pre-roll instead of being skipped straight to their attack.
           try {
             const win = clipWindowFor(panelId, el)
             const outside = timeline < win.entersAt || (win.mediaEnd > 0 && timeline >= win.exitsAt)
@@ -1052,6 +1051,6 @@ export function useMultitrackSync() {
     restart,
     seek,
     setOnAllEnded,
-    state: { isPlaying, currentTime, duration },
+    state: { isPlaying, currentTime, duration, preRollRemaining },
   }
 }

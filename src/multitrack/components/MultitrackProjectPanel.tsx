@@ -4,7 +4,8 @@ import type { MultitrackProjectSummary } from '../state/multitrackPersistence'
 import { compositionRects } from '../layout/composition'
 import { MULTITRACK_LAYOUT_PRESETS, getLayoutPreset } from '../layout/layoutPresets'
 
-export default function MultitrackProjectPanel({ session, projects, onProject, onUpdate, onPanel, onLayout, onReorder, onUndo, canUndo, onRecord, time }: {
+export default function MultitrackProjectPanel({ session, projects, onProject, onUpdate, onPanel, onLayout, onReorder, onUndo, canUndo, onRecord, time, onShare, onImport, fileBusy }: {
+  onShare: () => void; onImport: (file: File) => void; fileBusy: boolean
   session: MultitrackSession; projects: MultitrackProjectSummary[]
   onProject: (id?: string, duplicate?: boolean) => void
   onUpdate: (patch: Partial<MultitrackSession>) => void
@@ -17,6 +18,12 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
   const rects = compositionRects(session, getLayoutPreset(session.layoutId), time).panelRects
   const boxName = (panel: PerformancePanelState) => panel.label || panel.take?.name || `${panel.overlay ? 'Extra' : 'Box'} ${session.panels.filter(p => p.kind === 'performance' && !!p.overlay === !!panel.overlay).findIndex(p => p.id === panel.id) + 1}`
   return <div className="multitrack-project-panel">
+    <div className="multitrack-settings-heading"><h2>Collaborate</h2><p>Send your parts. Your friend adds theirs and sends the project back.</p></div>
+    <div className="multitrack-studio-actions">
+      <button disabled={fileBusy} onClick={onShare}>{fileBusy ? 'Working…' : 'Share project file'}</button>
+      <label className="multitrack-file-import">Open project file<input type="file" accept=".btmulti,application/octet-stream" disabled={fileBusy} aria-label="Open multitrack project file" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) onImport(file) }} /></label>
+    </div>
+    <p className="multitrack-file-note">Includes recordings and layout, up to 512 MB. Opens as a new project.{session.backing.kind === 'youtube' ? ' YouTube references need internet.' : ''}</p>
     <details className="multitrack-project-files"><summary>Project · {session.name || 'My performance'}</summary>
     <label>Performance name<input aria-label="Performance name" value={session.name ?? ''} maxLength={80} onChange={e => onUpdate({ name: e.target.value })} /></label>
     <div className="multitrack-studio-actions">

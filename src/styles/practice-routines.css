@@ -1365,6 +1365,53 @@ html.app-dark-mode .routine-bar--audio {
 
 /* ── Grip and title row ── */
 
+.routine-bar__collapse {
+  position: absolute;
+  top: -36px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 44px;
+  padding: 0 0 8px;
+  border: 0;
+  border-radius: 18px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.routine-bar__collapse::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 8px;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 18px;
+  background: rgba(22, 28, 38, 0.85);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.routine-bar--audio .routine-bar__collapse::before {
+  border-color: var(--audio-divider, rgba(23, 26, 34, 0.15));
+  background: var(--audio-surface, rgba(255, 255, 255, 0.94));
+}
+
+html.app-dark-mode .routine-bar--audio .routine-bar__collapse::before {
+  border-color: rgba(226, 232, 240, 0.24);
+  background: rgba(15, 23, 42, 0.94);
+}
+
+.routine-bar__collapse svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.5;
+}
+
 .routine-bar__grip {
   display: flex;
   width: 3.5rem;
@@ -1565,7 +1612,7 @@ html.app-dark-mode .routine-bar--audio {
   padding: 0;
 }
 
-/* The corner: drag it to set the width, tap it to fold the bar into a ball.
+/* The corner: drag it to set the width.
  * The rows leave room for it on the right so it never sits on Done. */
 .routine-bar__resize {
   position: absolute;
@@ -1623,7 +1670,7 @@ html.app-dark-mode .routine-bar--audio {
 }
 
 .routine-bar__panel--above {
-  bottom: calc(100% + 0.4rem);
+  bottom: calc(100% + 36px + 0.4rem);
 }
 
 .routine-bar__panel-head {

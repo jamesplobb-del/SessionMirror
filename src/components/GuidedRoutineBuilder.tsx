@@ -10,7 +10,7 @@ import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamil
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
-import { importPracticePlanFromText, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
+import { importPracticePlanFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
 import '../styles/routine-guide.css'
 
 type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'detail' | 'library'
@@ -39,7 +39,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
   const [showReorder, setShowReorder] = useState(false)
   const [goal, setGoal] = useState<PracticeGoal>('balanced')
-  const [goalMinutes, setGoalMinutes] = useState(20)
   const [screen, setScreen] = useState<Screen>(() => {
     if (mode === 'edit' && routine) return 'lineup'
     if (mode === 'build') return 'routines'
@@ -101,8 +100,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     'custom-settings': 'Set up your tools.', 'custom-reference': 'Add a reference.', 'custom-items': 'Build your own.', 'custom-tool': customItems[customIndex] ?? 'Choose a tool.', detail: detail?.title ?? 'Your exercise', library: 'Build your\nroutine.',
   }
   const subtitles: Record<Screen, string> = {
-    routines: 'Create a new plan or open one you’ve already built.', goals: 'Choose a goal and your available time. Your plan stays editable.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions made for ${instrumentName.toLowerCase()}.`, lineup: 'In your order. Set up and ready to play.',
-    'custom-settings': customItems[customIndex] ?? 'Your item', 'custom-reference': `Optional · ${customItems[customIndex] ?? 'Your item'}`, 'custom-items': 'Type every item in the order you want to practice it.', 'custom-tool': `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`, detail: 'Make this exercise work for you.', library: 'Start with your own plan, or use a researched preset.',
+    routines: 'Create a new plan or open one you’ve already built.', goals: 'Choose what you want to practice. You can change the exercises later.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions for ${instrumentName.toLowerCase()}.`, lineup: 'Review your exercises and their order.',
+    'custom-settings': customItems[customIndex] ?? 'Your item', 'custom-reference': `Optional · ${customItems[customIndex] ?? 'Your item'}`, 'custom-items': 'Type every item in the order you want to practice it.', 'custom-tool': `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`, detail: 'Make this exercise work for you.', library: 'Build your own plan or start with a suggestion.',
   }
   const move = (next: Screen, backwards = false) => { setDirection(backwards ? -1 : 1); setError(''); setScreen(next) }
   useEffect(() => { scrollRef.current?.scrollTo(0, 0) }, [screen])
@@ -246,19 +245,20 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const importInputRef = useRef<HTMLInputElement>(null)
   const importFile = (file: File) => {
     setError('')
+    if (file.size > MAX_PRACTICE_PLAN_BYTES) { setError('That file is too large to be a routine.'); return }
     void file.text().then(text => {
       const result = importPracticePlanFromText(text)
       if (!result.ok) { setError(result.error); return }
       setLibrary(loadRoutineLibrary())
       openSavedRoutine(result.routine)
-    })
+    }).catch(() => setError('Could not read that routine file. Please try again.'))
   }
   // A finished lineup goes straight into practice; saving on its own stays one tap away.
   const canStart = screen === 'lineup' && !pendingSetup.length && Boolean(onSaveAndStart)
   const editingToday = routine?.id === draft.id
   const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
   const secondaryAction = canStart ? { label: editingToday ? 'Save changes' : 'Save for later', run: () => saveDraft(false) } : null
-  const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal, goalMinutes); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('goals'); move('lineup') }
+  const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('goals'); move('lineup') }
     : screen === 'instrument' ? () => move(instrumentReturn)
     : screen === 'choose' ? configureNext
     : screen === 'lineup' ? () => saveDraft(canStart)
@@ -326,7 +326,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
                       <Pressable type="button" intensity="icon" haptic="light" hapticFeedback={hapticFeedback}
                         className="routine-guide-saved-share" onClick={() => shareRoutine(item)}
                         aria-label={`Share ${item.name}`} title={`Share ${item.name}`}>
-                        <Share2 aria-hidden />
+                        <Share2 aria-hidden /><span>Share</span>
                       </Pressable>
                     </div>
                   })}
@@ -341,7 +341,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
               * this is the way in for a file already saved on the phone, and
               * the only way in on the web build. */}
             <section className="routine-guide-saved" aria-label="Open a shared routine">
-              <h3>Sent one by your teacher?</h3>
+              <h3>Open a shared routine</h3>
               <button type="button" className="routine-guide-own" onClick={() => importInputRef.current?.click()}>
                 <Upload aria-hidden />
                 <span>
@@ -365,7 +365,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           </div>}
           {screen === 'goals' && <>
             <div className="routine-guide-tool-list">{PRACTICE_GOALS.map(item => <button type="button" key={item.id} className="routine-guide-choice" aria-pressed={goal === item.id} onClick={() => setGoal(item.id)}><span><strong>{item.title}</strong><small>{item.detail}</small></span>{goal === item.id && <Check aria-hidden />}</button>)}</div>
-            <section className="routine-goal-time"><h3>How much time today?</h3><div className="routine-segment" role="group" aria-label="Practice time">{[10, 20, 30, 45].map(minutes => <button type="button" key={minutes} aria-pressed={goalMinutes === minutes} onClick={() => setGoalMinutes(minutes)}>{minutes} min</button>)}</div></section>
           </>}
           {screen === 'instrument' && <div className="routine-guide-instruments">
             {INSTRUMENT_FAMILIES.map(family => <section key={family}>
@@ -390,6 +389,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <button type="button" className="routine-guide-text" onClick={() => move('lineup')}>Back to lineup</button>
           </>}
           {screen === 'lineup' && <>
+            <button type="button" className="routine-guide-own" disabled={!draft.steps.length} onClick={() => shareRoutine(draft)}><Share2 aria-hidden /> Share routine file</button>
             <label className="routine-guide-field routine-guide-field--name">Routine name<input id="guide-routine-name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
             <div className="routine-guide-lineup-meta">{draft.steps.length} exercises <span>·</span> {formatMinutes(total)}</div>
             <p className="routine-guide-ready-note">{pendingSetup.length ? null : <Check size={16} aria-hidden />}{pendingSetup.length ? 'Set up the remaining exercises before starting.' : 'Ready to start. Tap an exercise to adjust.'}</p>
@@ -433,7 +433,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             onDone={finishItem} onRemove={() => { setDraft(current => ({ ...current, steps: current.steps.filter(step => step.id !== detail.id) })); move('lineup', true) }} /></div>}
           {screen === 'library' && <>
             <button type="button" className="routine-guide-own routine-guide-own--hero" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items, order them, then choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
-            <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>A practice plan for your instrument and available time</small></span><ArrowRight aria-hidden /></button>
+            <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>Choose what you want to work on</small></span><ArrowRight aria-hidden /></button>
             <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); setDetailId(null); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
           </>}
         </motion.div>

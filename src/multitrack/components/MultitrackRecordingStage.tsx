@@ -464,12 +464,13 @@ export default function MultitrackRecordingStage({
           <p className="multitrack-sheet__title">Click &amp; count-in</p>
           <div className="multitrack-countin-sheet">
             <label className="multitrack-countin-sheet__row">
-              <span>Click track</span>
+              <span>Click during recording</span>
               <IOSSwitch
                 checked={practice.clickEnabled}
                 onChange={(clickEnabled) => onPracticeChange({ clickEnabled })}
               />
             </label>
+            <p className="multitrack-countin-sheet__hint">Use headphones for the click to work properly during recording; speaker clicks can be picked up by the microphone. Without headphones, leave this off and use the lead-in count-in below.</p>
             {hasBacking && !practice.clickEnabled ? (
               <p className="multitrack-countin-sheet__hint">
                 Off by default with a backing track — its tempo rarely matches the click. Turn it on

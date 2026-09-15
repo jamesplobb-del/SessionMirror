@@ -24,6 +24,7 @@ export async function startNativeMultitrackTransport(options: {
   countInBars: number
   clickEnabled: boolean
   soundId: string
+  playbackCountOff?: boolean
 }): Promise<NativeMultitrackTransportStartResult | null> {
   if (!isNativeMultitrackTransportAvailable()) return null
   return BestTakeAudioPlugin.startMultitrackTransport(options)

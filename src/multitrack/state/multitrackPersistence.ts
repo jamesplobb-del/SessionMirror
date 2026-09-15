@@ -1,5 +1,7 @@
 import { persistAsset, restoreAsset } from './multitrackAssets'
 import type { Take } from '../../types'
+import { Capacitor } from '@capacitor/core'
+import { Directory, Filesystem } from '@capacitor/filesystem'
 import { MULTITRACK_PANEL_SLOT_IDS, getLayoutPreset } from '../layout/layoutPresets'
 import type {
   MultitrackBackingTrack,
@@ -34,6 +36,8 @@ interface PersistedMultitrackSession {
   panelDetails?: Array<Pick<import('../types').PerformancePanelState, 'label' | 'frame' | 'overlay' | 'hidden' | 'timelineOffsetMs' | 'sectionAudio'>>
   /** Take id per performance panel slot, aligned with the layout's panel order. */
   panelTakeIds: (string | null)[]
+  /** Received parts belong to this project, independently of the local Vault. */
+  sharedTakes?: Take[]
   /** Mixer state per panel slot, aligned with panelTakeIds. */
   panelVolumes?: (number | null)[]
   panelMutes?: boolean[]
@@ -62,6 +66,11 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
       panelTakeIds: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.take?.id ?? null : null,
       ),
+      sharedTakes: await Promise.all([...new Map(performancePanels.flatMap(p => p.take?.id.startsWith('collab-') ? [[p.take.id, p.take] as const] : [])).values()].map(async take => ({
+        ...take,
+        videoUrl: take.filePath ? '' : await persistAsset(take.videoUrl),
+        thumbnailUrl: take.thumbnailUrl ? await persistAsset(take.thumbnailUrl) : '',
+      }))),
       panelVolumes: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.volume ?? null : null,
       ),
@@ -114,6 +123,13 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
       kind: 'performance', id: persisted.panelIds?.[i] ?? MULTITRACK_PANEL_SLOT_IDS[i], take: null,
     }))
     const takeById = new Map(takes.map((take) => [take.id, take]))
+    for (const take of persisted.sharedTakes ?? []) {
+      const videoUrl = take.filePath
+        ? Capacitor.convertFileSrc((await Filesystem.getUri({ path: take.filePath, directory: Directory.Data })).uri)
+        : await restoreAsset(take.videoUrl)
+      if (!videoUrl) throw new Error('A shared recording is missing. Reimport the project file.')
+      takeById.set(take.id, { ...take, videoUrl, thumbnailUrl: take.thumbnailUrl ? await restoreAsset(take.thumbnailUrl) ?? '' : '' })
+    }
 
     let performanceIndex = 0
     for (let i = 0; i < panels.length; i += 1) {

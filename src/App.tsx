@@ -354,6 +354,7 @@ const SettingsDrawer = lazy(importSettingsDrawer)
 const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 const CoachMark = lazy(() => import('./components/CoachMark'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
+import { getPendingMultitrackFile, subscribeMultitrackFile } from './multitrack/state/multitrackFileOpen'
 const MultitrackOverlay = lazy(() => import('./multitrack/components/MultitrackOverlay'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
@@ -3433,6 +3434,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setSuppressNativeBridgeRecovery,
     settings.hapticFeedback,
   ])
+
+  useEffect(() => {
+    const open = () => { if (getPendingMultitrackFile()) handleOpenMultitrack() }
+    open()
+    return subscribeMultitrackFile(open)
+  }, [handleOpenMultitrack])
 
   const handleMultitrackOpenRecordingStage = useCallback(() => {
     handleRecordingModeChange('video')

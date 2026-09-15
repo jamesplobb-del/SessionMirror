@@ -58,7 +58,7 @@ class MultitrackTransport {
   /** Begin rolling from a timeline position; epoch anchored to the clock now. */
   start(positionSec = this.heldAt): void {
     this.ensureCtx()
-    this.epoch = this.now() - Math.max(0, positionSec)
+    this.epoch = this.now() - positionSec
     this.state = 'rolling'
   }
 
@@ -79,7 +79,7 @@ class MultitrackTransport {
    * a seek, or to correct a gross deviation (stall/scrub) mid-roll.
    */
   reanchor(positionSec: number): void {
-    const p = Math.max(0, positionSec)
+    const p = positionSec
     if (this.state === 'rolling') {
       this.epoch = this.now() - p
     } else {
@@ -90,6 +90,11 @@ class MultitrackTransport {
   position(): number {
     if (this.state === 'rolling') return Math.max(0, this.now() - this.epoch)
     return this.heldAt
+  }
+
+  /** Signed playback position so pre-roll clips can enter before the downbeat. */
+  rawPosition(): number {
+    return this.state === 'rolling' ? this.now() - this.epoch : this.heldAt
   }
 
   /** Timeline position that corresponded to a past clock timestamp (event anchoring). */

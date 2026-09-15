@@ -3088,7 +3088,7 @@
 }
 
 /* New composition controls inherit the original multitrack palette and chrome. */
-.multitrack-canvas-frame { flex: 1; min-height: 0; min-width: 0; display: grid; place-items: center; overflow: hidden; }
+.multitrack-canvas-frame { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
 .multitrack-social-canvas.multitrack-grid { position: relative; flex: none; overflow: hidden; }
 .multitrack-social-canvas .multitrack-grid__cell { min-width: 0; min-height: 0; overflow: hidden; padding: .15rem; container-type: inline-size; }
 .multitrack-project-trigger { min-width: 0; text-align: left; }
@@ -3170,7 +3170,7 @@
 /* Selection actions live outside clipped cells and above all media layers. */
 .multitrack-canvas-frame { position: relative; }
 .multitrack-box-resize { max-width: 50%; max-height: 50%; min-width: 0; min-height: 0; }
-.multitrack-box-tools { position: absolute; z-index: 30; top: 4px; right: 4px; display: flex; gap: 4px; padding: 4px; border: 1px solid #e7e5e4; border-radius: 999px; background: #fafaf9ed; box-shadow: 0 2px 8px #1c19171a; }
+.multitrack-box-tools { position: relative; z-index: 30; flex-shrink: 0; margin-bottom: 8px; display: flex; gap: 4px; padding: 4px; border: 1px solid #e7e5e4; border-radius: 999px; background: #fafaf9ed; box-shadow: 0 2px 8px #1c19171a; }
 .multitrack-box-tools button { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 999px; color: #44403c; touch-action: none; }
 .multitrack-box-tools button:focus-visible { outline: 2px solid #78716c; }
 
@@ -3179,3 +3179,16 @@
 
 .multitrack-panel__play-surface { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border: 0; padding: 0; background: transparent; }
 .multitrack-panel__overlay { z-index: 2; }
+.multitrack-file-import { position: relative; display: flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid #e7e5e4; border-radius: 9999px; background: #fafaf9; color: #57534e; cursor: pointer; font-size: 13px; font-weight: 600; }
+.multitrack-file-import input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.multitrack-file-import:focus-within { outline: 2px solid #b78932; outline-offset: 2px; }
+.multitrack-file-note { font-size: 12px; color: #78716c; margin: 8px 0 18px; }
+.multitrack-file-busy { position: fixed; inset: 0; z-index: 2147483646; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; background: rgba(24,24,27,.94); color: white; padding: 24px; text-align: center; }
+.multitrack-take-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 44px; padding: 4px 10px; margin-bottom: 8px; border-radius: 999px; background: #fafaf9; border: 1px solid #e7e5e4; color: #292524; }
+.multitrack-take-controls__name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.multitrack-take-controls__actions { display: flex; flex: none; gap: 4px; }
+.multitrack-take-controls[aria-disabled=true] { opacity: .5; }
+.multitrack-take-controls__button[aria-label="Remove video"] { order: 2; }
+.multitrack-take-controls .multitrack-take-controls__button { position: static; display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 50%; background: #f5f5f4; color: #44403c; }
+.multitrack-take-controls .multitrack-take-controls__button svg { width: 18px; height: 18px; flex: none; display: block; }
+.multitrack-playback-count { text-align: center; padding: 6px; font-size: 14px; font-weight: 600; color: #57534e; font-variant-numeric: tabular-nums; }

@@ -827,8 +827,8 @@ const PRESETS: Record<PresetFamily, RoutinePreset[]> = {
 const tailoredPresets = (
   quick: string[], full: string[], quickBlurb: string, fullBlurb: string,
 ): RoutinePreset[] => [
-  { id: 'quick', name: 'Quick essentials', blurb: quickBlurb, templateIds: quick },
-  { id: 'standard', name: 'Complete session', blurb: fullBlurb, templateIds: full },
+  { id: 'quick', name: 'Fundamentals', blurb: quickBlurb, templateIds: quick },
+  { id: 'standard', name: 'Full practice', blurb: fullBlurb, templateIds: full },
 ]
 
 const INSTRUMENT_PRESETS: Record<string, RoutinePreset[]> = {
@@ -859,7 +859,8 @@ const INSTRUMENT_PRESETS: Record<string, RoutinePreset[]> = {
 }
 
 export function getRoutinePresets(instrumentId: string | null): RoutinePreset[] {
-  return instrumentId ? INSTRUMENT_PRESETS[instrumentId] ?? PRESETS[presetFamilyFor(instrumentId)] : PRESETS.general
+  const presets = instrumentId ? INSTRUMENT_PRESETS[instrumentId] ?? PRESETS[presetFamilyFor(instrumentId)] : PRESETS.general
+  return presets.map(preset => ({ ...preset, name: preset.id === 'quick' ? 'Fundamentals' : 'Full practice' }))
 }
 
 export function presetMinutes(preset: RoutinePreset, instrumentId: string | null): number {

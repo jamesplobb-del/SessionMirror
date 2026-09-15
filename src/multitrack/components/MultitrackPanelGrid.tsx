@@ -35,6 +35,9 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
 }) {
   const hasMusic = hasAnySheetImage(sheetMusicPanel)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [controlsHost, setControlsHost] = useState<HTMLDivElement | null>(null)
+  const controlsPanelId = panels.some(p => p.kind === 'performance' && p.take && p.id === selectedId)
+    ? selectedId : panels.find(p => p.kind === 'performance' && p.take)?.id
   const frameRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
   useEffect(() => {
@@ -48,7 +51,6 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     return () => observer.disconnect()
   }, [])
   const [w, h] = aspectRatio.split(':').map(Number)
-  const width = Math.min(size.width, size.height * w / h)
   const { panelRects, musicRect } = compositionRects({ panels, sheetMusic: sheetMusicPanel }, layout, currentTimeSec ?? 0)
   const rectStyle = (rect: LayoutRectPercent | null | undefined): CSSProperties => rect ? {
     position: 'absolute', left: `${rect.xPercent}%`, top: `${rect.yPercent}%`,
@@ -127,8 +129,12 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
   const selectedPanel = panels.find(panel => panel.id === selectedId && panel.kind === 'performance')
   const selectedRect = selectedId ? (draft?.id === selectedId ? draft.rect : panelRects[selectedId]) : null
   const showSelectionTools = !interactionDisabled && selectedPanel?.kind === 'performance' && (editable || !!selectedPanel.overlay) && selectedRect
+  const showTakeControls = controlsPanelId && recordingPhase === 'idle'
+  const controlsHeight = (showTakeControls ? 62 : 0) + (showSelectionTools ? 62 : 0)
+  const width = Math.min(size.width, Math.max(1, size.height - controlsHeight) * w / h)
   return (
     <div className="multitrack-canvas-frame" ref={frameRef}>
+    {showTakeControls && <div ref={setControlsHost} className="multitrack-take-controls" role="toolbar" aria-label="Take controls" inert={interactionDisabled} aria-disabled={interactionDisabled} />}
     {showSelectionTools && selectedId ? <div className="multitrack-box-tools" role="toolbar" aria-label="Selected box">
       <button type="button" aria-label="Move selected box" onPointerDown={event => begin(selectedId, 'move', event)} onPointerMove={move}
         onPointerUp={event => finish(event)} onPointerCancel={event => finish(event, true)} onLostPointerCapture={event => { if (event.target === drag.current?.captureTarget) finish(event, true) }}
@@ -188,6 +194,8 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
           {panel.kind === 'performance' ? (
             <PerformancePanel
               panel={panel}
+              controlsHost={controlsPanelId === panel.id && recordingPhase === 'idle' ? controlsHost : null}
+              onSelect={() => setSelectedId(panel.id)}
               displayName={panel.label || (panel.overlay
                 ? `Extra ${panels.filter(p => p.kind === 'performance' && p.overlay).findIndex(p => p.id === panel.id) + 1}`
                 : `Box ${panels.filter(p => p.kind === 'performance' && !p.overlay).findIndex(p => p.id === panel.id) + 1}`)}

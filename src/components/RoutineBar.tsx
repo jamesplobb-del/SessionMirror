@@ -20,6 +20,7 @@ import {
 import {
   Check,
   ChevronDown,
+  ChevronsDown,
   GripHorizontal,
   House,
   MoveDiagonal2,
@@ -108,9 +109,11 @@ const DEFAULT_WIDTH = 384
 const COMPACT_BELOW = 330
 /** Matches `.routine-ball` (4rem). */
 const BALL_SIZE = 64
+/** Space above the bar for the floating collapse control. */
+const COLLAPSE_HEADROOM = 36
 /** First run sits just above the control deck, where the bar used to be pinned. */
 const DEFAULT_BOTTOM_GAP = 124
-/** A press on the corner that travels less than this is a tap, and folds the bar. */
+/** Ignore small pointer movements when resizing. */
 const RESIZE_SLOP = 6
 const KEY_STEP = 16
 const ARROWS: Record<string, readonly [number, number]> = {
@@ -147,7 +150,7 @@ function clampToViewport(x: number, y: number, width: number, height: number, in
     x,
     y - insets.top,
   )
-  return { x: clamped.x, y: clamped.y + insets.top }
+  return { x: clamped.x, y: Math.max(clamped.y + insets.top, insets.top + EDGE + (width === BALL_SIZE ? 0 : COLLAPSE_HEADROOM)) }
 }
 
 function clampWidth(width: number): number {
@@ -159,7 +162,7 @@ function clampWidth(width: number): number {
 
 function roomFor(top: number, height: number, insets: Insets): Room {
   const below = window.innerHeight - insets.bottom - EDGE - (top + height) - PANEL_GAP
-  const above = top - insets.top - EDGE - PANEL_GAP
+  const above = top - insets.top - EDGE - PANEL_GAP - COLLAPSE_HEADROOM
   const side = below >= PANEL_IDEAL || below >= above ? 'below' : 'above'
   const space = side === 'below' ? below : above
   return { side, maxHeight: Math.round(Math.max(PANEL_MIN, Math.min(PANEL_MAX, space))) }
@@ -187,10 +190,10 @@ function saveFolded(folded: boolean): void {
  * The routine's presence while a step runs: which step, how long, and the two
  * things a player does mid-step — pause, or finish and move on.
  *
- * It floats rather than docks. Drag it by the grip or the title. The corner
- * does two jobs: drag it to set the width (narrow enough and the bar folds to
- * one row), or tap it to fold the whole bar into a ball that shows the step and
- * its timer. The ball drags the same way; tap it to open the bar again from the
+ * It floats rather than docks. Drag it by the grip or the title. Drag the corner
+ * to set the width (narrow enough and the bar folds to one row). The control above
+ * the bar folds it into a ball that shows the step and its timer.
+ * The ball drags the same way; tap it to open the bar again from the
  * ball's corner. Where each was left is remembered, like the metronome and
  * drone widgets. Position is owned entirely by x/y motion values: CSS centring
  * once fought the entry animation's transform and put the bar half off screen.
@@ -243,8 +246,6 @@ export default function RoutineBar({
   /** Set by a drag so the click that ends it does not also toggle anything. */
   const draggedRef = useRef(false)
   const resizeRef = useRef<{ id: number; startX: number; startY: number; startWidth: number; moved: boolean } | null>(null)
-  /** Set by a corner drag so the click that ends it does not fold the bar. */
-  const resizedRef = useRef(false)
   const [width, setWidth] = useState(() => clampWidth(loadWidgetSize(POSITION_ID)?.width ?? DEFAULT_WIDTH))
   const [folded, setFolded] = useState(loadFolded)
   const foldedRef = useRef(folded)
@@ -413,7 +414,7 @@ export default function RoutineBar({
     saveWidgetPosition(foldedRef.current ? BALL_POSITION_ID : POSITION_ID, next.x, next.y)
   }
 
-  /** Into the ball, which lands in the corner that was tapped. */
+  /** Into the ball, anchored at the bar's lower-right corner. */
   const fold = () => {
     const el = nodeRef.current
     if (!el) return
@@ -458,7 +459,6 @@ export default function RoutineBar({
 
   /** Width only; the height is whatever the layout for that width needs. */
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    resizedRef.current = false
     if (event.button !== 0 || !event.isPrimary) return
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -485,17 +485,8 @@ export default function RoutineBar({
     if (!gesture || gesture.id !== event.pointerId) return
     resizeRef.current = null
     if (!gesture.moved) return
-    resizedRef.current = true
     saveWidgetSize(POSITION_ID, width, nodeRef.current?.offsetHeight ?? 0)
     rememberSpot()
-  }
-
-  const tapCorner = () => {
-    if (resizedRef.current) {
-      resizedRef.current = false
-      return
-    }
-    fold()
   }
 
   const resizeWithKeys = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -659,6 +650,17 @@ export default function RoutineBar({
       >
         <button
           type="button"
+          className="routine-bar__collapse"
+          aria-label="Collapse routine"
+          title="Collapse routine"
+          data-no-drag
+          onPointerDown={event => event.stopPropagation()}
+          onClick={fold}
+        >
+          <ChevronsDown aria-hidden />
+        </button>
+        <button
+          type="button"
           className="routine-bar__grip"
           aria-label="Move the routine bar. Use the arrow keys."
           onPointerDown={startDrag}
@@ -722,13 +724,12 @@ export default function RoutineBar({
           type="button"
           className="routine-bar__resize"
           data-no-drag
-          aria-label="Fold the routine bar into a ball. Drag, or use the left and right arrow keys, to resize it."
+          aria-label="Resize routine bar. Drag, or use the left and right arrow keys."
           onPointerDown={startResize}
           onPointerMove={moveResize}
           onPointerUp={endResize}
           onPointerCancel={endResize}
           onLostPointerCapture={endResize}
-          onClick={tapCorner}
           onKeyDown={resizeWithKeys}
         >
           <MoveDiagonal2 aria-hidden />
