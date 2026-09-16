@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
 import { Check, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, X, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { PerformancePanelState, SheetMusicPanelState } from '../types'
@@ -35,6 +35,7 @@ export interface AlignClipState {
 }
 
 interface MultitrackAlignStageProps {
+  mixerControls?: ReactNode
   isOpen: boolean
   panels: PerformancePanelState[]
   sheetMusic: SheetMusicPanelState
@@ -324,6 +325,7 @@ function ClipTrack({
 }
 
 export default function MultitrackAlignStage({
+  mixerControls,
   isOpen,
   panels,
   sheetMusic,
@@ -987,6 +989,10 @@ export default function MultitrackAlignStage({
         </div>
       </div>
 
+      {mixerControls && <details className="multitrack-editor-mixer">
+        <summary>Mix <span aria-hidden>⌄</span></summary>
+        {mixerControls}
+      </details>}
       <footer className="multitrack-align-stage__transport">
         <Pressable
           type="button"

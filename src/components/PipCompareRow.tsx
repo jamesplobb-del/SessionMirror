@@ -140,7 +140,6 @@ function CompactTakeCaption({
 
   const content = (
     <>
-      <span className="compact-take-caption__label">{label}</span>
       <span className="compact-take-caption__name">{name}</span>
       {detail && <span className="compact-take-caption__detail">{detail}</span>}
     </>
@@ -1051,6 +1050,7 @@ export default memo(function PipCompareRow({
             compact && challengerGhost?.overPin ? 'compact-take-slot--drop-active' : ''
           }`}
         >
+          {compact && <span className="compact-take-caption__label">Best Take</span>}
           <BestTakeBox
             layout="pip"
             compact={compact}
@@ -1167,6 +1167,7 @@ export default memo(function PipCompareRow({
           }`}
           dataTutorial="challenger-card"
         >
+          {compact && <span className="compact-take-caption__label">Current Take</span>}
           <PipWindow
             compact={compact}
             src={challengerTake?.videoUrl ?? null}

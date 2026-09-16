@@ -1,3 +1,4 @@
+import { readMultitrackAsset } from '../state/readMultitrackAsset'
 import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
@@ -62,6 +63,7 @@ import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../back
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
 import MultitrackAlignStage from './MultitrackAlignStage'
+import ProjectFileActions from './ProjectFileActions'
 import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
@@ -170,7 +172,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
   const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, mixer, or a tile's action sheet. */
-  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'mixer' | 'export' | 'visual' | 'project' | null>(null)
+  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'project' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
   const [layoutEditing, setLayoutEditing] = useState(false)
@@ -220,9 +222,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       if (file) {
         let source: Blob
         if (typeof file === 'string') {
-          const response = await fetch(Capacitor.convertFileSrc(file))
-          if (!response.ok) throw new Error('Could not read the received project file.')
-          source = await response.blob()
+          source = await readMultitrackAsset(Capacitor.convertFileSrc(file), 'The received project', file)
         } else source = file
         imported = await readMultitrackFile(source)
         await importProject(imported.session)
@@ -1258,6 +1258,58 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         ? session.backing.fileName
         : session.backing.label || 'YouTube'
 
+  const mixerControls = <div className="multitrack-editor-mixer__rows">
+          {mixerPanels.length === 0 && session.backing.kind === 'none' ? (
+            <p className="multitrack-sheet__empty">Record or add a take to mix.</p>
+          ) : null}
+          {mixerPanels.map((panel, index) =>
+            panel.kind === 'performance' && panel.take ? (
+              <div key={panel.id} className="multitrack-mixer-row">
+                <Pressable
+                  type="button"
+                  intensity="icon"
+                  aria-label={`${panel.muted ? 'Unmute' : 'Mute'} ${panel.label || panel.take.name || `Box ${index + 1}`}`}
+                  className={`multitrack-mixer-row__mute ${panel.muted ? 'is-muted' : ''}`}
+                  onClick={() => setPanelMuted(panel.id, !panel.muted)}
+                >
+                  {panel.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </Pressable>
+                <span className="multitrack-mixer-row__name">
+                  {panel.label || panel.take.name || `Box ${index + 1}`}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  aria-label={`${panel.label || panel.take.name || `Box ${index + 1}`} volume`}
+                  value={panel.volume ?? 1}
+                  onChange={(event) => setPanelVolume(panel.id, Number(event.target.value))}
+                  className="multitrack-mixer-row__slider"
+                />
+              </div>
+            ) : null,
+          )}
+          {session.backing.kind !== 'none' ? (
+            <div className="multitrack-mixer-row">
+              <Music4 className="h-4 w-4 text-stone-400" />
+              <span className="multitrack-mixer-row__name">{backingChipLabel}</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                aria-label="Backing volume"
+                value={session.backing.volume}
+                onChange={(event) =>
+                  updateBacking({ ...session.backing, volume: Number(event.target.value) })
+                }
+                className="multitrack-mixer-row__slider"
+              />
+            </div>
+          ) : null}
+  </div>
+
 
   const handleSaveAlignChanges = useCallback(
     async (
@@ -1437,6 +1489,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 covering it: the grid above IS the preview you are editing. */}
             {alignStageOpen ? (
               <MultitrackAlignStage
+                mixerControls={mixerControls}
                 isOpen={alignStageOpen}
                 panels={session.panels.filter(
                   (panel): panel is PerformancePanelState => panel.kind === 'performance',
@@ -1472,7 +1525,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 activeLayoutId={session.layoutId}
                 onOpenLayout={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}
                 onSelectLayout={id => { pauseAllPlayback(); setLayout(id) }}
-                onOpenMixer={() => { pauseAllPlayback(); setActiveSourceSheet('mixer') }}
                 onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
                 onTogglePlay={() => {
                   if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
@@ -2028,9 +2080,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         <div className="multitrack-sheet">
           <p className="multitrack-sheet__title">Finish & share</p>
           <div className="multitrack-project-panel">
-            <button disabled={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'} onClick={() => void handleProjectFile()}>{projectFileBusy ? 'Preparing project…' : 'Collaborate · Share project'}</button>
-            <p>Send an editable multitrack file so someone else can add their parts and send it back.</p>
-            <label>Open a shared project<input type="file" accept=".btmulti" disabled={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void handleProjectFile(file) }} /></label>
+            <ProjectFileActions busy={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
+              onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} />
+            <p>Send your parts. Your friend adds theirs and sends the project back.</p>
           </div>
           <div className="multitrack-project-panel">
             <label>Video format<select disabled={isExporting} value={session.aspectRatio ?? '9:16'} onChange={e => updateProject({ aspectRatio: e.target.value as '9:16' | '16:9' | '1:1' })}>
@@ -2068,66 +2120,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         </div>
       </AnimatedBottomSheet>
 
-      {/* Mixer sheet: playback balance per tile + backing volume. */}
-      <AnimatedBottomSheet
-        isOpen={activeSourceSheet === 'mixer' && isOpen}
-        onClose={() => setActiveSourceSheet(null)}
-        ariaLabel="Mixer"
-        elevated
-        elevatedLight
-        zClass={MULTITRACK_SHEET_Z}
-        maxHeightClass="max-h-[70vh]"
-      >
-        <div className="multitrack-sheet">
-          <p className="multitrack-sheet__title">Mixer</p>
-          {mixerPanels.length === 0 && session.backing.kind === 'none' ? (
-            <p className="multitrack-sheet__empty">Record or add a take to mix.</p>
-          ) : null}
-          {mixerPanels.map((panel, index) =>
-            panel.kind === 'performance' && panel.take ? (
-              <div key={panel.id} className="multitrack-mixer-row">
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  aria-label={panel.muted ? 'Unmute tile' : 'Mute tile'}
-                  className={`multitrack-mixer-row__mute ${panel.muted ? 'is-muted' : ''}`}
-                  onClick={() => setPanelMuted(panel.id, !panel.muted)}
-                >
-                  {panel.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                </Pressable>
-                <span className="multitrack-mixer-row__name">
-                  {panel.label || panel.take.name || `Box ${index + 1}`}
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={panel.volume ?? 1}
-                  onChange={(event) => setPanelVolume(panel.id, Number(event.target.value))}
-                  className="multitrack-mixer-row__slider"
-                />
-              </div>
-            ) : null,
-          )}
-          {session.backing.kind !== 'none' ? (
-            <div className="multitrack-mixer-row">
-              <Music4 className="h-4 w-4 text-stone-400" />
-              <span className="multitrack-mixer-row__name">{backingChipLabel}</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={session.backing.volume}
-                onChange={(event) =>
-                  updateBacking({ ...session.backing, volume: Number(event.target.value) })
-                }
-                className="multitrack-mixer-row__slider"
-              />
-            </div>
-          ) : null}
-        </div>
-      </AnimatedBottomSheet>
+
     </>, document.body)
 }

@@ -1390,11 +1390,11 @@ button.compact-take-caption:active {
   font-weight: 600;
 }
 
-.compact-take-caption--best .compact-take-caption__label {
+.compact-take-slot--best > .compact-take-caption__label {
   color: #f7ae1c;
 }
 
-.compact-take-caption--current .compact-take-caption__label {
+.compact-take-slot--current > .compact-take-caption__label {
   color: #27a9f4;
 }
 
@@ -2833,6 +2833,16 @@ html.app-dark-mode
   padding-top: 1.85rem;
 }
 
+/* Bring the phone cards closer to the iPad's low, horizontal proportions.
+   Leave a dedicated title row and fit the preview inside the shorter body. */
+@media (max-width: 743px) {
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot {
+    --camera-take-card-height: clamp(5rem, 21vw, 5.15rem);
+    --camera-take-thumb-size: calc(var(--camera-take-card-height) - 2.2rem);
+    padding-top: 1.65rem;
+  }
+}
+
 /* Empty Best Take tiles should present two clear, comfortably tappable choices. */
 .pip-video-container .pip-empty-state__actions {
   min-height: clamp(3.25rem, 12vw, 5rem);
@@ -2854,16 +2864,25 @@ html.app-dark-mode
   width: 1.1rem;
   height: 1.1rem;
 }
+:root .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact > .compact-take-slot {
+  --camera-take-thumb-size: calc(var(--camera-take-card-height) - 2.2rem);
+  padding-top: 1.65rem;
+}
+
 .app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-caption {
-  position: static;
+  position: relative;
   padding-right: 0;
 }
-.app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-slot .compact-take-caption__label {
+.app-ui-overlay:not(.app-ui-overlay--audio-mode) .compact-take-slot > .compact-take-caption__label {
   position: absolute;
-  top: 0.65rem;
+  top: 0.55rem;
   left: 0.5rem;
   width: calc(100% - 4.1rem);
   padding-right: 0;
-  font-size: 0.7rem;
-  line-height: 1.1;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }

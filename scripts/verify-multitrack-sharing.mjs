@@ -32,6 +32,14 @@ try {
   const expiredPreview = URL.createObjectURL(new Blob(['thumbnail']))
   URL.revokeObjectURL(expiredPreview)
   source.panels[0].take.thumbnailUrl = expiredPreview
+  const duo = structuredClone(source)
+  duo.layoutId = 'three'; duo.panels = duo.panels.slice(0,3)
+  duo.panels[0].take.name = 'Take 11'; duo.panels[2].take = null
+  const openedDuo = await readMultitrackFile(await buildMultitrackFile(duo)); cleanups.push(openedDuo.dispose)
+  assert.equal(openedDuo.session.panels.length,3)
+  assert.equal(openedDuo.session.panels.filter(p=>p.take).length,2)
+  assert.equal(openedDuo.session.panels[2].take,null)
+  assert.equal(openedDuo.session.panels[0].take.name,'Take 11')
   const original = await buildMultitrackFile(source)
   if (process.env.MULTITRACK_TEST_FILE) {
     const uiSession = structuredClone(source)

@@ -1,3 +1,4 @@
+import { readMultitrackAsset } from './readMultitrackAsset'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { Share } from '@capacitor/share'
@@ -20,22 +21,15 @@ export async function buildMultitrackFile(session: MultitrackSession): Promise<B
   const sources = new Map<string, string>()
   const packed = new WeakSet<object>()
   let bytes = 0
-  const pack = async (src: string, label: string) => {
-    const existing = sources.get(src)
+  const pack = async (src: string, label: string, filePath?: string) => {
+    const sourceKey = filePath || src
+    const existing = sources.get(sourceKey)
     if (existing) return existing
-    let blob: Blob
-    try {
-      const response = await fetch(src)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      blob = await response.blob()
-      if (!blob.size) throw new Error('Empty file')
-    } catch {
-      throw new Error(`${label} could not be read. Choose that recording or attachment again, then retry sharing.`)
-    }
+    const blob = await readMultitrackAsset(src, label, filePath)
     bytes += blob.size
     if (bytes > MAX_BYTES) throw new Error('This project exceeds the 512 MB sharing limit. Use shorter recordings or split it into projects.')
     const ref = `asset:${blobs.length}`
-    sources.set(src, ref); blobs.push(blob); entries.push({ size: blob.size, type: blob.type || 'application/octet-stream' })
+    sources.set(sourceKey, ref); blobs.push(blob); entries.push({ size: blob.size, type: blob.type || 'application/octet-stream' })
     return ref
   }
   for (const panel of copy.panels) {
@@ -43,7 +37,7 @@ export async function buildMultitrackFile(session: MultitrackSession): Promise<B
     const take = panel.take
     if (packed.has(take)) continue
     packed.add(take)
-    take.videoUrl = await pack(await resolveTakePlaybackUrl(take.filePath, take.videoUrl), take.name || panel.label || 'A recording')
+    take.videoUrl = await pack(await resolveTakePlaybackUrl(take.filePath, take.videoUrl), `${panel.overlay ? 'Extra box' : 'Box'} ${copy.panels.indexOf(panel) + 1} (${take.name || panel.label || 'recording'})`, take.filePath)
     take.filePath = ''
     // Thumbnails are disposable previews, often backed by expired blob URLs.
     // They must never prevent sharing the original recording.

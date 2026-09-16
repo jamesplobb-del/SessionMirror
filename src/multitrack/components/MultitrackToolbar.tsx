@@ -31,7 +31,6 @@ export default function MultitrackToolbar(props: {
   duration: number
   activeLayoutId: string
   onSelectLayout: (id: string) => void
-  onOpenMixer: () => void
   onOpenAlign?: () => void
   onOpenLayout?: () => void
   onTogglePlay: () => void
@@ -44,7 +43,6 @@ export default function MultitrackToolbar(props: {
     duration,
     activeLayoutId,
     onSelectLayout,
-    onOpenMixer,
     onOpenAlign,
     onOpenLayout,
     onTogglePlay,
@@ -76,7 +74,8 @@ export default function MultitrackToolbar(props: {
         aria-label="Seek"
       />
       <div className="multitrack-toolbar__row2">
-        <div className="multitrack-layout-strip" role="radiogroup" aria-label="Layout">
+        <div className="multitrack-layout-strip">
+          <div role="radiogroup" aria-label="Layout" style={{ display: 'contents' }}>
           {MULTITRACK_LAYOUT_PRESETS.map((preset) => (
             <Pressable
               key={preset.id}
@@ -93,18 +92,15 @@ export default function MultitrackToolbar(props: {
               <LayoutGlyph areas={preset.areas} columns={preset.columns} rows={preset.rows} />
             </Pressable>
           ))}
-        </div>
+          </div>
         {onOpenLayout && <Pressable type="button" intensity="soft" onClick={onOpenLayout} className="multitrack-toolbar__chip" aria-label="Layout settings">Layout</Pressable>}
+        </div>
         {onOpenAlign && (
           <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Editor">
             <SlidersHorizontal className="h-4 w-4" />
             Editor
           </Pressable>
         )}
-        <Pressable type="button" intensity="soft" onClick={onOpenMixer} className="multitrack-toolbar__chip" aria-label="Mixer">
-          <SlidersHorizontal className="h-4 w-4" />
-          Mixer
-        </Pressable>
       </div>
     </footer>
   )
