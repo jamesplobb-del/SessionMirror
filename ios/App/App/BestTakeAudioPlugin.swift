@@ -1272,21 +1272,26 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             if let backingTrack = backingAsset.tracks(withMediaType: .audio).first {
                 // Backing audio never extends the export past the panels' own
                 // duration — trim it down if it's longer (e.g. a full song).
-                let backingDuration = min(backingAsset.duration, longestDuration)
-                let backingRange = CMTimeRange(start: .zero, duration: backingDuration)
-                if let compositionBacking = composition.addMutableTrack(
-                    withMediaType: .audio,
-                    preferredTrackID: kCMPersistentTrackID_Invalid
-                ) {
-                    do {
-                        try compositionBacking.insertTimeRange(backingRange, of: backingTrack, at: .zero)
-                        let gain = Float(backingDict["gain"] as? Double ?? 1.0)
-                        let parameters = AVMutableAudioMixInputParameters(track: compositionBacking)
-                        parameters.setVolume(gain, at: .zero)
-                        audioParameters.append(parameters)
-                    } catch {
-                        call.reject("The backing audio could not be added to the export", nil, error)
-                        return
+                let insertSec = max(0, (backingDict["insertAtSec"] as? NSNumber)?.doubleValue ?? 0)
+                let backingInsert = CMTime(seconds: insertSec, preferredTimescale: 600)
+                let remaining = CMTimeSubtract(longestDuration, backingInsert)
+                if remaining > CMTime.zero {
+                    let backingDuration = min(backingAsset.duration, remaining)
+                    let backingRange = CMTimeRange(start: .zero, duration: backingDuration)
+                    if let compositionBacking = composition.addMutableTrack(
+                        withMediaType: .audio,
+                        preferredTrackID: kCMPersistentTrackID_Invalid
+                    ) {
+                        do {
+                            try compositionBacking.insertTimeRange(backingRange, of: backingTrack, at: backingInsert)
+                            let gain = Float(backingDict["gain"] as? Double ?? 1.0)
+                            let parameters = AVMutableAudioMixInputParameters(track: compositionBacking)
+                            parameters.setVolume(gain, at: .zero)
+                            audioParameters.append(parameters)
+                        } catch {
+                            call.reject("The backing audio could not be added to the export", nil, error)
+                            return
+                        }
                     }
                 }
             }

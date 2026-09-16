@@ -33,7 +33,7 @@ interface PersistedMultitrackSession {
   aspectRatio?: MultitrackSession['aspectRatio']
   endSec?: number
   panelIds?: string[]
-  panelDetails?: Array<Pick<import('../types').PerformancePanelState, 'label' | 'frame' | 'overlay' | 'hidden' | 'timelineOffsetMs' | 'sectionAudio'>>
+  panelDetails?: Array<Pick<import('../types').PerformancePanelState, 'label' | 'frame' | 'overlay' | 'hidden' | 'timelineOffsetMs' | 'sectionAudio' | 'mirrored'>>
   /** Take id per performance panel slot, aligned with the layout's panel order. */
   panelTakeIds: (string | null)[]
   /** Received parts belong to this project, independently of the local Vault. */
@@ -62,7 +62,7 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
       aspectRatio: session.aspectRatio,
       endSec: session.endSec,
       panelIds: performancePanels.map(p => p.id),
-      panelDetails: performancePanels.map(p => ({ frame: p.frame, sectionAudio: p.sectionAudio, label: p.label, overlay: p.overlay, hidden: p.hidden, timelineOffsetMs: p.timelineOffsetMs })),
+      panelDetails: performancePanels.map(p => ({ frame: p.frame, sectionAudio: p.sectionAudio, label: p.label, overlay: p.overlay, hidden: p.hidden, timelineOffsetMs: p.timelineOffsetMs, mirrored: p.mirrored })),
       panelTakeIds: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.take?.id ?? null : null,
       ),

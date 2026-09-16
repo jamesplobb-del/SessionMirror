@@ -16,11 +16,12 @@
  * not read from the band books, so they start where the string class starts,
  * in D.
  *
- * Ranges are *written* (what is printed on the page) and practical rather than
- * professional: they decide which octave a scale lands in, and overshooting
- * here is what puts a 2-octave trumpet scale on double high B♭. The wind
- * numbers are Learn Your Instrument's chromatic-course bounds, which come from
- * the standard printed fingering charts.
+ * `range` is the practical teaching compass: it decides which octave a default
+ * scale lands in, so a 2-octave trumpet exercise stays on B♭3–B♭5 instead of
+ * double high B♭. `fullRange` is what the range picker offers: the lowest note
+ * written for the instrument (not pedals or other extreme lows) up to the top
+ * of the professional published range. The wind teaching numbers follow Learn
+ * Your Instrument's chromatic-course bounds.
  *
  * Viola uses the shared alto-clef notation map.
  */
@@ -52,6 +53,11 @@ export interface StaffJumperInstrument {
   /** Comfortable written range — the notes this player reads off the page. */
   range: WrittenRange
   /**
+   * Written compass for the range picker: lowest published note up to the
+   * professional top. Defaults to `range` when a horn has no extra notes.
+   */
+  fullRange?: WrittenRange
+  /**
    * Written key of this instrument's first scale: concert B♭ major as this
    * instrument spells it, or D for strings.
    */
@@ -70,11 +76,14 @@ export interface StaffJumperInstrument {
 
 /** MIDI numbers so the table below reads like note names. */
 const N = {
-  E1: 28, Bb1: 34,
-  C2: 36, E2: 40, F2: 41, Bb2: 46, C3: 48, Eb3: 51,
-  D3: 50, E3: 52, F3: 53, Fs3: 54, G3: 55, Bb3: 58,
-  C4: 60, D4: 62, F4: 65, G4: 67, Bb4: 70,
-  C5: 72, D5: 74, A5: 81, C6: 84, E6: 88, Fs6: 90, G6: 91,
+  A0: 21,
+  C1: 24, E1: 28, F1: 29, A1: 33, Bb1: 34, B1: 35,
+  C2: 36, E2: 40, F2: 41, Fs2: 42, Bb2: 46,
+  C3: 48, Eb3: 51, D3: 50, E3: 52, F3: 53, Fs3: 54, G3: 55, A3: 57, Bb3: 58, B3: 59,
+  C4: 60, D4: 62, F4: 65, G4: 67, A4: 69, Bb4: 70,
+  C5: 72, D5: 74, F5: 77, G5: 79, A5: 81, Bb5: 82,
+  C6: 84, E6: 88, F6: 89, Fs6: 90, G6: 91, A6: 93, B6: 95,
+  C7: 96, D7: 98, E7: 100, F7: 101, A7: 105, C8: 108,
 } as const
 
 /**
@@ -103,6 +112,8 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'trumpet', name: 'B♭ Trumpet', shortName: 'Trumpet', family: 'Brass',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Fs3, N.C6),
+    // Lowest written F♯, then up to double high A for fun.
+    fullRange: reads(N.Fs3, N.A6),
   },
   {
     // Written F4 rather than the F3 some books print: it sounds concert B♭3,
@@ -110,28 +121,33 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'french-horn', name: 'French Horn (F)', shortName: 'Horn', family: 'Brass',
     clef: 'treble', transposition: 'f', homeKey: 'F', homeRootMidi: N.F4,
     range: reads(N.F3, N.C6),
+    fullRange: reads(N.F2, N.C7),
   },
   {
     id: 'trombone', name: 'Trombone', shortName: 'Trombone', family: 'Brass',
     clef: 'bass', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb2,
     range: reads(N.E2, N.Bb4),
+    fullRange: reads(N.E2, N.Bb5),
   },
   {
     id: 'euphonium', name: 'Euphonium / Baritone (bass clef)', shortName: 'Euphonium', family: 'Brass',
     clef: 'bass', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb2,
     range: reads(N.E2, N.Bb4),
+    fullRange: reads(N.Bb1, N.Bb5),
   },
   {
     // The same horn reading a B♭ treble part, which is how a lot of band and
-    // brass-band parts are printed.
+    // brass-band parts are printed. Concert B♭5 is written C7.
     id: 'euphonium-treble', name: 'Euphonium / Baritone (treble clef)', shortName: 'Euphonium (T.C.)', family: 'Brass',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Fs3, N.C6),
+    fullRange: reads(N.Fs3, N.C7),
   },
   {
     id: 'tuba', name: 'Tuba', shortName: 'Tuba', family: 'Brass',
     clef: 'bass', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb1,
     range: reads(N.E1, N.Bb3),
+    fullRange: reads(N.E1, N.Bb4),
   },
 
   /* ── Woodwinds ── */
@@ -139,57 +155,68 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'flute', name: 'Flute', shortName: 'Flute', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb4,
     range: reads(N.C4, N.G6),
+    fullRange: reads(N.B3, N.D7),
   },
   {
     id: 'piccolo', name: 'Piccolo', shortName: 'Piccolo', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb4,
     range: reads(N.D4, N.G6),
+    fullRange: reads(N.D4, N.D7),
   },
   {
     id: 'oboe', name: 'Oboe', shortName: 'Oboe', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb4,
     range: reads(N.Bb3, N.G6),
+    fullRange: reads(N.Bb3, N.C7),
   },
   {
     id: 'clarinet', name: 'B♭ Clarinet', shortName: 'Clarinet', family: 'Woodwind',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.E3, N.C6),
+    fullRange: reads(N.E3, N.C7),
   },
   {
     id: 'bass-clarinet', name: 'Bass Clarinet', shortName: 'Bass Clarinet', family: 'Woodwind',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Eb3, N.C6),
+    fullRange: reads(N.Eb3, N.C7),
   },
   {
     id: 'soprano-sax', name: 'B♭ Soprano Sax', shortName: 'Soprano Sax', family: 'Woodwind',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Bb3, N.Fs6),
+    fullRange: reads(N.Bb3, N.F7),
   },
   {
     id: 'alto-sax', name: 'E♭ Alto Sax', shortName: 'Alto Sax', family: 'Woodwind',
     clef: 'treble', transposition: 'eb', homeKey: 'G', homeRootMidi: N.G4,
     range: reads(N.Bb3, N.Fs6),
+    fullRange: reads(N.Bb3, N.F7),
   },
   {
     id: 'tenor-sax', name: 'B♭ Tenor Sax', shortName: 'Tenor Sax', family: 'Woodwind',
     clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Bb3, N.Fs6),
+    fullRange: reads(N.Bb3, N.F7),
   },
   {
     id: 'bari-sax', name: 'E♭ Baritone Sax', shortName: 'Bari Sax', family: 'Woodwind',
     clef: 'treble', transposition: 'eb', homeKey: 'G', homeRootMidi: N.G4,
     range: reads(N.Bb3, N.Fs6),
+    fullRange: reads(N.A3, N.F7),
   },
   {
     id: 'bassoon', name: 'Bassoon', shortName: 'Bassoon', family: 'Woodwind',
     clef: 'bass', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb2,
     range: reads(N.Bb1, N.D5),
+    fullRange: reads(N.Bb1, N.C6),
   },
   {
     // Not a band instrument, so it keeps its own home octave of C.
     id: 'recorder', name: 'Soprano Recorder', shortName: 'Recorder', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.C4, N.C6),
+    fullRange: reads(N.C4, N.C7),
   },
 
   /* ── Strings ── */
@@ -197,6 +224,7 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'violin', name: 'Violin', shortName: 'Violin', family: 'Strings',
     clef: 'treble', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D4,
     range: reads(N.G3, N.G6),
+    fullRange: reads(N.G3, N.A7),
   },
   {
     // D3 is the open D string and first position; the octave below reads just
@@ -204,32 +232,37 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'viola', name: 'Viola', shortName: 'Viola', family: 'Strings',
     clef: 'alto', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D4,
     range: reads(N.C3, N.E6),
+    fullRange: reads(N.C3, N.E7),
   },
   {
     id: 'cello', name: 'Cello', shortName: 'Cello', family: 'Strings',
     clef: 'bass', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D3,
     range: reads(N.C2, N.C5),
+    fullRange: reads(N.C2, N.E6),
   },
   {
     id: 'double-bass', name: 'Double Bass', shortName: 'Double Bass', family: 'Strings',
     clef: 'bass', transposition: 'concert', homeKey: 'D', homeRootMidi: N.D3,
     range: reads(N.E2, N.G4),
+    fullRange: reads(N.E2, N.G5),
   },
   {
     id: 'guitar', name: 'Guitar', shortName: 'Guitar', family: 'Strings',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.E3, N.E6),
+    fullRange: reads(N.E3, N.E7),
   },
   {
     id: 'bass-guitar', name: 'Bass Guitar', shortName: 'Bass Guitar', family: 'Strings',
     clef: 'bass', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C3,
     range: reads(N.E2, N.G4),
+    fullRange: reads(N.E2, N.G5),
   },
   {
     id: 'ukulele', name: 'Ukulele', shortName: 'Ukulele', family: 'Strings',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
-    // Includes a standard 12-fret soprano; extended ranges need more frets.
     range: reads(N.C4, N.A5),
+    fullRange: reads(N.C4, N.A6),
   },
 
   /* ── Voice & keys ── */
@@ -237,21 +270,25 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'voice-treble', name: 'Voice (treble clef)', shortName: 'Voice', family: 'Voice & keys',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.G3, N.A5),
+    fullRange: reads(N.G3, N.F6),
   },
   {
     id: 'voice-bass', name: 'Voice (bass clef)', shortName: 'Voice (bass)', family: 'Voice & keys',
     clef: 'bass', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C3,
     range: reads(N.F2, N.F4),
+    fullRange: reads(N.E2, N.C5),
   },
   {
     id: 'piano-treble', name: 'Piano / Keys (right hand)', shortName: 'Piano (R.H.)', family: 'Voice & keys',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.C4, N.C6),
+    fullRange: reads(N.C4, N.C8),
   },
   {
     id: 'piano-bass', name: 'Piano / Keys (left hand)', shortName: 'Piano (L.H.)', family: 'Voice & keys',
     clef: 'bass', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C3,
     range: reads(N.C2, N.C4),
+    fullRange: reads(N.A0, N.C4),
   },
 ] as const
 
@@ -307,6 +344,9 @@ export function homeKeyForInstrument(
 /**
  * Written range for a setup, preferring the chosen instrument's own bounds and
  * falling back to the written-pitch table when the player has gone custom.
+ *
+ * Teaching compass only — default 1- and 2-octave scales sit here so a
+ * trumpet exercise does not open on double high B♭.
  */
 export function resolveWrittenRange(
   instrumentId: string | null | undefined,
@@ -318,6 +358,21 @@ export function resolveWrittenRange(
     getStaffJumperInstrument(instrumentId)?.range ??
     getWrittenRange(transposition, clef, tunerInstrument)
   )
+}
+
+/**
+ * Written compass for the range picker: lowest published note through the
+ * professional top. Falls back to the teaching range when a horn has none.
+ */
+export function resolveFullWrittenRange(
+  instrumentId: string | null | undefined,
+  transposition: StaffJumperTransposition,
+  clef: StaffJumperClef,
+  tunerInstrument: TunerInstrument,
+): WrittenRange {
+  const instrument = getStaffJumperInstrument(instrumentId)
+  if (instrument) return instrument.fullRange ?? instrument.range
+  return getWrittenRange(transposition, clef, tunerInstrument)
 }
 
 /**

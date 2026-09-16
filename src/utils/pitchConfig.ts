@@ -78,7 +78,9 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
   description: 'Reads cents exactly, and eases between notes so slides stay readable.',
-  minHz: 38,
+  // Piano A0 is 27.5 Hz; keep the floor below it so the bottom octave is not
+  // octave-shifted up by normalizeInstrumentFrequency.
+  minHz: 26,
   maxHz: 1700,
   clarityMin: 0.76,
   clarityMinMic: 0.84,

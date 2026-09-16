@@ -313,7 +313,7 @@ export interface BestTakeAudioPluginType {
       startSec: number
       endSec?: number
     }>
-    backingAudio: { path: string; gain: number } | null
+    backingAudio: { path: string; gain: number; insertAtSec?: number } | null
   }): Promise<NativeMultitrackRenderResult>
   prepareMultitrackMonitor(options: {
     sources: NativeMultitrackMonitorSource[]

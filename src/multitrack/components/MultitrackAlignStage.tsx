@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Check, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
@@ -35,7 +35,6 @@ export interface AlignClipState {
 }
 
 interface MultitrackAlignStageProps {
-  mixerControls?: ReactNode
   isOpen: boolean
   panels: PerformancePanelState[]
   sheetMusic: SheetMusicPanelState
@@ -54,6 +53,9 @@ interface MultitrackAlignStageProps {
   onMoveImage: (cueId: string, startSec: number) => void
   onRemoveImage: (cueId: string) => void
   onSectionChange: (panelId: string, startSec: number | undefined, endSec: number | undefined) => void
+  /** Each track carries its own level here — the project has no separate mixer. */
+  onPanelVolumeChange: (panelId: string, volume: number) => void
+  onPanelMuteToggle: (panelId: string, muted: boolean) => void
   onRestoreSheetMusic: (sheetMusic: SheetMusicPanelState) => void
   onDone: (
     changes: Array<{ panelId: string; takeId: string; offsetMs: number; trimStart: number; trimEnd: number | undefined }>,
@@ -325,7 +327,8 @@ function ClipTrack({
 }
 
 export default function MultitrackAlignStage({
-  mixerControls,
+  onPanelVolumeChange,
+  onPanelMuteToggle,
   isOpen,
   panels,
   sheetMusic,
@@ -953,6 +956,31 @@ export default function MultitrackAlignStage({
                         {clip.windowed ? 'Only here' : 'All song'}
                       </Pressable>
                     ) : null}
+                    {clip ? (
+                      <div className="multitrack-align-stage__track-audio">
+                        <Pressable
+                          type="button"
+                          intensity="icon"
+                          className={`multitrack-align-stage__track-mute ${panel.muted ? 'is-muted' : ''}`}
+                          aria-label={`${panel.muted ? 'Unmute' : 'Mute'} ${label}`}
+                          aria-pressed={panel.muted === true}
+                          onClick={() => onPanelMuteToggle(panel.id, !panel.muted)}
+                        >
+                          {panel.muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                        </Pressable>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          aria-label={`${label} volume`}
+                          value={panel.volume ?? 1}
+                          data-muted={panel.muted === true ? 'true' : 'false'}
+                          onChange={(event) => onPanelVolumeChange(panel.id, Number(event.target.value))}
+                          className="multitrack-align-stage__track-volume"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                   <div
                     className="multitrack-align-stage__track-lane"
@@ -989,10 +1017,6 @@ export default function MultitrackAlignStage({
         </div>
       </div>
 
-      {mixerControls && <details className="multitrack-editor-mixer">
-        <summary>Mix <span aria-hidden>⌄</span></summary>
-        {mixerControls}
-      </details>}
       <footer className="multitrack-align-stage__transport">
         <Pressable
           type="button"

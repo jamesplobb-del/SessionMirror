@@ -430,16 +430,25 @@ function contourDegree(contour: PhraseContour, progress: number, topDegree: numb
 }
 
 /** The degree of the wanted class that lies closest to where the line already is. */
-function nearestDegreeOfClass(near: number, degreeClass: number, topDegree: number): number {
-  let best = degreeClass
+function nearestDegreeOfClass(
+  near: number,
+  degreeClass: number,
+  topDegree: number,
+  tonicOffset = 0,
+): number {
+  const residue = ((tonicOffset + degreeClass) % 7 + 7) % 7
+  let best = residue
   let bestDistance = Number.POSITIVE_INFINITY
-  for (let degree = degreeClass; degree <= topDegree; degree += 7) {
+  let found = false
+  for (let degree = residue; degree <= topDegree; degree += 7) {
+    found = true
     const distance = Math.abs(degree - near)
     if (distance < bestDistance) {
       bestDistance = distance
       best = degree
     }
   }
+  if (!found) return Math.max(0, Math.min(topDegree, residue))
   return best
 }
 
@@ -456,6 +465,12 @@ export interface PhraseOptions {
   /** Written length of each note the phrase has room for, in sixteenths. */
   noteDurations: readonly number[]
   instrument: TunerInstrument
+  /**
+   * Pool index of the tonic, modulo 7. Zero when the window starts on the
+   * tonic; non-zero when the player tapped a range that begins mid-scale, so
+   * cadences still land on do/sol rather than on the lowest note.
+   */
+  tonicOffset?: number
 }
 
 /**
@@ -499,6 +514,7 @@ export function buildPhraseSteps(options: PhraseOptions): PatternStep[] {
     contourDegree(contour, 1, topDegree),
     CADENCE_DEGREE_CLASS[cadence],
     topDegree,
+    options.tonicOffset ?? 0,
   )
 
   const steps: PatternStep[] = []

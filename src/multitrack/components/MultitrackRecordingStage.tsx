@@ -16,6 +16,8 @@ import {
 import type { RefObject } from 'react'
 import type { Take } from '../../types'
 import IOSSwitch from '../../components/ui/IOSSwitch'
+import { useActionSheet } from '../../context/ActionSheetContext'
+import { useHeadphoneOutput } from '../../hooks/useHeadphoneOutput'
 import Pressable from '../../components/ui/Pressable'
 import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import MetronomeIcon from '../../components/icons/MetronomeIcon'
@@ -115,6 +117,8 @@ export default function MultitrackRecordingStage({
   onRetryTake,
   onClose,
 }: MultitrackRecordingStageProps) {
+  const { showAlert } = useActionSheet()
+  const headphonesConnected = useHeadphoneOutput()
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const internalReviewVideoRef = useRef<HTMLMediaElement | null>(null)
@@ -466,11 +470,25 @@ export default function MultitrackRecordingStage({
             <label className="multitrack-countin-sheet__row">
               <span>Click during recording</span>
               <IOSSwitch
-                checked={practice.clickEnabled}
-                onChange={(clickEnabled) => onPracticeChange({ clickEnabled })}
+                checked={practice.clickEnabled && headphonesConnected}
+                onChange={(clickEnabled) => {
+                  if (clickEnabled && !headphonesConnected) {
+                    void showAlert({
+                      title: 'Connect headphones for a click track',
+                      message:
+                        'On the speaker the click bleeds into your recording. Plug in or connect headphones (wired or Bluetooth) to run the click while you record. Your count-in still plays either way.',
+                    })
+                    return
+                  }
+                  onPracticeChange({ clickEnabled })
+                }}
               />
             </label>
-            <p className="multitrack-countin-sheet__hint">Use headphones for the click to work properly during recording; speaker clicks can be picked up by the microphone. Without headphones, leave this off and use the lead-in count-in below.</p>
+            <p className="multitrack-countin-sheet__hint">
+              {headphonesConnected
+                ? 'Headphones connected, so the click can run through the whole take without printing into your recording.'
+                : 'Needs headphones: through the speaker the microphone picks the click up and prints it into the take. Without them you still get the lead-in count-in below, then silence to play against.'}
+            </p>
             {hasBacking && !practice.clickEnabled ? (
               <p className="multitrack-countin-sheet__hint">
                 Off by default with a backing track — its tempo rarely matches the click. Turn it on

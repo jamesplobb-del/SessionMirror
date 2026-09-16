@@ -112,9 +112,9 @@ try {
   assert.equal((await exportMultitrackSession(project,layout,26)).ok,true)
   const payload=globalThis.exportCalls[0]
   assert.equal(payload.aspectRatio,'1:1')
-  assert.equal(payload.durationSeconds,26)
+  assert.equal(payload.durationSeconds,28)
   assert.equal(payload.sources[0].id,'extra-1','floating layers render above base videos')
-  assert.equal(payload.sources[0].insertAtSec,20)
+  assert.equal(payload.sources[0].insertAtSec,22)
   assert.ok(Math.abs(payload.sources[0].sourceInSec-2.3)<1e-9)
   assert.equal(payload.sources[0].sectionEndSec,24)
   assert.equal(payload.sources[1].volume,.4)

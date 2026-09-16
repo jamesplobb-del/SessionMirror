@@ -70,5 +70,29 @@ try {
  }
  assert.ok(scaleOpens<=4,'hard runs must not routinely open with a scale')
  assert.ok(barOneEqualsBarThree/phraseCount<0.35,'bar three must not photocopy bar one')
- console.log(`PASS: ${checked} rhythm slots across meters/levels/seeds, pulse grouping, rest exclusions, spacing, mixed-beam hooks, 400 custom-note slots, phrase variety (${barOneEqualsBarThree}/${phraseCount} bar-1 reprints), and non-scale openings (${scaleOpens}/40).`)
+
+ const fifth={key:'C',scaleMode:'major',range:'1-octave',rangeLowMidi:60,rangeHighMidi:67,difficulty:'easy',clef:'treble',tunerInstrument:'winds',transposition:'bb',instrumentId:'trumpet',playerModel:'frog',meter:'simple',tempoBpm:80,metronome:true,drone:false,lives:false,sessionSeed:4}
+ const fifthPool=m.midiPoolForConfig(fifth)
+ assert.deepEqual(fifthPool,[60,62,64,65,67])
+ const fifthPreview=m.getScaleRangePreview(fifth)
+ assert.equal(fifthPreview.lowLabel,'C4')
+ assert.equal(fifthPreview.highLabel,'G4')
+ assert.equal(fifthPreview.noteCount,5)
+ for(let i=0;i<80;i++){const note=m.getTargetNoteAtStep(fifth,i);if(!note.isRest) assert.ok(fifthPool.includes(note.midi),'fifth-range note must stay inside C4–G4')}
+
+ const wide={key:'C',scaleMode:'major',range:'1-octave',rangeLowMidi:60,rangeHighMidi:81,difficulty:'medium',clef:'treble',tunerInstrument:'winds',transposition:'bb',instrumentId:'trumpet',playerModel:'frog',meter:'simple',tempoBpm:88,metronome:true,drone:false,lives:false,sessionSeed:9}
+ const widePool=m.midiPoolForConfig(wide)
+ assert.equal(widePool[0],60)
+ assert.equal(widePool.at(-1),81)
+ assert.ok(widePool.length>8,'trumpet C4–A5 must hold more than one octave of the scale')
+ const sounded=[]
+ for(let i=0;i<160;i++){const note=m.getTargetNoteAtStep(wide,i);if(!note.isRest){assert.ok(widePool.includes(note.midi));sounded.push(note.midi)}}
+ assert.ok(Math.max(...sounded)-Math.min(...sounded)>12,'a wide staff range must not keep the whole exercise in one octave')
+
+ const scream={key:'C',scaleMode:'major',range:'1-octave',rangeLowMidi:60,rangeHighMidi:93,difficulty:'medium',clef:'treble',tunerInstrument:'winds',transposition:'bb',instrumentId:'trumpet',playerModel:'frog',meter:'simple',tempoBpm:88,metronome:true,drone:false,lives:false,sessionSeed:11}
+ const screamPool=m.midiPoolForConfig(scream)
+ assert.equal(screamPool.at(-1),93,'trumpet custom range must keep double high A')
+ const teaching=m.exerciseMidiBounds({key:'C',scaleMode:'major',range:'2-octave',difficulty:'easy',clef:'treble',tunerInstrument:'winds',transposition:'bb',instrumentId:'trumpet'})
+ assert.ok(teaching.maxMidi<=84,'default 2-octave trumpet must stay in the teaching compass')
+ console.log(`PASS: ${checked} rhythm slots across meters/levels/seeds, pulse grouping, rest exclusions, spacing, mixed-beam hooks, 400 custom-note slots, phrase variety (${barOneEqualsBarThree}/${phraseCount} bar-1 reprints), non-scale openings (${scaleOpens}/40), and custom staff ranges.`)
 } finally {await rm(dir,{recursive:true,force:true})}

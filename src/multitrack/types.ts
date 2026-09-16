@@ -31,6 +31,12 @@ export interface PerformancePanelState {
   /** Mixer state shared by preview, monitoring and export. */
   volume?: number
   muted?: boolean
+  /**
+   * Parts shot on the front camera play back and export mirrored, so the part
+   * matches the self-view the player performed against. Held per panel so a
+   * reopened project still mirrors — the take in the Vault is never modified.
+   */
+  mirrored?: boolean
   /** Trim: timeline 0 maps to trimStartSec into the take; trimEndSec caps it. */
   trimStartSec?: number
   trimEndSec?: number

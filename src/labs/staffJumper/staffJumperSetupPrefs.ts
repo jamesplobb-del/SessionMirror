@@ -32,6 +32,9 @@ export interface StaffJumperSetupPrefs {
   scaleMode: StaffJumperScaleMode
   key: StaffJumperKey
   range: StaffJumperRange
+  /** Inclusive written MIDI of a tapped staff range. Both or neither. */
+  rangeLowMidi?: number
+  rangeHighMidi?: number
   difficulty: StaffJumperDifficulty
   meter: StaffJumperMeter
   tempoBpm: number
@@ -88,10 +91,21 @@ export function loadStaffJumperSetupPrefs(): StaffJumperSetupPrefs | null {
     const customNotes = Array.isArray(parsed.customNotes)
       ? parsed.customNotes.filter((note): note is number => Number.isInteger(note) && note >= 0 && note < 12)
       : DEFAULTS.customNotes
+    const lowMidi = Number(parsed.rangeLowMidi)
+    const highMidi = Number(parsed.rangeHighMidi)
+    const hasMidiRange =
+      Number.isInteger(lowMidi) &&
+      Number.isInteger(highMidi) &&
+      lowMidi >= 0 &&
+      highMidi >= 0 &&
+      lowMidi <= 127 &&
+      highMidi <= 127
     return {
       scaleMode,
       key,
       range,
+      rangeLowMidi: hasMidiRange ? Math.min(lowMidi, highMidi) : undefined,
+      rangeHighMidi: hasMidiRange ? Math.max(lowMidi, highMidi) : undefined,
       difficulty,
       meter,
       tempoBpm:

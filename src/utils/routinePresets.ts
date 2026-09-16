@@ -512,9 +512,9 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
   ],
 }
 
-const tuned = (id: string, title: string, topic: RoutineTopic, hint: string, drone = false): StepTemplate => ({
+const tuned = (id: string, title: string, topic: RoutineTopic, hint: string, drone = false, bpm?: number): StepTemplate => ({
   id, title, topic, kind: 'tune', minutes: 4, hint,
-  desk: instrumentId => deskFor(instrumentId, { drone, pitch: true }),
+  desk: instrumentId => deskFor(instrumentId, { drone, pitch: true, bpm }),
 })
 const clicked = (id: string, title: string, topic: RoutineTopic, hint: string, bpm = 72): StepTemplate => ({
   id, title, topic, kind: 'metro', minutes: 4, hint,
@@ -536,7 +536,7 @@ const seen = (id: string, title: string, topic: RoutineTopic, hint: string): Ste
  */
 const SPECIALTIES: Record<string, StepTemplate[]> = {
   trumpet: [
-    clicked('buzzing', 'Breathing & mouthpiece', 'warmup', 'Breath patterns, easy buzzes, then transfer the sound to the horn.', 60),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Breath patterns, easy buzzes, then transfer the sound to the horn.', true, 60),
     tuned('long-tones', 'Long tones', 'long-tones', 'Begin in the middle register; keep air and sound steady.', true),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Easy harmonic patterns with uninterrupted air.', 68),
     clicked('technique', 'Valve coordination', 'technique', 'Clarke-style finger patterns, clean and even.', 80),
@@ -550,21 +550,21 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
     clicked('transposition', 'Transposition', 'sight-reading', 'Short lines in a different horn key each day.', 60),
   ],
   trombone: [
-    clicked('buzzing', 'Breathing & mouthpiece', 'warmup', 'Free air, easy buzz, then connect it to the slide.', 60),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Free air, easy buzz, then connect it to the slide.', true, 60),
     tuned('long-tones', 'Remington long tones', 'long-tones', 'Sustain a centered sound through every register.', true),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Move through the harmonic series without excess motion.', 66),
     clicked('technique', 'Slide coordination', 'technique', 'Move early and match tongue, air, and slide.', 72),
     heard('legato', 'Legato tonguing', 'articulation', 'Record smooth connections without glissandi.', 68),
   ],
   euphonium: [
-    clicked('buzzing', 'Breathing & mouthpiece', 'warmup', 'Full relaxed breaths and an easy, resonant buzz.', 60),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Full relaxed breaths and an easy, resonant buzz.', true, 60),
     tuned('long-tones', 'Long tones', 'long-tones', 'Match a drone through the middle and low register.', true),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Even harmonic patterns with relaxed airflow.', 66),
     heard('lyrical', 'Lyrical studies', 'etude', 'Record a Bordogni-style phrase and listen for line.'),
     clicked('articulation', 'Articulation', 'articulation', 'Keep single and multiple tonguing resonant.', 80),
   ],
   tuba: [
-    clicked('buzzing', 'Breathing & mouthpiece', 'warmup', 'Large relaxed breaths, buzzes, and easy first notes.', 56),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Large relaxed breaths, buzzes, and easy first notes.', true, 56),
     tuned('long-tones', 'Low-register long tones', 'long-tones', 'Start notes cleanly and sustain a resonant core.', true),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Slow harmonic patterns without forcing.', 60),
     clicked('technique', 'Valve & scale patterns', 'technique', 'Coordinate air and valves across the full range.', 68),

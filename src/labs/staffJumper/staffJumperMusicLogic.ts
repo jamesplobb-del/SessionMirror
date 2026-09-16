@@ -8,7 +8,6 @@ import {
   NOTE_SPACING_PX,
   STAFF_FIRST_NOTE_X,
   STAFF_MIDDLE_Y,
-  STAFF_NOTE_LETTERS,
   type StaffJumperClef,
   type StaffNoteLetter,
 } from './staffNotationMap'
@@ -16,7 +15,11 @@ import {
   STAFF_CENTER_MIDI,
   type StaffJumperTransposition,
 } from './staffJumperInstrumentRanges'
-import { preferredScaleRootMidi, resolveWrittenRange } from './staffJumperInstruments'
+import {
+  preferredScaleRootMidi,
+  resolveFullWrittenRange,
+  resolveWrittenRange,
+} from './staffJumperInstruments'
 import {
   getPhraseNoteDurations,
   getPhraseSpan,
@@ -141,6 +144,14 @@ export interface StaffJumperConfig {
   clef: StaffJumperClef
   tunerInstrument: TunerInstrument
   transposition: StaffJumperTransposition
+  /**
+   * Inclusive written MIDI of the exercise. When both are set they override
+   * the 1-octave / 2-octave preset: the run uses every scale note between
+   * them, so a trumpet C to G is a fifth and C to the A above the staff is
+   * more than an octave.
+   */
+  rangeLowMidi?: number
+  rangeHighMidi?: number
   /**
    * The instrument the player picked, or null when they set the clef and
    * written pitch by hand. It supplies the written range and the octave the
@@ -408,16 +419,6 @@ function scalePattern(scaleMode: StaffJumperScaleMode): readonly number[] {
   return scaleMode === 'major' ? MAJOR_PATTERN : MINOR_PATTERN
 }
 
-const NATURAL_PITCH_CLASS: Record<StaffNoteLetter, number> = {
-  C: 0,
-  D: 2,
-  E: 4,
-  F: 5,
-  G: 7,
-  A: 9,
-  B: 11,
-}
-
 interface WrittenScaleNote {
   letter: StaffNoteLetter
   octave: number
@@ -425,44 +426,109 @@ interface WrittenScaleNote {
   label: string
 }
 
-function writtenScaleNote(
-  key: StaffJumperKey,
-  pitchClass: number,
-  degreeIndex: number,
-  rootOctave = 4,
-): WrittenScaleNote {
-  const rootLetter = key[0] as StaffNoteLetter
-  const rootLetterIndex = STAFF_NOTE_LETTERS.indexOf(rootLetter)
-  const absoluteLetterIndex = rootLetterIndex + degreeIndex
-  const letter = STAFF_NOTE_LETTERS[((absoluteLetterIndex % 7) + 7) % 7]!
-  const octave = rootOctave + Math.floor(absoluteLetterIndex / 7)
-  const naturalPitchClass = NATURAL_PITCH_CLASS[letter]
-  const accidentalOffset = ((pitchClass - naturalPitchClass) % 12 + 12) % 12
-  const accidental = accidentalOffset === 1 ? '#' : accidentalOffset === 11 ? 'b' : null
-
-  return {
-    letter,
-    octave,
-    accidental,
-    label: `${letter}${accidental ?? ''}`,
-  }
-}
-
 export function pitchClassLabel(pitchClass: number, key: StaffJumperKey): string {
   const normalized = ((pitchClass % 12) + 12) % 12
   return prefersFlatSpelling(key) ? FLAT_LABELS[normalized]! : SHARP_LABELS[normalized]!
 }
 
-function midiForScaleDegree(
-  scaleMode: StaffJumperScaleMode,
-  degreeIndex: number,
-  rootMidi: number,
+export function hasCustomMidiRange(
+  config: Pick<StaffJumperConfig, 'rangeLowMidi' | 'rangeHighMidi'>,
+): boolean {
+  return Number.isInteger(config.rangeLowMidi) && Number.isInteger(config.rangeHighMidi)
+}
+
+/**
+ * Written MIDI the exercise may use, clamped to the instrument.
+ *
+ * A tapped staff range wins. Otherwise this is the old one- or two-octave
+ * window sitting on the tonic.
+ */
+export function exerciseMidiBounds(
+  config: Pick<
+    StaffJumperConfig,
+    | 'key'
+    | 'scaleMode'
+    | 'range'
+    | 'rangeLowMidi'
+    | 'rangeHighMidi'
+    | 'clef'
+    | 'transposition'
+    | 'tunerInstrument'
+    | 'instrumentId'
+  >,
+): { minMidi: number; maxMidi: number } {
+  const teaching = resolveWrittenRange(
+    config.instrumentId,
+    config.transposition,
+    config.clef,
+    config.tunerInstrument,
+  )
+  if (hasCustomMidiRange(config)) {
+    const compass = resolveFullWrittenRange(
+      config.instrumentId,
+      config.transposition,
+      config.clef,
+      config.tunerInstrument,
+    )
+    const lo = Math.min(config.rangeLowMidi!, config.rangeHighMidi!)
+    const hi = Math.max(config.rangeLowMidi!, config.rangeHighMidi!)
+    const minMidi = Math.min(compass.maxMidi, Math.max(compass.minMidi, lo))
+    const maxMidi = Math.max(minMidi, Math.min(compass.maxMidi, hi))
+    return { minMidi, maxMidi }
+  }
+  const root = resolveScaleRootMidi(config)
+  const span = config.range === '1-octave' ? 12 : 24
+  return {
+    minMidi: Math.max(root, teaching.minMidi),
+    maxMidi: Math.min(root + span, teaching.maxMidi),
+  }
+}
+
+export function spellWrittenMidi(midi: number, key: StaffJumperKey): WrittenScaleNote {
+  const pitchClass = ((midi % 12) + 12) % 12
+  const name = pitchClassLabel(pitchClass, key)
+  const letter = name.charAt(0) as StaffNoteLetter
+  const accidental = name.includes('b') ? 'b' : name.includes('#') ? '#' : null
+  const octave = Math.floor(midi / 12) - 1
+  return {
+    letter,
+    octave,
+    accidental,
+    label: `${letter}${accidental ?? ''}${octave}`,
+  }
+}
+
+export function prettyWrittenMidi(midi: number, key: StaffJumperKey): string {
+  const written = spellWrittenMidi(midi, key)
+  return prettyNoteLabel(written.letter, written.accidental, written.octave)
+}
+
+/** Scale (or custom-pitch) notes that sit inside the exercise window. */
+export function scaleMidisInRange(config: StaffJumperConfig): number[] {
+  const { minMidi, maxMidi } = exerciseMidiBounds(config)
+  const tonic = keyPitchClass(config.key)
+  const allowed = new Set(scalePattern(config.scaleMode).map((step) => (tonic + step) % 12))
+  const notes: number[] = []
+  for (let midi = minMidi; midi <= maxMidi; midi += 1) {
+    if (allowed.has(((midi % 12) + 12) % 12)) notes.push(midi)
+  }
+  return notes
+}
+
+export function midiPoolForConfig(config: StaffJumperConfig): number[] {
+  const custom = customNotePool(config)
+  return custom.length >= 2 ? custom : scaleMidisInRange(config)
+}
+
+/** A fifth of scale notes is enough for every stepwise shape in the vocabulary. */
+export const MIN_RANGE_SCALE_NOTES = 5
+
+export function scaleNoteCountInWindow(
+  config: StaffJumperConfig,
+  minMidi: number,
+  maxMidi: number,
 ): number {
-  const pattern = scalePattern(scaleMode)
-  const octaveOffset = Math.floor(degreeIndex / 7)
-  const degreeInOctave = degreeIndex % 7
-  const semitoneFromRoot = pattern[degreeInOctave]! + octaveOffset * 12
-  return rootMidi + semitoneFromRoot
+  return midiPoolForConfig({ ...config, rangeLowMidi: minMidi, rangeHighMidi: maxMidi }).length
 }
 
 /**
@@ -531,51 +597,43 @@ export function resolveScaleRootMidi(
   return root
 }
 
-/** Custom notes are written pitches, filtered to the selected instrument range. */
+/** Custom notes are written pitches, filtered to the selected exercise window. */
 export function customNotePool(config: StaffJumperConfig): number[] {
   if (!config.customPitchClasses?.length) return []
-  const selected = new Set(config.customPitchClasses.filter(pc => Number.isInteger(pc) && pc >= 0 && pc < 12))
-  const root = resolveScaleRootMidi(config)
-  const range = resolveWrittenRange(config.instrumentId, config.transposition, config.clef, config.tunerInstrument)
-  const low = Math.max(root, range.minMidi)
-  const high = Math.min(root + (config.range === '1-octave' ? 12 : 24), range.maxMidi)
-  return Array.from({ length: Math.max(0, high - low + 1) }, (_, i) => low + i).filter(midi => selected.has(midi % 12))
+  const selected = new Set(
+    config.customPitchClasses.filter((pc) => Number.isInteger(pc) && pc >= 0 && pc < 12),
+  )
+  const { minMidi, maxMidi } = exerciseMidiBounds(config)
+  const notes: number[] = []
+  for (let midi = minMidi; midi <= maxMidi; midi += 1) {
+    if (selected.has(((midi % 12) + 12) % 12)) notes.push(midi)
+  }
+  return notes
 }
 
 const topDegreeCache = new WeakMap<object, number>()
 
 /**
- * How far up the scale this exercise may actually go.
+ * How far up the pool this exercise may actually go.
  *
- * The setting asks for one octave or two, but the instrument gets the final
- * say: a two-octave scale needs a two-octave range *starting on the tonic*,
- * and outside a handful of keys no bass voice, horn or trumpet has that. Where
- * it does not fit, the exercise is shortened at the top rather than written
- * above the instrument's practical ceiling.
+ * Degrees are indexes into `midiPoolForConfig`, so a tapped fifth (C to G) is
+ * five notes and a trumpet C-to-A-above-the-staff is as many octaves as that
+ * span holds. The old 1- / 2-octave presets still feed the pool when the
+ * player has not tapped a custom window.
  */
 function topDegreeForConfig(config: StaffJumperConfig): number {
   const cached = topDegreeCache.get(config)
   if (cached !== undefined) return cached
-
-  const custom = customNotePool(config)
-  if (custom.length >= 2) return custom.length - 1
-  const wanted = config.range === '1-octave' ? 7 : 14
-  const rootMidi = resolveScaleRootMidi(config)
-  const { maxMidi } = resolveWrittenRange(
-    config.instrumentId,
-    config.transposition,
-    config.clef,
-    config.tunerInstrument,
-  )
-  let top = 0
-  while (top < wanted && midiForScaleDegree(config.scaleMode, top + 1, rootMidi) <= maxMidi) {
-    top += 1
-  }
-  // A floor so there is always an exercise to read, even on the narrowest
-  // range — a fifth is enough for every stepwise shape in the vocabulary.
-  const resolved = Math.max(4, top)
+  const pool = midiPoolForConfig(config)
+  const resolved = Math.max(0, pool.length - 1)
   topDegreeCache.set(config, resolved)
   return resolved
+}
+
+/** Scale-degree residue of the tonic inside the pool (0 when the pool starts on it). */
+function tonicOffsetInPool(pool: number[], tonicPitchClass: number): number {
+  const index = pool.findIndex((midi) => ((midi % 12) + 12) % 12 === tonicPitchClass)
+  return index >= 0 ? index % 7 : 0
 }
 
 interface ExerciseCache {
@@ -589,14 +647,17 @@ interface ExerciseCache {
 const exerciseCache = new WeakMap<StaffJumperConfig, ExerciseCache>()
 
 /** First note of a run: tonic often, but not a scale from the floor every time. */
-function pickOpeningDegree(rng: () => number, topDegree: number): number {
-  const choices: Array<[number, number]> = [
-    [0, 2.4],
-    [2, 1.1],
-    [4, 1.6],
-  ]
-  if (topDegree >= 5) choices.push([5, 0.7])
-  if (topDegree >= 7) choices.push([7, 1.2])
+function pickOpeningDegree(rng: () => number, topDegree: number, tonicOffset: number): number {
+  const choices: Array<[number, number]> = []
+  for (let tonic = tonicOffset; tonic <= topDegree; tonic += 7) {
+    choices.push([tonic, 2.4])
+    if (tonic + 2 <= topDegree) choices.push([tonic + 2, 1.1])
+    if (tonic + 4 <= topDegree) choices.push([tonic + 4, 1.6])
+    if (tonic + 5 <= topDegree) choices.push([tonic + 5, 0.7])
+  }
+  if (choices.length === 0) {
+    choices.push([0, 1], [Math.min(2, topDegree), 1], [Math.min(4, topDegree), 1])
+  }
   const allowed = choices.filter(([degree]) => degree <= topDegree)
   return pickWeightedLocal(allowed, ([, weight]) => weight, rng)[0]
 }
@@ -646,8 +707,12 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
     cache.phraseCount,
   )
   const rng = mulberry32(seed + cache.phraseCount * 7919)
+  const pool = midiPoolForConfig(config)
+  const tonicOffset = config.customPitchClasses?.length
+    ? 0
+    : tonicOffsetInPool(pool, keyPitchClass(config.key))
   const topDegree = topDegreeForConfig(config)
-  const startDegree = cache.steps.at(-1)?.degree ?? pickOpeningDegree(rng, topDegree)
+  const startDegree = cache.steps.at(-1)?.degree ?? pickOpeningDegree(rng, topDegree, tonicOffset)
   const phrase = buildPhraseSteps({
     difficulty: config.difficulty,
     topDegree,
@@ -658,6 +723,7 @@ function appendPhrase(config: StaffJumperConfig, cache: ExerciseCache): void {
     previousPatternId: cache.lastPatternId,
     noteDurations,
     instrument: config.tunerInstrument,
+    tonicOffset,
   })
   const steps: PatternStep[] = [...phrase]
   cache.lastPatternId = phrase.at(-1)?.patternId ?? cache.lastPatternId
@@ -843,23 +909,29 @@ export function getTargetNoteAtStep(config: StaffJumperConfig, sequenceStep: num
   // step — silence never costs the player a note of the pattern they are on.
   const exerciseStep = exerciseStepForSequenceStep(config, rhythm.noteIndex)
   const degreeIndex = exerciseStep.degree
-  const rootMidi = resolveScaleRootMidi(config)
   const custom = customNotePool(config)
-  const midi = custom.length >= 2 ? custom[Math.min(degreeIndex, custom.length - 1)]! : midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
+  const usingCustom = custom.length >= 2
+  const pool = usingCustom ? custom : scaleMidisInRange(config)
+  const midi =
+    pool[Math.max(0, Math.min(degreeIndex, Math.max(0, pool.length - 1)))] ??
+    resolveScaleRootMidi(config)
   const pitchClass = ((midi % 12) + 12) % 12
-  // The root's letter octave — writtenScaleNote walks letters up from here.
-  const rootOctave = Math.floor(rootMidi / 12) - 1
   const customLabel = SHARP_LABELS[pitchClass]!
-  const written = custom.length >= 2
-    ? { letter: customLabel[0] as StaffNoteLetter, octave: Math.floor(midi / 12) - 1, label: `${customLabel}${Math.floor(midi / 12) - 1}`, accidental: customLabel.length > 1 ? "#" as const : null }
-    : writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
+  const written = usingCustom
+    ? {
+        letter: customLabel[0] as StaffNoteLetter,
+        octave: Math.floor(midi / 12) - 1,
+        label: `${customLabel}${Math.floor(midi / 12) - 1}`,
+        accidental: customLabel.length > 1 ? ('#' as const) : null,
+      }
+    : spellWrittenMidi(midi, config.key)
   const staff = getStaffPositionForNote(written.letter, written.octave, config.clef)
   return {
     sequenceIndex: sequenceStep,
     midi,
     pitchClass,
-    noteLabel: written.label,
-    customAccidental: custom.length >= 2 ? (customLabel.length > 1 ? "♯" : "♮") : undefined,
+    noteLabel: usingCustom ? written.label : `${written.letter}${written.accidental ?? ''}`,
+    customAccidental: usingCustom ? (customLabel.length > 1 ? '♯' : '♮') : undefined,
     // A rest is written against the middle line whatever pitch surrounds it.
     yPx: rhythm.isRest ? STAFF_MIDDLE_Y : staff.yPx,
     kind: rhythm.isRest ? 'line' : staff.kind,
@@ -902,20 +974,12 @@ function prettyNoteLabel(letter: StaffNoteLetter, accidental: '#' | 'b' | null, 
  * checkable at a glance instead of a surprise on the first note.
  */
 export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePreview {
-  const topDegree = topDegreeForConfig(config)
-  const rootMidi = resolveScaleRootMidi(config)
-  const rootOctave = Math.floor(rootMidi / 12) - 1
-
-  const noteAt = (degreeIndex: number) => {
-    const custom = customNotePool(config)
-  const midi = custom.length >= 2 ? custom[Math.min(degreeIndex, custom.length - 1)]! : midiForScaleDegree(config.scaleMode, degreeIndex, rootMidi)
-    const pitchClass = ((midi % 12) + 12) % 12
-    const customLabel = SHARP_LABELS[pitchClass]!
-  const written = custom.length >= 2
-    ? { letter: customLabel[0] as StaffNoteLetter, octave: Math.floor(midi / 12) - 1, label: `${customLabel}${Math.floor(midi / 12) - 1}`, accidental: customLabel.length > 1 ? "#" as const : null }
-    : writtenScaleNote(config.key, pitchClass, degreeIndex, rootOctave)
-    return prettyNoteLabel(written.letter, written.accidental, written.octave)
-  }
+  const pool = midiPoolForConfig(config)
+  const usingCustom = (config.customPitchClasses?.length ?? 0) > 0
+  const spellingKey: StaffJumperKey = usingCustom ? 'C' : config.key
+  const { minMidi, maxMidi } = exerciseMidiBounds(config)
+  const lowMidi = pool[0] ?? minMidi
+  const highMidi = pool.at(-1) ?? maxMidi
 
   const accidentals = keySignatureAccidentals(config.key, config.scaleMode)
   const count = accidentals.size
@@ -926,10 +990,10 @@ export function getScaleRangePreview(config: StaffJumperConfig): ScaleRangePrevi
       : `${count} ${symbol === '#' ? 'sharp' : 'flat'}${count === 1 ? '' : 's'}`
 
   return {
-    lowLabel: noteAt(0),
-    highLabel: noteAt(topDegree),
-    noteCount: topDegree + 1,
-    signatureLabel: config.customPitchClasses?.length ? "Custom notes · accidentals shown" : signatureLabel,
+    lowLabel: prettyWrittenMidi(lowMidi, spellingKey),
+    highLabel: prettyWrittenMidi(highMidi, spellingKey),
+    noteCount: Math.max(pool.length, 1),
+    signatureLabel: usingCustom ? 'Custom notes · accidentals shown' : signatureLabel,
   }
 }
 

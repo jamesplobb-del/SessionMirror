@@ -38,8 +38,10 @@ be resolved. No app installation, UI interaction, or real redemption was tested.
    revocation/refunds, and startup/foreground refresh. Finish transactions only
    after delivering their content. Do not use local booleans or embedded master
    codes as purchase authority.
-3. Connect the full entitlement to the agreed free/paid feature boundaries.
-   Preserve playback/export access to existing recordings.
+3. Connect the full entitlement to the free/paid feature boundaries in
+   `BESTTAKE_PLUS.md`. Preserve playback/export access to existing recordings.
+   Do not lock compare, recording, live tuner, hands-free, or opening a
+   shared routine. Caps keep existing items; never cut off a take in progress.
 4. If adding the character pack, connect its verified entitlement to character
    selection and both game renderers. Preserve all existing earned unlocks.
 5. Verify on a physical device with sandbox accounts: free and discounted

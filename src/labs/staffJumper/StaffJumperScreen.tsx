@@ -23,14 +23,12 @@ import {
   DIFFICULTY_LABELS,
   DIFFICULTY_TIMEOUT_SECONDS,
   getConcertTonicPitchClass,
-  customNotePool,
   getScaleRangePreview,
   getTargetNoteAtStep,
   keysForScaleMode,
+  midiPoolForConfig,
   pitchClassLabel,
-  RANGE_LABELS,
   STAFF_JUMPER_DIFFICULTIES,
-  STAFF_JUMPER_RANGES,
   scaleDisplayName,
   type StaffJumperDifficulty,
   type StaffJumperKey,
@@ -71,6 +69,7 @@ import ArcadeCycleChip, { cycleNext } from '../../components/labs/ArcadeCycleChi
 import ArcadePickerChip from '../../components/labs/ArcadePickerChip'
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
 import StaffJumperGame from './StaffJumperGame'
+import StaffJumperRangePicker from './StaffJumperRangePicker'
 import StaffPreview from './StaffPreview'
 import { loadStaffJumperSetupPrefs, saveStaffJumperSetupPrefs } from './staffJumperSetupPrefs'
 
@@ -242,6 +241,15 @@ export default function StaffJumperScreen({
     return savedSetup.key
   })
   const [draftRange, setDraftRange] = useState<StaffJumperRange>(() => savedPrefs?.range ?? '1-octave')
+  const [draftRangeLowMidi, setDraftRangeLowMidi] = useState<number | undefined>(() => {
+    if (!savedPrefs || savedPrefs.instrumentId !== savedSetup.instrumentId) return undefined
+    return savedPrefs.rangeLowMidi
+  })
+  const [draftRangeHighMidi, setDraftRangeHighMidi] = useState<number | undefined>(() => {
+    if (!savedPrefs || savedPrefs.instrumentId !== savedSetup.instrumentId) return undefined
+    return savedPrefs.rangeHighMidi
+  })
+  const [showRangePicker, setShowRangePicker] = useState(false)
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>(() => savedPrefs?.difficulty ?? 'easy')
   const [draftInstrumentId, setDraftInstrumentId] = useState<string | null>(savedSetup.instrumentId)
   const [draftClef, setDraftClef] = useState<StaffJumperClef>(() =>
@@ -293,6 +301,8 @@ export default function StaffJumperScreen({
     setDraftInstrumentId(instrument?.id ?? null)
     saveStaffJumperInstrumentId(instrument?.id ?? null)
     if (instrument) savePracticeGameInstrumentId(instrument.id)
+    setDraftRangeLowMidi(undefined)
+    setDraftRangeHighMidi(undefined)
     if (!instrument) return
     setDraftClef(instrument.clef)
     setDraftTransposition(instrument.transposition)
@@ -307,12 +317,18 @@ export default function StaffJumperScreen({
   }
 
   const chooseClef = (clef: StaffJumperClef) => {
+    if (clef === draftClef) return
     setDraftClef(clef)
+    setDraftRangeLowMidi(undefined)
+    setDraftRangeHighMidi(undefined)
     if (selectedInstrument && selectedInstrument.clef !== clef) clearInstrument()
   }
 
   const chooseTransposition = (transposition: StaffJumperTransposition) => {
+    if (transposition === draftTransposition) return
     setDraftTransposition(transposition)
+    setDraftRangeLowMidi(undefined)
+    setDraftRangeHighMidi(undefined)
     if (selectedInstrument && selectedInstrument.transposition !== transposition) clearInstrument()
   }
 
@@ -432,6 +448,8 @@ export default function StaffJumperScreen({
       key: customEnabled ? "C" as const : draftKey,
       scaleMode: draftScaleMode,
       range: draftRange,
+      rangeLowMidi: draftRangeLowMidi,
+      rangeHighMidi: draftRangeHighMidi,
       difficulty: draftDifficulty,
       clef: draftClef,
       tunerInstrument,
@@ -455,6 +473,8 @@ export default function StaffJumperScreen({
       draftMetronome,
       draftPlayerModel,
       draftRange,
+      draftRangeHighMidi,
+      draftRangeLowMidi,
       draftMeter,
       draftScaleMode,
       draftTempo,
@@ -473,6 +493,8 @@ export default function StaffJumperScreen({
       scaleMode: draftScaleMode,
       key: draftKey,
       range: draftRange,
+      rangeLowMidi: draftRangeLowMidi,
+      rangeHighMidi: draftRangeHighMidi,
       difficulty: draftDifficulty,
       meter: draftMeter,
       tempoBpm: draftTempo,
@@ -497,6 +519,8 @@ export default function StaffJumperScreen({
     draftMeter,
     draftMetronome,
     draftRange,
+    draftRangeHighMidi,
+    draftRangeLowMidi,
     draftScaleMode,
     draftTempo,
     draftTransposition,
@@ -533,8 +557,23 @@ export default function StaffJumperScreen({
       WRITTEN_PITCH_CHOICES[0]!
     const instrumentFact = selectedInstrument?.shortName ?? `${writtenPitchChoice.name} · custom`
     const difficultyIndex = STAFF_JUMPER_DIFFICULTIES.indexOf(draftDifficulty)
-    const rangeIndex = STAFF_JUMPER_RANGES.indexOf(draftRange)
     const openMore = () => { setShowOptions(true); setActiveOptionsPanel("Exercise") }
+
+    if (showRangePicker) {
+      return (
+        <StaffJumperRangePicker
+          config={draftConfig}
+          hapticFeedback={hapticFeedback}
+          onBack={() => setShowRangePicker(false)}
+          onConfirm={(lowMidi, highMidi) => {
+            setDraftRangeLowMidi(lowMidi)
+            setDraftRangeHighMidi(highMidi)
+            setDraftRange(highMidi - lowMidi > 12 ? '2-octaves' : '1-octave')
+            setShowRangePicker(false)
+          }}
+        />
+      )
+    }
 
     return (
       <BalanceArcadeShell
@@ -550,7 +589,7 @@ export default function StaffJumperScreen({
               type="button"
               haptic="medium"
               hapticFeedback={hapticFeedback}
-              disabled={customEnabled && customNotePool(draftConfig).length < 2}
+              disabled={midiPoolForConfig(draftConfig).length < 2}
               onClick={() => start(draftConfig)}
               className="balance-cta"
             >
@@ -628,7 +667,32 @@ export default function StaffJumperScreen({
           <p className="sj-hero__hint">Tap the clef, key or time signature to change it.</p>
         </section>
 
-        <div className="balance-cycle-row" role="group" aria-label="Exercise settings">
+        <div className="balance-cycle-row sj-cycle-row" role="group" aria-label="Exercise settings">
+          {customEnabled ? (
+            <Pressable
+              type="button"
+              intensity="soft"
+              hapticFeedback={hapticFeedback}
+              className="balance-cycle"
+              onClick={openMore}
+              aria-label="Change key, currently a custom scale"
+            >
+              <small>Key</small>
+              <strong>
+                <span>Custom</span>
+                <ChevronDown aria-hidden />
+              </strong>
+            </Pressable>
+          ) : (
+            <ArcadePickerChip
+              label="Key"
+              value={draftKey}
+              display={draftKey}
+              options={availableKeys.map((key) => ({ value: key, label: key }))}
+              hapticFeedback={hapticFeedback}
+              onChange={setDraftKey}
+            />
+          )}
           <ArcadeCycleChip
             label="Level"
             value={DIFFICULTY_LABELS[draftDifficulty]}
@@ -637,14 +701,22 @@ export default function StaffJumperScreen({
             hapticFeedback={hapticFeedback}
             onCycle={() => setDraftDifficulty(cycleNext(STAFF_JUMPER_DIFFICULTIES, draftDifficulty))}
           />
-          <ArcadeCycleChip
-            label="Range"
-            value={RANGE_LABELS[draftRange]}
-            step={Math.max(0, rangeIndex)}
-            stepCount={STAFF_JUMPER_RANGES.length}
+          <Pressable
+            type="button"
+            intensity="soft"
             hapticFeedback={hapticFeedback}
-            onCycle={() => setDraftRange(cycleNext(STAFF_JUMPER_RANGES, draftRange))}
-          />
+            className="balance-cycle"
+            onClick={() => setShowRangePicker(true)}
+            aria-label={`Change range, currently ${rangePreview.lowLabel} to ${rangePreview.highLabel}`}
+          >
+            <small>Range</small>
+            <strong>
+              <span>
+                {rangePreview.lowLabel}–{rangePreview.highLabel}
+              </span>
+              <ChevronDown aria-hidden />
+            </strong>
+          </Pressable>
           <ArcadePickerChip
             label="Tempo"
             value={draftTempo}
@@ -679,7 +751,7 @@ export default function StaffJumperScreen({
           <div className="sj-custom-scale">
             <label><input type="checkbox" checked={customEnabled} onChange={event => setCustomEnabled(event.target.checked)} /> Build my own scale</label>
             {customEnabled && <>
-              <p>Choose at least two written notes. Your range setting controls the octaves.</p>
+              <p>Choose at least two written notes. The staff range you pick sets the octaves.</p>
               <div className="sj-custom-note-grid" role="group" aria-label="Custom scale notes">
                 {['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'].map((label, pc) => <button type="button" key={pc} aria-pressed={customNotes.includes(pc)} disabled={customNotes.includes(pc) && customNotes.length <= 2} onClick={() => setCustomNotes(notes => notes.includes(pc) ? notes.filter(n => n !== pc) : [...notes, pc].sort((a,b) => a-b))}>{label}</button>)}
               </div>
@@ -720,15 +792,19 @@ export default function StaffJumperScreen({
           </div>
 
           </>}
-          <div className="sj-field">
+          <div className="sj-field sj-field--stack">
             <p className="sj-field__label">Range</p>
-            <Options
-              label="Range"
-              value={draftRange}
-              onChange={setDraftRange}
-              options={STAFF_JUMPER_RANGES.map((range) => ({ id: range, label: RANGE_LABELS[range] }))}
+            <Pressable
+              type="button"
+              intensity="soft"
               hapticFeedback={hapticFeedback}
-            />
+              className="sj-range-open"
+              onClick={() => setShowRangePicker(true)}
+            >
+              {rangePreview.lowLabel} to {rangePreview.highLabel}
+              <ChevronDown aria-hidden />
+            </Pressable>
+            <p className="sj-field__note">Tap any two notes on the staff — a fifth, an octave, or the whole horn.</p>
           </div>
 
           <div className="sj-field sj-field--stack">
@@ -977,6 +1053,7 @@ export default function StaffJumperScreen({
   if (state.phase === 'gameover' && state.config) {
     const accuracy = computeAccuracy(state.correctCount, state.missCount)
     const scaleName = state.config.customPitchClasses?.length ? "My scale" : scaleDisplayName(state.config.key, state.config.scaleMode)
+    const runRange = getScaleRangePreview(state.config)
     const endTime = state.endedAtMs ?? Date.now()
     const durationSeconds = state.startedAtMs
       ? Math.max(0, endTime - state.startedAtMs - state.pausedDurationMs) / 1000
@@ -996,7 +1073,7 @@ export default function StaffJumperScreen({
         <section className="balance-card balance-award">
           <p className="balance-pill">{state.score} points</p>
           <p className="balance-card__line balance-card__line--tight">
-            {scaleName} · {CLEF_LABELS[state.config.clef]} clef · {RANGE_LABELS[state.config.range]} · {DIFFICULTY_LABELS[state.config.difficulty]}
+            {scaleName} · {CLEF_LABELS[state.config.clef]} clef · {runRange.lowLabel}–{runRange.highLabel} · {DIFFICULTY_LABELS[state.config.difficulty]}
           </p>
 
           <dl className="balance-award__stats balance-award__stats--pair">

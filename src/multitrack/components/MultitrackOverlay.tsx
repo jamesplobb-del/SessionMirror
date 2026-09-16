@@ -3,7 +3,7 @@ import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX, Volume2 } from 'lucide-react'
+import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -30,6 +30,9 @@ import {
   requestInteractiveMediaRecovery,
 } from '../../utils/appForeground'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
+import { getCameraFacingFront } from '../../utils/videoCapture'
+import { isHeadphoneOutputActive } from '../../utils/headphoneOutput'
+import { useHeadphoneOutput } from '../../hooks/useHeadphoneOutput'
 import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
 import { useMultitrackSync } from '../synchronization/useMultitrackSync'
@@ -169,9 +172,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const exportAbort = useRef<AbortController | null>(null)
   const [exportProgress, setExportProgress] = useState(0)
   const [renderedVideo, setRenderedVideo] = useState<{ path: string; durationSeconds: number; key: string } | null>(null)
-  const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take } | null>(null)
+  const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take; mirrored: boolean } | null>(null)
   const discardNextRecordingRef = useRef(false)
-  /** Bottom sheets: backing source, mixer, or a tile's action sheet. */
+  /** Bottom sheets: backing source, export, visual or a tile's action sheet. */
   const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'project' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
@@ -238,6 +241,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const nativeGridPlaybackActiveRef = useRef(false)
   const nativeGridPlaybackPreparingRef = useRef(false)
   const nativeGridPlaybackGenerationRef = useRef(0)
+  const playAllFromBeginningAfterRecordRef = useRef(false)
   const [isNativeGridPlaybackPreparing, setIsNativeGridPlaybackPreparing] = useState(false)
 
   const stopNativeGridPlayback = useCallback(async () => {
@@ -1010,7 +1014,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onClearPendingRecording()
       return
     }
-    setPendingReview({ panelId: targetPanelId, take })
+    // A part shot on the front camera is kept the way the player saw it while
+    // performing: review, the grid and the export all mirror it.
+    const mirrored = getCameraFacingFront()
+    setPendingReview({ panelId: targetPanelId, take: { ...take, mirrorPlayback: mirrored }, mirrored })
     onRecordingComplete()
     onClearPendingRecording()
   }, [activePanelId, onClearPendingRecording, onDeleteTakes, onRecordingComplete, pendingRecordingTakeId, recording.targetPanelId, takes])
@@ -1052,7 +1059,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const capturedOffsetMs = timelineOffsetMsForTake(take, session.practice.bpm)
       const offsetMs = Math.round(-startSec * 1000)
       assignTakeToPanel(pendingReview.panelId, take)
-      updatePanel(pendingReview.panelId, { timelineOffsetMs: offsetMs, trimStartSec: Math.max(0, capturedOffsetMs / 1000) })
+      updatePanel(pendingReview.panelId, { timelineOffsetMs: offsetMs, trimStartSec: Math.max(0, capturedOffsetMs / 1000), mirrored: pendingReview.mirrored })
       sync.setPanelOffset(pendingReview.panelId, offsetMs)
       sync.setPanelTrim(pendingReview.panelId, Math.max(0, capturedOffsetMs / 1000), null)
       // The new box appears exactly while its own part plays.
@@ -1064,11 +1071,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       )
     } else {
       assignTakeToPanel(pendingReview.panelId, pendingReview.take)
+      updatePanel(pendingReview.panelId, { mirrored: pendingReview.mirrored })
     }
 
     setPendingReview(null)
     recording.cancel()
     setActivePanelId(null)
+    pauseAllPlayback()
+    sync.seek(0)
+    playAllFromBeginningAfterRecordRef.current = true
     restoreRecordingReadiness()
     // One-time discoverability nudge: recordings auto-save to the vault.
     try {
@@ -1083,6 +1094,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
   }, [
     assignTakeToPanel, updatePanel,
+    pauseAllPlayback,
     pendingReview,
     recording,
     restoreRecordingReadiness,
@@ -1247,10 +1259,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     [assignSheetMusic, removeSheetCue, session.sheetMusic.id],
   )
 
-  const mixerPanels = session.panels.filter(
-    (panel) => panel.kind === 'performance' && !panel.hidden && panel.take !== null,
-  )
-
   const backingChipLabel =
     session.backing.kind === 'none'
       ? 'Add backing'
@@ -1258,58 +1266,44 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         ? session.backing.fileName
         : session.backing.label || 'YouTube'
 
-  const mixerControls = <div className="multitrack-editor-mixer__rows">
-          {mixerPanels.length === 0 && session.backing.kind === 'none' ? (
-            <p className="multitrack-sheet__empty">Record or add a take to mix.</p>
-          ) : null}
-          {mixerPanels.map((panel, index) =>
-            panel.kind === 'performance' && panel.take ? (
-              <div key={panel.id} className="multitrack-mixer-row">
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  aria-label={`${panel.muted ? 'Unmute' : 'Mute'} ${panel.label || panel.take.name || `Box ${index + 1}`}`}
-                  className={`multitrack-mixer-row__mute ${panel.muted ? 'is-muted' : ''}`}
-                  onClick={() => setPanelMuted(panel.id, !panel.muted)}
-                >
-                  {panel.muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                </Pressable>
-                <span className="multitrack-mixer-row__name">
-                  {panel.label || panel.take.name || `Box ${index + 1}`}
-                </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  aria-label={`${panel.label || panel.take.name || `Box ${index + 1}`} volume`}
-                  value={panel.volume ?? 1}
-                  onChange={(event) => setPanelVolume(panel.id, Number(event.target.value))}
-                  className="multitrack-mixer-row__slider"
-                />
-              </div>
-            ) : null,
-          )}
-          {session.backing.kind !== 'none' ? (
-            <div className="multitrack-mixer-row">
-              <Music4 className="h-4 w-4 text-stone-400" />
-              <span className="multitrack-mixer-row__name">{backingChipLabel}</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                aria-label="Backing volume"
-                value={session.backing.volume}
-                onChange={(event) =>
-                  updateBacking({ ...session.backing, volume: Number(event.target.value) })
-                }
-                className="multitrack-mixer-row__slider"
-              />
-            </div>
-          ) : null}
-  </div>
+  const headphonesConnected = useHeadphoneOutput()
+  const headphoneNoticeShownForOpenRef = useRef(false)
 
+  useEffect(() => {
+    if (!isOpen) {
+      headphoneNoticeShownForOpenRef.current = false
+      return
+    }
+    if (headphonesConnected || headphoneNoticeShownForOpenRef.current) return
+    const timer = window.setTimeout(() => {
+      if (!isOpen || isHeadphoneOutputActive() || headphoneNoticeShownForOpenRef.current) return
+      headphoneNoticeShownForOpenRef.current = true
+      void showAlert({
+        title: 'Headphones recommended',
+        message:
+          'Without headphones the click bleeds into your recording, so only a lead-in count-in can play. Plug in or connect headphones (wired or Bluetooth) to use the metronome while you record.',
+        confirmLabel: 'Got it',
+      })
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [headphonesConnected, isOpen, showAlert])
+
+  /**
+   * A click track needs headphones. On the speaker it is picked up by the
+   * microphone and printed into the part, so the toggle explains that instead
+   * of silently recording a ruined take. The count-in is unaffected either way.
+   */
+  const requestClickToggle = useCallback(() => {
+    if (!session.practice.clickEnabled && !headphonesConnected) {
+      void showAlert({
+        title: 'Connect headphones for a click track',
+        message:
+          'On the speaker the click bleeds into your recording. Plug in or connect headphones (wired or Bluetooth) to run the click while you record. Your count-in still plays either way.',
+      })
+      return
+    }
+    updatePractice({ clickEnabled: !session.practice.clickEnabled })
+  }, [headphonesConnected, session.practice.clickEnabled, showAlert, updatePractice])
 
   const handleSaveAlignChanges = useCallback(
     async (
@@ -1413,12 +1407,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 <Pressable
                   type="button"
                   intensity="soft"
-                  onClick={() => updatePractice({ clickEnabled: !session.practice.clickEnabled })}
-                  className={`multitrack-source-chip ${session.practice.clickEnabled ? 'multitrack-source-chip--active' : ''}`}
+                  onClick={requestClickToggle}
+                  className={`multitrack-source-chip ${session.practice.clickEnabled && headphonesConnected ? 'multitrack-source-chip--active' : ''}`}
                 >
                   <span className="multitrack-source-chip__label">Click</span>
                   <span className="multitrack-source-chip__state">
-                    {session.practice.clickEnabled ? 'on' : 'off'}
+                    {!session.practice.clickEnabled ? 'off' : headphonesConnected ? 'on' : 'count-in'}
                   </span>
                 </Pressable>
                 <Pressable
@@ -1489,7 +1483,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 covering it: the grid above IS the preview you are editing. */}
             {alignStageOpen ? (
               <MultitrackAlignStage
-                mixerControls={mixerControls}
+                onPanelVolumeChange={setPanelVolume}
+                onPanelMuteToggle={setPanelMuted}
                 isOpen={alignStageOpen}
                 panels={session.panels.filter(
                   (panel): panel is PerformancePanelState => panel.kind === 'performance',
@@ -1507,7 +1502,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                     pauseAllPlayback()
                     return
                   }
-                  void playAllFromStart(sync.state.currentTime)
+                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
+                  playAllFromBeginningAfterRecordRef.current = false
+                  void playAllFromStart(startAt)
                 }}
                 onEditStart={pauseAllPlayback}
                 onAddBox={handleAddBoxAt}
@@ -1531,8 +1528,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                     pauseAllPlayback()
                     return
                   }
-                  void playAllFromStart(sync.state.currentTime)
+                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
+                  playAllFromBeginningAfterRecordRef.current = false
+                  void playAllFromStart(startAt)
                 }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
+                  playAllFromBeginningAfterRecordRef.current = false
                   if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
                     pauseAllPlayback()
                   }
@@ -1601,8 +1601,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 recording.beginCountIn(activePanel.id, {
                   ...session.practice,
                   bpm: resolveRecordingGrid().bpm,
+                  // The click never loops through the speaker while the mic is
+                  // open: without headphones it bleeds into the take, so only
+                  // the count-in plays and then it stops.
                   clickEnabled:
-                    session.practice.clickEnabled && !monitorMutesRef.current.has('click'),
+                    session.practice.clickEnabled &&
+                    !monitorMutesRef.current.has('click') &&
+                    isHeadphoneOutputActive(),
                 })
               }}
               onStop={() => {
@@ -1647,6 +1652,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 recording.cancel()
                 recordStartSecRef.current = 0
                 setActivePanelId(null)
+                sync.seek(0)
+                playAllFromBeginningAfterRecordRef.current = true
               }}
             />
           </motion.div>
