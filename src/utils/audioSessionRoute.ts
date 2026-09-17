@@ -285,6 +285,8 @@ export interface BestTakeAudioPluginType {
       muted?: boolean
     }>
     gridRects: NativeRectPercent[]
+    /** Extra boxes sit above the grid. Native punches these out of base borders. */
+    overlayRects?: NativeRectPercent[]
     sheetMusic: {
       path: string
       fileType: string

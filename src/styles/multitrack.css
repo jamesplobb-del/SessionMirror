@@ -1316,6 +1316,12 @@
   z-index: 10;
 }
 
+.multitrack-practice-overlay--screen {
+  position: fixed;
+  inset: 0;
+  z-index: 152;
+}
+
 .multitrack-practice-overlay > * {
   pointer-events: auto;
 }
@@ -2102,11 +2108,38 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 55%;
-  min-height: 0;
+  min-height: 12rem;
   border-top: 1px solid #e7e5e4;
   background: #fafaf9;
   color: #1c1917;
   padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.multitrack-align-stage.is-resized {
+  flex: 0 0 auto;
+}
+
+.multitrack-align-stage__resize {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  height: 1.2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  color: #a8a29e;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.multitrack-align-stage__resize::after {
+  content: '';
+  width: 2.5rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: #d6d3d1;
 }
 
 .multitrack-align-stage__header {
@@ -2618,8 +2651,9 @@
 
 /* While the timeline editor is docked the canvas gives up half the screen. */
 .multitrack-overlay__body--editing {
-  flex: 0 0 auto;
-  max-height: 42vh;
+  flex: 1 1 28%;
+  min-height: 6.5rem;
+  max-height: none;
 }
 
 .multitrack-panel__sheet-cue-count {
@@ -3091,7 +3125,15 @@
 .multitrack-project-trigger:disabled { opacity: .5; }
 .multitrack-empty__name { position: absolute; top: 9px; left: 8px; right: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 11px; font-weight: 500; color: #78716c; }
 .multitrack-empty__hint { margin-top: .5rem; font-size: .875rem; font-weight: 500; white-space: nowrap; }
-.multitrack-social-canvas .multitrack-grid__cell.is-extra { filter: drop-shadow(0 4px 8px #1c191729); }
+.multitrack-social-canvas .multitrack-grid__cell.is-extra {
+  /* Fill the whole extra rect so grid/sheet borders behind cannot show through
+     the cell padding or the rounded corners of the panel inside. */
+  padding: 0;
+  overflow: hidden;
+  background: #1c1917;
+  border-radius: 0.75rem;
+  filter: drop-shadow(0 4px 8px #1c191729);
+}
 .multitrack-social-canvas .multitrack-grid__cell.is-selected { outline: 2px solid #78716c; outline-offset: -2px; border-radius: .85rem; }
 .multitrack-social-canvas .is-selected .multitrack-empty__name { visibility: hidden; }
 .multitrack-box-resize { position: absolute; z-index: 25; display: grid; place-items: center; min-width: 36px; min-height: 36px; border: 1px solid #e7e5e4; border-radius: 9999px; color: #44403c; background: #fff; box-shadow: 0 2px 8px #1c19171a; touch-action: none; }

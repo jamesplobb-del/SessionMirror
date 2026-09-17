@@ -337,6 +337,7 @@ interface MainAudioPitchSource {
 }
 
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
+const PracticeChartLayer = lazy(() => import('./components/PracticeChartLayer'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
 /** Minimum gap between unforced tuner capture-session rebuilds. */
 const TUNER_MIC_REBUILD_FLOOR_MS = 1500
@@ -589,6 +590,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // The pitch overlay comes back if it was up when the app was last closed.
   const [showPitch, setShowPitch] = useState(() => loadAppSettingsForSessionStart().pitchTrackerEnabled)
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
+  /** The part is actually covering the room, so the HUD stops painting over it. */
+  const [musicPageVisible, setMusicPageVisible] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
   /** Saved desks — chips at the top of the Workspace tray. */
   /** The live room, kept current so a focused take can remember the desk it was played on. */
@@ -2427,6 +2430,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [recordingMode])
 
+  /*
+   * The full-screen washes that tint the practice room are declared on `html`
+   * with `!important`, so standing them down has to happen at the same level.
+   * While the part is up the room paints nothing across it.
+   */
+  useEffect(() => {
+    document.documentElement.classList.toggle('app-music-page', musicPageVisible)
+    return () => {
+      document.documentElement.classList.remove('app-music-page')
+    }
+  }, [musicPageVisible])
+
   useEffect(() => {
     document.documentElement.classList.toggle('app-dark-mode', settings.darkMode)
     document.documentElement.style.colorScheme = settings.darkMode ? 'dark' : 'light'
@@ -3020,6 +3035,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pitchTrackerEnabled: settings.pitchTrackerEnabled,
       showMetronome: settings.showMetronome,
       showDrone: settings.showDrone,
+      showMusic: settings.showMusic,
       showTakeCards: settings.showTakeCards,
       autoSoundRecording: settings.autoSoundRecording,
       audioEnhancerEnabled: settings.audioEnhancerEnabled,
@@ -3045,6 +3061,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     settings.pitchTrackerEnabled,
     settings.showDrone,
     settings.showMetronome,
+    settings.showMusic,
     settings.showTakeCards,
     settings.soundSilenceSeconds,
   ])
@@ -3056,6 +3073,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         pitchTrackerEnabled: desk.pitchTrackerEnabled,
         showMetronome: desk.showMetronome,
         showDrone: desk.showDrone,
+        showMusic: desk.showMusic,
         showTakeCards: desk.showTakeCards,
         audioEnhancerEnabled: desk.audioEnhancerEnabled,
         soundSilenceSeconds: desk.soundSilenceSeconds,
@@ -3727,6 +3745,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       settings.pitchTrackerEnabled,
       settings.showDrone,
       settings.showMetronome,
+      settings.showMusic,
       settings.showTakeCards,
     ]
   )
@@ -4116,7 +4135,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isPracticeGameOpen = labsRoute !== null && labsRoute !== 'menu'
 
   useAppShellPolicies({
-    keepAwake: isRecording || isReviewOpen || takePlaybackActive || isPracticeGameOpen,
+    // A player reading off the page can go minutes without touching the screen,
+    // and a part that locks itself mid-phrase is useless as a music stand.
+    keepAwake:
+      isRecording || isReviewOpen || takePlaybackActive || isPracticeGameOpen || musicPageVisible,
     hudSurface: hudModalState,
     lightStatusBarSurface: recordingMode === 'audio' && !settings.darkMode,
   })
@@ -4156,6 +4178,27 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
    */
   const isAudioPracticeTunerActive =
     isAudioPracticeTunerTab && !audioPracticeSheetOpen && !isReviewOpen && !isLabsOpen
+
+  /*
+   * Practice on the music lives on the Tools surface, not on Camera.
+   *
+   * Camera is a lens: its whole chrome is white glass built to read against a
+   * dark preview, and over white paper none of it can be seen. Tools is already
+   * a light room — the widgets, the deck and the balls are drawn for it — so the
+   * page lands there without a second theme having to exist. The camera also has
+   * nothing to show while a part covers the viewfinder.
+   *
+   * A game, a multitrack session, the split compare and every sheet own the
+   * whole screen while they are up, and none of them is a music stand.
+   */
+  const musicRoomActive =
+    isAudioPracticeRecordTab &&
+    !metronomeHudSuspended &&
+    !audioPracticeSheetOpen &&
+    !isSplitView &&
+    !isLabsOpen &&
+    !multitrackOpen &&
+    !showOnboardingTutorial
 
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
@@ -4253,6 +4296,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     handleShowDroneSettingChange(false)
   }, [handleShowDroneSettingChange])
 
+  /**
+   * A routine step that pins music needs somewhere to keep it, and a step's
+   * practice folder is normally not made until the step first runs. Choosing a
+   * file is the other moment that binds one.
+   */
+  const handleCreatePracticeItem = useCallback(async (title: string) => {
+    const project = await createProject(title.trim() || 'Practice item')
+    setProjects(current => [project, ...current])
+    return project.id
+  }, [])
+
+  /**
+   * Music on means the part is the room, and the take cards are a panel across
+   * the middle of it — but they stand down by being drawn differently, not by
+   * switching `showTakeCards` off. That flag is wired to which take is the
+   * challenger, so turning it off here would quietly drop the take the player
+   * just recorded. While the page is up the takes show as the compact pills the
+   * Tuner tab already uses.
+   */
+  const handleShowMusicSettingChange = useCallback(
+    (show: boolean) => {
+      updateSettings({ showMusic: show })
+    },
+    [updateSettings],
+  )
+
+  const handleCloseMusic = useCallback(() => {
+    handleShowMusicSettingChange(false)
+  }, [handleShowMusicSettingChange])
+
   /* ---- Crossing between Tools and Camera clears the desk -----------------
    *
    * Carrying Pitch, Metronome, Drone and the Enhancer across the crossing
@@ -4285,6 +4358,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pitchTrackerEnabled: false,
       showMetronome: false,
       showDrone: false,
+      showMusic: false,
       audioEnhancerEnabled: false,
     })
     sharedMetronomeEngine.stop()
@@ -5515,7 +5589,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               ref={appShellRef}
               className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
                 isSplitView ? ' app-shell--split-open' : ''
-              }`}
+              }${musicPageVisible ? ' app-shell--music-page' : ''}`}
             >
               <audio
                 ref={autoPlaybackAudioRef}
@@ -5553,6 +5627,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
                 onCloseRoutineBuilder={() => setRoutineBuilderRequest(null)}
                 onSaveRoutine={handleSaveRoutine}
+                onCreatePracticeItem={handleCreatePracticeItem}
                 onSaveAndStartRoutine={handleSaveAndStartRoutine}
                 onDeleteRoutine={handleDeleteRoutine}
               />
@@ -5779,6 +5854,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
               />
 
+              {activeProjectId && settings.showMusic && (
+                <Suspense fallback={null}>
+                  <PracticeChartLayer
+                    key={activeProjectId}
+                    projectId={activeProjectId}
+                    active={musicRoomActive}
+                    boundaryRef={appShellRef}
+                    collapseResetKey={routineActiveStep?.id}
+                    onClose={handleCloseMusic}
+                    onPaperVisibleChange={setMusicPageVisible}
+                  />
+                </Suspense>
+              )}
+
               {cameraNeedsPermission && !SKIP_MEDIA_PERMISSION_GATE && (
                 <CameraPermissionPrompt
                   recordingMode={recordingMode}
@@ -5892,7 +5981,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               </div>
 
-              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && (
+              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
                 <PracticeToolStrip
                   reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
                   referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
@@ -6091,7 +6180,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                       <AnimatedTabPanel
                         panelKey="audio-mode-home-layer"
-                        active={audioPracticeTab === 'audio' && !isSplitView}
+                        active={audioPracticeTab === 'audio' && !isSplitView && !musicPageVisible}
                         className="audio-mode-home-layer min-h-0 flex-1"
                       >
                         <div data-tutorial="audio-take-cards">
@@ -6192,6 +6281,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
                     {((isAudioPracticeTunerTab && showTunerTakePills) ||
+                      (musicPageVisible &&
+                        settings.showTakeCards &&
+                        // Empty "No Best Take" pills over a staff are exactly the
+                        // kind of chrome the page is supposed to be free of. They
+                        // appear when there is a take to show.
+                        Boolean(benchmarkTake || challengerTake || libraryBenchmarkPlayback)) ||
                       (isAudioPracticeTimelineTab &&
                         practiceSessionActive &&
                         practiceRecordingControlsExpanded &&
@@ -6204,6 +6299,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           }
                           className={`audio-tuner-take-pills-wrap pointer-events-auto w-full ${
                             isAudioPracticeTunerTab ||
+                            musicPageVisible ||
                             (isAudioPracticeTimelineTab && practiceSessionActive)
                               ? 'audio-tuner-take-pills-wrap--compact'
                               : ''
@@ -6216,6 +6312,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           <TunerTakePillRow
                             compact={
                               isAudioPracticeTunerTab ||
+                              musicPageVisible ||
                               (isAudioPracticeTimelineTab && practiceSessionActive)
                             }
                             ariaLabel="Takes"
@@ -6333,6 +6430,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         showDrone={hudQuickSettings.showDrone}
                         droneToggleVisible={onRecordSurface}
                         onShowDroneChange={handleShowDroneSettingChange}
+                        showMusic={hudQuickSettings.showMusic}
+                        musicToggleVisible={isAudioPracticeRecordTab && Boolean(activeProjectId)}
+                        onShowMusicChange={handleShowMusicSettingChange}
                         againPulse={againPulse}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}

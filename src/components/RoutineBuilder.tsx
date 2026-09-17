@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
+import RoutineMusicSetup from './RoutineMusicSetup'
 import RoutineProgramSetup from './RoutineProgramSetup'
 import { iosFade } from '../utils/motionPresets'
 import {
@@ -66,6 +67,11 @@ export interface RoutineBuilderProps {
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   onSave: (routine: Routine) => void
+  /**
+   * Binds a step to its own practice folder on demand — the moment music is
+   * chosen for a step that does not have one yet.
+   */
+  onCreatePracticeItem: (title: string) => Promise<string>
   /** Saves, then opens the routine's next step straight away. */
   onSaveAndStart?: (routine: Routine) => void
   /** Today's session of this routine has begun, so Start reads as Continue. */
@@ -99,6 +105,15 @@ function kindNeedsDesk(kind: RoutineStepKind): boolean {
   return kind !== 'game' && kind !== 'free'
 }
 
+/**
+ * Only the steps that open the practice room can open on a part. The Tuner and
+ * Metronome steps land on their own tabs, where there is no room for a page and
+ * offering one would be a lie.
+ */
+function stepPlaysFromMusic(kind: RoutineStepKind): boolean {
+  return kind === 'record' || kind === 'focus'
+}
+
 export default function RoutineBuilder({
   mode,
   routine,
@@ -108,6 +123,7 @@ export default function RoutineBuilder({
   tunerTransposition,
   hapticFeedback,
   onSave,
+  onCreatePracticeItem,
   onDelete,
   onCancel,
   onViewChange,
@@ -544,6 +560,7 @@ export default function RoutineBuilder({
             projects={projects}
             tunerTransposition={tunerTransposition}
             hapticFeedback={hapticFeedback}
+            onCreatePracticeItem={onCreatePracticeItem}
             onChange={(patch) => updateStep(editingStep.id, patch)}
             onRemove={() => removeStep(editingStep.id)}
             onDone={() => {
@@ -565,6 +582,7 @@ interface StepEditorProps {
   projects: Project[]
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
+  onCreatePracticeItem: (title: string) => Promise<string>
   onChange: (patch: Partial<RoutineStep>) => void
   onRemove: () => void
   onDone: () => void
@@ -580,6 +598,7 @@ export function StepEditor({
   instrumentId,
   tunerTransposition,
   hapticFeedback,
+  onCreatePracticeItem,
   onChange,
   onRemove,
   onDone,
@@ -629,7 +648,7 @@ export function StepEditor({
 
   return (
     <div>
-      <h3 ref={pageHeading} tabIndex={-1} className="routine-item-page-heading">{page === 'item' ? '1 · Item details' : page === 'tools' ? '2 · Tools' : '3 · Reference'}</h3>
+      <h3 ref={pageHeading} tabIndex={-1} className="routine-item-page-heading">{page === 'item' ? '1 · Item details' : page === 'tools' ? '2 · Tools' : stepPlaysFromMusic(step.kind) ? '3 · Reference & music' : '3 · Reference'}</h3>
       {page === 'item' && <>
       <section className="practice-menu-section">
         <div className="practice-menu-form">
@@ -681,6 +700,11 @@ export function StepEditor({
           value={step.referenceQuery} onChange={referenceQuery => onChange({ referenceQuery })}
           videoId={step.referenceVideoId} onVideoIdChange={referenceVideoId => onChange({ referenceVideoId })} />
 
+        {stepPlaysFromMusic(step.kind) && <>
+          <h3>Practice on the music</h3>
+          <p className="practice-menu-note">Optional · The part fills the screen when this item starts, with the tuner, click and drone folded to balls on the edges.</p>
+          <RoutineMusicSetup step={step} onChange={onChange} onCreatePracticeItem={onCreatePracticeItem} />
+        </>}
       </>}
       {page === 'tools' && <>
       <button type="button" className="routine-link" onClick={() => toolsOnly ? onBackToOpening?.() : setPage('item')}>← Back</button>

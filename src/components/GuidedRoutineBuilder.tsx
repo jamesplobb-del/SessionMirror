@@ -35,7 +35,7 @@ function selectionForRoutine(routine: Routine): Record<string, string> {
 }
 
 export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
-  const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, todayStarted, onCancel } = props
+  const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, onCreatePracticeItem, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
   const [showReorder, setShowReorder] = useState(false)
   const [goal, setGoal] = useState<PracticeGoal>('balanced')
@@ -423,12 +423,12 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             {customToolKey && customToolKey !== 'none' && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
           </>}
           {screen === 'custom-settings' && customSetup && <div className="routine-guide-editor"><StepEditor key={customSetup.id} toolsOnly initialPage="tools" footerTarget={itemFooterTarget}
-            step={customSetup} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback}
+            step={customSetup} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback} onCreatePracticeItem={onCreatePracticeItem}
             onChange={patch => setCustomSetup(current => current ? { ...current, ...patch } : current)}
             onToolsDone={() => move('custom-reference')} onBackToOpening={() => move('custom-tool', true)} onDone={() => move('custom-reference')} onRemove={() => {}} /></div>}
           {screen === 'custom-reference' && <RoutineReferenceSetup inline instrumentId={instrument} title={customItems[customIndex] ?? ''} value={customReference} onChange={setCustomReference}
             videoId={customReferenceVideo} onVideoIdChange={setCustomReferenceVideo} />}
-          {screen === 'detail' && detail && <div className="routine-guide-editor"><StepEditor initialPage={configuredIds.includes(detail.id) ? 'item' : 'tools'} footerTarget={itemFooterTarget} key={detail.id} step={detail} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback}
+          {screen === 'detail' && detail && <div className="routine-guide-editor"><StepEditor initialPage={configuredIds.includes(detail.id) ? 'item' : 'tools'} footerTarget={itemFooterTarget} key={detail.id} step={detail} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback} onCreatePracticeItem={onCreatePracticeItem}
             onChange={patch => setDraft(current => ({ ...current, steps: current.steps.map(step => step.id === detail.id ? { ...step, ...patch } : step) }))}
             onDone={finishItem} onRemove={() => { setDraft(current => ({ ...current, steps: current.steps.filter(step => step.id !== detail.id) })); move('lineup', true) }} /></div>}
           {screen === 'library' && <>

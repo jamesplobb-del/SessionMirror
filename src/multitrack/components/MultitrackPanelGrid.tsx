@@ -15,8 +15,9 @@ import type {
   SheetMusicPanelState,
 } from '../types'
 
-export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, currentTimeSec, aspectRatio = '9:16', onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
+export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, currentTimeSec, aspectRatio = '9:16', bpm = 120, onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
   aspectRatio?: string
+  bpm?: number
   editable?: boolean
   interactionDisabled?: boolean
   onDeleteExtra?: (id: string) => void
@@ -51,7 +52,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     return () => observer.disconnect()
   }, [])
   const [w, h] = aspectRatio.split(':').map(Number)
-  const { panelRects, musicRect } = compositionRects({ panels, sheetMusic: sheetMusicPanel }, layout, currentTimeSec ?? 0)
+  const { panelRects, musicRect } = compositionRects({ panels, sheetMusic: sheetMusicPanel, practice: { bpm } }, layout, currentTimeSec ?? 0)
   const rectStyle = (rect: LayoutRectPercent | null | undefined): CSSProperties => rect ? {
     position: 'absolute', left: `${rect.xPercent}%`, top: `${rect.yPercent}%`,
     width: `${rect.widthPercent}%`, height: `${rect.heightPercent}%`,

@@ -5,7 +5,7 @@ import type { MultitrackPracticeSettings } from '../types'
 const DraggableMetronomeWidget = lazy(() => import('../../components/DraggableMetronomeWidget'))
 const DraggablePitchWidget = lazy(() => import('../../components/DraggablePitchWidget'))
 
-export default function MultitrackPracticeOverlay({ boundaryRef, practice, isPlaying, streamRef, tunerInstrument, mediaRef, mediaKey, onHideMetronome, onHidePitch }: {
+export default function MultitrackPracticeOverlay({ boundaryRef, practice, isPlaying, streamRef, tunerInstrument, mediaRef, mediaKey, onHideMetronome, onHidePitch, className }: {
   boundaryRef: RefObject<HTMLElement | null>
   practice: MultitrackPracticeSettings
   isPlaying: boolean
@@ -15,10 +15,11 @@ export default function MultitrackPracticeOverlay({ boundaryRef, practice, isPla
   mediaKey: string
   onHideMetronome: () => void
   onHidePitch: () => void
+  className?: string
 }) {
   if (!practice.practiceOverlayEnabled) return null
   return (
-    <div className="multitrack-practice-overlay">
+    <div className={['multitrack-practice-overlay', className].filter(Boolean).join(' ')}>
       <Suspense fallback={null}>
         {practice.showMetronome && <DraggableMetronomeWidget boundaryRef={boundaryRef} positionId="multitrack-metronome" isTakePlaying={isPlaying} muteDuringPlayback={false} controlsLocked={isPlaying} onClose={onHideMetronome} />}
         {practice.showPitch && <DraggablePitchWidget boundaryRef={boundaryRef} positionId="multitrack-pitch" mediaRef={mediaRef} isPlaying={isPlaying} mediaKey={mediaKey} tunerInstrument={tunerInstrument} pitchSource="microphone" liveMicEnabled micStreamRef={streamRef} onClose={onHidePitch} />}

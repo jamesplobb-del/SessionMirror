@@ -41,7 +41,7 @@ function primeElementForPlayback(element: HTMLMediaElement): void {
 }
 
 export function useMultitrackSync() {
-  const projectRulesRef = useRef<{ endSec?: number; hidden: Set<string>; sections: Map<string, { start?: number; end?: number }> }>({ hidden: new Set(), sections: new Map() })
+  const projectRulesRef = useRef<{ endSec?: number; hidden: Set<string>; sections: Map<string, { start?: number; end?: number; visualLeadIn?: number }> }>({ hidden: new Set(), sections: new Map() })
   const mediaMapRef = useRef<Map<string, HTMLMediaElement>>(new Map())
   const excludePanelIdRef = useRef<string | null>(null)
   const referencePanelIdsRef = useRef<string[] | null>(null)
@@ -102,7 +102,8 @@ export function useMultitrackSync() {
     const volume = panelVolumeRef.current.get(panelId) ?? 1
     const section = projectRulesRef.current.sections.get(panelId)
     const time = multitrackTransport.position()
-    const outsideSection = !!section && (time < (section.start ?? 0) || time >= (section.end ?? Infinity))
+    const appearAt = (section?.start ?? 0) - (section?.visualLeadIn ?? 0)
+    const outsideSection = !!section && (time < appearAt || time >= (section.end ?? Infinity))
     const muted = outsideSection || projectRulesRef.current.hidden.has(panelId) ||
       panelMutedRef.current.has(panelId) || monitorMutedRef.current.has(panelId)
     if (visualOnlyModeRef.current) {
@@ -194,17 +195,34 @@ export function useMultitrackSync() {
       const raw = Number.isFinite(element.duration) ? element.duration : 0
       const trim = trimFor(panelId)
       const offset = offsetFor(panelId)
+      const leadIn = projectRulesRef.current.sections.get(panelId)?.visualLeadIn ?? 0
       const mediaEnd = trim.end !== null && raw > 0 ? Math.min(trim.end, raw) : trim.end ?? raw
       return {
         trimStart: trim.start,
         mediaEnd,
-        entersAt: -offset,
+        leadIn,
+        entersAt: -offset - leadIn,
         exitsAt: mediaEnd - trim.start - offset,
         offset,
       }
     },
     [offsetFor, trimFor],
   )
+
+  const clockAt = (
+    win: { trimStart: number; leadIn: number; offset: number; mediaEnd: number },
+    timeline: number,
+  ) => {
+    const earliest = Math.max(0, win.trimStart - win.leadIn)
+    const raw = timeline + win.trimStart + win.offset
+    const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
+    return {
+      raw,
+      earliest,
+      pending: raw < earliest - 0.01,
+      target: Math.min(Math.max(raw, earliest), upper),
+    }
+  }
 
   /** Portion of the timeline this panel's media occupies (0 until metadata loads). */
   const effectiveDuration = useCallback((panelId: string, element: HTMLMediaElement) => {
@@ -234,7 +252,7 @@ export function useMultitrackSync() {
     setDuration(projectRulesRef.current.endSec ?? (durations.length > 0 ? Math.max(...durations) : 0))
   }, [effectiveDuration, getEntries])
 
-  const setProjectRules = useCallback((endSec: number | undefined, hidden: string[], sections: Array<{ id: string; start?: number; end?: number }>) => {
+  const setProjectRules = useCallback((endSec: number | undefined, hidden: string[], sections: Array<{ id: string; start?: number; end?: number; visualLeadIn?: number }>) => {
     projectRulesRef.current = { endSec, hidden: new Set(hidden), sections: new Map(sections.map(s => [s.id, s])) }
     for (const [id, el] of mediaMapRef.current) if (hidden.includes(id)) el.pause()
     applyMixStateToAll(); refreshDuration()
@@ -309,20 +327,17 @@ export function useMultitrackSync() {
       if (panelId === excludePanelId) continue
       try {
         const win = clipWindowFor(panelId, el)
-        const rawTarget = time + win.trimStart + win.offset
-        // Don't clamp to mediaEnd before metadata loads (mediaEnd is 0 then).
-        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
-        const target = Math.min(Math.max(rawTarget, win.trimStart), upper)
+        const clock = clockAt(win, time)
         el.style.opacity = time < win.entersAt || (win.mediaEnd > 0 && time >= win.exitsAt) ? '0' : '1'
         if (win.mediaEnd > 0 && time >= win.exitsAt) el.pause()
-        if (rawTarget < win.trimStart - 0.01) {
+        if (clock.pending) {
           // Clip enters later — park at its start and defer playback.
           if (!el.paused) el.pause()
           if (isPlayingRef.current) pendingStartRef.current.add(panelId)
         } else {
           pendingStartRef.current.delete(panelId)
         }
-        if (Math.abs(el.currentTime - target) > 0.05) el.currentTime = target
+        if (Math.abs(el.currentTime - clock.target) > 0.05) el.currentTime = clock.target
       } catch {
         /* Some media elements reject seeks until metadata is ready. */
       }
@@ -353,18 +368,17 @@ export function useMultitrackSync() {
       }
       try {
         const win = clipWindowFor(panelId, el)
-        const rawTarget = startTime + win.trimStart + win.offset
+        const clock = clockAt(win, startTime)
         if (win.mediaEnd > 0 && startTime >= win.exitsAt) { el.pause(); el.style.opacity = '0'; continue }
-        el.style.opacity = '1'
-        if (rawTarget < win.trimStart - 0.01) {
+        el.style.opacity = startTime < win.entersAt ? '0' : '1'
+        if (clock.pending) {
           // Clip enters the timeline later — park at its start; the rAF loop
           // starts it once the transport reaches its entry point.
-          el.currentTime = win.trimStart
+          el.currentTime = clock.earliest
           pendingStartRef.current.add(panelId)
           continue
         }
-        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
-        el.currentTime = Math.min(rawTarget, upper)
+        el.currentTime = clock.target
       } catch {
         /* Seek rejected before metadata — still try to play below. */
       }
@@ -477,13 +491,12 @@ export function useMultitrackSync() {
       }
       try {
         const win = clipWindowFor(panelId, el)
-        const rawTarget = startTime + win.trimStart + win.offset
-        if (rawTarget < win.trimStart - 0.01) {
-          el.currentTime = win.trimStart
+        const clock = clockAt(win, startTime)
+        if (clock.pending) {
+          el.currentTime = clock.earliest
           pendingStartRef.current.add(panelId)
         } else {
-          const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
-          el.currentTime = Math.min(rawTarget, upper)
+          el.currentTime = clock.target
         }
       } catch {
         /* ignore */
@@ -549,7 +562,7 @@ export function useMultitrackSync() {
         // time that timeline `startTime` maps to; clips that have not entered
         // yet stay parked at their own head until the rAF loop cues them.
         element.style.opacity = startTime < win.entersAt || (win.mediaEnd > 0 && startTime >= win.exitsAt) ? '0' : '1'
-        element.currentTime = Math.max(win.trimStart, startTime + win.trimStart + win.offset)
+        element.currentTime = clockAt(win, startTime).target
       } catch {
         /* metadata may finish loading during the count-in */
       }
@@ -763,10 +776,9 @@ export function useMultitrackSync() {
     for (const [panelId, el] of getEntries()) {
       try {
         const win = clipWindowFor(panelId, el)
-        const rawTarget = win.trimStart + win.offset
-        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
+        const clock = clockAt(win, 0)
         el.style.opacity = 0 < win.entersAt || (win.mediaEnd > 0 && 0 >= win.exitsAt) ? '0' : '1'
-        el.currentTime = Math.min(Math.max(rawTarget, win.trimStart), upper)
+        el.currentTime = clock.target
         el.pause()
       } catch {
         /* ignore */
@@ -809,10 +821,9 @@ export function useMultitrackSync() {
     for (const [panelId, el] of getEntries()) {
       try {
         const win = clipWindowFor(panelId, el)
-        const rawTarget = win.trimStart + win.offset
-        const upper = win.mediaEnd > win.trimStart ? win.mediaEnd : Number.POSITIVE_INFINITY
+        const clock = clockAt(win, 0)
         el.style.opacity = 0 < win.entersAt || (win.mediaEnd > 0 && 0 >= win.exitsAt) ? '0' : '1'
-        el.currentTime = Math.min(Math.max(rawTarget, win.trimStart), upper)
+        el.currentTime = clock.target
         el.pause()
       } catch {
         /* ignore */
@@ -958,7 +969,7 @@ export function useMultitrackSync() {
             if (pending.has(panelId)) {
               if (timeline >= win.entersAt - 0.02) {
                 pending.delete(panelId)
-                el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
+                el.currentTime = clockAt(win, timeline).target
                 if (visualOnlyModeRef.current) {
                   el.muted = true
                   el.volume = 0
@@ -1012,7 +1023,7 @@ export function useMultitrackSync() {
               deviation > slaveTolerance
             ) {
               lastReseekAtRef.current.set(panelId, tickNow)
-              el.currentTime = Math.max(win.trimStart, timeline + win.trimStart + win.offset)
+              el.currentTime = clockAt(win, timeline).target
             }
           } catch {
             /* ignore */

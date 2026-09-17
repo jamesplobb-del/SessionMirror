@@ -65,6 +65,8 @@ export default defineConfig(({ command, mode }) => {
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return
+            // pdf.js is only fetched when a player opens music on a part.
+            if (id.includes('pdfjs-dist')) return 'pdfjs'
             if (id.includes('framer-motion')) return 'motion'
             if (id.includes('@capacitor-community/sqlite') || id.includes('jeep-sqlite')) {
               return 'sqlite'

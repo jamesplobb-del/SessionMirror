@@ -3,7 +3,7 @@ import type { AppSettings } from './appSettings'
 /** Toggles owned by the Camera/Audio Mode Workspace menu. */
 export type HudQuickSettings = Pick<
   AppSettings,
-  'pitchTrackerEnabled' | 'showTakeCards' | 'showMetronome' | 'showDrone' | 'audioEnhancerEnabled'
+  'pitchTrackerEnabled' | 'showTakeCards' | 'showMetronome' | 'showDrone' | 'showMusic' | 'audioEnhancerEnabled'
 >
 
 export const HUD_QUICK_SETTING_KEYS = [
@@ -11,6 +11,7 @@ export const HUD_QUICK_SETTING_KEYS = [
   'showTakeCards',
   'showMetronome',
   'showDrone',
+  'showMusic',
   'audioEnhancerEnabled',
 ] as const satisfies ReadonlyArray<keyof HudQuickSettings>
 
@@ -20,6 +21,7 @@ export function pickHudQuickSettings(settings: AppSettings): HudQuickSettings {
     showTakeCards: settings.showTakeCards,
     showMetronome: settings.showMetronome,
     showDrone: settings.showDrone,
+    showMusic: settings.showMusic,
     audioEnhancerEnabled: settings.audioEnhancerEnabled,
   }
 }

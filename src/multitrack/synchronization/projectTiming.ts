@@ -6,6 +6,27 @@ export function playbackCountOffSec(bpm: number): number {
   return 4 * 60 / Math.max(40, Math.min(300, Number.isFinite(bpm) ? bpm : 120))
 }
 
+/** Extra boxes keep that same four-beat count-off on screen instead of popping in. */
+export function overlayLeadInSec(panel: Pick<PerformancePanelState, 'overlay'>, bpm: number): number {
+  return panel.overlay ? playbackCountOffSec(bpm) : 0
+}
+
+/** Shift trim/offset so export and monitor can play the recorded count-off before the extra appears. */
+export function withOverlayLeadIn(
+  panel: PerformancePanelState,
+  bpm: number,
+  trimStart: number,
+  offsetMs: number,
+): { trimStart: number; offsetMs: number; leadIn: number } {
+  const leadIn = overlayLeadInSec(panel, bpm)
+  if (!leadIn) return { trimStart, offsetMs, leadIn: 0 }
+  return {
+    trimStart: Math.max(0, trimStart - leadIn),
+    offsetMs: offsetMs + leadIn * 1000,
+    leadIn,
+  }
+}
+
 export function panelOffsetMs(panel: PerformancePanelState, bpm: number): number {
   return panel.timelineOffsetMs ?? (panel.take ? timelineOffsetMsForTake(panel.take, bpm) : 0)
 }

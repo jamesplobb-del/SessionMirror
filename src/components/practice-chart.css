@@ -1,0 +1,415 @@
+/*
+ * The music page, and the room standing down around it.
+ *
+ * The page is the product: it is opaque paper laid over the live camera at
+ * z-index 4, under the HUD plane (z-10) and under every floating tool (z-36+),
+ * so the record orbit and the balls stay reachable without ever covering the
+ * staff. The camera session keeps running underneath — hiding it costs a
+ * restart, and a player who taps record wants the take to start now.
+ */
+
+.practice-chart-paper {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  background: #ffffff;
+  color: #171717;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+/*
+ * The strip starts below the chrome at the top of the room, not behind it.
+ *
+ * Two things live up there: the status bar (a Dynamic Island through the title
+ * and the tempo marking is the same bug as a pill over the staff) and the
+ * Record / Tuner / Metronome / Games tabs, which are the only way off this
+ * surface — hiding them to win 45px would trap a player on the page. The page
+ * is fitted into what is left, and a whole page still fits inside it.
+ */
+.practice-chart-scroll {
+  position: absolute;
+  top: var(--music-page-top, var(--safe-top, env(safe-area-inset-top, 0px)));
+  right: 0;
+  bottom: var(--music-page-bottom, 0px);
+  left: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.practice-chart-scroll::-webkit-scrollbar { display: none; }
+
+.practice-chart-strip {
+  position: relative;
+  width: 100%;
+}
+
+/*
+ * Pages butt straight up against each other with no gap. That is what makes a
+ * half turn readable: stopping halfway down leaves the bottom of the page being
+ * played on top of the screen and brings the top of the next one up underneath,
+ * with no band of background cutting between the two systems. The page edge is
+ * an outline, which draws without taking any layout height.
+ */
+.practice-chart-page {
+  position: absolute;
+  background: #ffffff;
+  outline: 1px solid rgba(23, 26, 34, 0.14);
+}
+
+.practice-chart-page canvas,
+.practice-chart-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.practice-chart-page canvas[data-drawn='false'] { visibility: hidden; }
+
+/*
+ * The turn zones cannot be drawn — anything painted on the left and right
+ * quarter of an iPad is painted on the music. They say what they are once, when
+ * the page comes up, and then leave.
+ */
+.practice-chart-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.practice-chart-hint--on { opacity: 1; }
+
+.practice-chart-hint span {
+  margin: 0 10px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(16, 26, 43, 0.72);
+  color: #f1f6ff;
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-chart-hint { transition: none; }
+}
+
+/*
+ * A file that will not open. The sheet stays — disappearing would read as "the
+ * tap did nothing" — and says what happened where the music would have been.
+ */
+.practice-chart-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  color: #4a4f57;
+}
+
+.practice-chart-failed p {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.practice-chart-failed div { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+
+.practice-chart-failed button {
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(23, 26, 34, 0.14);
+  background: #ffffff;
+  color: #1d2430;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.practice-chart-failed button:first-child { background: #2f6fd0; border-color: #2f6fd0; color: #ffffff; }
+.practice-chart-failed button:disabled { opacity: 0.5; }
+
+/* ---- The room stands down --------------------------------------------- */
+
+/*
+ * A HUD that paints a full-screen scrim is a bug while music is up: it is a
+ * sheet of colour laid over the part. These surfaces keep their controls and
+ * give up their background — the page underneath is the background now.
+ */
+.app-shell--music-page .audio-mode-home,
+.app-shell--music-page .audio-mode-home-layer {
+  background: transparent !important;
+}
+
+.app-shell--music-page .audio-practice-metronome-scrim { display: none; }
+
+/*
+ * The room's own washes are declared on `html` with `!important` — the tuner
+ * tint in practice-system.css, the tools surface in audio-mode-tools.css — so
+ * these have to outrank them at the same level rather than hope to be loaded
+ * last. The rim glow is left alone: it lives on the screen edge, not the staff.
+ */
+html.app-music-page .app-ui-overlay,
+html.app-music-page .app-ui-overlay--audio-mode,
+html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-record,
+html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
+  .app-ui-overlay--audio-practice-record {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* ---- The music control ------------------------------------------------- */
+
+.music-widget {
+  width: min(17rem, calc(100vw - 1.5rem));
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.2));
+}
+
+.music-widget__panel {
+  position: relative;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0.7rem;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: rgba(10, 16, 28, 0.78);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  color: #eef4ff;
+}
+
+.app-shell--audio-mode .music-widget__panel {
+  background: var(--audio-surface, #ffffff);
+  border-color: rgba(23, 26, 34, 0.1);
+  color: var(--audio-text-primary, #171a22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.music-widget__close {
+  position: absolute;
+  right: 0.55rem;
+  top: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  opacity: 0.75;
+}
+
+.app-shell--audio-mode .music-widget__close { background: rgba(23, 26, 34, 0.07); }
+
+.music-widget__file {
+  margin: 0;
+  padding-right: 1.8rem;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.music-widget__turn {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.music-widget__turn button {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  border-radius: 0.85rem;
+  border: 0.5px solid rgba(127, 160, 210, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+}
+
+.app-shell--audio-mode .music-widget__turn button { background: rgba(23, 26, 34, 0.05); }
+.music-widget__turn button:disabled { opacity: 0.4; }
+.music-widget__turn button svg { width: 20px; height: 20px; }
+
+.music-widget__turn span {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-widget__row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.85rem;
+  border: 0.5px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-align: left;
+}
+
+.app-shell--audio-mode .music-widget__row { background: rgba(23, 26, 34, 0.04); }
+.music-widget__row svg { width: 18px; height: 18px; }
+
+.music-widget__row span {
+  display: grid;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.music-widget__row small {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+/* The switch: lit means the next page is already halfway up. */
+.music-widget__row i {
+  justify-self: end;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(134, 148, 168, 0.45);
+  transition: background 0.18s ease;
+}
+
+.music-widget__row i::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.18s ease;
+}
+
+.music-widget__row[aria-pressed='true'] i { background: #4d9bff; }
+.music-widget__row[aria-pressed='true'] i::after { transform: translateX(14px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .music-widget__row i,
+  .music-widget__row i::after { transition: none; }
+}
+
+.music-widget__fit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-shell--audio-mode .music-widget__fit { background: rgba(23, 26, 34, 0.05); }
+
+.music-widget__fit--three { grid-template-columns: repeat(3, 1fr); }
+
+.music-widget__fit button {
+  min-height: 36px;
+  padding: 0 0.25rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+.music-widget__fit button[aria-pressed='true'] {
+  background: rgba(77, 155, 255, 0.24);
+  opacity: 1;
+}
+
+.music-widget__actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.music-widget__actions button {
+  display: grid;
+  justify-items: center;
+  gap: 0.15rem;
+  min-height: 48px;
+  padding: 0.35rem 0.2rem;
+  border-radius: 0.85rem;
+  border: 0.5px solid rgba(127, 160, 210, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.app-shell--audio-mode .music-widget__actions button { background: rgba(23, 26, 34, 0.04); }
+.music-widget__actions button svg { width: 16px; height: 16px; }
+.music-widget__actions button:disabled { opacity: 0.45; }
+
+.music-widget__add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 46px;
+  border-radius: 0.9rem;
+  border: 0;
+  background: #2f6fd0;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.music-widget__add svg { width: 18px; height: 18px; }
+.music-widget__add:disabled { opacity: 0.5; }
+
+.music-widget__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.62;
+}
+
+.music-widget__error {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #ffb4a8;
+}
+
+.app-shell--audio-mode .music-widget__error { color: #b4321f; }
+
+.music-widget:focus-visible,
+.music-widget button:focus-visible {
+  outline: 2px solid #69b5ff;
+  outline-offset: 2px;
+}
+

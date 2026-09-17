@@ -92,6 +92,8 @@ interface PracticeHubProps {
   onOpenRoutineBuilder: (mode: RoutineBuilderMode) => void
   onCloseRoutineBuilder: () => void
   onSaveRoutine: (routine: Routine) => void
+  /** Creates the practice folder a routine step needs when music is pinned to it. */
+  onCreatePracticeItem: (title: string) => Promise<string>
   /** Saves, then opens the routine's next step; rejects if that step cannot open. */
   onSaveAndStartRoutine: (routine: Routine) => Promise<void>
   onDeleteRoutine: () => void
@@ -132,6 +134,7 @@ export default function PracticeHub({
   onCloseRoutineBuilder,
   onSaveRoutine,
   onSaveAndStartRoutine,
+  onCreatePracticeItem,
   onDeleteRoutine,
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
@@ -378,6 +381,7 @@ export default function PracticeHub({
                         setPage('home')
                       }}
                       onSaveAndStart={(next) => void saveAndStartRoutine(next)}
+                      onCreatePracticeItem={onCreatePracticeItem}
                       todayStarted={Boolean(routine && routineDay?.routineId === routine.id && routineDay.startedAt)}
                       onDelete={() => {
                         onDeleteRoutine()

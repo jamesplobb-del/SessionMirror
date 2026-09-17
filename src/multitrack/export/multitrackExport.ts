@@ -5,7 +5,7 @@ import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { resolveNativeFileUri } from '../../utils/shareTakeVideo'
 import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAssetCache'
 import { type LayoutRectPercent } from '../layout/layoutRects'
-import { panelOffsetMs, playbackCountOffSec, sourceWindow } from '../synchronization/projectTiming'
+import { panelOffsetMs, playbackCountOffSec, sourceWindow, withOverlayLeadIn } from '../synchronization/projectTiming'
 import { compositionRects } from '../layout/composition'
 import { sheetCueWindows, sheetYAt } from '../sheetMusic/sheetMusicTimeline'
 import type { MultitrackLayoutPreset, MultitrackSession, PerformancePanelState } from '../types'
@@ -62,9 +62,11 @@ export async function exportMultitrackSession(
 
   if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return { ok: false, reason: 'missing_takes' }
   const countOffSec = playbackCountOffSec(session.practice.bpm)
-  // Same four-beat Play All lead-in, so the exported file starts with that
-  // count-off instead of jumping straight to the first downbeat.
+  // Same four-beat Play All lead-in. Export timeline 0 is the first click, and
+  // each take contributes the footage already in the file from that lead-in
+  // (the boxes on screen during count-off), not a black pad before the downbeat.
   const exportDurationSeconds = durationSeconds + countOffSec
+  const exportFromSec = -countOffSec
   const { panelRects, musicRect } = compositionRects(session, layout, 0)
   const windows = sectionExportWindows(session, layout, durationSeconds)
   const sources: Array<{
@@ -88,8 +90,21 @@ export async function exportMultitrackSession(
     const rect = windows.find(w => w.panelRects[panel.id])?.panelRects[panel.id] ?? panel.overlay ?? panelRects[panel.id]
     // Audio-only section behavior remains valid when a part is visually absent.
     if (!rect) continue
-    const clip = sourceWindow(panel.trimStartSec ?? 0, panel.trimEndSec ?? panel.take!.duration ?? 0,
-      panelOffsetMs(panel, session.practice.bpm), 0, durationSeconds)
+    const lead = withOverlayLeadIn(
+      panel,
+      session.practice.bpm,
+      panel.trimStartSec ?? 0,
+      panelOffsetMs(panel, session.practice.bpm),
+    )
+    const from = panel.sectionAudio
+      ? Math.max(exportFromSec, (panel.sectionStartSec ?? 0) - lead.leadIn)
+      : exportFromSec
+    const end = Math.min(
+      durationSeconds,
+      panel.sectionAudio ? panel.sectionEndSec ?? Infinity : Infinity,
+    )
+    const clip = sourceWindow(lead.trimStart, panel.trimEndSec ?? panel.take!.duration ?? 0,
+      lead.offsetMs, from, end)
     if (!clip) continue
     const path = await resolveNativeFileUri(panel.take as Take).catch(() => null)
     if (!path) return { ok: false, reason: 'missing_file' }
@@ -97,11 +112,16 @@ export async function exportMultitrackSession(
     sources.push({
       id: panel.id,
       mirror: panel.mirrored === true || panel.take?.mirrorPlayback === true,
-      sourceInSec: clip.sourceInSec, sourceOutSec: clip.sourceOutSec, insertAtSec: clip.timelineDelaySec + countOffSec,
+      sourceInSec: clip.sourceInSec, sourceOutSec: clip.sourceOutSec,
+      insertAtSec: clip.timelineDelaySec + from - exportFromSec,
       ...(panel.sectionAudio ? { sectionStartSec: panel.sectionStartSec, sectionEndSec: panel.sectionEndSec } : {}),
       path,
       rect,
-      layoutWindows: windows.map(window => ({ startSec: window.startSec + countOffSec, endSec: window.endSec + countOffSec, rect: window.panelRects[panel.id] ?? null })),
+      layoutWindows: windows.map((window, index) => ({
+        startSec: index === 0 ? 0 : window.startSec + countOffSec,
+        endSec: window.endSec + countOffSec,
+        rect: window.panelRects[panel.id] ?? null,
+      })),
       ...(panel.trimStartSec ? { trimStartSec: panel.trimStartSec } : null),
       ...(panel.trimEndSec !== undefined ? { trimEndSec: panel.trimEndSec } : null),
       ...(timelineOffsetMs ? { timelineOffsetMs } : null),
@@ -209,12 +229,22 @@ export async function exportMultitrackSession(
     }
 
     if (options.signal?.aborted) return { ok: false, reason: 'cancelled' }
+    const overlayRects = session.panels.flatMap(panel =>
+      panel.kind === 'performance' && panel.overlay && panelRects[panel.id] ? [panelRects[panel.id]] : [],
+    )
+    const overlayIds = new Set(
+      session.panels.flatMap(panel => panel.kind === 'performance' && panel.overlay ? [panel.id] : []),
+    )
+    const baseGridRects = Object.entries(panelRects)
+      .filter(([id]) => !overlayIds.has(id))
+      .map(([, rect]) => rect)
     const rendered = await BestTakeAudioPlugin.renderMultitrackVideo({
       exportId,
       aspectRatio: session.aspectRatio ?? '9:16',
       durationSeconds: exportDurationSeconds,
       sources: [...sources].reverse().sort((a, b) => Number(!!session.panels.find(p => p.id === b.id && p.kind === 'performance' && p.overlay)) - Number(!!session.panels.find(p => p.id === a.id && p.kind === 'performance' && p.overlay))),
-      gridRects: windows.length > 1 ? [] : Object.values(panelRects),
+      gridRects: windows.length > 1 ? [] : baseGridRects,
+      overlayRects: windows.length > 1 ? [] : overlayRects,
       sheetMusic,
       ...(sheetMusicCues ? { sheetMusicCues } : null),
       backingAudio,

@@ -43,6 +43,8 @@ export interface AppSettings {
   showMetronome: boolean
   /** Floating drone widget on the main camera/audio HUD — a held pitch under the take. */
   showDrone: boolean
+  /** Practice on the music: the part fills the room and the tools fold to balls. */
+  showMusic: boolean
   /** Silence metronome clicks while a take is playing; internal clock keeps running. */
   muteMetronomeDuringPlayback: boolean
   /** Dolby On-style playback enhancer (EQ, compression, reverb). */
@@ -79,6 +81,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showTakeCards: true,
   showMetronome: false,
   showDrone: false,
+  showMusic: false,
   muteMetronomeDuringPlayback: true,
   audioEnhancerEnabled: false,
   audioEnhancerSettings: cloneAudioEnhancerSettings(DEFAULT_AUDIO_ENHANCER_SETTINGS),
@@ -187,6 +190,10 @@ function readStoredSettings(): AppSettings {
         parsed.showDrone !== undefined
           ? Boolean(parsed.showDrone)
           : DEFAULT_APP_SETTINGS.showDrone,
+      showMusic:
+        parsed.showMusic !== undefined
+          ? Boolean(parsed.showMusic)
+          : DEFAULT_APP_SETTINGS.showMusic,
       muteMetronomeDuringPlayback:
         parsed.muteMetronomeDuringPlayback !== undefined
           ? Boolean(parsed.muteMetronomeDuringPlayback)

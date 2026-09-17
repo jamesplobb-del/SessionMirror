@@ -774,6 +774,48 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         )
     }
 
+    /// Subtract overlapping rects so chrome behind an extra box cannot show through it.
+    private func rectsBySubtracting(_ occlusions: [CGRect], from bounds: CGRect) -> [CGRect] {
+        var visible = [bounds]
+        for frame in occlusions {
+            visible = visible.flatMap { region -> [CGRect] in
+                let cut = region.intersection(frame)
+                if cut.isNull || cut.isEmpty { return [region] }
+                return [
+                    CGRect(x: region.minX, y: region.minY, width: region.width, height: cut.minY - region.minY),
+                    CGRect(x: region.minX, y: cut.maxY, width: region.width, height: region.maxY - cut.maxY),
+                    CGRect(x: region.minX, y: cut.minY, width: cut.minX - region.minX, height: cut.height),
+                    CGRect(x: cut.maxX, y: cut.minY, width: region.maxX - cut.maxX, height: cut.height)
+                ].filter { !$0.isEmpty }
+            }
+        }
+        return visible
+    }
+
+    private func addMultitrackBorder(
+        frame: CGRect,
+        to decorationLayer: CALayer,
+        occlusions: [CGRect] = []
+    ) {
+        let visible = rectsBySubtracting(
+            occlusions.map { $0.offsetBy(dx: -frame.minX, dy: -frame.minY) },
+            from: CGRect(origin: .zero, size: frame.size)
+        )
+        if visible.isEmpty { return }
+        let borderLayer = CALayer()
+        borderLayer.frame = frame
+        borderLayer.borderColor = UIColor.white.withAlphaComponent(0.42).cgColor
+        borderLayer.borderWidth = 2
+        if visible.count != 1 || visible[0] != CGRect(origin: .zero, size: frame.size) {
+            let maskPath = UIBezierPath()
+            for region in visible { maskPath.append(UIBezierPath(rect: region)) }
+            let mask = CAShapeLayer()
+            mask.path = maskPath.cgPath
+            borderLayer.mask = mask
+        }
+        decorationLayer.addSublayer(borderLayer)
+    }
+
     /// Aspect-fills a panel and returns a crop in the track's natural coordinate
     /// space. The crop prevents cover-scaled pixels from bleeding into a neighbor.
     private func multitrackVideoGeometry(
@@ -1324,14 +1366,18 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
         // Draw every layout cell, including empty ones, so the final frame is a
         // deliberate connected grid instead of a set of floating rectangles.
+        // Extra boxes are their own chrome: punch them out of the base grid so
+        // those borders cannot cross the added box.
+        let overlayFrames = (call.getArray("overlayRects", JSObject.self) ?? []).map {
+            multitrackRectFrame($0 as [String: Any], renderSize: renderSize)
+        }
         let gridRects = call.getArray("gridRects", JSObject.self) ?? []
         for rectAny in gridRects {
-            let rect = rectAny as [String: Any]
-            let borderLayer = CALayer()
-            borderLayer.frame = multitrackRectFrame(rect, renderSize: renderSize)
-            borderLayer.borderColor = UIColor.white.withAlphaComponent(0.42).cgColor
-            borderLayer.borderWidth = 2
-            decorationLayer.addSublayer(borderLayer)
+            addMultitrackBorder(
+                frame: multitrackRectFrame(rectAny as [String: Any], renderSize: renderSize),
+                to: decorationLayer,
+                occlusions: overlayFrames
+            )
         }
 
         // Sheet cue windows are expressed against the finished composition, so
@@ -1452,6 +1498,14 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         } else if let sheetMusicDict = call.getObject("sheetMusic") {
             addSheetLayer(sheetMusicDict, window: nil)
+        }
+
+        for (index, frame) in overlayFrames.enumerated() {
+            addMultitrackBorder(
+                frame: frame,
+                to: decorationLayer,
+                occlusions: Array(overlayFrames.dropFirst(index + 1))
+            )
         }
 
         videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(

@@ -39,7 +39,7 @@ import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { Capacitor } from '@capacitor/core'
-import { panelOffsetMs, panelEndSec, sourceWindow, playbackCountOffSec, playbackStartPosition } from '../synchronization/projectTiming'
+import { panelOffsetMs, panelEndSec, sourceWindow, playbackCountOffSec, playbackStartPosition, withOverlayLeadIn, overlayLeadInSec } from '../synchronization/projectTiming'
 import { multitrackTransport } from '../synchronization/multitrackTransport'
 import MultitrackProjectPanel from './MultitrackProjectPanel'
 import { readMultitrackFile, shareMultitrackFile } from '../state/multitrackFile'
@@ -533,9 +533,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       // edits as the video instead of rebuilding from stale session metadata.
       const timeline = sync.getPanelTimelineSettings(panel.id)
       const rawEnd = timeline.trimEndSec ?? (sync.getPanelMediaDuration(panel.id) || panel.take.duration || 0)
-      const from = panel.sectionAudio ? Math.max(startSec, panel.sectionStartSec ?? startSec) : startSec
+      const lead = withOverlayLeadIn(panel, session.practice.bpm, timeline.trimStartSec, timeline.offsetMs)
+      const from = panel.sectionAudio
+        ? Math.max(startSec, (panel.sectionStartSec ?? 0) - lead.leadIn)
+        : startSec
       const end = Math.min(session.endSec ?? Infinity, panel.sectionAudio ? panel.sectionEndSec ?? Infinity : Infinity)
-      const window = sourceWindow(timeline.trimStartSec, rawEnd, timeline.offsetMs, from, end)
+      const window = sourceWindow(lead.trimStart, rawEnd, lead.offsetMs, from, end)
       if (!window) continue
       const sourceInSec = window.sourceInSec
       const timelineDelaySec = window.timelineDelaySec + from - startSec
@@ -1145,8 +1148,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   useEffect(() => {
     sync.setProjectRules(session.endSec, session.panels.filter(p => p.kind === 'performance' && p.hidden).map(p => p.id),
-      session.panels.flatMap(p => p.kind === 'performance' && p.sectionAudio ? [{ id: p.id, start: p.sectionStartSec, end: p.sectionEndSec }] : []))
-  }, [session.endSec, session.panels, sync.setProjectRules])
+      session.panels.flatMap(p => {
+        if (p.kind !== 'performance') return []
+        const visualLeadIn = overlayLeadInSec(p, session.practice.bpm)
+        if (p.sectionAudio || visualLeadIn) {
+          return [{ id: p.id, start: p.sectionStartSec, end: p.sectionEndSec, visualLeadIn }]
+        }
+        return []
+      }))
+  }, [session.endSec, session.panels, session.practice.bpm, sync.setProjectRules])
 
   const tileSheetPanel = session.panels.find(
     (panel) => panel.id === tileSheetPanelId && panel.kind === 'performance',
@@ -1464,7 +1474,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 </div>
                 <p className="multitrack-arrange-hint">Select a box to move or resize it.</p>
               </>}
-              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} editable={layoutEditing || alignStageOpen} interactionDisabled={isExporting || recording.phase !== 'idle' || sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
+              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} bpm={session.practice.bpm} editable={layoutEditing || alignStageOpen} interactionDisabled={isExporting || recording.phase !== 'idle' || sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
                 streamRef={streamRef} streamGeneration={streamGeneration}
                 nativeLivePreviewActive={nativeLivePreviewActive} nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
                 countInRemaining={recording.countInRemaining} recordingElapsed={elapsed}
@@ -1539,22 +1549,23 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   sync.seek(time)
                 }} /></>
             )}
-            {!activePanel ? (
-              <MultitrackPracticeOverlay
-                boundaryRef={shellRef}
-                practice={session.practice}
-                isPlaying={sync.state.isPlaying || backingPlaying}
-                streamRef={streamRef}
-                tunerInstrument={tunerInstrument}
-                mediaRef={masterMediaRef}
-                mediaKey="multitrack-grid"
-                onHideMetronome={() => handlePracticeChange({ showMetronome: false })}
-                onHidePitch={() => handlePracticeChange({ showPitch: false })}
-              />
-            ) : null}
           </motion.div>
         )}
       </AnimatePresence>
+      {isOpen ? (
+        <MultitrackPracticeOverlay
+          className="multitrack-practice-overlay--screen"
+          boundaryRef={shellRef}
+          practice={session.practice}
+          isPlaying={sync.state.isPlaying || backingPlaying || isRecording || recording.phase === 'count-in' || recording.phase === 'arming'}
+          streamRef={streamRef}
+          tunerInstrument={tunerInstrument}
+          mediaRef={masterMediaRef}
+          mediaKey="multitrack-grid"
+          onHideMetronome={() => handlePracticeChange({ showMetronome: false })}
+          onHidePitch={() => handlePracticeChange({ showPitch: false })}
+        />
+      ) : null}
       <AnimatePresence>
         {activePanel && isOpen && (
           <motion.div key="mt-recording-stage" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

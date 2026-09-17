@@ -36,7 +36,6 @@ import {
 import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
 import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
-import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
 import MultitrackClickSettings from './MultitrackClickSettings'
 
 /** Above the stage (z-150). */
@@ -94,7 +93,7 @@ export default function MultitrackRecordingStage({
   panelLabel,
   streamRef,
   streamGeneration,
-  tunerInstrument,
+  tunerInstrument: _tunerInstrument,
   practice,
   phase,
   countInRemaining,
@@ -123,7 +122,6 @@ export default function MultitrackRecordingStage({
   const videoRef = useRef<HTMLVideoElement>(null)
   const internalReviewVideoRef = useRef<HTMLMediaElement | null>(null)
   const reviewVideoRef = externalReviewMediaRef ?? internalReviewVideoRef
-  const emptyMediaRef = useRef<HTMLMediaElement | null>(null)
   const nativePreviewCanvasRef = useRef<HTMLCanvasElement>(null)
   const nativeFramePumpRef = useRef<ReturnType<typeof createNativePreviewFramePump> | null>(null)
   const nativeBridgePrimedRef = useRef(nativeLivePreviewActive)
@@ -368,18 +366,6 @@ export default function MultitrackRecordingStage({
           <AudioLines className="h-4 w-4" strokeWidth={2.1} />
         </Pressable>
       </div>
-
-      <MultitrackPracticeOverlay
-        boundaryRef={stageRef}
-        practice={practice}
-        isPlaying={isRecording || phase === 'count-in'}
-        streamRef={streamRef}
-        tunerInstrument={tunerInstrument}
-        mediaRef={emptyMediaRef}
-        mediaKey="multitrack-recording-stage"
-        onHideMetronome={() => onPracticeChange({ showMetronome: false })}
-        onHidePitch={() => onPracticeChange({ showPitch: false })}
-      />
 
       <footer className="multitrack-recording-stage__controls">
         {phase === 'review' ? (

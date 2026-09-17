@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import {
   AudioLines,
   Columns2,
+  FileMusic,
   Grid2X2,
   LayoutGrid,
   MicVocal,
@@ -40,6 +41,9 @@ interface SettingsBranchWheelProps {
   showDrone?: boolean
   droneToggleVisible?: boolean
   onShowDroneChange?: (show: boolean) => void
+  showMusic?: boolean
+  musicToggleVisible?: boolean
+  onShowMusicChange?: (show: boolean) => void
   /** Saved desks — up to three chips above the toggle grid. */
   desks?: WorkspaceDesk[]
   activeDeskId?: string | null
@@ -74,6 +78,7 @@ interface BranchItem {
     | 'tuner-takes'
     | 'metronome'
     | 'drone'
+    | 'music'
     | 'enhancer'
     | 'hands-free'
     | 'expand'
@@ -143,6 +148,9 @@ export default function SettingsBranchWheel({
   metronomeToggleVisible = true,
   showDrone = false,
   droneToggleVisible = true,
+  showMusic = false,
+  musicToggleVisible = false,
+  onShowMusicChange,
   onShowDroneChange,
   desks = [],
   activeDeskId = null,
@@ -322,6 +330,18 @@ export default function SettingsBranchWheel({
       })
     }
 
+    // Music sits with the other tools rather than in a tab of its own: the part
+    // is one more thing on the desk, not a second app to cross into.
+    if (musicToggleVisible && onShowMusicChange) {
+      items.push({
+        id: 'music',
+        label: 'Music',
+        icon: 'music',
+        active: showMusic,
+        onSelect: () => onShowMusicChange(!showMusic),
+      })
+    }
+
     items.push({
       id: 'audio-enhancer',
       label: 'Audio Enhance',
@@ -375,8 +395,11 @@ export default function SettingsBranchWheel({
     handsFreeToggleDisabled,
     expandViewActive,
     metronomeToggleVisible,
+    musicToggleVisible,
     onShowDroneChange,
+    onShowMusicChange,
     showDrone,
+    showMusic,
     onAudioEnhancerChange,
     onHandsFreeChange,
     onOpenMultitrack,
@@ -581,6 +604,8 @@ export default function SettingsBranchWheel({
                             <SlidersHorizontal strokeWidth={1.8} />
                           ) : item.icon === 'drone' ? (
                             <Radio strokeWidth={1.8} />
+                          ) : item.icon === 'music' ? (
+                            <FileMusic strokeWidth={1.8} />
                           ) : item.icon === 'hands-free' ? (
                             <MicVocal strokeWidth={1.8} />
                           ) : item.icon === 'expand' ? (

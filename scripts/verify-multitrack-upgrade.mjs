@@ -45,9 +45,11 @@ try {
   const after = m.compositionRects(floatingSession, preset, 25)
   check(before.panelRects.a, during.panelRects.a, 'floating box never reflows base')
   check(during.panelRects.b, floating.overlay, 'floating placement retained')
+  check(m.compositionRects(floatingSession, preset, 17).panelRects.b, undefined, 'extra waits until its own count-off')
+  check(before.panelRects.b, floating.overlay, 'extra is on screen for the lead-in, not a pop-in')
   check(after.panelRects.b, undefined, 'box disappears exactly at end boundary')
   const windows = m.sectionExportWindows(floatingSession, preset, 30)
-  check(windows.map(w => [w.startSec,w.endSec]), [[0,20],[20,25],[25,30]], 'export boundaries match preview')
+  check(windows.map(w => [w.startSec,w.endSec]), [[0,18],[18,20],[20,25],[25,30]], 'export boundaries include extra count-off')
   check(windows[1].panelRects, during.panelRects, 'export matches all floating rectangles')
   for (let box = 0; box < 12; box++) {
     for (const bpm of [40, 60, 120, 300]) for (const bars of [0, 1, 2, 8]) {
@@ -114,8 +116,11 @@ try {
   assert.equal(payload.aspectRatio,'1:1')
   assert.equal(payload.durationSeconds,28)
   assert.equal(payload.sources[0].id,'extra-1','floating layers render above base videos')
-  assert.equal(payload.sources[0].insertAtSec,22)
-  assert.ok(Math.abs(payload.sources[0].sourceInSec-2.3)<1e-9)
+  assert.equal(payload.sources[0].insertAtSec,20,'extra is on screen for its count-off, not a pop-in')
+  assert.ok(Math.abs(payload.sources[0].sourceInSec-0.3)<1e-9,'extra export plays the count-off already in the take')
+  assert.equal(payload.sources[1].insertAtSec,0,'lead-in is the take on screen, not a black pad')
+  assert.ok(Math.abs(payload.sources[1].sourceInSec-0.3)<1e-9,'export plays the count-off already in the take')
+  assert.equal(payload.sources[1].layoutWindows[0].startSec,0)
   assert.equal(payload.sources[0].sectionEndSec,24)
   assert.equal(payload.sources[1].volume,.4)
   assert.equal(payload.sources[1].mirror,true)
@@ -124,9 +129,16 @@ try {
   const single={...project,panels:[project.panels[0]]}
   await exportMultitrackSession(single,layout,26)
   assert.equal(globalThis.exportCalls[1].sheetMusicCues.length,1,'single timed sheet layer retains its timing')
+  const floating={...project,panels:[{kind:'performance',id:'a',take},{kind:'performance',id:'extra-1',take:{...take,id:'extra'},overlay:{xPercent:10,yPercent:10,widthPercent:30,heightPercent:20}}]}
+  await exportMultitrackSession(floating,layout,26)
+  const overlayPayload=globalThis.exportCalls[2]
+  assert.equal(overlayPayload.overlayRects.length,1,'extra boxes keep their own chrome')
+  assert.equal(overlayPayload.gridRects.length,1)
+  assert.ok(!overlayPayload.gridRects.some(r=>r.xPercent===10 && r.yPercent===10),'base grid lines stop at extra boxes')
+  assert.equal(overlayPayload.overlayRects[0].xPercent,10)
   const aborted=new AbortController();aborted.abort()
   assert.equal((await exportMultitrackSession(project,layout,26,{signal:aborted.signal})).reason,'cancelled')
-  assert.equal(globalThis.exportCalls.length,2,'cancelled job never enters native renderer')
+  assert.equal(globalThis.exportCalls.length,3,'cancelled job never enters native renderer')
   console.log('PASS: exporter payload, floating layer order, timed score, mix, mirror, format, ending and cancellation.')
 } finally { await rm(exportDir,{recursive:true,force:true}) }
 

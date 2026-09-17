@@ -35,7 +35,7 @@ assert.equal(embed.parseYoutubeVideoId('https://notyoutube.com/watch?v=abcdefghi
 assert.equal(embed.parseYoutubeVideoId('https://m.youtube.com/watch?v=abcdefghijk'), 'abcdefghijk')
 assert.equal(embed.parseYoutubeVideoId('https://youtube.com.evil.test/watch?v=abcdefghijk'), null)
 const snapshot = { mode: 'audio', pitchTrackerEnabled: true, showMetronome: true, showDrone: true,
-  showTakeCards: true, autoSoundRecording: false, audioEnhancerEnabled: false,
+  showMusic: false, showTakeCards: true, autoSoundRecording: false, audioEnhancerEnabled: false,
   metronome: { bpm: 72, meter: '4/4', subdivision: 'off' }, drone: { pitchClass: null, octave: 4 }, soundSilenceSeconds: 2 }
 desks.saveFocusDesk('excerpt-a', snapshot)
 assert.deepEqual(desks.loadFocusDesk('excerpt-a'), snapshot, 'A silent drone must stay silent on restore')

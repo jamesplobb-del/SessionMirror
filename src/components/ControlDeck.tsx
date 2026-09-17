@@ -52,6 +52,9 @@ interface ControlDeckProps {
   showDrone?: boolean
   droneToggleVisible?: boolean
   onShowDroneChange?: (show: boolean) => void
+  showMusic?: boolean
+  musicToggleVisible?: boolean
+  onShowMusicChange?: (show: boolean) => void
   /** Saved desks shown as chips at the top of the Workspace tray. */
   desks?: WorkspaceDesk[]
   activeDeskId?: string | null
@@ -131,6 +134,9 @@ function ControlDeck({
   showDrone = false,
   droneToggleVisible = true,
   onShowDroneChange,
+  showMusic = false,
+  musicToggleVisible = false,
+  onShowMusicChange,
   desks,
   activeDeskId = null,
   liveDeskSummary = '',
@@ -347,6 +353,9 @@ function ControlDeck({
         showDrone={showDrone}
         droneToggleVisible={droneToggleVisible}
         onShowDroneChange={(show) => onShowDroneChange?.(show)}
+        showMusic={showMusic}
+        musicToggleVisible={musicToggleVisible}
+        onShowMusicChange={onShowMusicChange}
         desks={desks}
         activeDeskId={activeDeskId}
         liveDeskSummary={liveDeskSummary}

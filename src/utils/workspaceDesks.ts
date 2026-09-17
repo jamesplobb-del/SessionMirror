@@ -15,6 +15,8 @@ export interface WorkspaceDesk {
   pitchTrackerEnabled: boolean
   showMetronome: boolean
   showDrone: boolean
+  /** Practice on the music: this desk opens with the part up. */
+  showMusic: boolean
   showTakeCards: boolean
   autoSoundRecording: boolean
   audioEnhancerEnabled: boolean
@@ -59,6 +61,7 @@ function parseDesk(value: unknown): WorkspaceDesk | null {
     pitchTrackerEnabled: Boolean(raw.pitchTrackerEnabled),
     showMetronome: Boolean(raw.showMetronome),
     showDrone: Boolean(raw.showDrone),
+    showMusic: Boolean(raw.showMusic),
     showTakeCards: raw.showTakeCards === undefined ? true : Boolean(raw.showTakeCards),
     autoSoundRecording: Boolean(raw.autoSoundRecording),
     audioEnhancerEnabled: Boolean(raw.audioEnhancerEnabled),
@@ -136,6 +139,7 @@ export function deskMatchesSnapshot(desk: WorkspaceDesk, live: DeskSnapshot): bo
     desk.pitchTrackerEnabled === live.pitchTrackerEnabled &&
     desk.showMetronome === live.showMetronome &&
     desk.showDrone === live.showDrone &&
+    desk.showMusic === live.showMusic &&
     desk.showTakeCards === live.showTakeCards &&
     desk.autoSoundRecording === live.autoSoundRecording &&
     desk.audioEnhancerEnabled === live.audioEnhancerEnabled &&
@@ -165,6 +169,7 @@ export function summarizeDesk(
     parts.push('Drone')
   }
   if (desk.pitchTrackerEnabled) parts.push('Pitch')
+  if (desk.showMusic) parts.push('Music')
   if (desk.autoSoundRecording) parts.push(`Hands-free ${desk.soundSilenceSeconds}s`)
   if (desk.audioEnhancerEnabled) parts.push('Enhancer')
   if (desk.mode === 'video' && !desk.showTakeCards) parts.push('Cards off')

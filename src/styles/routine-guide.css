@@ -714,3 +714,10 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 .routine-guide:has(.routine-guide-ready-note) .routine-guide-field--name{margin-bottom:13px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-field--name input{min-height:50px;padding:12px 14px;margin-top:6px;font-size:18px!important}
 .routine-guide:has(.routine-guide-ready-note) .routine-guide-lineup-meta{padding-bottom:2px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-ready-note{font-size:11px;padding:10px;margin-bottom:12px}
 .routine-guide:has(.routine-guide-ready-note) .routine-guide-lineup>li{min-height:0}.routine-guide:has(.routine-guide-ready-note) .routine-swipe-content{min-height:76px;padding:9px 12px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item{min-height:54px;padding:5px 0}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item strong{font-size:15px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item small{font-size:10px;margin-top:4px}.routine-guide-edit-exercise{width:14px!important;color:var(--guide-muted)}.routine-guide-lineup-actions{display:flex;justify-content:space-between;gap:8px}.routine-guide-lineup-actions .routine-guide-text{margin:4px 0 0;font-size:11px}
+
+/* Music pinned to a step: the file lives in the item's folder, the routine only
+   remembers that this step opens on it. Untick and the page stays down. */
+.routine-music-open { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, currentColor 5%, transparent); font-size: 12.5px; line-height: 1.3; }
+.routine-music-open input { width: 20px; height: 20px; flex: none; accent-color: var(--guide-accent, #1598ff); }
+.routine-music-open span { flex: 1; min-width: 0; }
+.routine-music-open svg { width: 14px; height: 14px; flex: none; opacity: .5; }

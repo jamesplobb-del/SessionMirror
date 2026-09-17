@@ -19,6 +19,8 @@ const TIMELINE_ORIGIN_PX = 96
 const MIN_CLIP_SEC = 0.2
 /** Movement before a touch on a selected clip counts as a drag and not a scroll. */
 const DRAG_INTENT_PX = 8
+const EDITOR_MIN_PX = 240
+const EDITOR_MAX_FRACTION = 0.88
 
 export interface AlignClipState {
   panelId: string
@@ -365,6 +367,9 @@ export default function MultitrackAlignStage({
   const initialSheetMusicRef = useRef(sheetMusic)
   const [selection, setSelection] = useState<{ kind: 'clip' | 'image'; id: string } | null>(null)
   const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
+  const stageRef = useRef<HTMLElement>(null)
+  const [editorHeightPx, setEditorHeightPx] = useState<number | null>(null)
+  const resizeDrag = useRef<{ pointerId: number; startY: number; startH: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const pxPerSec = ZOOM_STEPS[zoomIndex]
 
@@ -725,9 +730,52 @@ export default function MultitrackAlignStage({
       ? imageWindows.find((window) => window.id === selection.id) ?? null
       : null
   const playheadSec = Math.max(0, sync.state.currentTime)
+  const onEditorResizeDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const stage = stageRef.current
+    if (!stage || event.button !== 0) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resizeDrag.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startH: editorHeightPx ?? stage.getBoundingClientRect().height,
+    }
+  }
+  const onEditorResizeMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = resizeDrag.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    const parentHeight = stageRef.current?.parentElement?.clientHeight ?? window.innerHeight
+    const next = Math.min(
+      parentHeight * EDITOR_MAX_FRACTION,
+      Math.max(EDITOR_MIN_PX, drag.startH + (drag.startY - event.clientY)),
+    )
+    setEditorHeightPx(next)
+  }
+  const onEditorResizeUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (resizeDrag.current?.pointerId !== event.pointerId) return
+    resizeDrag.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }
 
   return (
-    <section className="multitrack-align-stage" aria-label="Editor" aria-busy={busy || saving}>
+    <section
+      ref={stageRef}
+      className={`multitrack-align-stage${editorHeightPx ? ' is-resized' : ''}`}
+      style={editorHeightPx ? { flexBasis: editorHeightPx, height: editorHeightPx } : undefined}
+      aria-label="Editor"
+      aria-busy={busy || saving}
+    >
+      <button
+        type="button"
+        className="multitrack-align-stage__resize"
+        aria-label="Drag up to expand editor"
+        onPointerDown={onEditorResizeDown}
+        onPointerMove={onEditorResizeMove}
+        onPointerUp={onEditorResizeUp}
+        onPointerCancel={onEditorResizeUp}
+      />
       {saveError && <p role="alert" className="multitrack-arrange-hint">{saveError}</p>}
       <div className="multitrack-editor-content" inert={busy || saving}>
       <header className="multitrack-align-stage__header">

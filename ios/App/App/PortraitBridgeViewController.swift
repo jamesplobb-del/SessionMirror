@@ -13,12 +13,25 @@ class PortraitBridgeViewController: CAPBridgeViewController {
         return nativePreviewHostView
     }
 
+    /*
+     * The root view controller is what UIKit actually asks, so a flat `.portrait`
+     * here quietly overrode both the iPad rule in AppDelegate's
+     * `supportedInterfaceOrientationsFor` and `ScreenOrientation.unlock()` from
+     * the web layer — an iPad could never leave portrait, whatever either of
+     * them said. iPhone stays locked: its camera framing and control deck are
+     * built around portrait. An iPad is propped on a stand and follows the
+     * device, which is the only way a part can be read two pages at a time.
+     */
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        .portrait
+        isPad ? .all : .portrait
     }
 
     override var shouldAutorotate: Bool {
-        false
+        isPad
     }
 
     override open func capacitorDidLoad() {

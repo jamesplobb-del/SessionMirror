@@ -2994,7 +2994,8 @@ html.native-camera-passthrough .camera-background-overlay {
 html.native-camera-passthrough .app-ui-rotator,
 html.native-camera-passthrough .app-ui-overlay,
 html.native-camera-passthrough .pitch-display-layer,
-html.native-camera-passthrough .metronome-display-layer {
+html.native-camera-passthrough .metronome-display-layer,
+html.native-camera-passthrough .multitrack-practice-overlay--screen {
   opacity: 1 !important;
   visibility: visible !important;
 }
@@ -3023,7 +3024,9 @@ html.native-camera-passthrough .app-ui-overlay--native-recording .pip-drag-layer
 html.native-camera-passthrough .pitch-display-layer .pitch-widget-draggable,
 html.native-camera-passthrough .pitch-display-layer .pointer-events-auto,
 html.native-camera-passthrough .metronome-display-layer .metronome-widget-draggable,
-html.native-camera-passthrough .metronome-display-layer .pointer-events-auto {
+html.native-camera-passthrough .metronome-display-layer .pointer-events-auto,
+html.native-camera-passthrough .multitrack-practice-overlay--screen .pitch-widget-draggable,
+html.native-camera-passthrough .multitrack-practice-overlay--screen .pointer-events-auto {
   pointer-events: auto !important;
 }
 
