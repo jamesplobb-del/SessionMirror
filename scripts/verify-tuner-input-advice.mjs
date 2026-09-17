@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict'
+import { build } from 'esbuild'
+const result = await build({ entryPoints: ['src/utils/tunerInputAdvice.ts'], bundle: true, write: false, format: 'esm', platform: 'node' })
+const { tunerInputAdvice: advice } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
+assert.equal(advice(-160, -50, 0, 0), null, 'Silence must not request more input')
+assert.equal(advice(-55, -50, 440, 0.2), null, 'Uncertain noise must not request more input')
+assert.equal(advice(-51, -50, 440, 0.9), 'quiet')
+assert.equal(advice(-30, -50, 440, 0.9), null)
+assert.equal(advice(-8, -50, 440, 0.9), 'loud')
+assert.equal(advice(NaN, -50, 440, 0.9), null)
+assert.equal(advice(-Infinity, -50, 440, 0.9), null)
+console.log('PASS: tuner advice ignores silence, noise and healthy input; detects quiet tones and very loud input.')

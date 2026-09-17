@@ -11,10 +11,15 @@ export const MULTITRACK_FILE_EXTENSION = '.btmulti'
 const MAGIC = 'BTMULTI1'
 const MAX_BYTES = 512 * 1024 * 1024
 const MAX_MANIFEST = 1024 * 1024
+/** A ceiling for a page reference in a shared file, not a limit on real parts. */
+const MAX_PDF_PAGES = 2000
 type AssetEntry = { size: number; type: string }
 
 /** Length-prefixed JSON followed by original media bytes; no base64 expansion. */
 export async function buildMultitrackFile(session: MultitrackSession): Promise<Blob> {
+  if (session.panels.some(p => p.kind === 'performance' && p.missingTakeId && !p.take)) {
+    throw new Error('Replace missing recordings before sharing this project.')
+  }
   const copy = structuredClone(session)
   const blobs: Blob[] = []
   const entries: AssetEntry[] = []
@@ -101,7 +106,7 @@ export async function readMultitrackFile(file: Blob): Promise<{ session: Multitr
   const parseSheet = (value: unknown): SheetMusicAsset => {
     const a = record(value); assetIndex(a.src)
     if (!/^(image\/(png|jpeg|webp|gif)|application\/pdf)$/.test(a.mimeType)) throw new Error('Unsupported sheet music attachment.')
-    return { src: a.src, mimeType: a.mimeType, fileName: text(a.fileName, 'Sheet music'), x: number(a.x, .5, -10, 10), y: number(a.y, .5, -10, 10), scale: number(a.scale, 1, .1, 20), contentMode: a.contentMode === 'fit' ? 'fit' : 'fill', framePosition: ['top','bottom','left','right'].includes(a.framePosition) ? a.framePosition : undefined, frameScale: number(a.frameScale, 1, .1, 20), scrollEndY: typeof a.scrollEndY === 'number' ? number(a.scrollEndY, 0, -100, 100) : undefined, scrollDurationSec: typeof a.scrollDurationSec === 'number' ? number(a.scrollDurationSec, 1, .1) : undefined }
+    return { src: a.src, mimeType: a.mimeType, fileName: text(a.fileName, 'Sheet music'), x: number(a.x, .5, -10, 10), y: number(a.y, .5, -10, 10), scale: number(a.scale, 1, .1, 20), contentMode: a.contentMode === 'fit' ? 'fit' : 'fill', framePosition: ['top','bottom','left','right'].includes(a.framePosition) ? a.framePosition : undefined, frameScale: number(a.frameScale, 1, .1, 20), scrollEndY: typeof a.scrollEndY === 'number' ? number(a.scrollEndY, 0, -100, 100) : undefined, scrollDurationSec: typeof a.scrollDurationSec === 'number' ? number(a.scrollDurationSec, 1, .1) : undefined, pageIndex: typeof a.pageIndex === 'number' ? Math.round(number(a.pageIndex, 0, 0, MAX_PDF_PAGES - 1)) : undefined, pageCount: typeof a.pageCount === 'number' ? Math.round(number(a.pageCount, 1, 1, MAX_PDF_PAGES)) : undefined }
   }
   const takes = new Map<string, Take>()
   const panels: PerformancePanelState[] = s.panels.map((value: unknown, i: number) => {

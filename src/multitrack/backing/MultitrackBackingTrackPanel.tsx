@@ -276,10 +276,10 @@ export default function MultitrackBackingTrackPanel({
             <p>{backing.kind === 'none' ? 'Backing track' : backing.kind === 'audio' ? backing.fileName : backing.label}</p>
             <span>
               {backing.kind === 'none'
-                ? 'Add MP3 or YouTube for recording'
+                ? 'Import audio to record and export with your parts'
                 : backing.kind === 'audio'
                   ? 'Synced with every recording'
-                  : 'Plays while recording · not included in export'}
+                  : 'Practice reference · approximate timing · excluded from export'}
             </span>
           </div>
         </div>
@@ -291,11 +291,7 @@ export default function MultitrackBackingTrackPanel({
       <div className="multitrack-backing-strip__controls">
         <Pressable type="button" intensity="soft" onClick={() => fileInputRef.current?.click()} className="multitrack-backing-strip__chip">
           <Upload className="h-3.5 w-3.5" />
-          MP3
-        </Pressable>
-        <Pressable type="button" intensity="soft" onClick={() => setYoutubeInputOpen((open) => !open)} className="multitrack-backing-strip__chip">
-          <Youtube className="h-3.5 w-3.5" />
-          YouTube
+          Import audio
         </Pressable>
         <label className="multitrack-backing-strip__volume">
           <span>Vol</span>
@@ -308,6 +304,13 @@ export default function MultitrackBackingTrackPanel({
         ) : null}
       </div>
 
+      <details className="multitrack-advanced" open={backing.kind === 'youtube' || undefined}>
+        <summary>Practice reference (YouTube)</summary>
+        <p>For practice only. Timing is approximate and this audio is excluded from exports. Import an audio file for synchronized recording.</p>
+        <Pressable type="button" intensity="soft" onClick={() => setYoutubeInputOpen((open) => !open)} className="multitrack-backing-strip__chip">
+          <Youtube className="h-3.5 w-3.5" />
+          Add YouTube reference
+        </Pressable>
       {youtubeInputOpen ? (
         <div className="multitrack-backing-strip__youtube-row">
           <Link className="h-4 w-4 text-stone-400" />
@@ -329,6 +332,7 @@ export default function MultitrackBackingTrackPanel({
           {youtubeError ? <span>{youtubeError}</span> : null}
         </div>
       ) : null}
+      </details>
     </section>
   )
 }

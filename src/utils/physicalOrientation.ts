@@ -1,3 +1,5 @@
+import { isTabletDevice } from './deviceFormFactor'
+
 export type RecordingOrientation = 'portrait' | 'landscape'
 export type PhysicalOrientation = 'portrait' | 'landscape-left' | 'landscape-right'
 
@@ -19,6 +21,7 @@ export function readPhysicalOrientation(): PhysicalOrientation {
 }
 
 export function readRecordingOrientation(): RecordingOrientation {
+  if (isTabletDevice()) return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
   return currentPhysicalOrientation === 'portrait' ? 'portrait' : 'landscape'
 }
 

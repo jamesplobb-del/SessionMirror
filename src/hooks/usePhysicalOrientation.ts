@@ -1,3 +1,4 @@
+import { isTabletDevice } from '../utils/deviceFormFactor'
 import { useEffect, useState } from 'react'
 import {
   classifyDeviceTilt,
@@ -34,6 +35,12 @@ export function usePhysicalOrientation(): PhysicalOrientation {
   )
 
   useEffect(() => {
+    // iPad rotates its entire interface. Applying the phone's sensor-driven
+    // control rotation on top of that turns the controls sideways a second time.
+    if (isTabletDevice()) {
+      syncPhysicalOrientationClass('portrait')
+      return
+    }
     let permissionGranted = false
     let stableOrientation: PhysicalOrientation = 'portrait'
     let pendingOrientation: PhysicalOrientation = 'portrait'

@@ -1,6 +1,6 @@
 import { motion, useMotionValue } from 'framer-motion'
 import {
-  ChevronLeft, ChevronRight, Eye, EyeOff, FileMusic, Maximize2, Pen, Plus, RefreshCw,
+  ChevronLeft, ChevronRight, Eraser, Eye, EyeOff, FileMusic, Maximize2, Pen, Plus, RefreshCw,
   Share, SquareSplitVertical, Trash2, Undo2,
 } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
@@ -11,7 +11,9 @@ import {
 } from '../../utils/floatingWidgetLayout'
 import { iosDragRelease, motionExitHide } from '../../utils/motionPresets'
 import type { ChartFitPreference } from './chartLayout'
-import { INK_CSS, INK_WIDTH_PX, INK_WIDTHS, type InkColour, type InkWidth } from './chartInk'
+import {
+  INK_CSS, INK_WIDTH_PX, INK_WIDTHS, isInkColour, type InkTool, type InkWidth,
+} from './chartInk'
 import type { ChartPaperView } from './PracticeChartPaper'
 
 const POSITION_ID = 'desk-music'
@@ -39,11 +41,11 @@ interface MusicWidgetProps {
   /** Rehearsal view: the tabs and the deck stand down so the part gets it all. */
   chromeHidden: boolean
   onChromeHiddenChange: (hidden: boolean) => void
-  marker: InkColour | null
+  marker: InkTool | null
   inkWidth: InkWidth
   markCount: number
   saving: boolean
-  onMarkerChange: (colour: InkColour | null) => void
+  onMarkerChange: (tool: InkTool | null) => void
   onInkWidthChange: (width: InkWidth) => void
   onUndoMark: () => void
   onClearMarks: () => void
@@ -199,9 +201,9 @@ export default function MusicWidget({
           </button>
 
           {/*
-            * A marker, not a pencil: two colours, three nibs. Tap a colour to
-            * pick it up; tap it again for thickness. Capped by default so a
-            * page-turn tap cannot draw a line across a system.
+            * A marker, not a pencil: two colours, three nibs, and an eraser.
+            * Tap a colour to pick it up; tap it again for thickness. Capped by
+            * default so a page-turn tap cannot draw a line across a system.
             */}
           <div className="music-widget__marker" role="group" aria-label="Marker">
             <button
@@ -227,9 +229,17 @@ export default function MusicWidget({
                 {colour === 'black' ? 'Black' : 'Red'}
               </button>
             ))}
+            <button
+              type="button"
+              aria-label="Eraser"
+              aria-pressed={marker === 'eraser'}
+              onClick={() => { setNibOpen(false); onMarkerChange(marker === 'eraser' ? null : 'eraser') }}
+            >
+              <Eraser aria-hidden />Erase
+            </button>
           </div>
 
-          {marker !== null && nibOpen && (
+          {isInkColour(marker) && nibOpen && (
             <div className="music-widget__nib" role="group" aria-label="Marker thickness">
               {INK_WIDTHS.map(width => (
                 <button
@@ -239,7 +249,7 @@ export default function MusicWidget({
                   aria-pressed={inkWidth === width}
                   onClick={() => onInkWidthChange(width)}
                 >
-                  <i style={{ width: INK_WIDTH_PX[width] + 6, height: INK_WIDTH_PX[width] + 6, background: INK_CSS[marker] }} aria-hidden />
+                  <i style={{ width: INK_WIDTH_PX[width] + 6, height: INK_WIDTH_PX[width] + 6, background: INK_CSS[isInkColour(marker) ? marker : 'black'] }} aria-hidden />
                   {width === 'fine' ? 'Fine' : width === 'medium' ? 'Medium' : 'Bold'}
                 </button>
               ))}

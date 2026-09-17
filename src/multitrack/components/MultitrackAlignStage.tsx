@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, FileText, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
@@ -52,6 +52,8 @@ interface MultitrackAlignStageProps {
   /** Record into an existing empty box, starting at this second. */
   onRecordBox: (panelId: string, atSec: number) => void
   onAddImage: (atSec: number) => void
+  /** Turn to the next page of the PDF already in the panel, at this second. */
+  onAddPage: (atSec: number) => void
   onMoveImage: (cueId: string, startSec: number) => void
   onRemoveImage: (cueId: string) => void
   onSectionChange: (panelId: string, startSec: number | undefined, endSec: number | undefined) => void
@@ -343,6 +345,7 @@ export default function MultitrackAlignStage({
   onAddBox,
   onRecordBox,
   onAddImage,
+  onAddPage,
   onMoveImage,
   onRemoveImage,
   onSectionChange,
@@ -730,6 +733,21 @@ export default function MultitrackAlignStage({
       ? imageWindows.find((window) => window.id === selection.id) ?? null
       : null
   const playheadSec = Math.max(0, sync.state.currentTime)
+
+  /*
+   * The page a "Page" tap would turn to: one on from whichever image the
+   * playhead is sitting in, when that image is a PDF with somewhere left to go.
+   * Nothing to turn to means no button — an action that cannot act is worse
+   * than a gap in the row.
+   */
+  const nextPage = useMemo(() => {
+    let active = imageWindows[0] ?? null
+    for (const window of imageWindows) if (window.startSec <= playheadSec) active = window
+    const asset = active?.asset
+    if (!asset || asset.mimeType !== 'application/pdf') return null
+    const pageIndex = (asset.pageIndex ?? 0) + 1
+    return pageIndex < (asset.pageCount ?? 0) ? { asset, pageIndex } : null
+  }, [imageWindows, playheadSec])
   const onEditorResizeDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const stage = stageRef.current
     if (!stage || event.button !== 0) return
@@ -850,6 +868,21 @@ export default function MultitrackAlignStage({
           <ImagePlus className="h-4 w-4" />
           Image
         </Pressable>
+        {/* The turn a player actually wants: the same part, one page on, at the
+            bar they were looking at when they pressed it. */}
+        {nextPage ? (
+          <Pressable
+            type="button"
+            intensity="soft"
+            className="multitrack-align-stage__action"
+            disabled={busy}
+            onClick={() => onAddPage(playheadSec)}
+            aria-label={`Turn to page ${nextPage.pageIndex + 1} here`}
+          >
+            <FileText className="h-4 w-4" />
+            Page {nextPage.pageIndex + 1}
+          </Pressable>
+        ) : null}
         <Pressable
           type="button"
           intensity="soft"

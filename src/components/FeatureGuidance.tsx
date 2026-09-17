@@ -2,12 +2,15 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   createGuidanceState, FEATURE_GUIDES, GUIDANCE_EVENT, GUIDANCE_PREFERENCES_EVENT, CONFIRMATION_EVENT,
-  guidanceReducer, readGuidancePreferences, writeGuidancePreferences,
+  guidanceReducer, readGuidancePreferences, writeGuidancePreferences, setFeatureTipsEnabled,
   type FeatureAction, type FeatureGuideId,
 } from '../utils/featureGuidance'
 import '../styles/feature-guidance.css'
 
 interface Props {
+  surface?: 'recording' | 'music' | 'other'
+  recordingReady?: boolean
+  hasTakes?: boolean
   paused: boolean
   feedbackPaused: boolean
   workspaceOpen: boolean
@@ -70,7 +73,10 @@ export default function FeatureGuidance(props: Props) {
   const paused = props.paused || documentHidden ||
     (active?.id === 'hands-free' && (!props.handsFreeEnabled || props.workspaceOpen)) ||
     (active?.id === 'workspace' && !props.workspaceOpen) ||
-    (active?.id === 'best-take' && props.workspaceOpen)
+    (active?.id === 'best-take' && props.workspaceOpen) ||
+    (active?.id === 'music-tools' && props.surface !== 'music') ||
+    (active?.id === 'recording' && (props.surface !== 'recording' || props.workspaceOpen)) ||
+    (active?.id === 'multitrack' && !props.workspaceOpen)
   const visible = Boolean(active && step && position && !paused)
   const toastVisible = Boolean(confirmation && confirmation.expires > now && !visible &&
     !props.feedbackPaused && !documentHidden)
@@ -100,7 +106,9 @@ export default function FeatureGuidance(props: Props) {
       switch (action) {
         case 'take-saved':
           confirm('Take saved')
+          learned('recording')
           request('best-take')
+          request('take-library')
           if (currentProps.handsFreeEnabled) learned('hands-free')
           break
         case 'current-take-pinned':
@@ -111,7 +119,7 @@ export default function FeatureGuidance(props: Props) {
           if (current.active?.id !== 'best-take') learned('best-take')
           break
         case 'take-card-transfer-completed': learned('best-take'); break
-        case 'overlays-opened': request('workspace'); break
+        case 'overlays-opened': request('workspace'); request('multitrack'); break
         case 'overlays-closed': learned('workspace'); break
         case 'branch-widget-selected':
           if (current.active?.id !== 'workspace') learned('workspace')
@@ -120,6 +128,10 @@ export default function FeatureGuidance(props: Props) {
         case 'hands-free-disabled': learned('hands-free'); confirm('Hands-free off'); break
         case 'hands-free-settings-opened': learned('hands-free'); break
         case 'hands-free-recorded': learned('hands-free'); break
+        case 'take-library-opened': learned('take-library'); break
+        case 'widget-expanded': learned('workspace'); learned('music-tools'); break
+        case 'tuner-input-quiet': if (!currentProps.paused) request('tuner-quiet'); break
+        case 'tuner-input-loud': if (!currentProps.paused) request('tuner-loud'); break
       }
     }
     window.addEventListener(CONFIRMATION_EVENT, onConfirmation)
@@ -135,6 +147,19 @@ export default function FeatureGuidance(props: Props) {
   }, [])
 
   useEffect(() => {
+    if (props.paused || !props.recordingReady) return
+    const id: FeatureGuideId | null = props.surface === 'music' ? 'music-tools'
+      : props.surface === 'recording' ? (props.hasTakes ? 'navigation' : 'recording') : null
+    if (!id) return
+    const timer = window.setTimeout(() => dispatch({ type: 'request', id, now: Date.now() }), 5000)
+    return () => window.clearTimeout(timer)
+  }, [props.paused, props.recordingReady, props.surface, props.hasTakes])
+
+  useEffect(() => {
+    if (props.isRecording) dispatch({ type: 'learned', id: 'recording', now: Date.now() })
+  }, [props.isRecording])
+
+  useEffect(() => {
     if (props.isRecording && props.handsFreeEnabled) dispatch({ type: 'learned', id: 'hands-free', now: Date.now() })
   }, [props.isRecording, props.handsFreeEnabled])
 
@@ -148,11 +173,16 @@ export default function FeatureGuidance(props: Props) {
     if (paused || active || !state.preferences.enabled || !state.pending.length) return
     const considerGuide = () => {
       const time = Date.now()
+      if (document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
       dispatch({ type: 'expire', now: time })
       // The success message gets its own moment before any teaching appears.
       if (confirmation && confirmation.expires + 700 > time) return
       const candidate = state.pending.find(item => {
-        if (item.expires <= time || (item.id === 'workspace' && !props.workspaceOpen) ||
+        if (item.expires <= time ||
+          (item.id === 'music-tools' && props.surface !== 'music') ||
+          (item.id === 'recording' && (props.surface !== 'recording' || props.workspaceOpen)) ||
+          (item.id === 'multitrack' && !props.workspaceOpen) ||
+          (item.id === 'workspace' && !props.workspaceOpen) ||
           (item.id === 'hands-free' && (!props.handsFreeEnabled || props.workspaceOpen))) return false
         const target = findTarget(FEATURE_GUIDES[item.id][0].selector)
         return target && positionCard(target.getBoundingClientRect(), 202)
@@ -162,7 +192,7 @@ export default function FeatureGuidance(props: Props) {
     const timer = window.setTimeout(considerGuide, 1000)
     const retry = window.setInterval(considerGuide, 1500)
     return () => { window.clearTimeout(timer); window.clearInterval(retry) }
-  }, [paused, active, state.pending, state.preferences.enabled, props.workspaceOpen, props.handsFreeEnabled, confirmation])
+  }, [paused, active, state.pending, state.preferences.enabled, props.workspaceOpen, props.handsFreeEnabled, props.surface, confirmation])
 
   useLayoutEffect(() => {
     setPosition(null)
@@ -193,6 +223,10 @@ export default function FeatureGuidance(props: Props) {
   useEffect(() => {
     if (!visible) return
     previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && !cardRef.current?.contains(target)) dispatch({ type: 'dismiss', now: Date.now() })
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
@@ -200,7 +234,8 @@ export default function FeatureGuidance(props: Props) {
       dispatch({ type: 'dismiss', now: Date.now() })
     }
     window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
+    window.addEventListener('pointerdown', onPointerDown, true)
+    return () => { window.removeEventListener('keydown', onKeyDown, true); window.removeEventListener('pointerdown', onPointerDown, true) }
   }, [visible])
 
   const advance = (skip: boolean) => {
@@ -221,15 +256,16 @@ export default function FeatureGuidance(props: Props) {
       <div ref={cardRef} className="feature-guidance-card" role="region"
         aria-labelledby="feature-guidance-title" aria-describedby="feature-guidance-body"
         style={position ? { left: position.left, top: position.top, width: position.width, maxHeight: position.maxHeight } : undefined}>
-        <span className="feature-guidance-progress">{active.step + 1} of {FEATURE_GUIDES[active.id].length}</span>
+        {FEATURE_GUIDES[active.id].length > 1 && <span className="feature-guidance-progress">{active.step + 1} of {FEATURE_GUIDES[active.id].length}</span>}
         <h2 id="feature-guidance-title">{step.title}</h2>
         <p id="feature-guidance-body">{step.body}</p>
         <div className="feature-guidance-actions">
-          <button type="button" onClick={() => advance(true)}>Skip guide</button>
+          <button type="button" onClick={() => advance(true)}>{FEATURE_GUIDES[active.id].length > 1 ? 'Skip' : 'Dismiss'}</button>
           <button type="button" className="feature-guidance-next" onClick={() => advance(false)}>
-            {active.step === FEATURE_GUIDES[active.id].length - 1 ? 'Done' : 'Next'}
+            {active.step === FEATURE_GUIDES[active.id].length - 1 ? 'Got it' : 'Next'}
           </button>
         </div>
+        <button type="button" className="feature-guidance-disable" onClick={() => setFeatureTipsEnabled(false)}>Don’t show tips</button>
       </div>
     </div>}
     <div className="feature-confirmation" role="status" aria-live="polite" aria-atomic="true" hidden={!toastVisible}>

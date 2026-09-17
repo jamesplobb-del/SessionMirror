@@ -1,9 +1,10 @@
-import { motion, useMotionValue } from 'framer-motion'
-import { Library } from 'lucide-react'
+import { motion, useDragControls, useMotionValue } from 'framer-motion'
+import { GripHorizontal, Library } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, type ComponentProps, type RefObject } from 'react'
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
-import TunerTakePillRow from './audioPractice/TunerTakePillRow'
+import type TunerTakePillRow from './audioPractice/TunerTakePillRow'
+import AudioModeHome, { AudioModeTakeCard } from './audioPractice/AudioModeHome'
 import {
   clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition,
 } from '../utils/floatingWidgetLayout'
@@ -15,22 +16,21 @@ type PillProps = Omit<ComponentProps<typeof TunerTakePillRow>, 'compact' | 'aria
 
 interface DraggableTakesWidgetProps extends PillProps {
   boundaryRef: RefObject<HTMLElement | null>
+  takeReadiness?: ComponentProps<typeof AudioModeHome>['takeReadiness']
+  onRetryTakePreparation?: (id: string) => void
+  onShareBenchmark?: () => void
+  onShareChallenger?: () => void
+  isRecording?: boolean
   visible?: boolean
   collapseResetKey?: string
 }
 
-/**
- * The takes, as a ball.
- *
- * On a surface where the part is the whole screen, Best Take and Current Take
- * cannot be a panel across the middle and they cannot live on the deck either,
- * because the deck is the first thing a player puts away for a rehearsal. So
- * they fold to the same 56px ball every other tool uses, and open into the
- * compact pills the Tuner tab already uses — no second way of drawing a take.
- */
+/** Full take controls on the music desk; only the header starts a drag. */
 export default function DraggableTakesWidget({
   boundaryRef, visible = true, collapseResetKey, ...pills
 }: DraggableTakesWidgetProps) {
+  const dragControls = useDragControls()
+  const bestTargetRef = useRef<HTMLElement | null>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragX = useMotionValue(0)
   const dragY = useMotionValue(0)
@@ -86,20 +86,39 @@ export default function DraggableTakesWidget({
       ref={widgetRef}
       aria-hidden={fold.collapsed}
       drag
+      dragListener={false}
+      dragControls={dragControls}
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
       onDragEnd={persist}
-      className={`takes-widget pointer-events-auto absolute left-0 top-0 z-20 touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''}`}
+      className={`takes-widget pointer-events-auto absolute left-0 top-0 z-20 ${fold.collapsed ? 'widget-is-collapsed' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
-      style={{ x: dragX, y: dragY, touchAction: 'none' }}
+      style={{ x: dragX, y: dragY }}
     >
-      <WidgetCollapseButton label="takes" onCollapse={fold.collapse} />
-      <div className="takes-widget__panel ui-orient-spin">
-        <TunerTakePillRow compact ariaLabel="Takes" {...pills} />
+      <div className="takes-widget__panel" data-guidance="music-takes" aria-label="Music takes">
+        <header className="takes-widget__header" onPointerDown={event => {
+          if (!(event.target as HTMLElement).closest('button')) dragControls.start(event)
+        }}><span><GripHorizontal aria-hidden />Takes</span><WidgetCollapseButton label="takes" onCollapse={fold.collapse} /></header>
+        <div className="takes-widget__cards" inert={pills.isRecording || undefined}>
+          <AudioModeTakeCard bestTargetRef={bestTargetRef} label="Best Take" tone="best"
+            take={pills.benchmarkTake} libraryPlayback={pills.libraryBenchmarkPlayback}
+            onOpen={pills.onExpandBenchmark} onClear={pills.onClearBenchmark}
+            onShare={pills.libraryBenchmarkPlayback ? undefined : pills.onShareBenchmark}
+            readiness={pills.benchmarkTake ? pills.takeReadiness?.[pills.benchmarkTake.id] : undefined}
+            onRetryPreparation={() => { if (pills.benchmarkTake) pills.onRetryTakePreparation?.(pills.benchmarkTake.id) }}
+            emptyHint="Pin a take to keep it here." />
+          <AudioModeTakeCard bestTargetRef={bestTargetRef} label="Current Take" tone="current"
+            take={pills.challengerTake} onOpen={pills.onExpandChallenger} onClear={pills.onClearChallenger}
+            onFavorite={pills.onPinCurrentAsBest} onShare={pills.onShareChallenger}
+            readiness={pills.challengerTake ? pills.takeReadiness?.[pills.challengerTake.id] : undefined}
+            onRetryPreparation={() => { if (pills.challengerTake) pills.onRetryTakePreparation?.(pills.challengerTake.id) }}
+            emptyHint="Your next recording appears here." />
+        </div>
+        {pills.isRecording && <p className="takes-widget__status" role="status">Recording… Listen back when you stop.</p>}
       </div>
     </motion.div>
   </>

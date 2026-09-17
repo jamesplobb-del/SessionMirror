@@ -703,13 +703,21 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         layer.setAffineTransform(CGAffineTransform(rotationAngle: degrees * .pi / 180))
     }
 
-    private func imageForCreatorStudioAsset(path: String, fileType: String) -> UIImage? {
+    private func imageForCreatorStudioAsset(path: String, fileType: String, pageIndex: Int = 0) -> UIImage? {
         guard let url = fileURL(from: path) else { return nil }
         if fileType == "pdf" {
-            guard let document = PDFDocument(url: url), let page = document.page(at: 0) else {
-                return nil
-            }
-            let bounds = page.bounds(for: .mediaBox)
+            guard let document = PDFDocument(url: url) else { return nil }
+            // A part is one file that a song walks through, so the page comes
+            // from the cue. Clamping rather than failing means a project whose
+            // file was replaced by a shorter one still draws its last page
+            // instead of dropping the music panel out of the video.
+            let index = max(0, min(pageIndex, document.pageCount - 1))
+            guard let page = document.page(at: index) else { return nil }
+            // The crop box, not the media box: pdf.js draws the crop box on
+            // screen, so the editor was showing the trimmed page while the
+            // export put the printer's margins back around it.
+            let bounds = page.bounds(for: .cropBox)
+            guard bounds.width > 0, bounds.height > 0 else { return nil }
             let scale: CGFloat = 2
             let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
             let renderer = UIGraphicsImageRenderer(size: size)
@@ -719,7 +727,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 context.cgContext.saveGState()
                 context.cgContext.translateBy(x: 0, y: size.height)
                 context.cgContext.scaleBy(x: scale, y: -scale)
-                page.draw(with: .mediaBox, to: context.cgContext)
+                page.draw(with: .cropBox, to: context.cgContext)
                 context.cgContext.restoreGState()
             }
         }
@@ -871,7 +879,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 let path = object["path"] as? String,
                 let image = imageForCreatorStudioAsset(
                     path: path,
-                    fileType: object["fileType"] as? String ?? "image"
+                    fileType: object["fileType"] as? String ?? "image",
+                    pageIndex: (object["pageIndex"] as? NSNumber)?.intValue ?? 0
                 )
             else { return }
             let imageRatio = image.size.height / max(image.size.width, 1)
@@ -1392,7 +1401,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                   let sheetRectDict = dict["rect"] as? [String: Any],
                   let image = imageForCreatorStudioAsset(
                       path: sheetPath,
-                      fileType: dict["fileType"] as? String ?? "image"
+                      fileType: dict["fileType"] as? String ?? "image",
+                      pageIndex: (dict["pageIndex"] as? NSNumber)?.intValue ?? 0
                   ) else { return }
 
             let fileType = dict["fileType"] as? String ?? "image"

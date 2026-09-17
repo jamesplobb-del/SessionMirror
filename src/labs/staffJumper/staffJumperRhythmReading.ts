@@ -26,14 +26,14 @@
  *    *ahead* of the click (Repp 2005; Repp & Su 2013); non-musicians spread to
  *    30–50 ms or more. Rhythm games and assessment tools therefore use windows
  *    an order of magnitude wider than the spread. "On the beat" here is the
- *    existing ±18 % of a pulse, clamped to 90–220 ms, which is the "good"
- *    band of a typical rhythm game; anything inside a wider acceptance window
+ *    base band of ±18 % of a pulse, clamped to 90–220 ms, widened for easy
+ *    and medium; anything inside a wider acceptance window
  *    still counts as the right note, merely early or late.
  *
  *  • The acceptance window must not be wider than the notes around it, or an
- *    attack could belong to two different written notes. It is therefore half
+ *    attack could belong to two different written notes. It borrows up to 65% of
  *    the neighbouring event on either side (the previous event for early, this
- *    event for late), and never more than half a pulse, so fast passages are
+ *    event for late), capped at 65% of a pulse (50% on hard), so fast passages are
  *    judged more tightly than slow ones — which is also how they are heard.
  *
  *  • The detector reports a pitch some tens of milliseconds after the attack
@@ -78,9 +78,9 @@ export const HOLD_DROPOUT_GRACE_MS = 90
 export const HOLD_FULL_FRACTION = 0.5
 
 /** Widest the acceptance window may reach on either side, as a fraction of a pulse. */
-const ACCEPT_WINDOW_MAX_PULSE_FRACTION = 0.5
+const ACCEPT_WINDOW_MAX_PULSE_FRACTION = 0.65
 /** How much of the neighbouring event the window may borrow. */
-const ACCEPT_WINDOW_NEIGHBOUR_FRACTION = 0.5
+const ACCEPT_WINDOW_NEIGHBOUR_FRACTION = 0.65
 /**
  * Time allowed after the late edge for the pitch to stabilise before the beat
  * is declared missed. The detector needs ~30 ms of steady pitch to accept a
@@ -120,7 +120,7 @@ function clamp(value: number, min: number, max: number): number {
  * The window an attack must land in to be this note.
  *
  * Early borrows from the event before (a note or a rest), late from the note
- * itself, and neither reaches past half a pulse. The late edge is additionally
+ * itself, capped by the selected difficulty. The late edge is additionally
  * kept clear of the next event's onset so that every note is settled — landed
  * or missed — before the run moves on to the next one.
  */
@@ -129,13 +129,14 @@ export function onsetWindowFor(
   previous: RhythmSlot | null,
   meter: MeterSpec,
   bpm: number,
+  difficulty: 'easy' | 'medium' | 'hard' = 'medium',
 ): OnsetWindow {
   const pulseMs = secondsPerPulse(bpm) * 1000
   const perUnit = unitMs(meter, bpm)
-  const onMs = onBeatWindowMs(bpm)
+  const onMs = onBeatWindowMs(bpm) * (difficulty === 'easy' ? 1.3 : difficulty === 'medium' ? 1.15 : 1)
   const thisMs = slot.durationUnits * perUnit
   const previousMs = previous ? previous.durationUnits * perUnit : thisMs
-  const maxMs = pulseMs * ACCEPT_WINDOW_MAX_PULSE_FRACTION
+  const maxMs = pulseMs * (difficulty === 'hard' ? 0.5 : ACCEPT_WINDOW_MAX_PULSE_FRACTION)
 
   const earlyMs = clamp(previousMs * ACCEPT_WINDOW_NEIGHBOUR_FRACTION, onMs, Math.max(onMs, maxMs))
   const lateUnclamped = clamp(thisMs * ACCEPT_WINDOW_NEIGHBOUR_FRACTION, onMs, Math.max(onMs, maxMs))
@@ -144,13 +145,21 @@ export function onsetWindowFor(
     Math.min(lateUnclamped, thisMs - LATE_EDGE_GRACE_MS - 10),
   )
   const closeMs = Math.min(lateMs + LATE_EDGE_GRACE_MS, Math.max(1, thisMs - 5))
-  return { onMs, earlyMs, lateMs, closeMs }
+  return { onMs: Math.min(onMs, earlyMs, lateMs), earlyMs, lateMs, closeMs }
 }
 
 /** Where an attack sat relative to the beat it was written on. */
 export function judgeOnset(errorMs: number, window: OnsetWindow): OnsetPlacement {
   if (Math.abs(errorMs) <= window.onMs) return 'on'
   return errorMs < 0 ? 'early' : 'late'
+}
+
+/** Judge after input delivery, while the audible click keeps its original clock.
+ * A pitch arriving at the late edge still needs the same detector and stability
+ * time as an on-beat attack. This allowance is shared by phone and iPad.
+ */
+export function rhythmDecisionGridMs(gridMs: number): number {
+  return gridMs - PITCH_DETECTION_LATENCY_MS - LATE_EDGE_GRACE_MS
 }
 
 /** The click has passed the last moment this note could still be attacked. */

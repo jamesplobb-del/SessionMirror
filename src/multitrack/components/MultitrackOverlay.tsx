@@ -3,7 +3,7 @@ import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
+import { AudioLines, ChevronLeft, ChevronRight, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -60,7 +60,7 @@ import { exportMultitrackSession, type MultitrackExportFailureReason } from '../
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from '../sheetMusic/sheetMusicUtils'
 import MultitrackPanelGrid from './MultitrackPanelGrid'
 import SheetPlacementDiagram from './SheetPlacementDiagram'
-import { SHEET_BASE_CUE_ID, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
+import { SHEET_BASE_CUE_ID, sheetCueWindows, sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
 import MultitrackToolbar from './MultitrackToolbar'
 import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../backing/MultitrackBackingTrackPanel'
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
@@ -628,7 +628,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       if (generation !== nativeGridPlaybackGenerationRef.current) return false
 
       const prepared = await prepareNativeMultitrackMonitor(sources)
-      if (!prepared || generation !== nativeGridPlaybackGenerationRef.current) {
+      // Cancellation already owns teardown. A stale completion must never
+      // stop the transport prepared for the next recording.
+      if (generation !== nativeGridPlaybackGenerationRef.current) return false
+      if (!prepared) {
         await stopNativeMultitrackTransport()
         return false
       }
@@ -646,7 +649,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         playbackCountOff: preRollSec > 0,
         soundId: session.practice.clickSound ?? snapshot.soundId,
       })
-      if (!transport || generation !== nativeGridPlaybackGenerationRef.current) {
+      if (generation !== nativeGridPlaybackGenerationRef.current) return false
+      if (!transport) {
         await stopNativeMultitrackTransport()
         return false
       }
@@ -663,12 +667,14 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         preRollSec > 0 ? transport.firstClickEpochMs : transport.performanceEpochMs,
         startAt > 0 ? startAt : -preRollSec,
       )
-      if (!visualsStarted || generation !== nativeGridPlaybackGenerationRef.current) {
+      if (generation !== nativeGridPlaybackGenerationRef.current) return false
+      if (!visualsStarted) {
         await stopNativeGridPlayback()
         return false
       }
       return true
     } catch (error) {
+      if (generation !== nativeGridPlaybackGenerationRef.current) return false
       console.error('[MultitrackOverlay] native Play All failed', error)
       sync.pause()
       pauseBacking()
@@ -704,6 +710,26 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     void stopNativeGridPlayback()
   }, [pauseBacking, stopNativeGridPlayback, sync])
 
+  // Keep/Retry and opening another box may happen before native recovery
+  // finishes. Arming must await that same handoff, never race it.
+  const recordingRecoveryRef = useRef<Promise<void>>(Promise.resolve())
+  const restoreRecordingReadiness = useCallback(() => {
+    inGridReviewMediaRef.current?.pause()
+    sync.pause()
+    pauseBacking()
+    const recovery = recordingRecoveryRef.current.catch(() => {}).then(async () => {
+      await stopNativeGridPlayback()
+      await stopNativeMultitrackTransport()
+      await completePlaybackRouteRestore()
+      await ensureNativeCameraSessionHealthy()
+    })
+    recordingRecoveryRef.current = recovery
+    // Background warm-up has no caller to surface a rejection. Arming below
+    // still awaits the original promise and reports failures to the player.
+    void recovery.catch(error => console.warn('[Multitrack] capture handoff failed', error))
+    return recovery
+  }, [pauseBacking, stopNativeGridPlayback, sync.pause])
+
   const recording = useMultitrackRecording({
     onPrepareRecording: (panelId) => {
       recordingTargetPanelIdRef.current = panelId
@@ -725,11 +751,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onStopRecording()
     },
     onArmPlayback: async (panelId) => {
-      await stopNativeGridPlayback()
-      await completePlaybackRouteRestore()
-      await ensureNativeCameraSessionHealthy()
-      sync.pause()
-      pauseBacking()
+      await restoreRecordingReadiness()
       if (session.backing.kind === 'youtube') {
         await prepareBackingAtStart()
         seekYoutubeProxy(backingYoutubeIframeRef.current, recordStartSecRef.current)
@@ -841,20 +863,20 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     const timer = window.setTimeout(() => {
       onStopRecording()
       void ensureNativeCameraSessionHealthy()
-      recording.fail('The camera never started recording. Please try again.')
+      recordingRef.current.fail('The camera never started recording. Please try again.')
     }, 4000)
     return () => window.clearTimeout(timer)
-  }, [isRecording, onStopRecording, recording])
+  }, [isRecording, onStopRecording, recording.phase])
 
   // Watchdog: stopped into review but the take never arrived from the save
   // pipeline — reset with an error instead of freezing on a blank review.
   useEffect(() => {
     if (recording.phase !== 'review' || pendingReview) return
     const timer = window.setTimeout(() => {
-      recording.fail('The recording could not be saved. Please try again.')
+      recordingRef.current.fail('The recording could not be saved. Please try again.')
     }, 8000)
     return () => window.clearTimeout(timer)
-  }, [pendingReview, recording])
+  }, [pendingReview, recording.phase])
 
   useEffect(() => {
     recordingTargetPanelIdRef.current = recording.targetPanelId
@@ -1040,14 +1062,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     return () => sync.setOnAllEnded(null)
   }, [pauseBacking, stopNativeGridPlayback, sync.setOnAllEnded])
 
-  /** After review playback (Preview) ends in Keep/Retry, hand the audio route
-   * back to recording and heal the capture session before the next take. */
-  const restoreRecordingReadiness = useCallback(() => {
-    void completePlaybackRouteRestore()
-      .catch(() => {})
-      .then(() => ensureNativeCameraSessionHealthy())
-  }, [])
-
   const handleConfirmTake = useCallback(() => {
     if (!pendingReview) return
     const startSec = recordStartSecRef.current
@@ -1109,11 +1123,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   const handleRetryTake = useCallback(() => {
     if (!pendingReview) return
-    onDeleteTakes([pendingReview.take.id])
     setPendingReview(null)
     recording.cancel()
     restoreRecordingReadiness()
-  }, [onDeleteTakes, pendingReview, recording, restoreRecordingReadiness])
+  }, [pendingReview, recording, restoreRecordingReadiness])
 
   const activePanel = session.panels.find((panel) => panel.id === activePanelId)
 
@@ -1183,9 +1196,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           .filter((panel) => panel.kind === 'performance' && panel.id !== panelId && panel.take)
           .map((panel) => panel.id),
       )
-      void ensureNativeCameraSessionHealthy()
+      void restoreRecordingReadiness()
     },
-    [hapticFeedback, onOpenRecordingStage, session.panels, sync],
+    [hapticFeedback, onOpenRecordingStage, restoreRecordingReadiness, session.panels, sync],
   )
 
   /** Tempo the count-in and the recorded take are anchored to. */
@@ -1252,6 +1265,22 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     pendingImageAtSecRef.current = Math.max(0, atSec)
     sheetMusicInputRef.current?.click()
   }, [])
+
+  /**
+   * Timeline "Page": the same part, one page on, cutting in at the playhead.
+   * The file is not picked again — a page turn is the same PDF, so the cue
+   * points at the asset already in the project and only the page differs.
+   */
+  const handleAddPageAt = useCallback((atSec: number) => {
+    const windows = sheetCueWindows(session.sheetMusic)
+    let active = windows[0] ?? null
+    for (const window of windows) if (window.startSec <= atSec) active = window
+    const asset = active?.asset
+    if (!asset || asset.mimeType !== 'application/pdf') return
+    const pageIndex = (asset.pageIndex ?? 0) + 1
+    if (pageIndex >= (asset.pageCount ?? 0)) return
+    addSheetCue({ ...asset, pageIndex }, Math.max(0, atSec))
+  }, [addSheetCue, session.sheetMusic])
 
   /**
    * Removing an image from the timeline. The opening image is the panel's base
@@ -1337,11 +1366,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   )
 
   // ── Monitor mix ("You'll hear" chips) ────────────────────────────────────
-  // Per-take mute set: panel ids plus the 'backing'/'click' sentinels. All-on
-  // by default; reset whenever the stage opens for a different tile.
+  // Keep monitoring choices across parts within the same project.
   useEffect(() => {
     setMonitorMutes(new Set())
-  }, [activePanelId])
+  }, [session.projectId])
 
   // Apply panel monitor mutes to the live sync elements while the stage is open.
   useEffect(() => {
@@ -1364,24 +1392,25 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [])
 
   const monitorSources = useMemo(() => {
-    const sources: Array<{ id: string; label: string; muted: boolean }> = []
+    const sources: Array<{ id: string; label: string; muted: boolean; unavailableReason?: string }> = []
     session.panels.forEach((panel, index) => {
       if (panel.kind !== 'performance' || !panel.take || panel.hidden) return
       if (panel.id === activePanelId) return
       sources.push({
         id: panel.id,
         label: panel.label || panel.take.name || `Box ${index + 1}`,
-        muted: monitorMutes.has(panel.id),
+        muted: monitorMutes.has(panel.id) || panel.muted === true || panel.volume === 0,
+        unavailableReason: panel.muted ? 'Muted in mix' : panel.volume === 0 ? 'Volume is zero' : undefined,
       })
     })
     if (session.backing.kind !== 'none') {
-      sources.push({ id: 'backing', label: backingChipLabel, muted: monitorMutes.has('backing') })
+      sources.push({ id: 'backing', label: backingChipLabel, muted: monitorMutes.has('backing') || session.backing.volume === 0, unavailableReason: session.backing.volume === 0 ? 'Volume is zero' : undefined })
     }
     if (session.practice.clickEnabled) {
       sources.push({ id: 'click', label: 'Click', muted: monitorMutes.has('click') })
     }
     return sources
-  }, [activePanelId, backingChipLabel, monitorMutes, session.backing.kind, session.panels, session.practice.clickEnabled])
+  }, [activePanelId, backingChipLabel, monitorMutes, session.backing.kind, session.backing.volume, session.panels, session.practice.clickEnabled])
 
   return createPortal(
     <>
@@ -1520,6 +1549,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onAddBox={handleAddBoxAt}
                 onRecordBox={handleRecordBoxAt}
                 onAddImage={handleAddImageAt}
+                onAddPage={handleAddPageAt}
                 onMoveImage={moveSheetCue}
                 onRemoveImage={handleRemoveSheetImage}
                 onRestoreSheetMusic={sheetMusic => updateProject({ sheetMusic })}
@@ -1529,9 +1559,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             ) : (
               <>{sync.state.isPlaying && sync.state.preRollRemaining > 0 && <div className="multitrack-playback-count" role="status">Count in · {Math.min(4, Math.ceil(sync.state.preRollRemaining / (60 / session.practice.bpm)))}</div>}
               <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
-                activeLayoutId={session.layoutId}
+                onAddPart={() => {
+                  pauseAllPlayback()
+                  const panelId = addPerformanceBox()
+                  if (!panelId) { void showAlert({ message: 'All twelve parts are filled. Tap a part to replace its recording.' }); return }
+                  openRecordingForPanel(panelId, 0)
+                }}
                 onOpenLayout={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}
-                onSelectLayout={id => { pauseAllPlayback(); setLayout(id) }}
                 onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
                 onTogglePlay={() => {
                   if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
@@ -1585,7 +1619,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               reviewTake={
                 pendingReview && pendingReview.panelId === activePanel.id
                   ? pendingReview.take
-                  : activePanel.kind === 'performance' ? activePanel.take : null
+                  : null
               }
               inGrid
               reviewMediaRef={inGridReviewMediaRef}
@@ -1596,9 +1630,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               onRecord={() => {
                 if (isRecording || isStopping) return
                 discardNextRecordingRef.current = false
-                // Heal a playback-interrupted capture session before starting;
-                // count-in gives it ample time to settle.
-                void ensureNativeCameraSessionHealthy()
                 recordingTargetPanelIdRef.current = activePanel.id
                 sync.setExcludePanelId(activePanel.id)
                 if (
@@ -1646,13 +1677,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               onUseExisting={() => setTakePickerPanelId(activePanel.id)}
               onConfirmTake={handleConfirmTake}
               onRetryTake={handleRetryTake}
+              onDiscardTake={() => {
+                if (!pendingReview || isStopping) return
+                onDeleteTakes([pendingReview.take.id])
+                handleRetryTake()
+                setActivePanelId(null)
+              }}
               onClose={() => {
                 if (isRecording && (recording.phase === 'idle' || recording.phase === 'review')) {
                   discardNextRecordingRef.current = true
                   onStopRecording()
                 }
                 if (pendingReview) {
-                  onDeleteTakes([pendingReview.take.id])
                   setPendingReview(null)
                 }
                 sync.setExcludePanelId(null)
@@ -1760,6 +1796,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               !session.sheetMusic.asset && (session.sheetMusic.cues?.length ?? 0) === 0
             addSheetCue(asset, atSec)
             if (isFirstImage) setActiveSourceSheet('visual')
+          }).catch((cause: unknown) => {
+            // A file that cannot be read has to say so now. Failing quietly
+            // left a white rectangle in the middle of the video with no
+            // explanation and no way to tell it from a page of rests.
+            void showAlert({
+              message: cause instanceof Error && cause.message
+                ? cause.message
+                : 'That file could not be opened. Try a PDF or a photo of the page.',
+            })
           })
           event.currentTarget.value = ''
         }}
@@ -1823,6 +1868,43 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </div>
             </section>
 
+            {layoutSheetAsset.mimeType === 'application/pdf' && (layoutSheetAsset.pageCount ?? 0) > 1 ? (
+              <section className="multitrack-visual-editor__section">
+                <div className="multitrack-visual-editor__section-title">
+                  <strong>First page</strong>
+                  <span>
+                    The page on screen from the downbeat. Scroll the panel or tap its edges to
+                    turn it; later pages are added to the timeline in the editor.
+                  </span>
+                </div>
+                <div className="multitrack-visual-editor__pages" role="group" aria-label="First page">
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    aria-label="Previous page"
+                    disabled={(layoutSheetAsset.pageIndex ?? 0) <= 0}
+                    onClick={() => updateSheetMusicAsset({ pageIndex: Math.max(0, (layoutSheetAsset.pageIndex ?? 0) - 1) })}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Pressable>
+                  <output>
+                    Page {Math.min((layoutSheetAsset.pageIndex ?? 0) + 1, layoutSheetAsset.pageCount ?? 1)}
+                    {' of '}
+                    {layoutSheetAsset.pageCount}
+                  </output>
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    aria-label="Next page"
+                    disabled={(layoutSheetAsset.pageIndex ?? 0) >= (layoutSheetAsset.pageCount ?? 1) - 1}
+                    onClick={() => updateSheetMusicAsset({ pageIndex: Math.min((layoutSheetAsset.pageCount ?? 1) - 1, (layoutSheetAsset.pageIndex ?? 0) + 1) })}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Pressable>
+                </div>
+              </section>
+            ) : null}
+
             {layoutSheetAsset.mimeType !== 'application/pdf' ? (
               <section className="multitrack-visual-editor__section">
                 <div className="multitrack-visual-editor__section-title">
@@ -1854,13 +1936,20 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </section>
             ) : null}
 
+            {/* Rolling belongs to a long photo of a part. A PDF page is fitted
+                whole, so rolling it would only drive it off the panel — pages
+                turn instead. */}
             <div className="multitrack-project-panel">
-              <label className="multitrack-check"><input type="checkbox" checked={layoutSheetAsset?.scrollEndY !== undefined} onChange={e => updateSheetMusicAsset({ scrollEndY: e.target.checked ? -.25 : undefined, scrollDurationSec: layoutSheetAsset?.scrollDurationSec ?? 10 })} /> Roll this image upward during playback</label>
-              {layoutSheetAsset?.scrollEndY !== undefined && <>
-                <label>Roll duration (seconds)<input type="number" min={.1} step={.5} value={layoutSheetAsset.scrollDurationSec ?? 10} onChange={e => updateSheetMusicAsset({ scrollDurationSec: Math.max(.1, Number(e.target.value)) })} /></label>
-                <label>Final vertical position<input type="range" min={-.25} max={1.25} step={.01} value={layoutSheetAsset.scrollEndY} onChange={e => updateSheetMusicAsset({ scrollEndY: Number(e.target.value) })} /></label>
-              </>}
-              <p>Use the editor’s Add image here button to change to the next screenshot at the playhead.</p>
+              {layoutSheetAsset.mimeType !== 'application/pdf' ? <>
+                <label className="multitrack-check"><input type="checkbox" checked={layoutSheetAsset?.scrollEndY !== undefined} onChange={e => updateSheetMusicAsset({ scrollEndY: e.target.checked ? -.25 : undefined, scrollDurationSec: layoutSheetAsset?.scrollDurationSec ?? 10 })} /> Roll this image upward during playback</label>
+                {layoutSheetAsset?.scrollEndY !== undefined && <>
+                  <label>Roll duration (seconds)<input type="number" min={.1} step={.5} value={layoutSheetAsset.scrollDurationSec ?? 10} onChange={e => updateSheetMusicAsset({ scrollDurationSec: Math.max(.1, Number(e.target.value)) })} /></label>
+                  <label>Final vertical position<input type="range" min={-.25} max={1.25} step={.01} value={layoutSheetAsset.scrollEndY} onChange={e => updateSheetMusicAsset({ scrollEndY: Number(e.target.value) })} /></label>
+                </>}
+              </> : null}
+              <p>{layoutSheetAsset.mimeType === 'application/pdf'
+                ? 'Use the editor’s Page button to turn to the next page at the playhead.'
+                : 'Use the editor’s Add image here button to change to the next screenshot at the playhead.'}</p>
             </div>
             <section className="multitrack-visual-editor__section multitrack-visual-editor__sliders">
               <label className="multitrack-visual-editor__slider-row">
@@ -1880,8 +1969,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </label>
               <label className="multitrack-visual-editor__slider-row">
                 <span>
-                  <strong>Image zoom</strong>
-                  <small>You can also pinch directly on the image</small>
+                  <strong>{layoutSheetAsset.mimeType === 'application/pdf' ? 'Page zoom' : 'Image zoom'}</strong>
+                  <small>{layoutSheetAsset.mimeType === 'application/pdf'
+                    ? 'The panel’s own gestures turn pages, so a page is zoomed here'
+                    : 'You can also pinch directly on the image'}</small>
                 </span>
                 <output>{Math.round((layoutSheetAsset.scale ?? 1) * 100)}%</output>
                 <input
@@ -2075,16 +2166,19 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       <AnimatedBottomSheet isOpen={activeSourceSheet === 'project' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Project and parts" elevated elevatedLight zClass={MULTITRACK_SHEET_Z} maxHeightClass="max-h-[85vh]">
         <div className="multitrack-sheet multitrack-project-tools">
           <p className="multitrack-sheet__title">Project & parts</p>
-          <div className="multitrack-studio-actions">
-            <button disabled={isExporting} onClick={() => { pauseAllPlayback(); setActiveSourceSheet(null); setAlignStageOpen(false); setLayoutEditing(true) }}>Arrange boxes</button>
-            <button disabled={isExporting} onClick={() => { setActiveSourceSheet(null); handleAddBoxAt(sync.state.currentTime) }}>+ Extra box</button>
-          </div>
+
         </div>
         <MultitrackProjectPanel session={session} projects={projects}
           onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} fileBusy={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
           onProject={(id, duplicate) => { pauseAllPlayback(); setAlignStageOpen(false); setRenderedVideo(null); void openProject(id, duplicate) }}
           onUpdate={updateProject} onPanel={updatePanel} onLayout={setLayout} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}
           onRecord={(id, time) => { setActiveSourceSheet(null); handleRecordBoxAt(id, time) }} time={sync.state.currentTime} />
+          <details className="multitrack-advanced"><summary>Advanced composition</summary>
+          <div className="multitrack-studio-actions">
+            <button disabled={isExporting} onClick={() => { pauseAllPlayback(); setActiveSourceSheet(null); setAlignStageOpen(false); setLayoutEditing(true) }}>Arrange boxes</button>
+            <button disabled={isExporting} onClick={() => { setActiveSourceSheet(null); handleAddBoxAt(sync.state.currentTime) }}>+ Extra box</button>
+          </div>
+          </details>
       </AnimatedBottomSheet>
       <AnimatedBottomSheet
         isOpen={activeSourceSheet === 'export' && isOpen}

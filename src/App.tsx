@@ -701,8 +701,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [handleAudioPracticeTabChange])
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
+  const musicEnhancerBypassed = musicPageVisible && settings.showMusic
   const audioEnhancerEnabledRef = useRef(settings.audioEnhancerEnabled)
-  audioEnhancerEnabledRef.current = settings.audioEnhancerEnabled
+  audioEnhancerEnabledRef.current = settings.audioEnhancerEnabled && !musicEnhancerBypassed
   const audioEnhancerSettingsRef = useRef(settings.audioEnhancerSettings)
   audioEnhancerSettingsRef.current = settings.audioEnhancerSettings
   const pendingChallengerIdRef = useRef<string | null>(null)
@@ -3519,13 +3520,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestCameraAccess,
   ])
 
-  const handleMultitrackStartRecording = useCallback((): Promise<boolean> => {
+  const handleMultitrackStartRecording = useCallback(async (): Promise<boolean> => {
     multitrackRecordingActiveRef.current = true
     if (shouldPauseYoutubeForRecording) {
       pauseYoutubeReference()
     }
     pausePipVideos()
-    return startRecording()
+    try {
+      const started = await startRecording()
+      if (!started) multitrackRecordingActiveRef.current = false
+      return started
+    } catch (error) {
+      multitrackRecordingActiveRef.current = false
+      throw error
+    }
   }, [pausePipVideos, pauseYoutubeReference, startRecording, shouldPauseYoutubeForRecording])
 
   const handleMultitrackStopRecording = useCallback(
@@ -4178,11 +4186,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
-      settings.audioEnhancerEnabled,
+      settings.audioEnhancerEnabled && !musicEnhancerBypassed,
       settings.audioEnhancerSettings,
       takes.filter(take => take.enhancerBaked).flatMap(take => [take.filePath ?? '', take.videoUrl ?? '']),
     )
-  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings, takes])
+  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings, takes, musicEnhancerBypassed])
 
   useEffect(() => {
     setActiveCaptureProfile('natural')
@@ -5610,6 +5618,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           handsFreePlaybackPending || practiceSessionActive || pipDragState.isDragging || Boolean(takeDeleteError)}
         feedbackPaused={showOnboardingTutorial || isRecording || isStopping || takePlaybackActive ||
           handsFreePlaybackPending || isLabsOpen || Boolean(takeDeleteError)}
+        surface={musicPageVisible ? 'music' : onRecordSurface ? 'recording' : 'other'}
+        recordingReady={ready || simulatorCaptureAvailable}
+        hasTakes={takes.length > 0}
         workspaceOpen={quickSettingsOpen}
         handsFreeEnabled={settings.autoSoundRecording}
         isRecording={isRecording}
@@ -5906,12 +5917,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   <PracticeChartLayer
                     key={activeProjectId}
                     projectId={activeProjectId}
+                    workspace={hudQuickSettings}
+                    onWorkspaceChange={(key, enabled) => {
+                      switch (key) {
+                        case 'pitchTrackerEnabled': handlePitchTrackerSettingChange(enabled); break
+                        case 'showMetronome': handleShowMetronomeSettingChange(enabled); break
+                        case 'showDrone': handleShowDroneSettingChange(enabled); break
+                        case 'showTakeCards': handleShowTakeCardsSettingChange(enabled); break
+                      }
+                    }}
                     active={musicRoomActive}
                     boundaryRef={appShellRef}
                     collapseResetKey={routineActiveStep?.id}
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
                     onChromeHiddenChange={setMusicChromeHidden}
+                    isRecording={isRecording}
+                    isStopping={isStopping}
+                    recordReady={ready || simulatorCaptureAvailable}
+                    recordElapsed={elapsed}
+                    onToggleRecord={handleToggleRecord}
                   />
                 </Suspense>
               )}
@@ -6046,6 +6071,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onPinCurrentAsBest={handlePinCurrentAsBest}
                     onClearBenchmark={handleClearAudioBenchmark}
                     onClearChallenger={handleClearAudioChallenger}
+                    takeReadiness={audioTakeReadiness}
+                    onRetryTakePreparation={handleRetryAudioTakePreparation}
+                    onShareBenchmark={benchmarkTake ? () => handleShareTake(benchmarkTake) : undefined}
+                    onShareChallenger={challengerTake ? () => handleShareTake(challengerTake) : undefined}
+                    isRecording={isRecording || isStopping}
                   />
                 </Suspense>
               )}
@@ -6504,6 +6534,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         musicToggleVisible={isAudioPracticeRecordTab && Boolean(activeProjectId)}
                         onShowMusicChange={handleShowMusicSettingChange}
                         againPulse={againPulse}
+                        audioEnhancerToggleVisible={!musicRoomActive}
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                         settingsLayoutMode={

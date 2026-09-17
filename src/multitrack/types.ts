@@ -15,12 +15,22 @@ export interface SheetMusicAsset {
   frameScale?: number
   scrollEndY?: number
   scrollDurationSec?: number
+  /**
+   * PDFs only: the page this asset shows. A part is one file, but a song walks
+   * through it, so the page belongs to the cue rather than to the file — cue at
+   * 0:00 is page 1, cue at 0:42 is page 2, and both point at the same PDF.
+   */
+  pageIndex?: number
+  /** Pages in the file, remembered so the panel can say "2/7" before it opens. */
+  pageCount?: number
 }
 
 export interface PerformancePanelState {
   kind: 'performance'
   id: string
   take: Take | null
+  /** Retained when a Vault recording is unavailable, until explicitly replaced. */
+  missingTakeId?: string
   label?: string
   hidden?: boolean
   /** Project-local timing; the source recording in the Vault is never modified. */

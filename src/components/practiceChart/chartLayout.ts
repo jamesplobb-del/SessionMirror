@@ -1,13 +1,9 @@
 /**
  * Geometry for the music page.
  *
- * The page strip is one continuous column — page 2 starts exactly where page 1
- * ends, with no gap. That single decision is what makes a half turn possible:
- * scrolling half a page down leaves the bottom half of the page you are still
- * reading on top of the screen and brings the top half of the next one up
- * underneath it, which is the turn forScore players already know. A gap between
- * pages, or letterboxing each page into its own screen, would put a band of
- * background through the middle of that view.
+ * Whole-page and fill-width reading use a continuous strip. Fitted half turns
+ * use its offsets as logical stops, but keep the bottom of the current page
+ * stationary while revealing the next page's top above it.
  *
  * Everything here is pure so the turn maths can be tested without a PDF.
  */
@@ -56,6 +52,7 @@ export function resolveChartFit(
   viewWidth: number,
   viewHeight: number,
 ): ChartFit {
+  if (preference === 'spread') return chartSpreadFits(pages, viewWidth, viewHeight) ? 'spread' : 'page'
   if (preference !== 'auto') return preference
   return chartSpreadFits(pages, viewWidth, viewHeight) ? 'spread' : 'page'
 }
@@ -70,8 +67,8 @@ export function resolveChartFit(
  * point somewhere other than the middle of the screen, and a half turn would
  * show 45% of one page and 55% of the next. Slotting each row into a full
  * screen and centring the page in it means half a slot is half the screen,
- * always: the bottom half of what you are playing stays up top and the top
- * half of the next page comes up underneath it.
+ * always. Fitted half turns clip at this midpoint while leaving both pages
+ * at their original vertical positions.
  */
 export interface ChartRow {
   top: number
@@ -246,6 +243,20 @@ export function chartOffsetForFraction(layout: ChartStripLayout, fraction: numbe
   return Math.min(layout.maxScroll, Math.max(0, fraction * layout.total))
 }
 
+/** Keep the same reading row when rotation changes one page into a spread. */
+export function chartOffsetAfterReflow(previous: ChartStripLayout, next: ChartStripLayout, offset: number): number {
+  if (!previous.rows.length || !next.rows.length) return 0
+  let rowIndex = 0
+  for (let index = 1; index < previous.rows.length; index++) {
+    if (previous.rows[index].top <= offset + 0.5) rowIndex = index
+  }
+  const row = previous.rows[rowIndex]
+  const progress = Math.max(0, Math.min(1, (offset - row.top) / row.height))
+  const page = rowIndex * previous.columns
+  const nextRow = next.rows[Math.min(next.rows.length - 1, Math.floor(page / next.columns))]
+  return Math.min(next.maxScroll, nextRow.top + progress * nextRow.height)
+}
+
 /** Snap a restored or free-scrolled position onto the nearest legal stop. */
 export function nearestChartStop(stops: readonly number[], offset: number): number {
   let best = stops[0] ?? 0
@@ -253,4 +264,19 @@ export function nearestChartStop(stops: readonly number[], offset: number): numb
     if (Math.abs(stop - offset) < Math.abs(best - offset)) best = stop
   }
   return best
+}
+
+/** A fitted half turn changes clipping only; page canvases keep their identity. */
+export function chartHalfTurnPresentation(layout: ChartStripLayout, offset: number, index: number) {
+  const height = layout.rows[0]?.height ?? 1
+  const step = Math.round(Math.max(0, Math.min(layout.maxScroll, offset)) / (height / 2))
+  const row = Math.floor(step / 2)
+  const split = step % 2 === 1
+  const pageRow = layout.rowOfPage[index]
+  const top = layout.tops[index] - layout.rows[pageRow].top
+  const visible = pageRow === row || (split && pageRow === row + 1)
+  const clipTop = split && pageRow === row ? Math.max(0, height / 2 - top) : 0
+  const clipBottom = split && pageRow === row + 1
+    ? Math.max(0, top + layout.heights[index] - height / 2) : 0
+  return { top, visible, clipTop, clipBottom, split }
 }

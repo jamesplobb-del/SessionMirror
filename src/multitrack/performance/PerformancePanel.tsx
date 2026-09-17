@@ -77,9 +77,9 @@ export default function PerformancePanel({
   if (!panel.take) {
     return (
       <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label={`Add recording to ${displayName || 'box'}`}>
-        <span className="multitrack-empty__name">{displayName || 'Box'}</span>
+        <span className="multitrack-empty__name">{panel.missingTakeId ? 'Missing recording' : displayName || 'Box'}</span>
         <Video className="multitrack-empty__camera h-8 w-8 text-stone-400" />
-        <span className="multitrack-empty__hint text-stone-500">Tap to add</span>
+        <span className="multitrack-empty__hint text-stone-500">{panel.missingTakeId ? 'Tap to replace' : 'Tap to add'}</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
             {recordingPhase === 'arming'

@@ -499,7 +499,7 @@
   cursor: grabbing;
 }
 
-.multitrack-panel__sheet-pdf,
+.multitrack-sheet-pages__canvas,
 .multitrack-panel__sheet-image {
   position: absolute;
   inset: 0;
@@ -520,6 +520,98 @@
 
 .multitrack-panel__sheet-image--fit {
   object-fit: contain;
+}
+
+/* ── A PDF part in a box: one page per slot, snapped, tap the edge to turn ── */
+.multitrack-sheet-pages {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* A turn lands, it never glides: a page that slides past the viewer mid-bar
+     is worse than one that is simply there. */
+  scroll-behavior: auto;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  background: white;
+}
+
+.multitrack-sheet-pages[data-interactive='false'] {
+  overflow: hidden;
+  touch-action: none;
+  pointer-events: none;
+}
+
+.multitrack-sheet-pages__strip {
+  position: relative;
+  width: 100%;
+}
+
+.multitrack-sheet-pages__slot {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.multitrack-sheet-pages__canvas[data-drawn='false'] {
+  opacity: 0;
+}
+
+/* The page count and its arrows, in the corner no music reaches. */
+.multitrack-panel__sheet-pager {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.1rem 0.2rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.multitrack-panel__sheet-pager span {
+  min-width: 2.4rem;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.multitrack-panel__sheet-pager button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  color: inherit;
+}
+
+.multitrack-panel__sheet-pager button:disabled {
+  opacity: 0.35;
+}
+
+.multitrack-panel__sheet-error {
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 5;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(127, 29, 29, 0.92);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .multitrack-panel__sheet-actions {
@@ -3232,3 +3324,11 @@
 .multitrack-take-controls .multitrack-take-controls__button { position: static; display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border-radius: 50%; background: #f5f5f4; color: #44403c; }
 .multitrack-take-controls .multitrack-take-controls__button svg { width: 18px; height: 18px; flex: none; display: block; }
 .multitrack-playback-count { text-align: center; padding: 6px; font-size: 14px; font-weight: 600; color: #57534e; font-variant-numeric: tabular-nums; }
+
+/* Secondary composition tools stay accessible without crowding recording. */
+.multitrack-advanced { margin: .75rem 0; padding: .65rem; border: 1px solid rgba(128, 128, 128, .25); border-radius: .75rem; }
+.multitrack-advanced > summary { cursor: pointer; min-height: 2rem; font-weight: 600; }
+.multitrack-advanced > p { font-size: .85rem; margin: .5rem 0; }
+.multitrack-recording-stage__actions--review { flex-wrap: wrap; }
+.multitrack-review-note { flex-basis: 100%; text-align: center; font-size: .75rem; }
+.multitrack-recording-stage__actions--review button:disabled { opacity: .45; }

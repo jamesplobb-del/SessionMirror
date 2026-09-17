@@ -1,5 +1,7 @@
 /** Pitch detection bounds — instruments + singing voice (A440). */
 
+import { isTabletDevice } from './deviceFormFactor'
+
 /** Low voice range; instrument-specific bounds are defined below. */
 export const MIN_INSTRUMENT_HZ = 65
 
@@ -136,14 +138,44 @@ const WINDS_TUNER_PROFILE: PitchTunerProfile = {
 
 export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'winds']
 
+/**
+ * Tablet microphones need a lower loudness floor for quiet playing at a stand.
+ * The existing 8 dB tablet adjustment is retained; profiles stay user-selected.
+ * Keep pitch clarity, frequency bounds and silence expiry unchanged so lowering
+ * the floor does not turn unpitched room noise into accepted notes.
+ * The widget, live tuner and games all receive this same cached profile.
+ */
+const TABLET_MIC_GATE_RELIEF_DB = 8
+
+/*
+ * Cached per profile so the returned object keeps its identity — the profile is
+ * a dependency of the tracker's effects, and a fresh object every call would
+ * tear down and rebuild the pitch graph on every render.
+ */
+const tabletProfiles = new WeakMap<PitchTunerProfile, PitchTunerProfile>()
+
+function forThisDevice(profile: PitchTunerProfile): PitchTunerProfile {
+  // The screen's short side, so this is settled once by the hardware and does
+  // not move with split view.
+  if (!isTabletDevice()) return profile
+  const cached = tabletProfiles.get(profile)
+  if (cached) return cached
+  const adjusted: PitchTunerProfile = {
+    ...profile,
+    rmsGateDbMic: profile.rmsGateDbMic - TABLET_MIC_GATE_RELIEF_DB,
+  }
+  tabletProfiles.set(profile, adjusted)
+  return adjusted
+}
+
 export function getTunerProfile(instrument: TunerInstrument): PitchTunerProfile {
   switch (instrument) {
     case 'strings':
-      return STRINGS_TUNER_PROFILE
+      return forThisDevice(STRINGS_TUNER_PROFILE)
     case 'winds':
-      return WINDS_TUNER_PROFILE
+      return forThisDevice(WINDS_TUNER_PROFILE)
     default:
-      return VOICE_TUNER_PROFILE
+      return forThisDevice(VOICE_TUNER_PROFILE)
   }
 }
 

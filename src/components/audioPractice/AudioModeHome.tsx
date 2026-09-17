@@ -411,7 +411,7 @@ interface AudioModeTakeCardProps {
   liveWaveform?: ReactNode
 }
 
-function AudioModeTakeCard({
+export function AudioModeTakeCard({
   bestTargetRef,
   dragEnabled = false,
   dropHovered = false,

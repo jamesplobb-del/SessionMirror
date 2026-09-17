@@ -134,7 +134,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   const addPerformanceBox = useCallback((floating = false): string | null => {
     const current = sessionRef.current
     const vacant = floating ? undefined
-      : current.panels.find(p => p.kind === 'performance' && !p.overlay && !p.take)
+      : current.panels.find(p => p.kind === 'performance' && !p.overlay && !p.take && !p.missingTakeId)
     const floatingCount = current.panels.filter(p => p.kind === 'performance' && p.overlay).length
     const id = vacant?.id ?? (floating
       ? (floatingCount < 4 ? `extra-${crypto.randomUUID()}` : undefined)
@@ -151,10 +151,34 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     return id
   }, [setSession])
 
+  /**
+   * Clear the canvas without leaving the project.
+   *
+   * A workspace carries a lot of state that is invisible until it bites: a
+   * hidden box from a layout you abandoned, a section window on a part you
+   * re-recorded, a backing track you muted rather than removed, a trim you set
+   * on a take that is no longer here. "New project" makes another entry in the
+   * list and does not answer that — the player does not want a second project,
+   * they want this one back to the start. Name and id survive because those are
+   * the thing they are still working on; everything else goes.
+   *
+   * Undo covers it like any other edit, so a reset by mistake is one tap back.
+   */
+  const resetSession = useCallback(() => {
+    setSession(prev => {
+      const fresh = createInitialSession()
+      return {
+        ...fresh,
+        projectId: prev.projectId ?? fresh.projectId,
+        name: prev.name ?? fresh.name,
+      }
+    })
+  }, [setSession])
+
   const assignTakeToPanel = useCallback((panelId: string, take: Take | null) => {
     setSession(prev => ({ ...prev, panels: prev.panels.map(panel => {
       if (panel.id !== panelId || panel.kind !== 'performance') return panel
-      if (panel.take?.id === take?.id) return { ...panel, take }
+      if (panel.take?.id === take?.id) return { ...panel, take, missingTakeId: undefined }
       // A replacement has its own timing. Keep its visual placement and name only.
       return { kind: 'performance', id: panel.id, take, label: panel.label,
         hidden: panel.hidden, overlay: panel.overlay, frame: panel.frame, sectionAudio: panel.overlay ? true : undefined }
@@ -333,6 +357,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     layout,
     setLayout,
     addPerformanceBox,
+    resetSession,
     assignTakeToPanel,
     setPanelVolume,
     setPanelMuted,

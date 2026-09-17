@@ -114,6 +114,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var isPreviewActive = false
     private var isBridgePreviewActive = false
     private var previewUsesFrontCamera = true
+    private let interfaceOrientationLock = NSLock()
+    private var padInterfaceOrientation: UIInterfaceOrientation = .portrait
     private var lastPadInputOrientation: AVAudioSession.StereoOrientation?
 
     /// Delivers JPEG base64 (no data-URL prefix) to the Capacitor plugin for canvas preview in the WebView.
@@ -655,7 +657,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private func applyPadAudioInputOrientation() {
         guard isPad else { return }
         let stereo: AVAudioSession.StereoOrientation
-        switch Self.currentInterfaceOrientation() {
+        switch cachedInterfaceOrientation {
         case .landscapeLeft:
             stereo = .landscapeLeft
         case .landscapeRight:
@@ -674,8 +676,50 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
     }
 
+    // UIKit is sampled on the main thread. Capture configuration reads this
+    // snapshot without synchronously dispatching back from the session queue.
+    private var cachedInterfaceOrientation: UIInterfaceOrientation {
+        interfaceOrientationLock.lock()
+        defer { interfaceOrientationLock.unlock() }
+        return padInterfaceOrientation
+    }
+
+    private var captureVideoOrientation: AVCaptureVideoOrientation {
+        guard isPad else { return .portrait }
+        return AVCaptureVideoOrientation(rawValue: cachedInterfaceOrientation.rawValue) ?? .portrait
+    }
+
+    private func updatePadCaptureOrientation() {
+        guard isPad else { return }
+        let interfaceOrientation = Self.currentInterfaceOrientation()
+        interfaceOrientationLock.lock()
+        let changed = padInterfaceOrientation != interfaceOrientation
+        padInterfaceOrientation = interfaceOrientation
+        interfaceOrientationLock.unlock()
+        let orientation = captureVideoOrientation
+        if let connection = previewLayer?.connection, connection.isVideoOrientationSupported,
+           connection.videoOrientation != orientation {
+            connection.videoOrientation = orientation
+        }
+        guard changed else { return }
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.applyPadAudioInputOrientation()
+            if let connection = self.videoDataOutput?.connection(with: .video), connection.isVideoOrientationSupported {
+                connection.videoOrientation = orientation
+            }
+            // A movie keeps the orientation it started with. Preview and controls
+            // can rotate mid-take without changing the movie's track matrix.
+            if self.movieOutput?.isRecording != true && self.startCompletion == nil,
+               let connection = self.movieOutput?.connection(with: .video), connection.isVideoOrientationSupported {
+                connection.videoOrientation = orientation
+            }
+        }
+    }
+
     private static func currentInterfaceOrientation() -> UIInterfaceOrientation {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .filter { $0.activationState == .foregroundActive }
         if let orientation = scenes.first?.interfaceOrientation, orientation != .unknown {
             return orientation
         }
@@ -979,12 +1023,14 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     func layoutPreview(in container: UIView) {
+        // The controller also lays out in Tools/audio mode, where there is no
+        // preview container but the iPad microphone still needs its orientation.
+        updatePadCaptureOrientation()
         guard previewContainer === container else { return }
         // bounds + position instead of frame: frame is undefined once the
         // pinch-zoom transform is applied to the layer.
         previewLayer?.bounds = container.bounds
         previewLayer?.position = CGPoint(x: container.bounds.midX, y: container.bounds.midY)
-        applyPadAudioInputOrientation()
     }
 
     /// Preview-only pinch zoom (mirrors the CSS `--camera-preview-zoom` behavior):
@@ -1070,7 +1116,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         layer.position = CGPoint(x: container.bounds.midX, y: container.bounds.midY)
         if let connection = layer.connection {
             if connection.isVideoOrientationSupported {
-                connection.videoOrientation = .portrait
+                connection.videoOrientation = captureVideoOrientation
             }
             applyFrontCameraMirroring(to: connection)
         }
@@ -1333,7 +1379,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 connection.isVideoMirrored = false
             }
             if connection.isVideoOrientationSupported {
-                connection.videoOrientation = .portrait
+                connection.videoOrientation = captureVideoOrientation
             }
             if connection.isVideoStabilizationSupported {
                 connection.preferredVideoStabilizationMode = .off
@@ -1350,28 +1396,41 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         ]
         videoDataOutput.alwaysDiscardsLateVideoFrames = true
         videoDataOutput.setSampleBufferDelegate(self, queue: frameBridgeQueue)
-        guard session.canAddOutput(videoDataOutput) else {
-            throw NSError(
-                domain: "NativeCameraTest",
-                code: 12,
-                userInfo: [NSLocalizedDescriptionKey: "Cannot add video data output"]
+        /*
+         * The frame bridge is the last thing in the queue for a slot, and the
+         * only one that may go without.
+         *
+         * An iPad running a 1080p movie file output can refuse a third output,
+         * and this one is the least missed: the preview the player watches is
+         * the AVCaptureVideoPreviewLayer, and this pump exists to hand JPEGs to
+         * JS consumers on demand. Throwing here cost the entire capture
+         * session — no preview, no recording, no tuner — to protect a pump that
+         * most of the app never asks for. So it degrades instead, and the
+         * mandatory movie output and the audio tap that feeds pitch both keep
+         * the slots they were given above.
+         */
+        if session.canAddOutput(videoDataOutput) {
+            session.addOutput(videoDataOutput)
+            self.videoDataOutput = videoDataOutput
+            if let connection = videoDataOutput.connection(with: .video) {
+                if connection.isVideoOrientationSupported {
+                    connection.videoOrientation = captureVideoOrientation
+                }
+                if connection.isVideoMirroringSupported {
+                    connection.automaticallyAdjustsVideoMirroring = false
+                    connection.isVideoMirrored = false
+                }
+            }
+        } else {
+            self.videoDataOutput = nil
+            print("[NativeCamera] video data output UNAVAILABLE — canAddOutput=false. Layer preview only; the JPEG frame bridge is off for this session.")
+            AudioRouteConfigurator.debugCaptureEvent(
+                "NativeCameraRecordingEngine.configureCaptureSession videoDataOutput.unavailable"
             )
         }
-        session.addOutput(videoDataOutput)
-        self.videoDataOutput = videoDataOutput
 
         if audioDataOutput == nil {
             _ = addAudioTapOutput(to: session)
-        }
-
-        if let connection = videoDataOutput.connection(with: .video) {
-            if connection.isVideoOrientationSupported {
-                connection.videoOrientation = .portrait
-            }
-            if connection.isVideoMirroringSupported {
-                connection.automaticallyAdjustsVideoMirroring = false
-                connection.isVideoMirrored = false
-            }
         }
 
         logActiveFormatDiagnostics(reason: "sessionConfigured")
@@ -1585,6 +1644,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             )
         }
 
+        if let connection = activeMovieOutput.connection(with: .video), connection.isVideoOrientationSupported {
+            connection.videoOrientation = captureVideoOrientation
+        }
         logMovieAudioConnection(context: "recordStart", movieOutput: activeMovieOutput)
 
         var result: [String: Any] = [

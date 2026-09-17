@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { FileImage, Move, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { ChevronLeft, ChevronRight, FileImage, Move, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { SheetMusicAsset, SheetMusicPanelState } from '../types'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from './sheetMusicUtils'
 import { sheetCueWindows, sheetYAt } from './sheetMusicTimeline'
+import SheetPdfPages from './SheetPdfPages'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -39,6 +40,7 @@ function distanceBetween(first: GesturePoint, second: GesturePoint): number {
 export default function SheetMusicPanel({
   panel,
   currentTimeSec = 0,
+  interactionDisabled = false,
   onAssetChange,
   onCueAssetChange,
   onRemoveCue,
@@ -47,6 +49,8 @@ export default function SheetMusicPanel({
   panel: SheetMusicPanelState
   /** Timeline position — decides which screenshot in the cue list is on screen. */
   currentTimeSec?: number
+  /** A take is recording, playing or exporting: the page is fixed for the run. */
+  interactionDisabled?: boolean
   onAssetChange: (asset: SheetMusicAsset | null) => void
   onCueAssetChange?: (cueId: string, asset: SheetMusicAsset) => void
   onRemoveCue?: (cueId: string) => void
@@ -54,6 +58,14 @@ export default function SheetMusicPanel({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadedAssetUrlRef = useRef<string | null>(null)
+  const [importError, setImportError] = useState('')
+  /*
+   * Page count as the open file reports it. It is not written back into the
+   * project: the length of a PDF is a property of the file, and recording it
+   * on every open would put an undo step on the stack for simply looking at a
+   * part. Imports record it up front; this covers the ones that predate that.
+   */
+  const [livePageCount, setLivePageCount] = useState(0)
 
   // Which screenshot is up right now, and where it sits in the sequence.
   const cueWindows = useMemo(() => sheetCueWindows(panel), [panel])
@@ -90,6 +102,30 @@ export default function SheetMusicPanel({
     setDraftTransform(next)
   }, [activeAsset?.src, activeAsset?.x, activeAsset?.y, activeAsset?.scale])
 
+  /*
+   * Writing back to whichever image is on screen. The first image is the
+   * panel's own asset; every later one is a cue, and a cue is edited by id.
+   */
+  const commitActiveAsset = useCallback((next: SheetMusicAsset) => {
+    if (!activeCue) return
+    if (activeCue.isBase) onAssetChange(next)
+    else onCueAssetChange?.(activeCue.id, next)
+  }, [activeCue, onAssetChange, onCueAssetChange])
+
+  const importFile = useCallback((file: File) => {
+    setImportError('')
+    void loadSheetMusicFile(file)
+      .then((asset) => {
+        uploadedAssetUrlRef.current = asset.src
+        onAssetChange(asset)
+      })
+      .catch((cause: unknown) => {
+        setImportError(cause instanceof Error && cause.message
+          ? cause.message
+          : 'That file could not be opened.')
+      })
+  }, [onAssetChange])
+
   if (!activeCue || !activeAsset) {
     return (
       <div className="multitrack-panel multitrack-panel--empty">
@@ -100,18 +136,15 @@ export default function SheetMusicPanel({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (!file) return
-            void loadSheetMusicFile(file).then((asset) => {
-              uploadedAssetUrlRef.current = asset.src
-              onAssetChange(asset)
-            })
             e.currentTarget.value = ''
+            if (file) importFile(file)
           }}
         />
         <Pressable type="button" intensity="soft" onClick={() => fileInputRef.current?.click()} className="flex h-full w-full flex-col items-center justify-center" aria-label="Add sheet music">
           <Upload className="h-8 w-8 text-stone-400" />
           <span className="mt-2 text-sm font-medium text-stone-500">Add music, photo, or PDF</span>
         </Pressable>
+        {importError ? <p className="multitrack-panel__sheet-error" role="alert">{importError}</p> : null}
       </div>
     )
   }
@@ -126,6 +159,14 @@ export default function SheetMusicPanel({
     '--sheet-y': `${((activeAsset.scrollEndY === undefined ? draftTransform.y : sheetYAt(activeAsset, currentTimeSec - activeCue.startSec)) - 0.5) * 70}%`,
     '--sheet-scale': draftTransform.scale,
   } as CSSProperties
+
+  const pageCount = asset.pageCount ?? livePageCount
+  const pageIndex = Math.min(Math.max(0, asset.pageIndex ?? 0), Math.max(0, pageCount - 1))
+
+  const setPage = (next: number) => {
+    if (next === pageIndex) return
+    commitActiveAsset({ ...asset, pageIndex: next })
+  }
 
   const applyDraftTransform = (next: SheetTransform) => {
     transformRef.current = next
@@ -221,9 +262,7 @@ export default function SheetMusicPanel({
     }
 
     const next = transformRef.current
-    const moved = { ...asset, x: next.x, y: next.y, scale: next.scale }
-    if (activeCue.isBase) onAssetChange(moved)
-    else onCueAssetChange?.(activeCue.id, moved)
+    commitActiveAsset({ ...asset, x: next.x, y: next.y, scale: next.scale })
     gesture.baseline = next
     gesture.startPoint = null
     gesture.startCenter = null
@@ -232,19 +271,36 @@ export default function SheetMusicPanel({
 
   return (
     <div className="multitrack-panel multitrack-panel--sheet">
-      <div
-        className={`multitrack-panel__sheet-viewport multitrack-panel__sheet-viewport--${contentMode}`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endGesture}
-        onPointerCancel={endGesture}
-      >
-        {isPdf ? (
-          <object data={asset.src} type="application/pdf" className="multitrack-panel__sheet-pdf" style={contentStyle} />
-        ) : (
+      {isPdf ? (
+        /*
+         * A PDF gets the reader, not the framing gestures. One finger has to
+         * belong to the page strip — a part you cannot turn is not a part —
+         * and a pinch that also scrolled would turn the page every time
+         * somebody zoomed in on the last system. Framing a PDF page is done
+         * with the zoom slider in Layout, where it is a deliberate act.
+         */
+        <div className={`multitrack-panel__sheet-viewport multitrack-panel__sheet-viewport--${contentMode}`}>
+          <SheetPdfPages
+            src={asset.src}
+            pageIndex={pageIndex}
+            style={contentStyle}
+            interactive={!interactionDisabled}
+            onPageChange={setPage}
+            onPageCount={setLivePageCount}
+            onError={setImportError}
+          />
+        </div>
+      ) : (
+        <div
+          className={`multitrack-panel__sheet-viewport multitrack-panel__sheet-viewport--${contentMode}`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={endGesture}
+          onPointerCancel={endGesture}
+        >
           <img src={asset.src} alt={asset.fileName} className={`multitrack-panel__sheet-image multitrack-panel__sheet-image--${contentMode}`} style={contentStyle} draggable={false} />
-        )}
-      </div>
+        </div>
+      )}
       <div className="multitrack-panel__overlay">
         <div className="multitrack-panel__label">
           <FileImage className="h-3.5 w-3.5" />
@@ -276,10 +332,37 @@ export default function SheetMusicPanel({
           </Pressable>
         </div>
       </div>
-      <div className="multitrack-panel__gesture-hint" aria-hidden>
-        <Move className="h-3.5 w-3.5" />
-        Drag · pinch to zoom
-      </div>
+      {isPdf && pageCount > 1 ? (
+        <div className="multitrack-panel__sheet-pager" role="group" aria-label="Turn the page">
+          <Pressable
+            type="button"
+            intensity="soft"
+            aria-label="Previous page"
+            disabled={interactionDisabled || pageIndex <= 0}
+            onClick={() => setPage(pageIndex - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Pressable>
+          <span aria-live="polite">{Math.min(pageIndex + 1, pageCount)}/{pageCount}</span>
+          <Pressable
+            type="button"
+            intensity="soft"
+            aria-label="Next page"
+            disabled={interactionDisabled || pageIndex >= pageCount - 1}
+            onClick={() => setPage(pageIndex + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Pressable>
+        </div>
+      ) : null}
+      {importError ? (
+        <p className="multitrack-panel__sheet-error" role="alert">{importError}</p>
+      ) : (
+        <div className="multitrack-panel__gesture-hint" aria-hidden>
+          <Move className="h-3.5 w-3.5" />
+          {isPdf ? 'Scroll · tap the edge to turn' : 'Drag · pinch to zoom'}
+        </div>
+      )}
     </div>
   )
 }

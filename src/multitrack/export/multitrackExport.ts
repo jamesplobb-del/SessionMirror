@@ -49,6 +49,9 @@ export async function exportMultitrackSession(
   durationSeconds: number,
   options: MultitrackExportOptions = {},
 ): Promise<MultitrackExportResult> {
+  if (session.panels.some(p => p.kind === 'performance' && !p.hidden && p.missingTakeId && !p.take)) {
+    return { ok: false, reason: 'missing_file' }
+  }
   if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {
     return { ok: false, reason: 'unsupported' }
   }
@@ -137,6 +140,8 @@ export async function exportMultitrackSession(
   interface ExportSheetLayer {
     path: string
     fileType: string
+    /** PDFs only: the page this cue shows. Older builds always drew page one. */
+    pageIndex?: number
     rect: LayoutRectPercent
     x: number
     y: number
@@ -166,15 +171,23 @@ export async function exportMultitrackSession(
     // window it owns, so the render cuts line to line exactly as the canvas did.
     const cueWindows = musicRect ? sheetCueWindows(session.sheetMusic) : []
     const layers: Array<ExportSheetLayer & { startSec: number; endSec?: number }> = []
+    // Turning a page is the same file again. Copying a 40 MB part into the
+    // export cache once per page turn is the difference between a render and a
+    // full disk, so each source is written out once and reused by page.
+    const written = new Map<string, string>()
     for (const [index, window] of cueWindows.entries()) {
       const asset = window.asset
-      const blob = await fetchBlob(asset.src)
-      const extension = extensionForBlob(blob, asset.fileName)
-      const path = await writeBlobToNativeCache(
-        MULTITRACK_EXPORT_DIR,
-        `sheet-${Date.now()}-${index}.${extension}`,
-        blob,
-      )
+      let path = written.get(asset.src)
+      if (path === undefined) {
+        const blob = await fetchBlob(asset.src)
+        const extension = extensionForBlob(blob, asset.fileName)
+        path = await writeBlobToNativeCache(
+          MULTITRACK_EXPORT_DIR,
+          `sheet-${Date.now()}-${index}.${extension}`,
+          blob,
+        )
+        written.set(asset.src, path)
+      }
       const isPdf = asset.mimeType === 'application/pdf'
       for (const layoutWindow of windows) {
         const startSec = Math.max(window.startSec, layoutWindow.startSec)
@@ -183,6 +196,7 @@ export async function exportMultitrackSession(
         layers.push({
         path,
         fileType: isPdf ? 'pdf' : 'image',
+        ...(isPdf ? { pageIndex: Math.max(0, asset.pageIndex ?? 0) } : null),
         rect: layoutWindow.musicRect,
         x: asset.x ?? 0.5,
         y: sheetYAt(asset, startSec - window.startSec),
@@ -203,6 +217,7 @@ export async function exportMultitrackSession(
       sheetMusic = {
         path: first.path,
         fileType: first.fileType,
+        ...(first.pageIndex !== undefined ? { pageIndex: first.pageIndex } : null),
         rect: first.rect,
         x: first.x,
         y: first.y,

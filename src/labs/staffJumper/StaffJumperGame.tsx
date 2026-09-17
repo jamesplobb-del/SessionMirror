@@ -315,8 +315,10 @@ export default function StaffJumperGame({
       setViewport({ width: el.clientWidth, height: el.clientHeight })
     }
     measure()
+    const observer = new ResizeObserver(measure)
+    if (playfieldRef.current) observer.observe(playfieldRef.current)
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
   }, [])
 
   useLayoutEffect(() => {

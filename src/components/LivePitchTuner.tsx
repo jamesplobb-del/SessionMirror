@@ -1,3 +1,4 @@
+import { reportFeatureAction } from '../utils/featureGuidance'
 import { createTunerTrace, type TunerTrace } from '../utils/tunerTrace'
 import TunerHistory from './audioPractice/TunerHistory'
 import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
@@ -455,6 +456,7 @@ function LiveAudioTunerPane({
                       ? 'pitch-living-transposition-trigger--active'
                       : ''
                   }`}
+                  data-guidance="tuner-settings"
                   onClick={toggleTransposition}
                   aria-expanded={transpositionOpen}
                   aria-controls="pitch-living-transposition-panel"
@@ -730,6 +732,7 @@ function LivePitchTunerAudio({
       preferNativeAudioTap: true,
       retryNativeTapOnInteractiveRecovery: liveMicOnly,
       onSourceHealthChange: onLiveSourceHealthChange,
+      onInputAdvice: (advice: 'quiet' | 'loud') => reportFeatureAction(`tuner-input-${advice}`),
       onAcceptedPitchFrame: liveMicOnly ? handleAcceptedPitchFrame : undefined,
     }),
     [

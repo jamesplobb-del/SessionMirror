@@ -45,6 +45,7 @@ export interface MultitrackMonitorSource {
   id: string
   label: string
   muted: boolean
+  unavailableReason?: string
 }
 
 interface MultitrackRecordingStageProps {
@@ -79,6 +80,7 @@ interface MultitrackRecordingStageProps {
   onUseExisting: () => void
   onConfirmTake: () => void
   onRetryTake: () => void
+  onDiscardTake: () => void
   onClose: () => void
 }
 
@@ -114,6 +116,7 @@ export default function MultitrackRecordingStage({
   onUseExisting,
   onConfirmTake,
   onRetryTake,
+  onDiscardTake,
   onClose,
 }: MultitrackRecordingStageProps) {
   const { showAlert } = useActionSheet()
@@ -229,6 +232,12 @@ export default function MultitrackRecordingStage({
     return () => media.removeEventListener('ended', onEnded)
   }, [reviewTake?.id, reviewVideoRef])
 
+  const reviewGenerationRef = useRef(0)
+  useEffect(() => () => {
+    reviewGenerationRef.current += 1
+    reviewVideoRef.current?.pause()
+  }, [reviewTake?.id, reviewVideoRef])
+
   const handleReview = useCallback(() => {
     const video = reviewVideoRef.current
     if (!video || !reviewTake) return
@@ -239,9 +248,10 @@ export default function MultitrackRecordingStage({
       return
     }
 
+    const generation = ++reviewGenerationRef.current
     void (async () => {
       const url = await resolveTakePlaybackUrl(reviewTake.filePath, reviewTake.videoUrl)
-      if (!url) return
+      if (!url || generation !== reviewGenerationRef.current) return
       assignMediaPlaybackSrc(video, url)
       try {
         video.currentTime = 0
@@ -254,10 +264,18 @@ export default function MultitrackRecordingStage({
       video.setAttribute('playsinline', 'true')
       video.setAttribute('webkit-playsinline', 'true')
       const started = await playTakeMediaAudible(video)
+      if (generation !== reviewGenerationRef.current) return
       setReviewPlaying(started)
-    })()
-  }, [reviewPlaying, reviewTake])
+    })().catch(() => {
+      if (generation === reviewGenerationRef.current) {
+        setReviewPlaying(false)
+        void showAlert({ message: 'Could not preview this recording. Please try again.', tone: 'error' })
+      }
+    })
+  }, [reviewPlaying, reviewTake, showAlert])
 
+  const reviewReady = phase === 'review' && !!reviewTake && !isStopping
+  const savingTake = phase === 'review' && !reviewReady
   const busy = phase !== 'idle' || isRecording
   const anyMonitorAudible = monitorSources.some((source) => !source.muted)
 
@@ -296,7 +314,7 @@ export default function MultitrackRecordingStage({
       ) : null}
 
       <header className="multitrack-recording-stage__header">
-        <Pressable type="button" intensity="icon" onClick={onClose} aria-label="Close recorder">
+        <Pressable type="button" intensity="icon" onClick={onClose} disabled={savingTake} aria-label="Close recorder">
           <X className="h-5 w-5" />
         </Pressable>
         {isRecording ? (
@@ -320,13 +338,16 @@ export default function MultitrackRecordingStage({
               type="button"
               intensity="soft"
               onClick={() => onToggleMonitorSource(source.id)}
-              disabled={busy}
+              disabled={busy || !!source.unavailableReason}
+              aria-pressed={!source.muted}
               className={`multitrack-monitor-chip ${source.muted ? 'multitrack-monitor-chip--muted' : ''}`}
             >
               {source.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-              {source.label}
+              {source.id === 'click' && !headphonesActive ? 'Count-in only' : source.label}
+              {source.unavailableReason ? ` · ${source.unavailableReason}` : ''}
             </Pressable>
           ))}
+          {monitorSources.some(source => source.unavailableReason) && <span>Adjust part mute and volume in the Editor.</span>}
           {anyMonitorAudible ? (
             <span
               className={`multitrack-headphone-chip ${headphonesActive ? 'multitrack-headphone-chip--on' : 'multitrack-headphone-chip--warn'}`}
@@ -370,7 +391,8 @@ export default function MultitrackRecordingStage({
       <footer className="multitrack-recording-stage__controls">
         {phase === 'review' ? (
           <div className="multitrack-recording-stage__actions multitrack-recording-stage__actions--review">
-            <Pressable type="button" intensity="soft" onClick={onRetryTake} className="multitrack-recording-stage__retry">
+            {savingTake && <span role="status">Saving recording…</span>}
+            <Pressable type="button" intensity="soft" disabled={!reviewReady} onClick={onRetryTake} className="multitrack-recording-stage__retry">
               <RotateCcw className="h-4 w-4" />
               Retry
             </Pressable>
@@ -378,15 +400,18 @@ export default function MultitrackRecordingStage({
               type="button"
               intensity="soft"
               onClick={handleReview}
+              disabled={!reviewReady}
               className="multitrack-recording-stage__preview-btn"
             >
               {reviewPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               {reviewPlaying ? 'Pause' : 'Preview'}
             </Pressable>
-            <Pressable type="button" intensity="normal" haptic="medium" onClick={onConfirmTake} className="multitrack-recording-stage__confirm">
+            <Pressable type="button" intensity="normal" haptic="medium" disabled={!reviewReady} onClick={onConfirmTake} className="multitrack-recording-stage__confirm">
               <Check className="h-5 w-5" />
               Keep
             </Pressable>
+            <Pressable type="button" intensity="soft" disabled={!reviewReady} onClick={onDiscardTake} className="multitrack-recording-stage__retry">Discard take</Pressable>
+            <span className="multitrack-review-note">Retry or close keeps this recording in your Take Vault.</span>
           </div>
         ) : (
           <div className="multitrack-recording-stage__actions multitrack-recording-stage__actions--live">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { Maximize2, Minimize2, X } from 'lucide-react'
+import { AudioLines, Columns2, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, X } from 'lucide-react'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
   DEFAULT_CHART_VIEW, deletePracticeChart, isChartVisible, loadChartView, loadPracticeChart,
@@ -7,14 +7,25 @@ import {
   type ChartView, type PracticeChart,
 } from '../utils/practiceChartStorage'
 import MusicWidget from './practiceChart/MusicWidget'
+import type { HudQuickSettings } from '../utils/hudQuickSettings'
+
+
 import {
-  clearInkStrokes, loadInkStrokes, loadInkWidth, saveInkStrokes, saveInkWidth,
-  type InkColour, type InkStroke, type InkWidth,
+  clearInkStrokes, eraseStrokesAt, loadInkStrokes, loadInkWidth, saveInkStrokes, saveInkWidth,
+  type InkStroke, type InkTool, type InkWidth,
 } from './practiceChart/chartInk'
 import { shareMarkedChart } from './practiceChart/chartExport'
 import PracticeChartPaper, { type ChartPaperHandle, type ChartPaperView } from './practiceChart/PracticeChartPaper'
 import { closeCachedPdfChart } from './practiceChart/chartDocument'
 import './practice-chart.css'
+
+type MusicWorkspaceKey = Exclude<keyof HudQuickSettings, 'showMusic' | 'audioEnhancerEnabled'>
+const MUSIC_WORKSPACE_TOOLS = [
+  { key: 'pitchTrackerEnabled', label: 'Pitch', icon: AudioLines },
+  { key: 'showMetronome', label: 'Metronome', icon: Music2 },
+  { key: 'showDrone', label: 'Drone', icon: Radio },
+  { key: 'showTakeCards', label: 'Takes', icon: Columns2 },
+] as const
 
 /** A tap this short and this still is a page turn; anything else is a scroll. */
 const TAP_SLOP_PX = 8
@@ -25,6 +36,8 @@ const HINT_MS = 2600
 
 interface PracticeChartLayerProps {
   projectId: string
+  workspace: HudQuickSettings
+  onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
   /** The Music tool is on and this surface is the practice room. */
   active: boolean
   boundaryRef: RefObject<HTMLElement | null>
@@ -35,6 +48,23 @@ interface PracticeChartLayerProps {
   onPaperVisibleChange: (visible: boolean) => void
   /** True while the player has asked for the tabs and the deck to stand down too. */
   onChromeHiddenChange: (hidden: boolean) => void
+  /*
+   * The record orbit itself is untouched — but in full screen it is put away
+   * with the rest of the deck, and a player on a stand still has to be able to
+   * start a take without leaving the page. These are the deck's own record
+   * control, borrowed for the rail.
+   */
+  isRecording: boolean
+  isStopping: boolean
+  recordReady: boolean
+  /** Seconds into the current take, for the rail's timer. */
+  recordElapsed: number
+  onToggleRecord: () => void
+}
+
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`
 }
 
 /**
@@ -47,8 +77,8 @@ interface PracticeChartLayerProps {
  * this project's folder next to the file.
  */
 export default function PracticeChartLayer({
-  projectId, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
-  onChromeHiddenChange,
+  projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
+  onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -66,13 +96,14 @@ export default function PracticeChartLayer({
    * remembered: a part must never open in marking mode, where the first tap
    * to turn the page would draw on it instead.
    */
-  const [marker, setMarker] = useState<InkColour | null>(null)
+  const [marker, setMarker] = useState<InkTool | null>(null)
   const [inkWidth, setInkWidth] = useState<InkWidth>(loadInkWidth)
   /*
    * Rehearsal view is a mode you step into, not a setting you keep. Remembered,
    * it would mean opening a part next week to an app with no tabs and no deck
    * and no memory of asking for that — which reads as broken, not as a feature.
    */
+  const [workspaceOpen, setWorkspaceOpen] = useState(true)
   const [chromeOff, setChromeOff] = useState(false)
   const [saving, setSaving] = useState(false)
   const [hint, setHint] = useState(false)
@@ -104,6 +135,25 @@ export default function PracticeChartLayer({
 
   const showing = active && paperVisible && chart !== null
   useEffect(() => { onPaperVisibleChange(showing) }, [onPaperVisibleChange, showing])
+
+  /*
+   * A part opens full screen.
+   *
+   * Picking music is already the player saying what this screen is for, and a
+   * part fitted into the band left over between the tabs and the deck is a
+   * part you have to squint at. What made this unsafe before was that the way
+   * out lived in a folded widget; the exit and the full-screen toggle now sit
+   * in the page's own top corners, so there is nothing to be stranded in.
+   *
+   * Once per file: a player who leaves full screen and then hides and shows
+   * the page again has said what they want, and it is not this.
+   */
+  const opened = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showing || !paperKey || opened.current === paperKey) return
+    opened.current = paperKey
+    setChromeOff(true)
+  }, [paperKey, showing])
 
   /*
    * Rehearsal view only means anything while a part is up, and it must never
@@ -155,14 +205,14 @@ export default function PracticeChartLayer({
       return
     }
     const apply = () => {
-      const tabs = document.querySelector('.audio-practice-top-tabs')
+      const tabs = document.querySelector(chromeHidden ? '.practice-chart-topbar' : '.audio-practice-top-tabs')
       const top = tabs ? Math.max(0, Math.round(tabs.getBoundingClientRect().bottom)) : 0
       if (top > 0) root.style.setProperty('--music-page-top', `${top}px`)
       else root.style.removeProperty('--music-page-top')
 
       const deck = document.querySelector('.app-hud-bottom')
       const deckTop = deck ? deck.getBoundingClientRect().top : 0
-      const height = window.visualViewport?.height ?? window.innerHeight
+      const height = window.innerHeight
       const bottom = deckTop > 0 ? Math.max(0, Math.round(height - deckTop)) : 0
       if (bottom > 0) root.style.setProperty('--music-page-bottom', `${bottom}px`)
       else root.style.removeProperty('--music-page-bottom')
@@ -193,7 +243,7 @@ export default function PracticeChartLayer({
       window.visualViewport?.removeEventListener('resize', apply)
       clear()
     }
-  }, [showing])
+  }, [showing, chromeHidden, workspaceOpen])
 
   // The turn zones are invisible on purpose — nothing may sit on the staff —
   // so they announce themselves once when the page comes up, then get out of
@@ -248,6 +298,23 @@ export default function PracticeChartLayer({
     })
   }, [projectId])
 
+  /*
+   * The eraser moves faster than React re-renders, so it works from a mirror
+   * of the list rather than from `strokes`: erasing off the last rendered
+   * value would put every mark the finger already passed back on the page.
+   */
+  const strokesRef = useRef(strokes)
+  strokesRef.current = strokes
+  const eraseAt = useCallback((
+    page: number, x: number, y: number, radiusX: number, radiusY: number,
+  ) => {
+    const next = eraseStrokesAt(strokesRef.current, page, x, y, radiusX, radiusY)
+    if (!next) return
+    strokesRef.current = next
+    saveInkStrokes(projectId, next)
+    setStrokes(next)
+  }, [projectId])
+
   const undoStroke = useCallback(() => {
     setStrokes(current => {
       if (current.length === 0) return current
@@ -283,11 +350,27 @@ export default function PracticeChartLayer({
     input.current?.click()
   }, [])
 
+  /*
+   * Music with no music is nothing: the tool comes on, the room looks exactly
+   * as it did, and the only sign anything happened is a ball on the edge. So
+   * the first thing turning it on does for a part that has none is ask for the
+   * file. Once per item, because a player who cancels the picker, or who has
+   * just removed a part on purpose, has answered the question.
+   */
+  const offered = useRef<string | null>(null)
+  useEffect(() => {
+    if (!active || busy || chart !== null) return
+    if (offered.current === projectId) return
+    offered.current = projectId
+    pick()
+  }, [active, busy, chart, pick, projectId])
+
   const remove = useCallback(async () => {
     setBusy(true)
     setError('')
     try {
       await deletePracticeChart(projectId)
+      offered.current = projectId
       clearInkStrokes(projectId)
       setStrokes([])
       setMarker(null)
@@ -311,8 +394,10 @@ export default function PracticeChartLayer({
     // With the marker out every tap is a mark, never a page turn.
     if (marker) return
     if (!start || start.id !== event.pointerId) return
-    // The corner controls sit inside the turn zones; pressing one is not a turn.
-    if (event.target instanceof Element && event.target.closest('.practice-chart-control')) return
+    // The corner controls and the rail sit inside the turn zones; pressing one
+    // of them is not a turn.
+    if (event.target instanceof Element
+      && event.target.closest('.practice-chart-topbar, .practice-chart-rail')) return
     if (Date.now() - start.at > TAP_MS) return
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return
     const box = event.currentTarget.getBoundingClientRect()
@@ -376,6 +461,7 @@ export default function PracticeChartLayer({
           marker={marker}
           inkWidth={inkWidth}
           onStroke={handleStroke}
+          onErase={eraseAt}
         />
         {/*
           * The two things a player needs from the page itself, in the corners
@@ -383,6 +469,7 @@ export default function PracticeChartLayer({
           * They stay put in full screen — hiding the exit inside the thing it
           * exits is how a player gets stranded on a page with no deck.
           */}
+        <div className="practice-chart-topbar">
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
           <button
             type="button"
@@ -393,6 +480,12 @@ export default function PracticeChartLayer({
             {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
+          {chromeOff && (
+            <button type="button" className="practice-chart-control" aria-expanded={workspaceOpen}
+              data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => setWorkspaceOpen(value => !value)}>
+              <LayoutGrid aria-hidden /><span>Workspace</span>
+            </button>
+          )}
           <button
             type="button"
             className="practice-chart-control practice-chart-control--end"
@@ -402,6 +495,43 @@ export default function PracticeChartLayer({
             <span>Exit music</span>
           </button>
         </div>
+        {chromeOff && workspaceOpen && (
+          <div className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
+            {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => (
+              <button key={key} type="button" aria-pressed={workspace[key]}
+                onClick={() => onWorkspaceChange(key, !workspace[key])}>
+                <Icon aria-hidden /><span>{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        </div>
+        {/*
+          * In full screen the deck is away, and the whole point of the page
+          * being on a stand is that the player is holding an instrument. The
+          * rail is the record orbit's own control, no more: one button, down
+          * the left margin where the staff is not, and only while the deck it
+          * stands in for is actually put away.
+          */}
+        {chromeOff && (
+          <div className="practice-chart-rail" data-dim={marker ? 'true' : undefined}>
+            <button
+              type="button"
+              className="practice-chart-rail__record"
+              data-recording={isRecording ? 'true' : undefined}
+              disabled={isStopping || (!recordReady && !isRecording)}
+              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+              onClick={onToggleRecord}
+            >
+              {isRecording ? <Square aria-hidden /> : <i aria-hidden />}
+            </button>
+            {isRecording && (
+              <span className="practice-chart-rail__elapsed" aria-live="polite">
+                {formatElapsed(recordElapsed)}
+              </span>
+            )}
+          </div>
+        )}
         {loadFailed ? (
           <div className="practice-chart-failed" role="alert">
             <p>{error || 'This file could not be opened.'}</p>

@@ -290,6 +290,8 @@ export interface BestTakeAudioPluginType {
     sheetMusic: {
       path: string
       fileType: string
+      /** PDFs only: which page to draw. Omitted means the first. */
+      pageIndex?: number
       rect: NativeRectPercent
       x: number
       y: number
@@ -307,6 +309,8 @@ export interface BestTakeAudioPluginType {
       scrollDurationSec?: number
       path: string
       fileType: string
+      /** PDFs only: which page to draw. Omitted means the first. */
+      pageIndex?: number
       rect: NativeRectPercent
       x: number
       y: number

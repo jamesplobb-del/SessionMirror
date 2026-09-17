@@ -1,9 +1,9 @@
 /** First-use help has its own history; skipping Welcome does not dismiss it. */
-export type FeatureGuideId = 'best-take' | 'workspace' | 'hands-free'
+export type FeatureGuideId = 'best-take' | 'workspace' | 'hands-free' | 'recording' | 'navigation' | 'take-library' | 'music-tools' | 'multitrack' | 'tuner-quiet' | 'tuner-loud'
 export type FeatureAction = 'take-saved' | 'best-take-pinned' | 'current-take-pinned'
   | 'overlays-opened' | 'overlays-closed' | 'branch-widget-selected'
   | 'hands-free-enabled' | 'hands-free-disabled' | 'hands-free-settings-opened'
-  | 'hands-free-recorded' | 'take-card-transfer-completed'
+  | 'hands-free-recorded' | 'take-card-transfer-completed' | 'widget-expanded' | 'take-library-opened' | 'tuner-input-quiet' | 'tuner-input-loud'
 
 export const CONFIRMATION_EVENT = 'besttake:action-confirmed'
 export function confirmFeatureAction(text: string): void {
@@ -13,13 +13,13 @@ export function confirmFeatureAction(text: string): void {
 export const GUIDANCE_EVENT = 'besttake:feature-action'
 export const GUIDANCE_PREFERENCES_EVENT = 'besttake:feature-help-preferences'
 const STORAGE_KEY = 'besttake:feature-help:v1'
-export const GUIDE_COOLDOWN_MS = 45_000
+export const GUIDE_COOLDOWN_MS = 90_000
 export const GUIDE_EXPIRY_MS = 120_000
 export const GUIDE_SESSION_LIMIT = 2
 
 export interface GuidancePreferences { enabled: boolean; seen: FeatureGuideId[] }
 let fallback: GuidancePreferences = { enabled: true, seen: [] }
-const ids: FeatureGuideId[] = ['best-take', 'workspace', 'hands-free']
+const ids: FeatureGuideId[] = ['best-take', 'workspace', 'hands-free', 'recording', 'navigation', 'take-library', 'music-tools', 'multitrack', 'tuner-quiet', 'tuner-loud']
 
 export function readGuidancePreferences(): GuidancePreferences {
   try {
@@ -62,6 +62,13 @@ export interface GuideStep {
   action?: FeatureAction
 }
 export const FEATURE_GUIDES: Record<FeatureGuideId, GuideStep[]> = {
+  'tuner-quiet': [{ title: 'A little more input may help', body: 'The tuner is hearing a quiet note. Check Voice, Strings or Winds here first, then try moving closer to the mic.', selector: '[data-guidance="tuner-settings"]' }],
+  'tuner-loud': [{ title: 'Give the mic a little space', body: 'The input is very loud. Move back a little, or lower the gain if you’re using an external mic.', selector: '[data-guidance="tuner-settings"]' }],
+  recording: [{ title: 'One tap to record', body: 'Tap Record to start, then tap again to stop. Your take saves automatically.', selector: '[data-tutorial="record-controls"]' }],
+  navigation: [{ title: 'Find your practice tools', body: 'Use these tabs for the metronome, tuner and games. Come back to Audio to record.', selector: '[data-tutorial="audio-mode-tabs"]' }],
+  'take-library': [{ title: 'Your recordings are here', body: 'Open the Take library to listen, rename or share a recording. Clearing a take from the screen keeps it here.', selector: '[data-guidance="take-library"]', action: 'take-library-opened' }],
+  'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace and choose Takes, Pitch, Metronome or Drone. Tap the tool’s small circle to expand it.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]' }],
+  multitrack: [{ title: 'Record a part over another', body: 'Multitrack lets you build a performance one part at a time. Use headphones to hear earlier parts as you record.', selector: '[data-tutorial="multitrack-button"]' }],
   'best-take': [
     { title: 'Keep your best take', body: 'Tap the pin to keep this take beside your next recording.',
       selector: '[data-tutorial="pin-current-as-best"]', action: 'current-take-pinned' },
@@ -69,9 +76,9 @@ export const FEATURE_GUIDES: Record<FeatureGuideId, GuideStep[]> = {
       selector: '[data-tutorial="best-take-box"]' },
   ],
   workspace: [
-    { title: 'Choose your tools', body: 'Tap a tool to add it to your practice screen.',
+    { title: 'Choose your tools', body: 'Choose a tool here. Close Workspace, then tap its small circle to expand it.',
       selector: '[data-guidance="workspace-tools"]', action: 'branch-widget-selected' },
-    { title: 'Keep what you need', body: 'Tap a selected tool to hide it. Tap outside Workspace when you’re finished.',
+    { title: 'Tap the circle to open it', body: 'Close Workspace, then tap the tool’s circle to expand it. Drag it wherever it’s comfortable.',
       selector: '[data-guidance="workspace-tools"]', action: 'overlays-closed' },
   ],
   'hands-free': [
@@ -141,6 +148,6 @@ export function guidanceReducer(state: GuidanceState, update: GuidanceUpdate): G
     (state.lastEnded !== null && update.now - state.lastEnded < GUIDE_COOLDOWN_MS)) return state
   const pending = state.pending.find(item => item.id === update.id && item.expires > update.now)
   if (!pending) return state
-  return { ...state, active: { id: update.id, step: 0, expires: pending.expires },
+  return { ...state, preferences: { ...state.preferences, seen: [...state.preferences.seen, update.id] }, active: { id: update.id, step: 0, expires: pending.expires },
     pending: state.pending.filter(item => item.id !== update.id), shown: state.shown + 1 }
 }

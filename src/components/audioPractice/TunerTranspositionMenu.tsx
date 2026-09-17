@@ -42,7 +42,7 @@ function TunerTranspositionMenu({
       </header>
 
       {instrument && onInstrumentChange ? (
-        <div className="tuner-settings-source">
+        <div className="tuner-settings-source" data-guidance="tuner-profile">
           <p className="tuner-settings-source__label">Instrument</p>
           <div role="radiogroup" aria-label="Instrument">
             {TUNER_INSTRUMENTS.map((id) => (
@@ -58,6 +58,7 @@ function TunerTranspositionMenu({
               </button>
             ))}
           </div>
+          <p className="tuner-settings-source__help">Choose what you’re playing. Voice, Strings and Winds listen differently. If a quiet note won’t register, check this first, then move closer. If the input is too loud, move back or lower your mic’s gain.</p>
         </div>
       ) : null}
 

@@ -1,3 +1,4 @@
+import { reportFeatureAction } from '../utils/featureGuidance'
 import { ChevronsDown } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -153,6 +154,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     onRestore?.(next)
     transferFocus.current = document.activeElement === ballRef.current
     ballPlacements.delete(placementId.current)
+    reportFeatureAction('widget-expanded')
     setCollapsed(false)
   }
 

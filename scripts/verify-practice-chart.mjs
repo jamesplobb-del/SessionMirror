@@ -10,7 +10,7 @@ const result = await build({
 const {
   layoutChartStrip, chartTurnStops, nextChartStop, chartPagesInView,
   chartScrollFraction, chartOffsetForFraction, nearestChartStop,
-  chartSpreadFits, resolveChartFit,
+  chartSpreadFits, resolveChartFit, chartHalfTurnPresentation, chartOffsetAfterReflow,
 } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
 
 const LETTER = { width: 612, height: 792 }
@@ -56,12 +56,32 @@ for (const [width, height] of [LANDSCAPE, PORTRAIT, PHONE]) {
   assert.equal(nextChartStop(stops, offset, 1), null, 'And stops at the end of the part')
 }
 
-/* ---- The half turn, as forScore does it --------------------------------- */
+/* ---- Half turns keep each system at its original screen position -------- */
+for (const [width, height] of [LANDSCAPE, PORTRAIT, PHONE]) {
+  for (const fit of ['page', 'spread']) {
+    const layout = layoutChartStrip(part(5), width, height, fit)
+    const stops = chartTurnStops(layout, true)
+    for (let row = 0; row < layout.rows.length - 1; row++) {
+      const current = row * layout.columns
+      const next = current + layout.columns
+      const whole = row * height
+      const half = nextChartStop(stops, whole, 1)
+      const before = chartHalfTurnPresentation(layout, whole, current)
+      const bottom = chartHalfTurnPresentation(layout, half, current)
+      const top = chartHalfTurnPresentation(layout, half, next)
+      assert.equal(bottom.top, before.top, 'Current bottom stays at exactly the same screen coordinate')
+      assert.equal(bottom.clipBottom, 0, 'Current bottom remains unclipped')
+      assert.equal(bottom.top + bottom.clipTop, height / 2, 'Current top is hidden at the divider')
+      assert.equal(top.top + layout.heights[next] - top.clipBottom, height / 2, 'Next top ends at the divider')
+      const completed = chartHalfTurnPresentation(layout, nextChartStop(stops, half, 1), next)
+      assert.equal(top.top, completed.top, 'Next top stays fixed when its bottom catches up')
+      assert.equal(completed.clipTop + completed.clipBottom, 0, 'Second turn completes the page')
+      assert.equal(nextChartStop(stops, half, -1), whole, 'Back reverses one half at a time')
+    }
+  }
+}
+/* Scroll geometry still applies in fill-width mode. */
 
-/*
- * Bottom half of the page you are playing stays on the top of the screen; the
- * top half of the next page comes up underneath it.
- */
 for (const [width, height] of [LANDSCAPE, PORTRAIT]) {
   const layout = layoutChartStrip(part(4), width, height, 'page')
   const stops = chartTurnStops(layout, true)
@@ -182,6 +202,8 @@ console.log('Practice chart: slots, whole turns, forScore half turns and rotatio
 
   assert.equal(resolveChartFit('auto', part(6), ...LANDSCAPE), 'spread', 'Landscape opens on a spread')
   assert.equal(resolveChartFit('auto', part(6), ...PORTRAIT), 'page', 'Portrait opens on one page')
+  assert.equal(resolveChartFit('spread', part(6), ...PHONE), 'page', 'A remembered spread fits one page on a narrow screen')
+  assert.equal(resolveChartFit('spread', part(6), ...LANDSCAPE), 'spread', 'Spread preference returns when there is room')
   assert.equal(resolveChartFit('page', part(6), ...LANDSCAPE), 'page', 'A chosen fit is never overridden')
 
   const layout = layoutChartStrip(part(6), ...LANDSCAPE, 'spread')
@@ -218,3 +240,13 @@ console.log('Practice chart: slots, whole turns, forScore half turns and rotatio
 }
 
 console.log('Practice chart: two-page spreads, odd last pages and mixed page sizes passed.')
+
+// Odd page counts cannot use a percentage of spread count to preserve a page.
+{
+  const single = layoutChartStrip(part(5), ...PORTRAIT, 'page')
+  const spread = layoutChartStrip(part(5), ...LANDSCAPE, 'spread')
+  const offset = chartOffsetAfterReflow(single, spread, single.rows[3].top)
+  assert.equal(offset, spread.rows[1].top, 'Page 4 rotates into its 3–4 spread, never skips to page 5')
+  const half = chartOffsetAfterReflow(spread, single, spread.rows[1].top + spread.rows[1].height/2)
+  assert.equal(half, single.rows[2].top + single.rows[2].height/2, 'Rotation preserves the half-turn phase')
+}

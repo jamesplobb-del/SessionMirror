@@ -149,6 +149,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
           <SheetMusicPanel
             panel={sheetMusicPanel}
             currentTimeSec={currentTimeSec}
+            interactionDisabled={interactionDisabled}
             onAssetChange={(asset) => onSheetMusicChange(sheetMusicPanel.id, asset)}
             onCueAssetChange={onSheetCueAssetChange}
             onRemoveCue={onRemoveSheetCue}
@@ -218,6 +219,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
             <SheetMusicPanel
               panel={panel}
               currentTimeSec={currentTimeSec}
+              interactionDisabled={interactionDisabled}
               onAssetChange={(asset) => onSheetMusicChange(panel.id, asset)}
               onCueAssetChange={onSheetCueAssetChange}
               onRemoveCue={onRemoveSheetCue}

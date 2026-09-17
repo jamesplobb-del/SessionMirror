@@ -1,6 +1,6 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { Pause, Play, Music2 } from 'lucide-react'
+import { Check, Pause, Play, Music2 } from 'lucide-react'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import {
   useCallback,
@@ -304,7 +304,7 @@ export default function DraggableMetronomeWidget({
   const handleShellPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       onPinchPointerUp(event)
-      if (pinching || editingBpm || playing) return
+      if (pinching || editingBpm) return
       if (event.button !== 0) return
       // Double-tap resets the size, so it can only count taps on the panel
       // itself — opening a picker and choosing from it is two taps too.
@@ -320,7 +320,7 @@ export default function DraggableMetronomeWidget({
       }
       lastTapAtRef.current = now
     },
-    [editingBpm, onPinchPointerUp, pinching, playing, positionId, resetSize],
+    [editingBpm, onPinchPointerUp, pinching, positionId, resetSize],
   )
 
   const commitBpmDraft = useCallback(() => {
@@ -361,12 +361,9 @@ export default function DraggableMetronomeWidget({
   )
 
   const openBpmEditor = useCallback(() => {
-    if (playing) {
-      stop()
-    }
     setBpmDraft(String(bpm))
     setEditingBpm(true)
-  }, [bpm, playing, stop])
+  }, [bpm])
 
   const onBpmPointerUp = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -445,13 +442,13 @@ export default function DraggableMetronomeWidget({
 
   const handleShellPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      onPinchPointerDown(event)
-      if (pinching || editingBpm || playing) return
       const target = event.target as HTMLElement
       if (target.closest('button, input, textarea, select, a, [data-no-drag]')) return
+      onPinchPointerDown(event)
+      if (pinching || editingBpm) return
       dragControls.start(event)
     },
-    [dragControls, editingBpm, onPinchPointerDown, pinching, playing],
+    [dragControls, editingBpm, onPinchPointerDown, pinching],
   )
 
   const handleClosePress = useCallback(
@@ -488,7 +485,7 @@ export default function DraggableMetronomeWidget({
       onPointerMove={onPinchPointerMove}
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
-      onDragEnd={persistPosition}
+      onDragEnd={() => { lastTapAtRef.current = 0; persistPosition() }}
       className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}
@@ -588,6 +585,7 @@ export default function DraggableMetronomeWidget({
 
           <div className="metronome-widget__bpm-wrap">
             {editingBpm ? (
+              <>
               <input
                 id={bpmInputId}
                 type="number"
@@ -608,7 +606,13 @@ export default function DraggableMetronomeWidget({
                 }}
                 className="metronome-widget__bpm-input pointer-events-auto"
                 aria-label="Beats per minute"
+                enterKeyHint="done"
+                onFocus={event => event.currentTarget.select()}
               />
+              <button type="button" className="metronome-widget__bpm-done" aria-label="Apply tempo"
+                onPointerDown={event => { event.preventDefault(); event.stopPropagation() }}
+                onClick={commitBpmDraft}><Check aria-hidden /></button>
+              </>
             ) : (
               <button
                 type="button"

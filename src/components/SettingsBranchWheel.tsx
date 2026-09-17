@@ -31,6 +31,7 @@ interface SettingsBranchWheelProps {
   pitchTrackerEnabled: boolean
   showTakeCards: boolean
   showMetronome: boolean
+  audioEnhancerToggleVisible?: boolean
   audioEnhancerEnabled: boolean
   handsFreeEnabled?: boolean
   /** Keep discoverable on both recording surfaces, including during capture. */
@@ -140,6 +141,7 @@ export default function SettingsBranchWheel({
   pitchTrackerEnabled,
   showTakeCards,
   showMetronome,
+  audioEnhancerToggleVisible = true,
   audioEnhancerEnabled,
   handsFreeEnabled = false,
   handsFreeToggleVisible = false,
@@ -342,7 +344,7 @@ export default function SettingsBranchWheel({
       })
     }
 
-    items.push({
+    if (audioEnhancerToggleVisible) items.push({
       id: 'audio-enhancer',
       label: 'Audio Enhance',
       icon: 'enhancer',
@@ -389,6 +391,7 @@ export default function SettingsBranchWheel({
     return items
   }, [
     audioEnhancerEnabled,
+    audioEnhancerToggleVisible,
     droneToggleVisible,
     handsFreeEnabled,
     handsFreeToggleVisible,

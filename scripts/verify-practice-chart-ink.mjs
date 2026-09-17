@@ -3,6 +3,27 @@
 import assert from 'node:assert/strict'
 import { build } from 'esbuild'
 import { PDFDocument } from 'pdf-lib'
+import zlib from 'node:zlib'
+
+/**
+ * What the page actually tells a reader to draw. pdf-lib deflates its content
+ * streams, so searching the raw file for a colour finds nothing whether the
+ * mark is there or not — which would make every assertion about ink pass by
+ * saying nothing at all.
+ */
+function pageDrawingOps(bytes) {
+  const raw = Buffer.from(bytes)
+  const latin = raw.toString('latin1')
+  let ops = ''
+  for (const match of latin.matchAll(/stream\r?\n/g)) {
+    const start = match.index + match[0].length
+    const end = latin.indexOf('endstream', start)
+    if (end < 0) continue
+    const slice = raw.subarray(start, end)
+    try { ops += zlib.inflateSync(slice).toString('latin1') } catch { ops += slice.toString('latin1') }
+  }
+  return ops
+}
 
 /** Capacitor is a device API; on the web path the export never calls it. */
 const stubCapacitor = {
@@ -125,4 +146,77 @@ const strokes = [
   assert.equal(out.getPageCount(), 2)
 }
 
-console.log('Practice chart ink: parsing, thinning, and a marked PDF that keeps its pages passed.')
+/* ---- The eraser --------------------------------------------------------- */
+
+{
+  // A letter page: wider than it is tall in normalised terms it is not, but the
+  // box is 612x792, so an eraser that is round on screen is an ellipse here.
+  const across = { page: 0, colour: 'black', points: [0.2, 0.5, 0.8, 0.5] }
+  const elsewhere = { page: 0, colour: 'red', points: [0.2, 0.1, 0.8, 0.1] }
+  const otherPage = { page: 1, colour: 'red', points: [0.2, 0.5, 0.8, 0.5] }
+  const all = [across, elsewhere, otherPage]
+
+  assert.ok(ink.strokeHitsEraser(across, 0.5, 0.5, 0.03, 0.023),
+    'The eraser takes a line it is sitting on')
+  assert.ok(ink.strokeHitsEraser(across, 0.2, 0.5, 0.03, 0.023),
+    'It takes a line at its very start, not only in the middle')
+  assert.ok(!ink.strokeHitsEraser(across, 0.5, 0.9, 0.03, 0.023),
+    'It leaves a line it is nowhere near')
+  assert.ok(!ink.strokeHitsEraser(across, 0.05, 0.5, 0.03, 0.023),
+    'Past the end of a line is past it, not on it')
+
+  // Only what it touches, and only on the page it is touching.
+  assert.deepEqual(ink.eraseStrokesAt(all, 0, 0.5, 0.5, 0.03, 0.023), [elsewhere, otherPage],
+    'One mark goes; the other mark and the other page stay')
+  assert.equal(ink.eraseStrokesAt(all, 0, 0.5, 0.75, 0.03, 0.023), null,
+    'A drag across blank paper reports nothing, so nothing is rewritten')
+  assert.equal(ink.eraseStrokesAt(all, 2, 0.5, 0.5, 0.03, 0.023), null,
+    'A page with no marks on it cannot lose any')
+
+  // A whole gesture at a time: rubbing one end of a circled accidental must not
+  // leave the other half of the circle behind.
+  const circle = { page: 0, colour: 'red', points: [0.4, 0.4, 0.6, 0.4, 0.6, 0.6, 0.4, 0.6, 0.4, 0.4] }
+  assert.deepEqual(ink.eraseStrokesAt([circle], 0, 0.4, 0.4, 0.02, 0.015), [],
+    'Touching one corner of a mark takes the whole mark')
+
+  // A dot has no segment to measure against.
+  const dot = { page: 0, colour: 'black', points: [0.5, 0.5] }
+  assert.ok(ink.strokeHitsEraser(dot, 0.5, 0.5, 0.02, 0.015), 'A dot can be rubbed out')
+  assert.ok(!ink.strokeHitsEraser(dot, 0.7, 0.5, 0.02, 0.015), 'A distant dot is left alone')
+
+  // The radius is per axis precisely so the eraser is round on screen. On a
+  // 612x792 page the same 17px reaches further across than down in page units,
+  // and a point that is inside the circle on screen must be inside here too.
+  const tall = { page: 0, colour: 'black', points: [0.5, 0.54, 0.5, 0.56] }
+  assert.ok(!ink.strokeHitsEraser(tall, 0.5, 0.5, 0.0278, 0.0215),
+    'A mark below the eraser, outside its shorter vertical reach, survives')
+  const wide = { page: 0, colour: 'black', points: [0.525, 0.5, 0.53, 0.5] }
+  assert.ok(ink.strokeHitsEraser(wide, 0.5, 0.5, 0.0278, 0.0215),
+    'The same distance sideways is inside its longer horizontal reach')
+}
+
+/* What is left after erasing is what gets written into the PDF. */
+{
+  const source = await fixturePdf(1)
+  const chart = { mimeType: 'application/pdf', bytes: source, fileName: 'Erased.pdf', objectUrl: '' }
+  const kept = ink.eraseStrokesAt([
+    { page: 0, colour: 'red', points: [0.2, 0.5, 0.8, 0.5] },
+    { page: 0, colour: 'black', points: [0.2, 0.1, 0.8, 0.1] },
+  ], 0, 0.5, 0.5, 0.03, 0.023)
+  assert.equal(kept.length, 1, 'One of the two marks was rubbed out')
+  const erased = pageDrawingOps(await exporter.buildMarkedPdf(chart, kept))
+  assert.ok(erased.includes('0.1 0.1 0.12'), 'The mark that was kept is drawn in the saved PDF')
+  assert.ok(!erased.includes('0.84 0.13 0.13'),
+    'The rubbed-out red mark is not drawn in the saved PDF')
+
+  // The same check the other way around, so the assertion above is known to be
+  // capable of failing.
+  const untouched = pageDrawingOps(await exporter.buildMarkedPdf(chart, [
+    { page: 0, colour: 'red', points: [0.2, 0.5, 0.8, 0.5] },
+    { page: 0, colour: 'black', points: [0.2, 0.1, 0.8, 0.1] },
+  ]))
+  assert.ok(untouched.includes('0.84 0.13 0.13'),
+    'Without the eraser, the red mark is there — so its absence above means something')
+}
+
+console.log('Practice chart ink: parsing, thinning, erasing, and a marked PDF that keeps its pages passed.')

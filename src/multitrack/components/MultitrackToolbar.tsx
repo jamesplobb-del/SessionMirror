@@ -1,7 +1,6 @@
 import { Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { formatTime } from '../../hooks/useVideoPlayback'
 import Pressable from '../../components/ui/Pressable'
-import { MULTITRACK_LAYOUT_PRESETS } from '../layout/layoutPresets'
 
 /** Tiny live preview of a layout preset — a mini CSS grid of filled cells. */
 export function LayoutGlyph({ areas, columns, rows }: { areas: string[]; columns: string; rows: string }) {
@@ -29,8 +28,7 @@ export default function MultitrackToolbar(props: {
   isPlaying: boolean
   currentTime: number
   duration: number
-  activeLayoutId: string
-  onSelectLayout: (id: string) => void
+  onAddPart: () => void
   onOpenAlign?: () => void
   onOpenLayout?: () => void
   onTogglePlay: () => void
@@ -41,8 +39,7 @@ export default function MultitrackToolbar(props: {
     isPlaying,
     currentTime,
     duration,
-    activeLayoutId,
-    onSelectLayout,
+    onAddPart,
     onOpenAlign,
     onOpenLayout,
     onTogglePlay,
@@ -74,25 +71,8 @@ export default function MultitrackToolbar(props: {
         aria-label="Seek"
       />
       <div className="multitrack-toolbar__row2">
+        <Pressable type="button" intensity="soft" onClick={onAddPart} className="multitrack-toolbar__chip">Record next part</Pressable>
         <div className="multitrack-layout-strip">
-          <div role="radiogroup" aria-label="Layout" style={{ display: 'contents' }}>
-          {MULTITRACK_LAYOUT_PRESETS.map((preset) => (
-            <Pressable
-              key={preset.id}
-              type="button"
-              intensity="soft"
-              role="radio"
-              aria-checked={activeLayoutId === preset.id}
-              aria-label={preset.label}
-              onClick={() => onSelectLayout(preset.id)}
-              className={`multitrack-layout-strip__item ${
-                activeLayoutId === preset.id ? 'multitrack-layout-strip__item--active' : ''
-              }`}
-            >
-              <LayoutGlyph areas={preset.areas} columns={preset.columns} rows={preset.rows} />
-            </Pressable>
-          ))}
-          </div>
         {onOpenLayout && <Pressable type="button" intensity="soft" onClick={onOpenLayout} className="multitrack-toolbar__chip" aria-label="Layout settings">Layout</Pressable>}
         </div>
         {onOpenAlign && (

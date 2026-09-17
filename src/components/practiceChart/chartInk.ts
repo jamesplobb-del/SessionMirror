@@ -14,6 +14,17 @@
 export type InkColour = 'black' | 'red'
 export type InkWidth = 'fine' | 'medium' | 'bold'
 
+/**
+ * What is in the player's hand. The eraser is a third thing you pick up rather
+ * than a mode on the marker, because it behaves the same way: while it is out,
+ * a tap is not a page turn.
+ */
+export type InkTool = InkColour | 'eraser'
+
+export function isInkColour(tool: InkTool | null): tool is InkColour {
+  return tool === 'black' || tool === 'red'
+}
+
 export const INK_WIDTHS: readonly InkWidth[] = ['fine', 'medium', 'bold']
 /** New marks start thinner than the original single nib, which read as a highlighter. */
 export const DEFAULT_INK_WIDTH: InkWidth = 'fine'
@@ -154,6 +165,76 @@ export function simplifyStroke(points: number[], tolerance = 0.0025): number[] {
   }
   kept.push(points[points.length - 2], points[points.length - 1])
   return kept
+}
+
+/**
+ * The eraser rubs whole marks out, not pieces of them.
+ *
+ * A mark here is one gesture — a circled accidental, a breath — so taking the
+ * whole gesture is what a player means by rubbing it out. Splitting a stroke
+ * where the eraser crossed it would leave two orphaned fragments of a circle
+ * behind, which is worse than what they were trying to remove.
+ *
+ * The radius is given per axis in page-normalised units, because a page is not
+ * square: dividing by each one turns the ellipse those two numbers describe on
+ * the page back into a circle the size of the fingertip on screen.
+ */
+export function strokeHitsEraser(
+  stroke: InkStroke,
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+): boolean {
+  const rx = Math.max(1e-6, radiusX)
+  const ry = Math.max(1e-6, radiusY)
+  const points = stroke.points
+  if (points.length < 2) return false
+  const toX = (value: number) => (value - x) / rx
+  const toY = (value: number) => (value - y) / ry
+
+  // A dot has no segment to measure against, so test the point itself.
+  if (points.length < 4) {
+    const px = toX(points[0])
+    const py = toY(points[1])
+    return px * px + py * py <= 1
+  }
+
+  for (let index = 0; index + 3 < points.length; index += 2) {
+    const ax = toX(points[index])
+    const ay = toY(points[index + 1])
+    const bx = toX(points[index + 2])
+    const by = toY(points[index + 3])
+    const dx = bx - ax
+    const dy = by - ay
+    const lengthSquared = dx * dx + dy * dy
+    // Closest point on the segment to the origin, which is the eraser centre.
+    const t = lengthSquared > 0
+      ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / lengthSquared))
+      : 0
+    const cx = ax + dx * t
+    const cy = ay + dy * t
+    if (cx * cx + cy * cy <= 1) return true
+  }
+  return false
+}
+
+/**
+ * Every mark the eraser is touching, gone. Returns `null` when it touched
+ * nothing, so a drag across blank paper does not churn state or storage on
+ * every pointer move.
+ */
+export function eraseStrokesAt(
+  strokes: readonly InkStroke[],
+  page: number,
+  x: number,
+  y: number,
+  radiusX: number,
+  radiusY: number,
+): InkStroke[] | null {
+  const kept = strokes.filter(stroke =>
+    stroke.page !== page || !strokeHitsEraser(stroke, x, y, radiusX, radiusY))
+  return kept.length === strokes.length ? null : kept
 }
 
 /** An SVG path for one stroke, in a 0..1000 viewBox. */

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import MetronomeAudioSelect from '../../components/audioPractice/MetronomeAudioSelect'
 import { AUDIO_PRACTICE_CLICK_SOUNDS, PRACTICE_ALL_METERS, type AudioPracticeClickSoundId } from '../../components/audioPractice/audioPracticeMetronome'
 import type { MultitrackPracticeSettings } from '../types'
@@ -8,10 +9,20 @@ export default function MultitrackClickSettings({ practice, onChange }: {
   onChange: (patch: Partial<MultitrackPracticeSettings>) => void
 }) {
   const meter = practice.meter ?? '4/4'
+  const [tempo, setTempo] = useState(String(practice.bpm))
+  useEffect(() => { setTempo(String(practice.bpm)) }, [practice.bpm])
+  const commitTempo = () => {
+    const value = Number(tempo)
+    const bpm = tempo.trim() && Number.isFinite(value)
+      ? Math.max(40, Math.min(300, Math.round(value))) : practice.bpm
+    setTempo(String(bpm))
+    if (bpm !== practice.bpm) onChange({ bpm })
+  }
   return <>
     <label className="multitrack-countin-sheet__row"><span>Click tempo (BPM)</span>
-      <input type="number" aria-label="Count-in tempo" min={40} max={300} value={practice.bpm}
-        onChange={e => onChange({ bpm: Math.max(40, Math.min(300, Math.round(Number(e.target.value)) || 120)) })} />
+      <input type="number" aria-label="Count-in tempo" min={40} max={300} value={tempo}
+        onChange={e => setTempo(e.target.value)} onBlur={commitTempo}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setTempo(String(practice.bpm)) } }} />
     </label>
     <div className="multitrack-click-settings">
       <div className="multitrack-click-settings__title"><strong>Count-in & click</strong><span>{Number.parseInt(meter)} clicks per bar · saved with this project</span></div>

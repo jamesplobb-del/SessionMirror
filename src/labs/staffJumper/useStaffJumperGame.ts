@@ -22,6 +22,7 @@ import { durationMs, judgeTiming, lingerMs, METERS, secondsPerPulse } from './st
 import { clamp01 } from './staffJumperTravel'
 import {
   attackWindowClosed,
+  rhythmDecisionGridMs,
   classifyHold,
   HOLD_DROPOUT_GRACE_MS,
   holdIsReported,
@@ -734,7 +735,7 @@ export function useStaffJumperGame(
     const perUnitMs = unitMsFor(stepMeter, bpm)
     const previousSlot =
       state.sequenceStep > 0 ? getRhythmForStep(state.config!, state.sequenceStep - 1) : null
-    const onsetWindow = onsetWindowFor(stepRhythm, previousSlot, stepMeter, bpm)
+    const onsetWindow = onsetWindowFor(stepRhythm, previousSlot, stepMeter, bpm, state.config!.difficulty)
     const writtenMs = slotDurationMs(stepRhythm, stepMeter, bpm)
     /** Attack settled — accepted, or given up on when its window closed. */
     let attackResolved = false
@@ -869,6 +870,7 @@ export function useStaffJumperGame(
         // The grid is the only clock here; the free-play timeout never runs.
         resetTargetDeadline(now)
         const gridMs = gridNowMs(now)
+        const decisionGridMs = rhythmDecisionGridMs(gridMs)
         publishBeat(gridMs)
         const slotOnsetMs = (stepRhythm.unitPosition - gridOriginRef.current.units) * perUnitMs
         const slotEndMs = slotOnsetMs + writtenMs
@@ -881,7 +883,7 @@ export function useStaffJumperGame(
           // Silence is read, not played: whatever sounds during a rest is
           // neither right nor wrong, and the run waits out the written length.
           setTravelProgress(gridProgress)
-          if (!advanced && gridMs >= slotEndMs) {
+          if (!advanced && decisionGridMs >= slotEndMs) {
             advanced = true
             handOver()
             releasingPitchClassRef.current = null
@@ -899,11 +901,16 @@ export function useStaffJumperGame(
           }
           const isReleasingPreviousNote = releasingPitchClassRef.current != null
 
-          if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
+          if (detectedNow != null && pitchClassesMatch(detectedNow, target)) {
             wrongStableMs = 0
             wrongPitchClassRef.current = null
-            const soundingForMs = now - pitchOnsetRef.current.startedAt
-            const requiredMs = isReleasingPreviousNote ? REPEATED_NOTE_HOLD_MS : timing.correctMs
+            // A held repeated pitch must earn stability within this slot; its
+            // old onset must not instantly score every subsequent repeated note.
+            const soundingForMs = isReleasingPreviousNote
+              ? Math.min(now - pitchOnsetRef.current.startedAt, Math.max(0, gridMs - slotOnsetMs - PITCH_DETECTION_LATENCY_MS))
+              : now - pitchOnsetRef.current.startedAt
+            const requiredMs = isReleasingPreviousNote
+              ? Math.min(REPEATED_NOTE_HOLD_MS, writtenMs * 0.35) : timing.correctMs
             if (soundingForMs >= requiredMs) {
               // The attack is when the pitch first appeared, pulled back by the
               // detector's lag. A note already sounding when its slot arrived
@@ -964,11 +971,12 @@ export function useStaffJumperGame(
             wrongPitchClassRef.current = null
           }
 
+          // Input delivery is allowed to settle before the window closes.
           // The window closing settles the note; so does the note ending, as a
           // backstop, so nothing can slip through unjudged.
           if (
             !attackResolved &&
-            (attackWindowClosed(gridMs, slotOnsetMs, onsetWindow) || gridMs >= slotEndMs)
+            (attackWindowClosed(decisionGridMs, slotOnsetMs, onsetWindow) || decisionGridMs >= slotEndMs)
           ) {
             attackResolved = true
             // A wrong note still sounding as the beat passes is a wrong note,
@@ -1000,7 +1008,7 @@ export function useStaffJumperGame(
         setTravelProgress(gridProgress)
 
         // The click has reached the next written onset: hop, played or not.
-        if (!advanced && gridMs >= slotEndMs) {
+        if (!advanced && decisionGridMs >= slotEndMs) {
           advanced = true
           handOver()
           let holdQuality: HoldQuality | null = null

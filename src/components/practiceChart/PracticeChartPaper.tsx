@@ -4,15 +4,15 @@ import {
 } from 'react'
 import type { PracticeChart } from '../../utils/practiceChartStorage'
 import {
-  chartOffsetForFraction, chartPagesInView,
+  chartHalfTurnPresentation, chartOffsetAfterReflow, chartOffsetForFraction, chartPagesInView,
   chartScrollFraction, chartSpreadFits, chartTurnStops, layoutChartStrip,
   nearestChartStop, nextChartStop, resolveChartFit,
   type ChartFitPreference, type ChartPageSize, type ChartStripLayout,
 } from './chartLayout'
 import { isChartRenderCancelled, openCachedPdfChart, type ChartDocument } from './chartDocument'
 import {
-  inkPathData, inkStrokeWidthPx, simplifyStroke, INK_CSS,
-  type InkColour, type InkStroke, type InkWidth,
+  inkPathData, inkStrokeWidthPx, isInkColour, simplifyStroke, INK_CSS,
+  type InkColour, type InkStroke, type InkTool, type InkWidth,
 } from './chartInk'
 
 export interface ChartPaperHandle {
@@ -41,19 +41,27 @@ interface PracticeChartPaperProps {
   onSpreadAvailable: (available: boolean) => void
   /** Marks already on this part. */
   strokes: readonly InkStroke[]
-  /** The marker colour in hand, or null when the marker is capped. */
-  marker: InkColour | null
+  /** What is in hand — a marker colour, the eraser, or nothing. */
+  marker: InkTool | null
   /** Nib the current marks are drawn with. */
   inkWidth: InkWidth
   onStroke: (stroke: InkStroke) => void
+  /** Rub out every mark the eraser touches, in page-normalised units. */
+  onErase: (page: number, x: number, y: number, radiusX: number, radiusY: number) => void
 }
+
+/**
+ * How big the eraser is on screen, in px. Sized to a fingertip rather than to
+ * the nib: you rub an area out, you do not trace the line back.
+ */
+const ERASER_RADIUS_PX = 17
 
 /** How long a player keeps scrolling before the position is worth writing down. */
 const POSITION_SETTLE_MS = 450
 
 export default function PracticeChartPaper({
   chart, fit, halfTurn, initialFraction, handleRef, onView, onFraction, onError, onLoadFailed,
-  onSpreadAvailable, strokes, marker, inkWidth, onStroke,
+  onSpreadAvailable, strokes, marker, inkWidth, onStroke, onErase,
 }: PracticeChartPaperProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [document_, setDocument] = useState<ChartDocument | null>(null)
@@ -61,8 +69,10 @@ export default function PracticeChartPaper({
   const [viewport, setViewport] = useState({ width: 0, height: 0 })
   const fractionRef = useRef(initialFraction)
   const restoredRef = useRef(false)
+  const previousLayoutRef = useRef<ChartStripLayout | null>(null)
   /** Mirrors scrollTop in state, because the render window is React's to decide. */
   const [offset, setOffset] = useState(0)
+  const offsetRef = useRef(0)
 
   /* ---- Open the file ---------------------------------------------------- */
 
@@ -71,6 +81,7 @@ export default function PracticeChartPaper({
   useEffect(() => {
     let cancelled = false
     restoredRef.current = false
+    previousLayoutRef.current = null
     setDocument(null)
     setPages(null)
     if (chart.mimeType === 'application/pdf') {
@@ -130,6 +141,7 @@ export default function PracticeChartPaper({
     [pages, viewport.width, viewport.height],
   )
   useEffect(() => { onSpreadAvailable(spreadFits) }, [onSpreadAvailable, spreadFits])
+  const stationaryHalfTurn = halfTurn && resolvedFit !== 'width'
   const stops = useMemo(() => chartTurnStops(layout, halfTurn), [layout, halfTurn])
 
   /* ---- Reading position ------------------------------------------------- */
@@ -146,16 +158,22 @@ export default function PracticeChartPaper({
   useLayoutEffect(() => {
     const element = scrollRef.current
     if (!element || layout.total <= 0) return
-    const wanted = chartOffsetForFraction(layout, fractionRef.current)
-    const target = restoredRef.current ? wanted : nearestChartStop(stops, wanted)
+    const previous = previousLayoutRef.current
+    const wanted = previous && previous.columns !== layout.columns
+      ? chartOffsetAfterReflow(previous, layout, offsetRef.current)
+      : chartOffsetForFraction(layout, fractionRef.current)
+    const target = restoredRef.current && !stationaryHalfTurn ? wanted : nearestChartStop(stops, wanted)
     restoredRef.current = true
-    element.scrollTop = target
+    previousLayoutRef.current = layout
+    fractionRef.current = chartScrollFraction(layout, target)
+    element.scrollTop = stationaryHalfTurn ? 0 : target
+    offsetRef.current = target
     setOffset(target)
     reportView(target)
-    // `stops` only refines where a restore may land; it must not re-seek on a
-    // half-turn toggle.
+    // Stops are derived from layout and mode. Reflow restores once, without
+    // subscribing the effect to every saved reading-position update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, reportView])
+  }, [layout, reportView, stationaryHalfTurn])
 
   /*
    * A mark in progress. It is kept as page-normalised points from the first
@@ -166,7 +184,7 @@ export default function PracticeChartPaper({
   const drawingRef = useRef<{ pointerId: number; page: number; points: number[] } | null>(null)
 
   const beginStroke = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!marker || event.button !== 0 || drawingRef.current) return
+    if (!isInkColour(marker) || event.button !== 0 || drawingRef.current) return
     const box = event.currentTarget.getBoundingClientRect()
     if (box.width <= 0 || box.height <= 0) return
     const point = [(event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height]
@@ -200,18 +218,61 @@ export default function PracticeChartPaper({
     }
     // A tap is not a mark. Two points is the shortest thing worth keeping, and
     // it becomes a dot the player can see.
-    if (!marker) return
+    if (!isInkColour(marker)) return
     const points = active.points.length >= 4
       ? simplifyStroke(active.points)
       : [...active.points, active.points[0] + 0.0015, active.points[1] + 0.0015]
     onStroke({ page: active.page, colour: marker, points, width: inkWidth })
   }, [inkWidth, marker, onStroke])
 
+  /*
+   * The eraser is a drag, not a tap: it rubs continuously while the finger is
+   * down, the same as a real one. Erasing on every pointer move means the
+   * caller has to work from the marks it just removed rather than from the
+   * last render, which is why it hands back the whole list each time.
+   */
+  const erasingRef = useRef<number | null>(null)
+
+  const eraseAtEvent = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) return
+    onErase(
+      page,
+      (event.clientX - box.left) / box.width,
+      (event.clientY - box.top) / box.height,
+      ERASER_RADIUS_PX / box.width,
+      ERASER_RADIUS_PX / box.height,
+    )
+  }, [onErase])
+
+  const beginErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || erasingRef.current !== null) return
+    erasingRef.current = event.pointerId
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
+    eraseAtEvent(page, event)
+  }, [eraseAtEvent])
+
+  const extendErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (erasingRef.current !== event.pointerId) return
+    event.preventDefault()
+    eraseAtEvent(page, event)
+  }, [eraseAtEvent])
+
+  const endErase = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (erasingRef.current !== event.pointerId) return
+    erasingRef.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }, [])
+
   const settleRef = useRef<number | null>(null)
   const handleScroll = useCallback(() => {
     const element = scrollRef.current
-    if (!element) return
+    if (!element || stationaryHalfTurn) return
     const next = element.scrollTop
+    offsetRef.current = next
     setOffset(next)
     fractionRef.current = chartScrollFraction(layout, next)
     reportView(next)
@@ -220,7 +281,7 @@ export default function PracticeChartPaper({
       settleRef.current = null
       onFraction(fractionRef.current)
     }, POSITION_SETTLE_MS)
-  }, [layout, onFraction, reportView])
+  }, [layout, onFraction, reportView, stationaryHalfTurn])
 
   // Hiding the page unmounts the paper, and the settle timer would take the
   // last few seconds of reading with it. Write the position out on the way out.
@@ -243,14 +304,15 @@ export default function PracticeChartPaper({
   const turn = useCallback((direction: 1 | -1) => {
     const element = scrollRef.current
     if (!element) return
-    const target = nextChartStop(stops, element.scrollTop, direction)
+    const target = nextChartStop(stops, stationaryHalfTurn ? offsetRef.current : element.scrollTop, direction)
     if (target === null) return
-    element.scrollTop = target
+    element.scrollTop = stationaryHalfTurn ? 0 : target
+    offsetRef.current = target
     setOffset(target)
     fractionRef.current = chartScrollFraction(layout, target)
     reportView(target)
     onFraction(fractionRef.current)
-  }, [layout, onFraction, reportView, stops])
+  }, [layout, onFraction, reportView, stops, stationaryHalfTurn])
 
   useEffect(() => {
     handleRef.current = { turn }
@@ -285,7 +347,7 @@ export default function PracticeChartPaper({
    */
   const renderPageFace = (index: number) => (
     <>
-      {index >= window_.first - 1 && index <= window_.last + 1 && (
+      {index >= window_.first - layout.columns && index <= window_.last + layout.columns && (
         document_
           ? <ChartPdfPage
               document={document_}
@@ -298,7 +360,7 @@ export default function PracticeChartPaper({
       <ChartPageInk
         strokes={strokesByPage.get(index)}
         live={drawing?.page === index ? drawing.points : null}
-        liveColour={marker}
+        liveColour={isInkColour(marker) ? marker : null}
         liveWidth={inkWidth}
       />
     </>
@@ -307,39 +369,41 @@ export default function PracticeChartPaper({
   return (
     <div
       ref={scrollRef}
-      className="practice-chart-scroll"
+      className={`practice-chart-scroll${stationaryHalfTurn ? ' practice-chart-scroll--half-turn' : ''}`}
       onScroll={handleScroll}
       role="document"
       aria-label={`${chart.fileName}${ready ? `, ${layout.tops.length} page${layout.tops.length === 1 ? '' : 's'}` : ''}`}
     >
-      {/*
-        * One strip, one element per page, keyed by page index and never moved
-        * between parents. That is the whole reason a half turn is instant: the
-        * canvas a page was drawn into stays mounted, and turning only changes
-        * where the strip is scrolled to. Composing the two halves out of
-        * separate panes re-mounted every visible page on every tap, which is
-        * what "it reloads the whole page" was.
-        */}
-      <div className="practice-chart-strip" style={{ height: ready ? layout.total : '100%' }}>
-        {layout.tops.map((top, index) => (
+      {/* Stable page nodes retain their canvases through every half turn. */}
+      <div className="practice-chart-strip" style={{ height: stationaryHalfTurn ? '100%' : ready ? layout.total : '100%' }}>
+        {layout.tops.map((top, index) => {
+          const presentation = stationaryHalfTurn ? chartHalfTurnPresentation(layout, offset, index) : null
+          return (
           <div
             key={index}
-            className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}`}
+            className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}${
+              marker === 'eraser' ? ' practice-chart-page--erasing' : ''}`}
             style={{
-              top, left: layout.lefts[index],
+              top: presentation?.top ?? top, left: layout.lefts[index],
+              visibility: presentation && !presentation.visible ? 'hidden' : undefined,
+              clipPath: presentation ? `inset(${presentation.clipTop}px 0 ${presentation.clipBottom}px 0)` : undefined,
               height: layout.heights[index], width: layout.widths[index],
             }}
-            onPointerDown={marker ? event => beginStroke(index, event) : undefined}
-            onPointerMove={marker ? extendStroke : undefined}
-            onPointerUp={marker ? endStroke : undefined}
-            onPointerCancel={marker ? endStroke : undefined}
+            onPointerDown={marker === 'eraser'
+              ? event => beginErase(index, event)
+              : marker ? event => beginStroke(index, event) : undefined}
+            onPointerMove={marker === 'eraser'
+              ? event => extendErase(index, event)
+              : marker ? extendStroke : undefined}
+            onPointerUp={marker === 'eraser' ? endErase : marker ? endStroke : undefined}
+            onPointerCancel={marker === 'eraser' ? endErase : marker ? endStroke : undefined}
           >
             {renderPageFace(index)}
           </div>
-        ))}
+        )})}
         {/* The join between two slots, so a half turn reads as two pages and
             not as one long one. */}
-        {halfTurn && layout.rows.slice(1).map((row, index) => (
+        {!stationaryHalfTurn && halfTurn && layout.rows.slice(1).map((row, index) => (
           <div
             key={`join-${index}`}
             className="practice-chart-join"
@@ -347,6 +411,9 @@ export default function PracticeChartPaper({
             aria-hidden
           />
         ))}
+        {stationaryHalfTurn && ready && chartHalfTurnPresentation(layout, offset, 0).split && (
+          <div className="practice-chart-join practice-chart-join--half" style={{ top: '50%' }} aria-hidden />
+        )}
       </div>
     </div>
   )

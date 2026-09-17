@@ -39,6 +39,12 @@ function readSafeAreaInsets(): { top: number; bottom: number } {
 }
 
 export function readViewportSize(): { width: number; height: number } {
+  // Music and floating tools share the layout viewport. The keyboard only
+  // occludes it; fitting the score to the keyboard animation redraws every PDF
+  // canvas and pushes saved widget positions around while entering a tempo.
+  if (document.documentElement.classList.contains('app-music-page')) {
+    return { width: Math.round(window.innerWidth), height: Math.round(window.innerHeight) }
+  }
   const visualViewport = window.visualViewport
   if (visualViewport) {
     return {
@@ -205,8 +211,15 @@ export function scheduleViewportSync(onHeightChange: (height: number) => void): 
     }, 180)
   }
 
+  let layoutWidth = window.innerWidth
+  let layoutHeight = window.innerHeight
   const scheduleLayoutRecovery = () => {
     scheduleSync()
+    // Keyboard opening/closing is a visual viewport change, not a camera change.
+    if (layoutWidth === window.innerWidth && layoutHeight === window.innerHeight) return
+    layoutWidth = window.innerWidth
+    layoutHeight = window.innerHeight
+    cachedSafeAreaInsets = null
     scheduleCameraRecovery()
   }
 

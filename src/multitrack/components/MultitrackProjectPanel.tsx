@@ -19,10 +19,7 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
   const rects = compositionRects(session, getLayoutPreset(session.layoutId), time).panelRects
   const boxName = (panel: PerformancePanelState) => panel.label || panel.take?.name || `${panel.overlay ? 'Extra' : 'Box'} ${session.panels.filter(p => p.kind === 'performance' && !!p.overlay === !!panel.overlay).findIndex(p => p.id === panel.id) + 1}`
   return <div className="multitrack-project-panel">
-    <div className="multitrack-settings-heading"><h2>Collaborate</h2><p>Send your parts. Your friend adds theirs and sends the project back.</p></div>
-    <ProjectFileActions busy={fileBusy} onShare={onShare} onImport={onImport} />
-    <p className="multitrack-file-note">Includes recordings and layout, up to 512 MB. Opens as a new project.{session.backing.kind === 'youtube' ? ' YouTube references need internet.' : ''}</p>
-    <details className="multitrack-project-files"><summary>Project · {session.name || 'My performance'}</summary>
+    <div className="multitrack-settings-heading"><h2>Project</h2></div>
     <label>Performance name<input aria-label="Performance name" value={session.name ?? ''} maxLength={80} onChange={e => onUpdate({ name: e.target.value })} /></label>
     <div className="multitrack-studio-actions">
       <button onClick={() => onProject()}>New project</button>
@@ -33,15 +30,22 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       {!projects.some(p => p.id === session.projectId) && <option value={session.projectId}>Current performance</option>}
       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
-    </details>
     <div className="multitrack-settings-heading"><h2>Layout</h2>
-      <p>Extra boxes sit above the main layout.</p></div>
+      <p>Choose a layout. New parts expand the grid automatically.</p></div>
     <div className="multitrack-layout-options" role="group" aria-label="Base layout">
-      {MULTITRACK_LAYOUT_PRESETS.map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
+      {MULTITRACK_LAYOUT_PRESETS.filter(p => ['two', 'four', 'six'].includes(p.id)).map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
         <span className="multitrack-layout-card__preview" style={{ aspectRatio: (session.aspectRatio || '9:16').replace(':', '/'), height: session.aspectRatio === '16:9' ? 36 : 64 }}><LayoutGlyph {...p} /></span>
         <span>{p.label}</span><span className="multitrack-layout-card__check" aria-hidden>{session.layoutId === p.id ? '✓' : ''}</span>
       </button>)}
     </div>
+    <details className="multitrack-advanced"><summary>More layouts · current: {getLayoutPreset(session.layoutId).label}</summary>
+    <div className="multitrack-layout-options" role="group" aria-label="More layouts">
+      {MULTITRACK_LAYOUT_PRESETS.filter(p => !['two', 'four', 'six'].includes(p.id)).map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
+        <span className="multitrack-layout-card__preview" style={{ aspectRatio: (session.aspectRatio || '9:16').replace(':', '/'), height: session.aspectRatio === '16:9' ? 36 : 64 }}><LayoutGlyph {...p} /></span>
+        <span>{p.label}</span><span className="multitrack-layout-card__check" aria-hidden>{session.layoutId === p.id ? '✓' : ''}</span>
+      </button>)}
+    </div>
+    </details>
     <div className="multitrack-settings-heading"><h2>Parts</h2></div>
     {session.panels.map((p, i) => p.kind !== 'performance' ? null : <details key={p.id} className="multitrack-part-settings"
       draggable onDragStart={e => e.dataTransfer.setData('text/plain', p.id)} onDragOver={e => e.preventDefault()}
@@ -56,10 +60,13 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       <label>Box name<input aria-label={`${boxName(p)} name`} placeholder={boxName(p)} value={p.label ?? ''} maxLength={60} onChange={e => onPanel(p.id, { label: e.target.value })} /></label>
       <div className="multitrack-studio-actions">
         <button aria-pressed={!!p.hidden} onClick={() => onPanel(p.id, { hidden: !p.hidden })}>{p.hidden ? 'Show part' : 'Hide part'}</button>
-        <button aria-pressed={!!p.overlay} disabled={!!p.overlay && session.panels.filter(p => p.kind === 'performance' && !p.overlay).length >= 12} onClick={() => onPanel(p.id, { overlay: p.overlay ? undefined : { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } })}>{p.overlay ? 'Move into main layout' : 'Make an extra box'}</button>
+
         <button disabled={i === 0} onClick={() => onReorder(p.id, session.panels[i - 1].id)}>Move earlier</button>
+        {p.missingTakeId && <p role="status">This recording is missing from the Take Vault. Tap its box to choose a replacement or record again.</p>}
         {!p.take && <button onClick={() => onRecord(p.id, time)}>Record here</button>}
       </div>
+      <details className="multitrack-advanced"><summary>Advanced composition</summary>
+        <button aria-pressed={!!p.overlay} disabled={!!p.overlay && session.panels.filter(p => p.kind === 'performance' && !p.overlay).length >= 12} onClick={() => onPanel(p.id, { overlay: p.overlay ? undefined : { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } })}>{p.overlay ? 'Move into main layout' : 'Make an extra box'}</button>
       {p.overlay && <>
         <div className="multitrack-studio-actions">{['Top left', 'Top right', 'Bottom left', 'Bottom right'].map((label, n) => <button key={label} onClick={() => onPanel(p.id, { overlay: { ...p.overlay!, xPercent: n % 2 ? Math.max(0, 98 - p.overlay!.widthPercent) : Math.min(2, 100 - p.overlay!.widthPercent), yPercent: n >= 2 ? Math.max(0, 98 - p.overlay!.heightPercent) : Math.min(2, 100 - p.overlay!.heightPercent) } })}>{label}</button>)}</div>
 
@@ -83,6 +90,12 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       <label className="multitrack-check"><input type="checkbox" checked={p.sectionAudio === true} onChange={e => onPanel(p.id, { sectionAudio: e.target.checked })} /> Play audio only while this box is visible</label>
       <button onClick={() => onPanel(p.id, { sectionStartSec: undefined, sectionEndSec: undefined })}>Show for whole song</button>
       {p.overlay && <button onClick={() => onUpdate({ panels: session.panels.filter(other => other.id !== p.id) })}>Delete extra box</button>}
+      </details>
     </details>)}
+    <details className="multitrack-advanced"><summary>Share or import project</summary>
+    <div className="multitrack-settings-heading"><h2>Collaborate</h2><p>Send your parts. Your friend adds theirs and sends the project back.</p></div>
+    <ProjectFileActions busy={fileBusy} onShare={onShare} onImport={onImport} />
+    <p className="multitrack-file-note">Includes recordings and layout, up to 512 MB. Opens as a new project.{session.backing.kind === 'youtube' ? ' YouTube references need internet.' : ''}</p>
+    </details>
   </div>
 }

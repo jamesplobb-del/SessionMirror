@@ -194,6 +194,57 @@ that used to be a grab handle at the bottom) and **Exit music** on the right, wh
 control that turns the tool off. They dim while the marker is up and are excluded from
 tap-to-turn, so hitting one never also turns the page.
 
+## Fourth pass: opening, erasing, full screen, and the iPad's ears
+
+**An empty part asks for the file.** Turning Music on for an item with no music
+used to leave the room looking exactly as it did, with a ball on the edge as the
+only sign anything had happened. It now opens the picker, once per item — a
+player who cancels, or who has just removed a part on purpose, has answered the
+question and is not asked again.
+
+**A part opens full screen,** and the record control comes with it.
+`.practice-chart-rail` puts the deck's own record button down the left margin
+while the deck is away, with the take's elapsed time under it. It is excluded
+from tap-to-turn along with the corner controls. Opening full screen was unsafe
+while the way out lived in a folded widget; the exit and the toggle are in the
+page's corners now, so there is nothing to be stranded in.
+
+**An eraser.** A fourth thing in the marker group. It rubs out whole marks
+rather than pieces of them — a mark is one gesture, and half an erased circle is
+worse than the circle. The radius is given per axis so a round eraser on screen
+stays round on a page that is not square. `eraseStrokesAt` returns `null` when it
+touched nothing, so dragging across blank paper does not churn storage, and the
+page works from a ref rather than the last render because a finger moves faster
+than React does. What survives is what Save PDF writes, which
+`verify-practice-chart-ink.mjs` now checks by inflating the page's content
+stream — searching the raw file for a colour finds nothing either way, so that
+assertion used to pass by saying nothing.
+
+**The green zone came back.** The pitch widget draws through `glass-audio`, but
+under the `depth-electric` refinement `blitGlassStaticLayer` swaps its static
+layer for a flat background — which took the in-tune band, the grid and the
+centre line with it, leaving the per-frame pass to light the band green only
+once you were already in tune. The band is back in that layer, with its edges
+and a brighter centre line, measured with the same axis the caller returns (the
+two variants centre differently, and using the wrong one puts the zone in the
+wrong place). Verified against the live canvas: green spans 0.459–0.544 of the
+widget's height, and ±5 cents on that axis is 0.460–0.540.
+
+**The iPad registers pitch.** `getTunerProfile` now relaxes `rmsGateDbMic` by
+8 dB on a tablet. The gate was set against a phone propped a foot away; an iPad
+lives on a stand at arm's length with its mics pointed at the room, and the app
+asks for the mic with automatic gain off, so the same playing simply never
+opened it. Only the loudness gate moves — the clarity gate is what keeps room
+noise off the trace. It reaches the tuner, the widget and every practice game,
+because they all read through `getTunerProfile`.
+
+**Taps were being eaten.** `.audio-mode-home-layer` stands down for the music
+page at `opacity: 0; pointer-events: none`, but `AudioModeHome` carries its own
+`pointer-events-auto` and took them straight back. The result was an invisible
+"Record your first take" panel lying across the whole part and swallowing every
+tap that landed on it — a large part of what "it doesn't let me tap back and
+forward very well" was. Nothing inside an invisible layer is touchable now.
+
 ## Bugs this pass found and fixed
 
 Everything below was found by driving the real UI, not by reading it.
@@ -272,6 +323,17 @@ Games is unreachable, because the tab bar is covered while a game is up.
   rotation mid-part keeps the page, the stop and the ink.
 - `npx tsc -b --force` clean, `npm run build` clean, and the ten verify scripts covering this
   area all pass.
+
+- Fourth pass, driven through the real UI at an iPad viewport: turning Music on
+  with no part opens the picker exactly once; a loaded part opens full screen
+  with the tabs away, the deck gone and the rail up; every half turn moves
+  exactly 595 of a 1190 screen, forward and back, with labels `1/4 → 1–2/4 →
+  2/4 → 2–3/4 → 3/4` and the same in reverse; tapping the rail does not turn the
+  page; the eraser rubs out only what it touches, leaves blank paper alone, and
+  does not turn the page; Exit full screen brings back the tabs and the deck and
+  refits the page to 972 between them; the takes and music balls still work with
+  the hidden layer made untouchable; and the pitch widget's green zone is on the
+  canvas before a note is played.
 
 **Geometry in the browser preview is only meaningful with an emulated viewport** — the pane reports
 `innerWidth: 0` when collapsed, which reads as "the page rendered nothing".

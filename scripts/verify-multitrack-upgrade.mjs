@@ -86,6 +86,14 @@ try {
   await m.saveMultitrackSession({ ...session, projectId: 'copy', name: 'Copy' })
   check(m.listMultitrackProjects().length,2,'duplicate is independent project')
   check((await m.loadMultitrackSession(takes,session.projectId)).name,'Twelve parts','original project preserved')
+  const missing = await m.loadMultitrackSession(takes.slice(1), session.projectId)
+  check(missing.panels[0].missingTakeId, takes[0].id, 'missing take retains source identity')
+  check(missing.panels[0].take, null, 'missing source is not playable')
+  check(!!missing.recoveryNotice, true, 'missing part has a recovery notice')
+  await m.saveMultitrackSession(missing)
+  const missingAgain = await m.loadMultitrackSession(takes.slice(1), session.projectId)
+  check(missingAgain.panels[0].missingTakeId, takes[0].id, 'autosave preserves missing source')
+  check((await m.loadMultitrackSession(takes, session.projectId)).panels[0].take.id, takes[0].id, 'restoring source repairs assignment')
   console.log(`PASS: ${checks} multitrack assertions (1–12 parts, count-ins, lead-in, seek, timing, layouts, section exports, project restore).`)
 } finally { await rm(dir, { recursive: true, force: true }) }
 

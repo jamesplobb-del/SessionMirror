@@ -64,7 +64,7 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
       panelIds: performancePanels.map(p => p.id),
       panelDetails: performancePanels.map(p => ({ frame: p.frame, sectionAudio: p.sectionAudio, label: p.label, overlay: p.overlay, hidden: p.hidden, timelineOffsetMs: p.timelineOffsetMs, mirrored: p.mirrored })),
       panelTakeIds: performancePanels.map((panel) =>
-        panel.kind === 'performance' ? panel.take?.id ?? null : null,
+        panel.kind === 'performance' ? panel.take?.id ?? panel.missingTakeId ?? null : null,
       ),
       sharedTakes: await Promise.all([...new Map(performancePanels.flatMap(p => p.take?.id.startsWith('collab-') ? [[p.take.id, p.take] as const] : [])).values()].map(async take => ({
         ...take,
@@ -143,8 +143,9 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
       panels[i] = {
         ...panel,
         ...persisted.panelDetails?.[performanceIndex],
-        // Takes deleted since last session are silently dropped.
+        // Preserve the source identity so an autosave cannot erase a missing part.
         take: takeId ? takeById.get(takeId) ?? null : null,
+        missingTakeId: takeId && !takeById.has(takeId) ? takeId : undefined,
         ...(typeof volume === 'number' ? { volume: bounded(volume, 1, 0, 1) } : null),
         ...(muted === true ? { muted: true } : null),
         ...(Array.isArray(trim)
@@ -204,7 +205,7 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
       endSec: typeof persisted.endSec === 'number' ? bounded(persisted.endSec, 1, .1, 86400) : undefined,
       panels,
       sheetMusic,
-      ...(missingAssets ? { recoveryNotice: 'Some imported files are missing. Reimport your backing audio or sheet music.' } : {}),
+      ...((missingAssets || panels.some(p => p.missingTakeId)) ? { recoveryNotice: [panels.some(p => p.missingTakeId) ? 'Some recordings are missing. Tap a missing part to replace it.' : '', missingAssets ? 'Some imported files are missing. Reimport your backing audio or sheet music.' : ''].filter(Boolean).join(' ') } : {}),
       practice: {
         meter: typeof persisted.practice?.meter === 'string' && /^(?:[1-9]|1[0-2])\/(?:2|4|8|16)$/.test(persisted.practice.meter) ? persisted.practice.meter : '4/4',
         clickSound: typeof persisted.practice?.clickSound === 'string' ? persisted.practice.clickSound : 'classic',

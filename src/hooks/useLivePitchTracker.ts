@@ -1,3 +1,4 @@
+import { tunerInputAdvice, type TunerInputAdvice } from '../utils/tunerInputAdvice'
 import { appendTunerTrace, tunerTracePoints, type TunerTrace } from '../utils/tunerTrace'
 import { subscribeNativeTunerPitch, type NativeTunerPitch } from '../utils/nativeTunerPitch'
 import { drawSilkTuner, silkTunerGeometry, silkPitchColor } from '../utils/reactiveSilkTuner'
@@ -19,6 +20,7 @@ import {
   isSilenceFloorSample,
   isFrequencyInInstrumentRange,
   isSignalAboveRmsGate,
+  bufferRmsDb,
   movingAverage,
   normalizeInstrumentFrequency,
   quantizeDisplayCents,
@@ -155,19 +157,12 @@ function drawInTuneBandRegion(
   const boost = Math.max(0, inTuneHighlight)
 
   if (lite) {
+    // The static layer under this already draws the zone and its centre line;
+    // all that is left per frame is the glow when the note is actually in it.
     if (boost > 0.01) {
       ctx.fillStyle = `rgba(34, 197, 94, ${0.05 + t * 0.14})`
       ctx.fillRect(0, bandTop, width, bandHeight)
     }
-
-    const centerY = centsToY(0)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
-    ctx.lineWidth = 1
-    ctx.setLineDash([])
-    ctx.beginPath()
-    ctx.moveTo(0, centerY)
-    ctx.lineTo(width, centerY)
-    ctx.stroke()
     return
   }
 
@@ -359,6 +354,7 @@ export interface PitchTrackerOptions {
   retryNativeTapOnInteractiveRecovery?: boolean
   /** Reports source delivery health without treating musical silence as a failure. */
   onSourceHealthChange?: (health: PitchSourceHealth) => void
+  onInputAdvice?: (advice: 'quiet' | 'loud') => void
   /** Accepted detector frames for lightweight derived analytics such as Pitch Insights. */
   onAcceptedPitchFrame?: (frame: AcceptedPitchFrame | null) => void
 }
@@ -1363,7 +1359,7 @@ function drawLivingPitchSurface(
 }
 
 /** Bumped when static grid art changes — invalidates cached offscreen layers. */
-const GLASS_STATIC_GRID_VERSION = 10
+const GLASS_STATIC_GRID_VERSION = 11
 
 type GlassStaticVariant = 'widget' | 'legacy' | 'audio'
 
@@ -1389,10 +1385,46 @@ function drawGlassWidgetStaticContent(
   width: number,
   height: number,
   dark: boolean,
+  centsToY: (cents: number) => number,
 ): void {
   ctx.clearRect(0, 0, width, height)
   ctx.fillStyle = dark ? '#07101f' : '#f7f8fa'
   ctx.fillRect(0, 0, width, height)
+
+  /*
+   * The green zone: where in tune is.
+   *
+   * This band is the whole point of a tuner graph — it is the target you are
+   * aiming the trace at, so it has to be on the canvas *before* you hit it.
+   * Lighting it up only once the note is already centred (which is all the
+   * glow layer in `drawInTuneBandRegion` does) leaves a player reading a bare
+   * rectangle and guessing where the middle is. It lives in the cached static
+   * layer, so it costs one paint per resize and nothing per frame.
+   */
+  const bandTop = Math.min(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
+  const bandBottom = Math.max(centsToY(TUNING_GREEN_CENTS), centsToY(-TUNING_GREEN_CENTS))
+  ctx.fillStyle = dark ? 'rgba(34, 197, 94, 0.13)' : 'rgba(22, 163, 74, 0.1)'
+  ctx.fillRect(0, bandTop, width, bandBottom - bandTop)
+
+  // Edges, so the zone reads as a target with a boundary rather than a smudge.
+  ctx.strokeStyle = dark ? 'rgba(34, 197, 94, 0.3)' : 'rgba(22, 163, 74, 0.26)'
+  ctx.lineWidth = 1
+  ctx.setLineDash([])
+  for (const edge of [bandTop, bandBottom]) {
+    ctx.beginPath()
+    ctx.moveTo(0, edge + 0.5)
+    ctx.lineTo(width, edge + 0.5)
+    ctx.stroke()
+  }
+
+  // Dead centre, brighter than its edges: the line the trace is chasing.
+  const centerY = centsToY(0)
+  ctx.strokeStyle = dark ? 'rgba(134, 239, 172, 0.5)' : 'rgba(21, 128, 61, 0.42)'
+  ctx.lineWidth = 1.2
+  ctx.beginPath()
+  ctx.moveTo(0, centerY)
+  ctx.lineTo(width, centerY)
+  ctx.stroke()
 }
 
 function blitGlassStaticLayer(
@@ -1422,10 +1454,11 @@ function blitGlassStaticLayer(
     const offCtx = off.getContext('2d')
     if (!offCtx) return getGlassLayoutMetrics(height)
     offCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    if (cleanWidget) {
-      drawGlassWidgetStaticContent(offCtx, width, height, dark)
-    } else if (variant === 'widget') {
-      drawGlassWidgetStaticContent(offCtx, width, height, dark)
+    if (cleanWidget || variant === 'widget') {
+      // Same axis the caller returns below, or the green zone lands in the
+      // wrong place on whichever variant it was not measured for.
+      const { centsToY } = getGlassLayoutMetrics(height, variant === 'audio')
+      drawGlassWidgetStaticContent(offCtx, width, height, dark, centsToY)
     } else if (variant === 'audio') {
       const { pitchTop, pitchBottom, centsToY } = getGlassLayoutMetrics(height, true)
       offCtx.clearRect(0, 0, width, height)
@@ -1754,6 +1787,9 @@ export function useLivePitchTracker(
   onSourceHealthChangeRef.current = options.onSourceHealthChange
   const onAcceptedPitchFrameRef = useRef(options.onAcceptedPitchFrame)
   onAcceptedPitchFrameRef.current = options.onAcceptedPitchFrame
+  const inputAdviceCallbackRef = useRef(options.onInputAdvice)
+  inputAdviceCallbackRef.current = options.onInputAdvice
+  const inputAdviceRef = useRef<{ kind: TunerInputAdvice; since: number; sent: boolean }>({ kind: null, since: 0, sent: false })
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -2826,6 +2862,18 @@ export function useLivePitchTracker(
             nativeTap.cachedSignalStrong = signalStrong
             nativeTap.cachedRawPitch = rawPitch
             nativeTap.cachedClarity = clarity
+          }
+        }
+
+        if (source === 'microphone' && inputAdviceCallbackRef.current) {
+          const level = nativeTap?.nativePitchOnly
+            ? nativeTap.estimate?.rmsDb ?? -160 : bufferRmsDb(graph.buffer)
+          const advice = tunerInputAdvice(level, rmsGate, rawPitch, clarity)
+          const previous = inputAdviceRef.current
+          if (advice !== previous.kind) inputAdviceRef.current = { kind: advice, since: now, sent: false }
+          else if (advice && !previous.sent && now - previous.since >= 5000) {
+            previous.sent = true
+            inputAdviceCallbackRef.current(advice)
           }
         }
 
