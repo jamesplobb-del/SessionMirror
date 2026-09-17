@@ -25,9 +25,13 @@ async function probeVideoDuration(blob: Blob): Promise<number> {
   return new Promise((resolve) => {
     const video = document.createElement('video')
     const url = URL.createObjectURL(blob)
+    let settled = false
     const finish = (duration: number) => {
+      if (settled) return
+      settled = true
       URL.revokeObjectURL(url)
-      video.src = ''
+      video.removeAttribute('src')
+      video.load()
       resolve(duration)
     }
     video.preload = 'metadata'
@@ -36,7 +40,7 @@ async function probeVideoDuration(blob: Blob): Promise<number> {
       finish(Number.isFinite(duration) && duration > 0 ? duration : 0)
     }
     video.onerror = () => finish(0)
-    window.setTimeout(() => finish(0), 2500)
+    window.setTimeout(() => finish(0), 1500)
     video.src = url
   })
 }
@@ -70,7 +74,7 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
     return null
   }
 
-  const draw = (elapsedMs: number) => {
+  const draw = () => {
     ctx.fillStyle = spec.color
     ctx.fillRect(0, 0, width, height)
     ctx.fillStyle = 'rgba(255,255,255,0.92)'
@@ -79,41 +83,18 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
     ctx.fillText(spec.name, width / 2, height / 2)
     ctx.font = '500 18px ui-sans-serif, system-ui, sans-serif'
     ctx.fillText('Bot QA take', width / 2, height / 2 + 40)
-    ctx.fillText(`${(elapsedMs / 1000).toFixed(1)}s`, width / 2, height / 2 + 72)
   }
 
-  draw(0)
+  draw()
   const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7)
-  const videoStream = canvas.captureStream(15)
-  const tracks: MediaStreamTrack[] = [...videoStream.getVideoTracks()]
-
-  let audioContext: AudioContext | null = null
-  let oscillator: OscillatorNode | null = null
-  try {
-    audioContext = new AudioContext()
-    oscillator = audioContext.createOscillator()
-    const gain = audioContext.createGain()
-    gain.gain.value = 0.08
-    oscillator.frequency.value = 220 * spec.index
-    oscillator.connect(gain)
-    const dest = audioContext.createMediaStreamDestination()
-    gain.connect(dest)
-    oscillator.start()
-    tracks.push(...dest.stream.getAudioTracks())
-  } catch {
-    audioContext = null
-    oscillator = null
-  }
-
-  const stream = new MediaStream(tracks)
+  const stream = canvas.captureStream(15)
   const mimeType = pickRecorderMime()
   let recorder: MediaRecorder
   try {
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
-  } catch {
+  } catch (error) {
+    console.warn('[BotQA] MediaRecorder unavailable', error)
     stream.getTracks().forEach((track) => track.stop())
-    oscillator?.stop()
-    void audioContext?.close()
     canvas.remove()
     return null
   }
@@ -127,13 +108,20 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
     recorder.addEventListener('stop', () => resolve(), { once: true })
   })
 
-  recorder.start(200)
+  try {
+    recorder.start(100)
+  } catch (error) {
+    console.warn('[BotQA] MediaRecorder.start failed', error)
+    stream.getTracks().forEach((track) => track.stop())
+    canvas.remove()
+    return null
+  }
+
   const startedAt = performance.now()
   await new Promise<void>((resolve) => {
     const tick = () => {
-      const elapsed = performance.now() - startedAt
-      draw(elapsed)
-      if (elapsed >= 2000) {
+      draw()
+      if (performance.now() - startedAt >= 1200) {
         resolve()
         return
       }
@@ -143,12 +131,13 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
   })
   if (recorder.state === 'recording') recorder.stop()
   await stopped
-  oscillator?.stop()
-  void audioContext?.close()
   stream.getTracks().forEach((track) => track.stop())
   canvas.remove()
 
-  if (chunks.length === 0) return null
+  if (chunks.length === 0) {
+    console.warn('[BotQA] recorded clip was empty', spec.name)
+    return null
+  }
   const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'video/webm' })
   if (blob.size < 32) return null
   const duration = await probeVideoDuration(blob)
@@ -156,17 +145,18 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
     blob,
     mimeType: blob.type || 'video/webm',
     thumbnailUrl,
-    duration: duration > 0 ? duration : 2,
+    duration: duration > 0 ? duration : 1.2,
   }
 }
 
 export async function createBotQaTakes(): Promise<Take[]> {
   if (!BOT_QA_MODE) return []
 
+  const recorded = await Promise.all(QA_CLIPS.map((spec) => recordLabeledClip(spec)))
   const takes: Take[] = []
-  for (const spec of QA_CLIPS) {
-    const clip = await recordLabeledClip(spec)
-    if (!clip) continue
+  recorded.forEach((clip, index) => {
+    const spec = QA_CLIPS[index]
+    if (!spec || !clip) return
     const id = `${BOT_QA_TAKE_ID_PREFIX}${spec.index}`
     const take = createTake(id, spec.index, URL.createObjectURL(clip.blob), '', clip.mimeType, 'video')
     take.name = spec.name
@@ -174,7 +164,8 @@ export async function createBotQaTakes(): Promise<Take[]> {
     take.thumbnailUrl = clip.thumbnailUrl
     take.notes = 'Seeded for Grok Bot QA. Not a real performance.'
     takes.push(take)
-  }
-
+  })
+  if (takes.length === 0) console.warn('[BotQA] no seeded video takes were created')
   return takes
 }
+

@@ -1281,26 +1281,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [applyTakeThumbnails]
   )
 
-  useEffect(() => {
-    if (bootSnapshot.takes.length === 0) return
-    void hydrateTakeThumbnailsInBackground(bootSnapshot.takes, applyTakeThumbnails)
-  }, [applyTakeThumbnails, bootSnapshot.takes])
-
-  useEffect(() => {
+  const seedBotQaTakes = useCallback(() => {
     if (!BOT_QA_MODE) return
-    let cancelled = false
     void createBotQaTakes().then((qaTakes) => {
-      if (cancelled || qaTakes.length === 0) return
+      if (qaTakes.length === 0) return
       setTakes((current) => {
         const existing = new Set(current.map((take) => take.id))
         const extra = qaTakes.filter((take) => !existing.has(take.id))
         return extra.length > 0 ? [...current, ...extra] : current
       })
     })
-    return () => {
-      cancelled = true
-    }
   }, [])
+
+  useEffect(() => {
+    if (bootSnapshot.takes.length === 0) return
+    void hydrateTakeThumbnailsInBackground(bootSnapshot.takes, applyTakeThumbnails)
+  }, [applyTakeThumbnails, bootSnapshot.takes])
+
+  useEffect(() => {
+    seedBotQaTakes()
+  }, [seedBotQaTakes])
 
   const handleSelectProject = useCallback(
     async (projectId: string) => {
@@ -3304,9 +3304,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // the live bridge preview (black stage) — recovery is suppressed until close.
     setSuppressNativeBridgeRecovery(true)
     deferHudMediaPause()
+    seedBotQaTakes()
   }, [
     deferHudMediaPause,
     markOverlayClosed,
+    seedBotQaTakes,
     setSuppressNativeBridgeRecovery,
     settings.hapticFeedback,
   ])
