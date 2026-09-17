@@ -123,6 +123,8 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
+import { BOT_QA_MODE, persistBotQaFlag, readBotQaSurface } from './utils/botQaMode'
+import { createBotQaTakes } from './utils/botQaFixtures'
 import { getInstrumentSettings } from './utils/instrumentProfiles'
 import { ActionSheetProvider, showAlertOutsideTree } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
@@ -328,6 +330,7 @@ const OnboardingTutorial = lazy(() => import('./components/OnboardingTutorial'))
 const CoachMark = lazy(() => import('./components/CoachMark'))
 const LabsOverlay = lazy(() => import('./components/labs/LabsOverlay'))
 const MultitrackOverlay = lazy(() => import('./multitrack/components/MultitrackOverlay'))
+const BotQaLauncher = lazy(() => import('./components/BotQaLauncher'))
 
 /** Wait for Settings sheet exit before attaching pitch engine (matches drawer close animation). */
 const PITCH_ENGINE_COMMIT_DELAY_MS = 300
@@ -692,7 +695,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   useEffect(() => {
-    if (isOnboardingComplete()) return
+    persistBotQaFlag()
+    if (BOT_QA_MODE || isOnboardingComplete()) return
     const timer = window.setTimeout(() => {
       setShowOnboardingTutorial(true)
     }, BOOT_REVEAL_DELAY_MS + 240)
@@ -1281,6 +1285,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (bootSnapshot.takes.length === 0) return
     void hydrateTakeThumbnailsInBackground(bootSnapshot.takes, applyTakeThumbnails)
   }, [applyTakeThumbnails, bootSnapshot.takes])
+
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    let cancelled = false
+    void createBotQaTakes().then((qaTakes) => {
+      if (cancelled || qaTakes.length === 0) return
+      setTakes((current) => {
+        const existing = new Set(current.map((take) => take.id))
+        const extra = qaTakes.filter((take) => !existing.has(take.id))
+        return extra.length > 0 ? [...current, ...extra] : current
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleSelectProject = useCallback(
     async (projectId: string) => {
@@ -3290,6 +3310,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setSuppressNativeBridgeRecovery,
     settings.hapticFeedback,
   ])
+
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    const surface = readBotQaSurface()
+    if (!surface) return
+    const timer = window.setTimeout(() => {
+      if (surface === 'games') handleOpenPracticeGames()
+      else handleOpenMultitrack()
+    }, BOOT_REVEAL_DELAY_MS + 80)
+    return () => window.clearTimeout(timer)
+  }, [handleOpenMultitrack, handleOpenPracticeGames])
 
   const handleMultitrackOpenRecordingStage = useCallback(() => {
     handleRecordingModeChange('video')
@@ -5856,6 +5887,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onRequestMicStream={handleRequestLabsMicStream}
                     onReleaseMicStream={releaseLiveStream}
                   />
+
+                  {BOT_QA_MODE ? (
+                    <Suspense fallback={null}>
+                      <BotQaLauncher
+                        onOpenGames={handleOpenPracticeGames}
+                        onOpenMultitrack={handleOpenMultitrack}
+                      />
+                    </Suspense>
+                  ) : null}
 
                   <MultitrackOverlay
                     isOpen={multitrackOpen}

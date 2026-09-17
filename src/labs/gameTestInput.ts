@@ -1,23 +1,25 @@
 /**
  * Touch input that stands in for an instrument, for testing the games.
  *
- * Off unless the build is made with `VITE_GAME_TEST_INPUT=1`:
+ * On when either:
+ *   - the build is made with `VITE_GAME_TEST_INPUT=1` (`npm run cap:sync`), or
+ *   - Vite is in `npm run dev` and the page was opened with `?qa=1`.
  *
- *     VITE_GAME_TEST_INPUT=1 npm run cap:sync
+ * Vite inlines `import.meta.env.DEV` and `VITE_GAME_TEST_INPUT` at build time,
+ * so in an ordinary release build the constant is `false`, every branch
+ * guarded by it is dead code, and the whole feature is dropped from the
+ * bundle. It cannot reach a release build by accident.
  *
- * Vite inlines that comparison at build time, so in an ordinary build the
- * constant is `false`, every branch guarded by it is dead code, and the whole
- * feature is dropped from the bundle. It cannot reach a release build by
- * accident — there is no runtime toggle and no UI to leave switched on.
- *
- * Rather than skipping the game logic, both games are fed a *synthetic pitch*
+ * Rather than skipping the game logic, the games are fed a *synthetic pitch*
  * at whatever note they are currently asking for. Timing, the release gate,
  * the linger, the tuning tolerance and the scoring all run exactly as they do
  * with a real horn, so what is being tested is still the real thing.
  */
 import { midiToNoteName, type PitchReadout } from '../utils/pitchUtils'
+import { BOT_QA_MODE } from '../utils/botQaMode'
 
-export const GAME_TEST_INPUT = import.meta.env.VITE_GAME_TEST_INPUT === '1'
+export const GAME_TEST_INPUT =
+  import.meta.env.VITE_GAME_TEST_INPUT === '1' || BOT_QA_MODE
 
 const A4_HZ = 440
 

@@ -13,6 +13,7 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import type { TunerTranspositionId } from '../../utils/tunerTransposition'
 import { useLivePitchTracker, type PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTestInput'
+import { BOT_QA_MODE } from '../../utils/botQaMode'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceHome from './BalanceHome'
@@ -113,7 +114,7 @@ export default function BalanceScreen({
    * without which the game returns to a suspended AudioContext and hears
    * nothing at all.
    */
-  const micEpoch = useGameMicRecovery(pitchEnabled, onRequestMicStream)
+  const micEpoch = useGameMicRecovery(pitchEnabled && !GAME_TEST_INPUT, onRequestMicStream)
 
   const { readout } = useLivePitchTracker(
     mediaRef,
@@ -136,7 +137,7 @@ export default function BalanceScreen({
   )
 
   useEffect(() => {
-    if (!pitchEnabled) return
+    if (!pitchEnabled || GAME_TEST_INPUT) return
     onRequestMicStream()
   }, [onRequestMicStream, pitchEnabled, streamGeneration])
 
@@ -190,6 +191,20 @@ export default function BalanceScreen({
 
   useEffect(() => stopTestHold, [stopTestHold])
 
+  /**
+   * Grok Bot long runs: hold the written target so lock-on, balance time,
+   * and note completion actually fire.
+   */
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    const auto =
+      game.state.phase === 'waitingForPitch' ||
+      game.state.phase === 'pitchLock' ||
+      game.state.phase === 'active'
+    if (auto) startTestHold()
+    else stopTestHold()
+  }, [game.state.phase, startTestHold, stopTestHold])
+
   const previewTargets = useMemo(
     () => buildBalanceTargets(game.state.settings, game.customRoutines),
     [game.customRoutines, game.state.settings],
@@ -197,20 +212,20 @@ export default function BalanceScreen({
 
   const startLevel = useCallback(
     (level: BalanceLevel) => {
-      onRequestMicStream()
+      if (!GAME_TEST_INPUT) onRequestMicStream()
       gameRef.current.start(balanceLevelLaunch(level, gameRef.current.state.settings.instrumentId))
     },
     [onRequestMicStream],
   )
 
   const startDaily = useCallback(() => {
-    onRequestMicStream()
+    if (!GAME_TEST_INPUT) onRequestMicStream()
     const settings = gameRef.current.state.settings
     gameRef.current.start(balanceDailyLaunch(balanceDailyChallenge(settings.instrumentId)))
   }, [onRequestMicStream])
 
   const startQuick = useCallback(() => {
-    onRequestMicStream()
+    if (!GAME_TEST_INPUT) onRequestMicStream()
     gameRef.current.start(QUICK_PLAY_LAUNCH)
   }, [onRequestMicStream])
 
@@ -598,7 +613,9 @@ export default function BalanceScreen({
         <div className="balance-progress" aria-label={`${Math.round(game.hud.progress * 100)} percent complete`}><i style={{ width: `${game.hud.progress * 100}%` }} /></div>
       </section>
       {GAME_TEST_INPUT ? (
-        <span className="balance-test-input-badge" aria-hidden>hold anywhere = play the note</span>
+        <span className="balance-test-input-badge" aria-hidden>
+          {BOT_QA_MODE ? 'auto = hold the note' : 'hold anywhere = play the note'}
+        </span>
       ) : null}
     </div>
   )

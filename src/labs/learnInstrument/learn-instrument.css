@@ -944,3 +944,21 @@
     flex: 1 1 0;
   }
 }
+
+.li-play--test-input {
+  position: relative;
+}
+
+.li-test-input-badge {
+  position: absolute;
+  right: 0.75rem;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 2;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  color: #f8fafc;
+  font-size: 0.65rem;
+  font-weight: 650;
+  pointer-events: none;
+}

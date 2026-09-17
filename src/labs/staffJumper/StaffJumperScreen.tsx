@@ -15,6 +15,7 @@ import './staff-jumper.css'
 import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
+import { BOT_QA_MODE } from '../../utils/botQaMode'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
@@ -293,10 +294,11 @@ export default function StaffJumperScreen({
   }
 
   useEffect(() => {
+    if (GAME_TEST_INPUT) return
     onRequestMicStream()
   }, [onRequestMicStream, streamGeneration])
 
-  const pitchEnabled = true
+  const pitchEnabled = !GAME_TEST_INPUT
   /*
    * Coming back from the background, the stream is usually dead while
    * still looking present. This re-acquires it and, through the epoch in
@@ -364,7 +366,7 @@ export default function StaffJumperScreen({
     noteRemainingMs,
     noteTimeoutMs,
     beatInBar,
-  } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
+  } = useStaffJumperGame(effectiveReadout, true, hapticFeedback)
 
   targetMidiRef.current =
     state.config && state.phase === 'playing'
@@ -402,6 +404,16 @@ export default function StaffJumperScreen({
       tunerInstrument,
     ],
   )
+  /**
+   * Grok Bot long runs: once a round has started, sound each new target so
+   * scoring, lives, and the staff actually advance without a horn.
+   */
+  useEffect(() => {
+    if (!BOT_QA_MODE || state.phase !== 'playing' || state.isCountingIn) return
+    const timer = window.setTimeout(() => playTestNote(), 420)
+    return () => window.clearTimeout(timer)
+  }, [state.phase, state.sequenceStep, state.isCountingIn])
+
   const rangePreview = useMemo(() => getScaleRangePreview(draftConfig), [draftConfig])
   const previewConfig = useMemo(
     () => ({ ...draftConfig, sessionSeed: previewSeed }),
@@ -907,7 +919,9 @@ export default function StaffJumperScreen({
       }}
     >
       {game}
-      <span className="sj-test-input__badge" aria-hidden>tap = play note</span>
+      <span className="sj-test-input__badge" aria-hidden>
+        {BOT_QA_MODE ? 'auto = play note' : 'tap = play note'}
+      </span>
     </div>
   )
 }

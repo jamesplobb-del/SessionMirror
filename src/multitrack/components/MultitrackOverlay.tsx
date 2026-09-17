@@ -5,6 +5,8 @@ import { AudioLines, ChevronLeft, Crosshair, FileMusic, FolderOpen, Music4, Refr
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import { getTakeMediaType } from '../../utils/mediaType'
+import { BOT_QA_MODE, isBotQaTakeId } from '../../utils/botQaMode'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
@@ -200,6 +202,26 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     updatePractice,
     updateBacking,
   } = useMultitrackSession({ takes, isOpen })
+  const qaAssignedRef = useRef(false)
+  useEffect(() => {
+    if (!BOT_QA_MODE || !isOpen || qaAssignedRef.current) return
+    const videos = takes.filter(
+      (take) => isBotQaTakeId(take.id) && getTakeMediaType(take) === 'video',
+    )
+    if (videos.length === 0) return
+    const performance = session.panels.filter(
+      (panel): panel is PerformancePanelState => panel.kind === 'performance',
+    )
+    if (performance.some((panel) => panel.take)) {
+      qaAssignedRef.current = true
+      return
+    }
+    qaAssignedRef.current = true
+    videos.slice(0, performance.length).forEach((take, index) => {
+      const panel = performance[index]
+      if (panel) assignTakeToPanel(panel.id, take)
+    })
+  }, [assignTakeToPanel, isOpen, session.panels, takes])
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
   const nativeGridPlaybackActiveRef = useRef(false)
