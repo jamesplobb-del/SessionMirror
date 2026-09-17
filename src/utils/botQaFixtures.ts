@@ -152,11 +152,13 @@ async function recordLabeledClip(spec: QaClipSpec): Promise<{
 export async function createBotQaTakes(): Promise<Take[]> {
   if (!BOT_QA_MODE) return []
 
-  const recorded = await Promise.all(QA_CLIPS.map((spec) => recordLabeledClip(spec)))
   const takes: Take[] = []
-  recorded.forEach((clip, index) => {
-    const spec = QA_CLIPS[index]
-    if (!spec || !clip) return
+  for (const spec of QA_CLIPS) {
+    const clip = await recordLabeledClip(spec)
+    if (!clip) {
+      console.warn('[BotQA] clip failed', spec.name)
+      continue
+    }
     const id = `${BOT_QA_TAKE_ID_PREFIX}${spec.index}`
     const take = createTake(id, spec.index, URL.createObjectURL(clip.blob), '', clip.mimeType, 'video')
     take.name = spec.name
@@ -164,7 +166,7 @@ export async function createBotQaTakes(): Promise<Take[]> {
     take.thumbnailUrl = clip.thumbnailUrl
     take.notes = 'Seeded for Grok Bot QA. Not a real performance.'
     takes.push(take)
-  })
+  }
   if (takes.length === 0) console.warn('[BotQA] no seeded video takes were created')
   return takes
 }
