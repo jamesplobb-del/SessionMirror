@@ -202,6 +202,10 @@ import {
   syncNativeCameraSessionState,
   isNativeCaptureSessionActive,
 } from './utils/cameraSessionState'
+import {
+  acquireNativeTunerMonitor,
+  releaseNativeTunerMonitor,
+} from './utils/nativeAudioPitchTap'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
 import {
@@ -339,6 +343,7 @@ interface MainAudioPitchSource {
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const PracticeChartLayer = lazy(() => import('./components/PracticeChartLayer'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
+const DraggableTakesWidget = lazy(() => import('./components/DraggableTakesWidget'))
 /** Minimum gap between unforced tuner capture-session rebuilds. */
 const TUNER_MIC_REBUILD_FLOOR_MS = 1500
 
@@ -592,6 +597,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   /** The part is actually covering the room, so the HUD stops painting over it. */
   const [musicPageVisible, setMusicPageVisible] = useState(false)
+  /** Rehearsal view: the player has put the tabs and the deck away as well. */
+  const [musicChromeHidden, setMusicChromeHidden] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
   /** Saved desks — chips at the top of the Workspace tray. */
   /** The live room, kept current so a focused take can remember the desk it was played on. */
@@ -3426,6 +3433,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     handleOpenFullPracticeTool('metronome')
   }, [handleOpenFullPracticeTool])
 
+  const handleOpenMusicFromPracticeHub = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    dismissPracticeHub()
+    setIsSettingsOpen(false)
+    setIsVaultOpen(false)
+    setQuickSettingsOpen(false)
+    setLabsRoute(null)
+    handleRecordingModeChange('audio')
+    handleAudioPracticeTabChange('audio')
+    updateSettings({ showMusic: true })
+    deferHudMediaPause()
+  }, [
+    deferHudMediaPause,
+    dismissPracticeHub,
+    handleAudioPracticeTabChange,
+    handleRecordingModeChange,
+    settings.hapticFeedback,
+    updateSettings,
+  ])
+
   const handleOpenVaultFromPracticeHub = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setIsPracticeHubOpen(false)
@@ -4257,6 +4284,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const showFloatingMainPitch =
     showPitch && mainAudioPitchSource !== null && !isAudioPracticeTunerTab
+
+  useEffect(() => {
+    if (!musicPageVisible || !pitchTrackerActive || recordingMode !== 'audio' || isRecording) return
+    let cancelled = false
+    void acquireNativeTunerMonitor(settings.micInputPreference).then((active) => {
+      if (cancelled && active) void releaseNativeTunerMonitor()
+    })
+    return () => {
+      cancelled = true
+      void releaseNativeTunerMonitor()
+    }
+  }, [
+    isRecording,
+    musicPageVisible,
+    pitchTrackerActive,
+    recordingMode,
+    settings.micInputPreference,
+  ])
 
   useEffect(() => {
     if (!pitchTrackerActive) {
@@ -5589,7 +5634,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               ref={appShellRef}
               className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
                 isSplitView ? ' app-shell--split-open' : ''
-              }${musicPageVisible ? ' app-shell--music-page' : ''}`}
+              }${musicPageVisible ? ' app-shell--music-page' : ''}${
+                musicChromeHidden ? ' app-shell--music-chrome-hidden' : ''
+              }`}
             >
               <audio
                 ref={autoPlaybackAudioRef}
@@ -5616,6 +5663,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onOpenVault={handleOpenVaultFromPracticeHub}
                 onOpenTuner={handleOpenFullTunerFromPracticeHub}
                 onOpenMetronome={handleOpenFullMetronomeFromPracticeHub}
+                onOpenMusic={handleOpenMusicFromPracticeHub}
                 routine={routine}
                 routineDay={routineDay}
                 routineBuilderRequest={routineBuilderRequest}
@@ -5864,6 +5912,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     collapseResetKey={routineActiveStep?.id}
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
+                    onChromeHiddenChange={setMusicChromeHidden}
                   />
                 </Suspense>
               )}
@@ -5901,6 +5950,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           takeName={mainAudioPitchSource.take?.name}
                           label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
                           pitchSource="microphone"
+                          nativePitchProcessing={musicPageVisible}
                           positionId="main-pitch-audio"
                           liveMicEnabled={
                             (settings.liveMicTunerEnabled ||
@@ -5980,6 +6030,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   </AnimatePresence>
                 </Suspense>
               </div>
+
+              {/* The takes become a ball while a part is up: a panel cannot sit on
+                  a staff, and the deck they normally ride on is the first thing a
+                  player puts away for a rehearsal. */}
+              {musicPageVisible && settings.showTakeCards && (
+                <Suspense fallback={null}>
+                  <DraggableTakesWidget
+                    boundaryRef={appShellRef}
+                    collapseResetKey={routineActiveStep?.id}
+                    benchmarkTake={benchmarkTake}
+                    libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                    challengerTake={challengerTake}
+                    onExpandBenchmark={handleExpandBenchmark}
+                    onExpandChallenger={handleExpandChallenger}
+                    onPinCurrentAsBest={handlePinCurrentAsBest}
+                    onClearBenchmark={handleClearAudioBenchmark}
+                    onClearChallenger={handleClearAudioChallenger}
+                  />
+                </Suspense>
+              )}
 
               {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
                 <PracticeToolStrip
@@ -6110,7 +6180,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                 >
 
-                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && (
+                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && !musicChromeHidden && (
                     <div data-tutorial="audio-mode-tabs">
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
@@ -6178,9 +6248,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         />
                       </AnimatedTabPanel>
 
+                      {/* Never unmounted for the music page, only hidden.
+                          `AnimatedTabPanel` drops its children when inactive, and
+                          this subtree holds a shared native audio-tap claim
+                          (`useLiveRecordingWaveform`) that the floating tuner and
+                          hands-free both read through. The app already learned
+                          this once — see the `.widget-is-collapsed` note: folding
+                          a tool must never take its capture down with it. */}
                       <AnimatedTabPanel
                         panelKey="audio-mode-home-layer"
-                        active={audioPracticeTab === 'audio' && !isSplitView && !musicPageVisible}
+                        active={audioPracticeTab === 'audio' && !isSplitView}
                         className="audio-mode-home-layer min-h-0 flex-1"
                       >
                         <div data-tutorial="audio-take-cards">
@@ -6281,12 +6358,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   <div className="app-hud-bottom pointer-events-none flex flex-col shrink-0">
                     {((isAudioPracticeTunerTab && showTunerTakePills) ||
-                      (musicPageVisible &&
-                        settings.showTakeCards &&
-                        // Empty "No Best Take" pills over a staff are exactly the
-                        // kind of chrome the page is supposed to be free of. They
-                        // appear when there is a take to show.
-                        Boolean(benchmarkTake || challengerTake || libraryBenchmarkPlayback)) ||
                       (isAudioPracticeTimelineTab &&
                         practiceSessionActive &&
                         practiceRecordingControlsExpanded &&
@@ -6299,7 +6370,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           }
                           className={`audio-tuner-take-pills-wrap pointer-events-auto w-full ${
                             isAudioPracticeTunerTab ||
-                            musicPageVisible ||
                             (isAudioPracticeTimelineTab && practiceSessionActive)
                               ? 'audio-tuner-take-pills-wrap--compact'
                               : ''
@@ -6312,7 +6382,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           <TunerTakePillRow
                             compact={
                               isAudioPracticeTunerTab ||
-                              musicPageVisible ||
                               (isAudioPracticeTimelineTab && practiceSessionActive)
                             }
                             ariaLabel="Takes"
@@ -6387,6 +6456,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       )}
 
                     {!isAudioPracticeMetronomeTab &&
+                      !musicChromeHidden &&
                       !(
                         isAudioPracticeTimelineTab &&
                         !practiceSessionActive &&

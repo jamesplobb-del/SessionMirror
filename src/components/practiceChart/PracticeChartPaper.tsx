@@ -1,11 +1,20 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+  type PointerEvent as ReactPointerEvent, type RefObject,
+} from 'react'
 import type { PracticeChart } from '../../utils/practiceChartStorage'
 import {
-  chartOffsetForFraction, chartPagesInView, chartScrollFraction, chartSpreadFits,
-  chartTurnStops, layoutChartStrip, nearestChartStop, nextChartStop, resolveChartFit,
-  type ChartFitPreference, type ChartPageSize, type ChartStripLayout,
+  chartFractionFromHalfTurn, chartHalfTurnFromFraction, chartHalfTurnView,
+  chartOffsetForFraction, chartPagesInView, chartRowCount, chartRowPages,
+  chartScrollFraction, chartSpreadFits, chartTurnStops, layoutChartStrip,
+  nearestChartStop, nextChartHalfTurn, nextChartStop, resolveChartFit,
+  type ChartFitPreference, type ChartHalfTurn, type ChartPageSize, type ChartStripLayout,
 } from './chartLayout'
 import { isChartRenderCancelled, openCachedPdfChart, type ChartDocument } from './chartDocument'
+import {
+  inkPathData, inkStrokeWidthPx, simplifyStroke, INK_CSS,
+  type InkColour, type InkStroke, type InkWidth,
+} from './chartInk'
 
 export interface ChartPaperHandle {
   /** Forward or back by one stop: a whole page, or half of one. */
@@ -31,6 +40,13 @@ interface PracticeChartPaperProps {
   onLoadFailed: () => void
   /** Whether a two-page spread is worth offering for this part on this screen. */
   onSpreadAvailable: (available: boolean) => void
+  /** Marks already on this part. */
+  strokes: readonly InkStroke[]
+  /** The marker colour in hand, or null when the marker is capped. */
+  marker: InkColour | null
+  /** Nib the current marks are drawn with. */
+  inkWidth: InkWidth
+  onStroke: (stroke: InkStroke) => void
 }
 
 /** How long a player keeps scrolling before the position is worth writing down. */
@@ -38,7 +54,7 @@ const POSITION_SETTLE_MS = 450
 
 export default function PracticeChartPaper({
   chart, fit, halfTurn, initialFraction, handleRef, onView, onFraction, onError, onLoadFailed,
-  onSpreadAvailable,
+  onSpreadAvailable, strokes, marker, inkWidth, onStroke,
 }: PracticeChartPaperProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [document_, setDocument] = useState<ChartDocument | null>(null)
@@ -116,6 +132,9 @@ export default function PracticeChartPaper({
   )
   useEffect(() => { onSpreadAvailable(spreadFits) }, [onSpreadAvailable, spreadFits])
   const stops = useMemo(() => chartTurnStops(layout, halfTurn), [layout, halfTurn])
+  const rows = chartRowCount(layout.tops.length, layout.columns)
+  const splitMode = halfTurn && resolvedFit !== 'width' && rows > 0
+  const [half, setHalf] = useState<ChartHalfTurn>({ row: 0, peek: false })
 
   /* ---- Reading position ------------------------------------------------- */
 
@@ -129,6 +148,7 @@ export default function PracticeChartPaper({
   // coming back to a part lands on a real turn stop rather than half a system
   // into one, where the first tap would only move a sliver.
   useLayoutEffect(() => {
+    if (splitMode) return
     const element = scrollRef.current
     if (!element || layout.total <= 0) return
     const wanted = chartOffsetForFraction(layout, fractionRef.current)
@@ -140,7 +160,65 @@ export default function PracticeChartPaper({
     // `stops` only refines where a restore may land; it must not re-seek on a
     // half-turn toggle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, reportView])
+  }, [layout, reportView, splitMode])
+
+  useLayoutEffect(() => {
+    if (!splitMode || rows <= 0) return
+    const next = chartHalfTurnFromFraction(fractionRef.current, rows)
+    setHalf(next)
+    const { first, last } = chartHalfTurnView(next, layout.columns, layout.tops.length)
+    onView({ first, last, count: layout.tops.length })
+  }, [layout.columns, layout.tops.length, onView, rows, splitMode])
+
+  /*
+   * A mark in progress. It is kept as page-normalised points from the first
+   * move, so the line that appears under the finger is the same line that gets
+   * stored — there is no separate screen-space path to reconcile afterwards.
+   */
+  const [drawing, setDrawing] = useState<{ page: number; points: number[] } | null>(null)
+  const drawingRef = useRef<{ pointerId: number; page: number; points: number[] } | null>(null)
+
+  const beginStroke = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!marker || event.button !== 0 || drawingRef.current) return
+    const box = event.currentTarget.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) return
+    const point = [(event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height]
+    drawingRef.current = { pointerId: event.pointerId, page, points: point }
+    setDrawing({ page, points: point })
+    event.currentTarget.setPointerCapture(event.pointerId)
+    event.preventDefault()
+  }, [marker])
+
+  const extendStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const active = drawingRef.current
+    if (!active || active.pointerId !== event.pointerId) return
+    const box = event.currentTarget.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) return
+    const x = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
+    const y = Math.min(1, Math.max(0, (event.clientY - box.top) / box.height))
+    const last = active.points.length
+    if (last >= 2 && Math.hypot(x - active.points[last - 2], y - active.points[last - 1]) < 0.001) return
+    active.points.push(x, y)
+    setDrawing({ page: active.page, points: [...active.points] })
+    event.preventDefault()
+  }, [])
+
+  const endStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const active = drawingRef.current
+    if (!active || active.pointerId !== event.pointerId) return
+    drawingRef.current = null
+    setDrawing(null)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    // A tap is not a mark. Two points is the shortest thing worth keeping, and
+    // it becomes a dot the player can see.
+    if (!marker) return
+    const points = active.points.length >= 4
+      ? simplifyStroke(active.points)
+      : [...active.points, active.points[0] + 0.0015, active.points[1] + 0.0015]
+    onStroke({ page: active.page, colour: marker, points, width: inkWidth })
+  }, [inkWidth, marker, onStroke])
 
   const settleRef = useRef<number | null>(null)
   const handleScroll = useCallback(() => {
@@ -176,6 +254,17 @@ export default function PracticeChartPaper({
    * page does: it is there, or it is not.
    */
   const turn = useCallback((direction: 1 | -1) => {
+    if (splitMode) {
+      const next = nextChartHalfTurn(half, rows, direction)
+      if (!next) return
+      setHalf(next)
+      const fraction = chartFractionFromHalfTurn(next, rows)
+      fractionRef.current = fraction
+      const { first, last } = chartHalfTurnView(next, layout.columns, layout.tops.length)
+      onView({ first, last, count: layout.tops.length })
+      onFraction(fraction)
+      return
+    }
     const element = scrollRef.current
     if (!element) return
     const target = nextChartStop(stops, element.scrollTop, direction)
@@ -185,7 +274,7 @@ export default function PracticeChartPaper({
     fractionRef.current = chartScrollFraction(layout, target)
     reportView(target)
     onFraction(fractionRef.current)
-  }, [layout, onFraction, reportView, stops])
+  }, [half, layout, onFraction, onView, reportView, rows, splitMode, stops])
 
   useEffect(() => {
     handleRef.current = { turn }
@@ -201,39 +290,173 @@ export default function PracticeChartPaper({
     [layout, offset, viewport.height],
   )
 
+  const strokesByPage = useMemo(() => {
+    const byPage = new Map<number, InkStroke[]>()
+    for (const stroke of strokes) {
+      const list = byPage.get(stroke.page)
+      if (list) list.push(stroke)
+      else byPage.set(stroke.page, [stroke])
+    }
+    return byPage
+  }, [strokes])
+
   const ready = layout.tops.length > 0
+  const peeking = splitMode && half.peek
+  const stagePages = splitMode
+    ? chartRowPages(half.row, layout.columns, layout.tops.length)
+    : null
+  const peekPages = peeking
+    ? chartRowPages(half.row + 1, layout.columns, layout.tops.length)
+    : null
+
+  const renderPageFace = (index: number) => (
+    <>
+      {index >= window_.first - 1 && index <= window_.last + 1 && (
+        document_
+          ? <ChartPdfPage
+              document={document_}
+              index={index}
+              cssWidth={layout.widths[index]}
+              onError={onError}
+            />
+          : <img src={chart.objectUrl} alt="" draggable={false} />
+      )}
+      <ChartPageInk
+        strokes={strokesByPage.get(index)}
+        live={drawing?.page === index ? drawing.points : null}
+        liveColour={marker}
+        liveWidth={inkWidth}
+      />
+    </>
+  )
+
+  const renderSheet = (index: number, pin: 'top' | 'bottom' | 'center') => {
+    const height = layout.drawHeights[index]
+    const width = layout.widths[index]
+    const left = layout.lefts[index]
+    const style = pin === 'center'
+      ? {
+          left, width, height,
+          top: Math.max(0, (viewport.height - height) / 2),
+        }
+      : pin === 'top'
+        ? { left, width, height, top: 0 }
+        : { left, width, height, bottom: 0, top: 'auto' as const }
+    return (
+      <div
+        key={`${pin}-${index}`}
+        className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}${pin === 'center' ? '' : ' practice-chart-split__sheet'}`}
+        style={style}
+        onPointerDown={marker ? event => beginStroke(index, event) : undefined}
+        onPointerMove={marker ? extendStroke : undefined}
+        onPointerUp={marker ? endStroke : undefined}
+        onPointerCancel={marker ? endStroke : undefined}
+      >
+        {document_
+          ? <ChartPdfPage
+              document={document_}
+              index={index}
+              cssWidth={width}
+              onError={onError}
+            />
+          : <img src={chart.objectUrl} alt="" draggable={false} />}
+        <ChartPageInk
+          strokes={strokesByPage.get(index)}
+          live={drawing?.page === index ? drawing.points : null}
+          liveColour={marker}
+          liveWidth={inkWidth}
+        />
+      </div>
+    )
+  }
+
   return (
     <div
       ref={scrollRef}
-      className="practice-chart-scroll"
-      onScroll={handleScroll}
+      className={`practice-chart-scroll${peeking ? ' practice-chart-scroll--split' : ''}`}
+      onScroll={peeking ? undefined : handleScroll}
       role="document"
       aria-label={`${chart.fileName}${ready ? `, ${layout.tops.length} page${layout.tops.length === 1 ? '' : 's'}` : ''}`}
     >
-      <div className="practice-chart-strip" style={{ height: ready ? layout.total : '100%' }}>
-        {layout.tops.map((top, index) => (
-          <div
-            key={index}
-            className="practice-chart-page"
-            style={{
-              top, left: layout.lefts[index],
-              height: layout.drawHeights[index], width: layout.widths[index],
-            }}
-          >
-            {index >= window_.first - 1 && index <= window_.last + 1 && (
-              document_
-                ? <ChartPdfPage
-                    document={document_}
-                    index={index}
-                    cssWidth={layout.widths[index]}
-                    onError={onError}
-                  />
-                : <img src={chart.objectUrl} alt="" draggable={false} />
-            )}
+      {peeking && peekPages && stagePages ? (
+        <div className="practice-chart-split">
+          <div className="practice-chart-split__pane practice-chart-split__pane--top">
+            {peekPages.map(index => renderSheet(index, 'top'))}
           </div>
-        ))}
-      </div>
+          <div className="practice-chart-split__rule" role="separator" aria-hidden />
+          <div className="practice-chart-split__pane practice-chart-split__pane--bottom">
+            {stagePages.map(index => renderSheet(index, 'bottom'))}
+          </div>
+        </div>
+      ) : splitMode && stagePages ? (
+        <div className="practice-chart-stage">
+          {stagePages.map(index => renderSheet(index, 'center'))}
+        </div>
+      ) : (
+        <div className="practice-chart-strip" style={{ height: ready ? layout.total : '100%' }}>
+          {layout.tops.map((top, index) => (
+            <div
+              key={index}
+              className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}`}
+              style={{
+                top, left: layout.lefts[index],
+                height: layout.drawHeights[index], width: layout.widths[index],
+              }}
+              onPointerDown={marker ? event => beginStroke(index, event) : undefined}
+              onPointerMove={marker ? extendStroke : undefined}
+              onPointerUp={marker ? endStroke : undefined}
+              onPointerCancel={marker ? endStroke : undefined}
+            >
+              {renderPageFace(index)}
+            </div>
+          ))}
+          {halfTurn && layout.tops.slice(1).map((top, index) => (
+            <div
+              key={`join-${index}`}
+              className="practice-chart-join"
+              style={{ top }}
+              aria-hidden
+            />
+          ))}
+        </div>
+      )}
     </div>
+  )
+}
+
+/**
+ * The marks on one page, drawn in the page's own 0..1000 space so they sit
+ * exactly where they were put at any zoom, in a spread, or after a rotation.
+ * `non-scaling-stroke` keeps the marker the same weight on screen however far
+ * the page is scaled, which is what a marker does on paper.
+ */
+function ChartPageInk({ strokes, live, liveColour, liveWidth }: {
+  strokes: InkStroke[] | undefined
+  live: number[] | null
+  liveColour: InkColour | null
+  liveWidth?: InkWidth
+}) {
+  if (!strokes?.length && !live) return null
+  return (
+    <svg className="practice-chart-ink" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden>
+      {strokes?.map((stroke, index) => (
+        <path
+          key={index}
+          d={inkPathData(stroke.points)}
+          stroke={INK_CSS[stroke.colour]}
+          strokeWidth={inkStrokeWidthPx(stroke.width)}
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+      {live && live.length >= 2 && (
+        <path
+          d={inkPathData(live.length >= 4 ? live : [...live, ...live])}
+          stroke={INK_CSS[liveColour ?? 'black']}
+          strokeWidth={inkStrokeWidthPx(liveWidth)}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </svg>
   )
 }
 

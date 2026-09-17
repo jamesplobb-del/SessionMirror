@@ -5,6 +5,15 @@ export function isTabletViewport(width = readViewportWidth()): boolean {
   return width >= TABLET_MIN_VIEWPORT_WIDTH
 }
 
+export function subscribeFormFactor(onChange: () => void): () => void {
+  window.addEventListener('resize', onChange)
+  window.visualViewport?.addEventListener('resize', onChange)
+  return () => {
+    window.removeEventListener('resize', onChange)
+    window.visualViewport?.removeEventListener('resize', onChange)
+  }
+}
+
 function readViewportWidth(): number {
   if (typeof window === 'undefined') return 0
   return Math.round(window.innerWidth)

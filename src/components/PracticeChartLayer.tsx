@@ -6,6 +6,11 @@ import {
   type ChartView, type PracticeChart,
 } from '../utils/practiceChartStorage'
 import MusicWidget from './practiceChart/MusicWidget'
+import {
+  clearInkStrokes, loadInkStrokes, loadInkWidth, saveInkStrokes, saveInkWidth,
+  type InkColour, type InkStroke, type InkWidth,
+} from './practiceChart/chartInk'
+import { shareMarkedChart } from './practiceChart/chartExport'
 import PracticeChartPaper, { type ChartPaperHandle, type ChartPaperView } from './practiceChart/PracticeChartPaper'
 import { closeCachedPdfChart } from './practiceChart/chartDocument'
 import './practice-chart.css'
@@ -27,6 +32,8 @@ interface PracticeChartLayerProps {
   onClose: () => void
   /** True while the page is actually covering the room, so the HUD can stand down. */
   onPaperVisibleChange: (visible: boolean) => void
+  /** True while the player has asked for the tabs and the deck to stand down too. */
+  onChromeHiddenChange: (hidden: boolean) => void
 }
 
 /**
@@ -40,6 +47,7 @@ interface PracticeChartLayerProps {
  */
 export default function PracticeChartLayer({
   projectId, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
+  onChromeHiddenChange,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -51,6 +59,21 @@ export default function PracticeChartLayer({
   const [error, setError] = useState('')
   const [loadFailed, setLoadFailed] = useState(false)
   const [spreadAvailable, setSpreadAvailable] = useState(false)
+  const [strokes, setStrokes] = useState<InkStroke[]>([])
+  /*
+   * The marker is picked up for a moment and put down again, so it is not
+   * remembered: a part must never open in marking mode, where the first tap
+   * to turn the page would draw on it instead.
+   */
+  const [marker, setMarker] = useState<InkColour | null>(null)
+  const [inkWidth, setInkWidth] = useState<InkWidth>(loadInkWidth)
+  /*
+   * Rehearsal view is a mode you step into, not a setting you keep. Remembered,
+   * it would mean opening a part next week to an app with no tabs and no deck
+   * and no memory of asking for that — which reads as broken, not as a feature.
+   */
+  const [chromeOff, setChromeOff] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [hint, setHint] = useState(false)
 
   useEffect(() => {
@@ -61,6 +84,9 @@ export default function PracticeChartLayer({
     setError('')
     setLoadFailed(false)
     setView(loadChartView(projectId))
+    setStrokes(loadInkStrokes(projectId))
+    setMarker(null)
+    setChromeOff(false)
     setPaperVisible(isChartVisible(projectId))
     void loadPracticeChart(projectId)
       .then(value => { if (!cancelled) setChart(value) })
@@ -79,16 +105,25 @@ export default function PracticeChartLayer({
   useEffect(() => { onPaperVisibleChange(showing) }, [onPaperVisibleChange, showing])
 
   /*
+   * Rehearsal view only means anything while a part is up, and it must never
+   * outlive one: chrome hidden with no page behind it is a room with no way
+   * out.
+   */
+  const chromeHidden = showing && chromeOff
+  useEffect(() => { onChromeHiddenChange(chromeHidden) }, [chromeHidden, onChromeHiddenChange])
+
+  /*
    * Turning the Music tool off unmounts this layer outright, and the room would
    * otherwise be left standing down for a page that is no longer there: a
    * transparent HUD over a live camera. The same unmount is the one moment the
    * parsed file is genuinely finished with, so it is released here rather than
    * on every hide — a hide is something a player does mid-piece.
    */
-  const releaseRef = useRef(onPaperVisibleChange)
-  releaseRef.current = onPaperVisibleChange
+  const releaseRef = useRef({ paper: onPaperVisibleChange, chrome: onChromeHiddenChange })
+  releaseRef.current = { paper: onPaperVisibleChange, chrome: onChromeHiddenChange }
   useEffect(() => () => {
-    releaseRef.current(false)
+    releaseRef.current.paper(false)
+    releaseRef.current.chrome(false)
     closeCachedPdfChart()
   }, [])
 
@@ -204,6 +239,44 @@ export default function PracticeChartLayer({
     setSpreadAvailable(available)
   }, [])
 
+  const handleStroke = useCallback((stroke: InkStroke) => {
+    setStrokes(current => {
+      const next = [...current, stroke]
+      saveInkStrokes(projectId, next)
+      return next
+    })
+  }, [projectId])
+
+  const undoStroke = useCallback(() => {
+    setStrokes(current => {
+      if (current.length === 0) return current
+      const next = current.slice(0, -1)
+      saveInkStrokes(projectId, next)
+      return next
+    })
+  }, [projectId])
+
+  const clearMarks = useCallback(() => {
+    clearInkStrokes(projectId)
+    setStrokes([])
+  }, [projectId])
+
+  const saveMarked = useCallback(async () => {
+    if (!chart) return
+    setSaving(true)
+    setError('')
+    try {
+      const result = await shareMarkedChart(chart, strokes)
+      if (!result.ok) setError(result.message)
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message
+        ? cause.message
+        : 'Could not save a marked copy of this music.')
+    } finally {
+      setSaving(false)
+    }
+  }, [chart, strokes])
+
   const pick = useCallback(() => {
     setError('')
     input.current?.click()
@@ -214,6 +287,9 @@ export default function PracticeChartLayer({
     setError('')
     try {
       await deletePracticeChart(projectId)
+      clearInkStrokes(projectId)
+      setStrokes([])
+      setMarker(null)
       setChart(null)
       setPageView(null)
       setPaperVisible(true)
@@ -231,6 +307,8 @@ export default function PracticeChartLayer({
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const start = gesture.current
     gesture.current = null
+    // With the marker out every tap is a mark, never a page turn.
+    if (marker) return
     if (!start || start.id !== event.pointerId) return
     if (Date.now() - start.at > TAP_MS) return
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return
@@ -259,6 +337,9 @@ export default function PracticeChartLayer({
         setError('')
         try {
           setChart(await savePracticeChart(projectId, file))
+          clearInkStrokes(projectId)
+          setStrokes([])
+          setMarker(null)
           setPaperVisible(true)
           setView(loadChartView(projectId))
         } catch (cause) {
@@ -288,7 +369,21 @@ export default function PracticeChartLayer({
           onError={handleError}
           onLoadFailed={handleLoadFailed}
           onSpreadAvailable={handleSpreadAvailable}
+          strokes={strokes}
+          marker={marker}
+          inkWidth={inkWidth}
+          onStroke={handleStroke}
         />
+        {chromeHidden && !marker && (
+          <button
+            type="button"
+            className="practice-chart-restore"
+            aria-label="Show the tabs and the deck"
+            onClick={() => setChromeOff(false)}
+          >
+            <span aria-hidden />
+          </button>
+        )}
         {loadFailed ? (
           <div className="practice-chart-failed" role="alert">
             <p>{error || 'This file could not be opened.'}</p>
@@ -319,6 +414,17 @@ export default function PracticeChartLayer({
       fit={view.fit}
       spreadAvailable={spreadAvailable}
       halfTurn={view.halfTurn}
+      chromeHidden={chromeOff}
+      onChromeHiddenChange={setChromeOff}
+      marker={marker}
+      inkWidth={inkWidth}
+      markCount={strokes.length}
+      saving={saving}
+      onMarkerChange={setMarker}
+      onInkWidthChange={width => { saveInkWidth(width); setInkWidth(width) }}
+      onUndoMark={undoStroke}
+      onClearMarks={clearMarks}
+      onSaveMarked={() => void saveMarked()}
       onAdd={pick}
       onRemove={() => void remove()}
       onTurn={direction => paper.current?.turn(direction)}

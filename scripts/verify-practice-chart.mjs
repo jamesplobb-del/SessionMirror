@@ -8,6 +8,8 @@ const result = await build({
 const {
   layoutChartStrip, chartTurnStops, nextChartStop, chartPagesInView,
   chartScrollFraction, chartOffsetForFraction, nearestChartStop,
+  nextChartHalfTurn, chartHalfTurnFromFraction, chartFractionFromHalfTurn,
+  chartHalfTurnView, chartRowCount,
 } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
 
 const LETTER = { width: 612, height: 792 }
@@ -191,3 +193,22 @@ console.log('Practice chart: portrait page numbering passed.')
 }
 
 console.log('Practice chart: two-page spreads, odd last pages and mixed page sizes passed.')
+
+/* forScore half turn: bottom of the current page stays, top of the next comes
+ * in above it. One tap peeks, the next tap completes the page. */
+{
+  assert.equal(chartRowCount(6, 1), 6)
+  assert.equal(chartRowCount(6, 2), 3)
+  const start = { row: 0, peek: false }
+  const peek = nextChartHalfTurn(start, 4, 1)
+  assert.deepEqual(peek, { row: 0, peek: true }, 'The first half turn keeps the current page on the bottom')
+  assert.deepEqual(chartHalfTurnView(peek, 1, 4), { first: 0, last: 1 })
+  assert.deepEqual(nextChartHalfTurn(peek, 4, 1), { row: 1, peek: false }, 'The next tap finishes the turn')
+  assert.deepEqual(nextChartHalfTurn(peek, 4, -1), start, 'Turning back undoes the peek')
+  assert.equal(nextChartHalfTurn({ row: 3, peek: false }, 4, 1), null, 'The last page has nowhere to peek')
+
+  const restored = chartHalfTurnFromFraction(chartFractionFromHalfTurn(peek, 4), 4)
+  assert.deepEqual(restored, peek, 'A peek survives being stored as a fraction')
+}
+
+console.log('Practice chart: forScore half turns passed.')

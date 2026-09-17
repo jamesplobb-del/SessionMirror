@@ -821,9 +821,8 @@
 
 .practice-menu-focus-tools {
   display: grid;
-  /* One row, four across: as a 2x2 these pushed the whole grid below the fold
-   * on a phone, which is what made home feel like a scrolling page. */
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Phone keeps three tools on one row. iPad adds Music as a fourth. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
   margin-top: 0.2rem;
   overflow: visible;
@@ -831,6 +830,10 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+html.form-factor-tablet .practice-menu-focus-tools {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .practice-menu-focus-tools .practice-menu-shortcut {

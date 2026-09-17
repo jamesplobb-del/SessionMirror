@@ -890,6 +890,9 @@ export default function LivePitchTuner({
       tunerInstrument,
       realtimeMode: isWidget,
       preferNativeAudioTap: liveMicWidget,
+      nativePitchProcessing: liveMicWidget && nativePitchProcessing,
+      allowStandaloneMicFallback: liveMicWidget,
+      retryNativeTapOnInteractiveRecovery: liveMicWidget,
     },
   )
   if (isAudio) {

@@ -229,3 +229,77 @@ export function nearestChartStop(stops: readonly number[], offset: number): numb
   }
   return best
 }
+
+/**
+ * forScore-style half turn: the bottom half of the page stays put and the top
+ * half is replaced with the top of the next page, with a line between them.
+ *
+ * `row` is a layout row (one page, or a two-page spread). `peek` means the
+ * two halves are out of phase — bottom still on this row, top already on the
+ * next. Fill-width still uses the scroll stops above; this is the page/spread
+ * turn, where a scroll would move the bottom of the page up the screen.
+ */
+export interface ChartHalfTurn {
+  row: number
+  peek: boolean
+}
+
+export function chartRowCount(pageCount: number, columns: number): number {
+  if (pageCount <= 0) return 0
+  return Math.ceil(pageCount / Math.max(1, columns))
+}
+
+export function chartRowPages(row: number, columns: number, pageCount: number): number[] {
+  const start = row * Math.max(1, columns)
+  const pages: number[] = []
+  for (let index = 0; index < Math.max(1, columns) && start + index < pageCount; index += 1) {
+    pages.push(start + index)
+  }
+  return pages
+}
+
+export function nextChartHalfTurn(
+  current: ChartHalfTurn,
+  rows: number,
+  direction: 1 | -1,
+): ChartHalfTurn | null {
+  if (rows <= 0) return null
+  if (direction === 1) {
+    if (!current.peek) {
+      if (current.row >= rows - 1) return null
+      return { row: current.row, peek: true }
+    }
+    if (current.row >= rows - 1) return null
+    return { row: current.row + 1, peek: false }
+  }
+  if (current.peek) return { row: current.row, peek: false }
+  if (current.row <= 0) return null
+  return { row: current.row - 1, peek: true }
+}
+
+export function chartHalfTurnView(
+  turn: ChartHalfTurn,
+  columns: number,
+  pageCount: number,
+): { first: number; last: number } {
+  const bottom = chartRowPages(turn.row, columns, pageCount)
+  const top = turn.peek ? chartRowPages(turn.row + 1, columns, pageCount) : bottom
+  const pages = [...bottom, ...top]
+  if (pages.length === 0) return { first: 0, last: 0 }
+  return { first: Math.min(...pages), last: Math.max(...pages) }
+}
+
+export function chartFractionFromHalfTurn(turn: ChartHalfTurn, rows: number): number {
+  if (rows <= 1) return 0
+  const stops = rows * 2 - 1
+  const index = turn.row * 2 + (turn.peek ? 1 : 0)
+  return Math.min(1, Math.max(0, index / (stops - 1)))
+}
+
+export function chartHalfTurnFromFraction(fraction: number, rows: number): ChartHalfTurn {
+  if (rows <= 1) return { row: 0, peek: false }
+  const stops = rows * 2 - 1
+  const index = Math.round(Math.min(1, Math.max(0, fraction)) * (stops - 1))
+  const row = Math.min(rows - 1, Math.floor(index / 2))
+  return { row, peek: index % 2 === 1 && row < rows - 1 }
+}

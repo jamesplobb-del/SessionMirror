@@ -1,6 +1,6 @@
 import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
 import DailyChallenges from './DailyChallenges'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -26,6 +26,7 @@ import {
   type TunerTranspositionId,
 } from '../utils/tunerTransposition'
 import { loadMetronomePrefs, type MetronomePrefs } from '../utils/metronomeConfig'
+import { isTabletViewport, subscribeFormFactor } from '../utils/deviceFormFactor'
 import type { Project } from '../db'
 import type { Take } from '../types'
 import type { DeskSnapshot } from '../utils/workspaceDesks'
@@ -77,6 +78,8 @@ interface PracticeHubProps {
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
+  /** iPad home only — music is a stand, not a phone tool. */
+  onOpenMusic?: () => void
 
   /* ---- Daily routine ---- */
   routine: Routine | null
@@ -121,6 +124,7 @@ export default function PracticeHub({
   onDailyGame,
   onOpenTuner,
   onOpenMetronome,
+  onOpenMusic,
   routine,
   routineDay,
   routineBuilderRequest,
@@ -146,6 +150,7 @@ export default function PracticeHub({
   const [launchError, setLaunchError] = useState('')
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
+  const isIpadHome = useSyncExternalStore(subscribeFormFactor, isTabletViewport, () => false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -527,6 +532,31 @@ export default function PracticeHub({
                           <strong>Tuner</strong>
                           <small>{instrumentId ? instrumentHeading(instrumentId) : tunerKey.shortLabel}</small>
                         </Pressable>
+                        {isIpadHome && onOpenMusic && (
+                          <Pressable
+                            type="button"
+                            intensity="soft"
+                            haptic="light"
+                            hapticFeedback={hapticFeedback}
+                            className="practice-menu-shortcut"
+                            onClick={onOpenMusic}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={1.9}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden
+                            >
+                              <path d="M6 4h9.5a1.5 1.5 0 0 1 1.5 1.5V20H7.5A1.5 1.5 0 0 1 6 18.5V4Z" />
+                              <path d="M9 8h6M9 12h6M9 16h3" />
+                            </svg>
+                            <strong>Music</strong>
+                            <small>On the stand</small>
+                          </Pressable>
+                        )}
                       </div>
                     </section>
                   </motion.div>

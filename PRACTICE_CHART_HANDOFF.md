@@ -125,6 +125,37 @@ now be seen in landscape for the first time. Practice Home, Record, Tuner and Me
 checked and are properly laid out. **Camera in iPad landscape is the one surface not checked** —
 framing and the orientation a take is recorded in are worth a look before this ships.
 
+## Second pass: the takes ball, rehearsal view, and the marker
+
+**The takes are a ball.** On a surface where the part is the whole screen the
+take cards cannot be a panel across the middle, and they cannot live on the deck
+either — the deck is the first thing a player puts away for a rehearsal. So they
+fold to the same 56px ball as every other tool and open into the compact pills
+the Tuner tab already uses. `DraggableTakesWidget`, `ballSlot: 5`.
+
+**Rehearsal view** (`Full page` in the music widget) stands the tab bar and the
+deck down so the part gets the whole screen — on an 834×1194 iPad that is 972px
+of page becoming 1079. The balls stay, because they are the tools. It is
+deliberately **not remembered**: a setting that survives would mean opening a
+part next week to an app with no tabs and no deck and no memory of asking for
+that, which reads as broken rather than as a feature. A quiet grab handle at the
+bottom edge brings the room back, and so does hiding the page or turning the
+tool off.
+
+**The marker** is two colours, one width, an undo and a clear — not a pencil.
+Marks are stored per page in **page-normalised coordinates**, so they stay put
+through a rotation, a spread, a fit change and any screen the part is opened on.
+With the marker out every tap is a mark, so tap-to-turn stands down and the page
+stops scrolling under the hand; it is capped by default and never remembered,
+because a part that opens in marking mode draws a line across a system on the
+first tap meant to turn it.
+
+**Save PDF** writes the marks into the original pages with `pdf-lib` and hands
+the file to the system share sheet. It is the same PDF with marks in it, not a
+stack of screenshots: page count, page sizes and the original text all survive,
+which `scripts/verify-practice-chart-ink.mjs` asserts. A photo of a part becomes
+a one-page PDF the same way.
+
 ## Bugs this pass found and fixed
 
 Everything below was found by driving the real UI, not by reading it.
@@ -146,6 +177,14 @@ Everything below was found by driving the real UI, not by reading it.
 7. **Empty "No Best Take" pills were drawn over the staff.** They appear only when a take exists.
 8. **Turning the tool off left the room standing down** — a transparent HUD over a live camera with
    no page behind it.
+9. **The take-card panel was unmounted, not hidden.** `AnimatedTabPanel` drops its children when
+   inactive, and that subtree holds a shared **native audio-tap claim**
+   (`useLiveRecordingWaveform`) that the floating tuner and hands-free read through. The app had
+   already learned this rule once — the `.widget-is-collapsed` note says folding a tool must never
+   take its capture down with it. It is now hidden rather than unmounted. **This is the most likely
+   cause of "the pitch graph reads nothing over the music" and it needs a device to confirm**: the
+   browser uses a per-consumer WebAudio analyser, so it cannot reproduce the symptom — driving it
+   there showed the tuner reading A4/440.0 Hz identically with and without a part up.
 
 Two things that looked like bugs and were not: the app hanging on a splash after
 `location.reload()` is a pre-existing web-only IndexedDB lock, and the page not returning after
@@ -169,6 +208,16 @@ Games is unreachable, because the tab bar is covered while a game is up.
   landscape opens a two-page spread; a tap turns it on by two pages; rotating back to portrait
   lands on the same page. That is the whole iPad story end to end.
 
+- Second pass, driven the same way: the takes ball replacing the pill row, rehearsal view hiding
+  and restoring the tabs and deck (including the dangerous case — turning the tool off while the
+  chrome is away gives the room back), the marker in both colours, tap-to-turn standing down and
+  coming back, undo, marks surviving hide/show and a page turn, marks cleared by Replace, marks
+  drawn on the **second page of a landscape spread** landing on page 2 in page-local coordinates,
+  and Save PDF parsed back with pdf.js: 3 pages, 612×792, original text intact, stroke colour
+  exactly the marker's.
+- The record control stays hit-testable with a part up, and the page stays visible through a
+  record attempt. Whether a take actually lands is a microphone question for a device.
+
 **Geometry in the browser preview is only meaningful with an emulated viewport** — the pane reports
 `innerWidth: 0` when collapsed, which reads as "the page rendered nothing".
 
@@ -176,9 +225,12 @@ Games is unreachable, because the tab bar is covered while a game is up.
 
 Everything audio, and everything native. In particular:
 
+0. **The pitch graph over a part, on a device.** Fix 9 above is the candidate; it could not be
+   reproduced in a browser.
 1. A real multi-page PDF on an iPad: render quality, memory under a long part, rotation.
 2. **A flattened annotated PDF shared out of forScore** — the actual import path.
 3. Native disk persistence across a relaunch (the web build keeps charts in memory for the
    session only, by design).
 4. Recording from the page, and playing back a take with the page still up.
 5. Half turns with an instrument in hand, which is the only test that matters.
+6. Save PDF on device: the share sheet, and the marked copy opening in Files or forScore.

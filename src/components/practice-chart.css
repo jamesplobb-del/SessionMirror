@@ -60,6 +60,53 @@
   outline: 1px solid rgba(23, 26, 34, 0.14);
 }
 
+.practice-chart-scroll--split {
+  overflow: hidden;
+}
+
+.practice-chart-split {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.practice-chart-split__pane {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.practice-chart-split__rule {
+  flex: 0 0 2px;
+  background: rgba(23, 26, 34, 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  z-index: 3;
+}
+
+.practice-chart-split__sheet {
+  position: absolute;
+}
+
+.practice-chart-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.practice-chart-join {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(23, 26, 34, 0.5);
+  z-index: 2;
+  pointer-events: none;
+}
+
 .practice-chart-page canvas,
 .practice-chart-page img {
   display: block;
@@ -149,9 +196,23 @@
  * sheet of colour laid over the part. These surfaces keep their controls and
  * give up their background — the page underneath is the background now.
  */
+/*
+ * The take-card panel stands down by going invisible, not by being unmounted:
+ * it holds a shared native audio-tap claim the tuner reads through. Same rule
+ * as `.widget-is-collapsed`.
+ */
+.app-shell--music-page .audio-mode-home-layer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .app-shell--music-page .audio-mode-home,
 .app-shell--music-page .audio-mode-home-layer {
   background: transparent !important;
+}
+
+.app-shell--music-page .pitch-display-layer {
+  z-index: 36;
 }
 
 .app-shell--music-page .audio-practice-metronome-scrim { display: none; }
@@ -179,11 +240,16 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.2));
 }
 
+.music-widget .widget-collapse {
+  left: 6px;
+  right: auto;
+}
+
 .music-widget__panel {
   position: relative;
   display: grid;
-  gap: 0.5rem;
-  padding: 0.75rem 0.75rem 0.7rem;
+  gap: 0.7rem;
+  padding: 1.35rem 0.85rem 0.8rem;
   border-radius: 1.25rem;
   overflow: hidden;
   background: rgba(10, 16, 28, 0.78);
@@ -202,26 +268,31 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   -webkit-backdrop-filter: none;
 }
 
+.music-widget__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .music-widget__close {
-  position: absolute;
-  right: 0.55rem;
-  top: 0.55rem;
+  position: static;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: 0;
   background: rgba(255, 255, 255, 0.1);
   color: inherit;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .app-shell--audio-mode .music-widget__close { background: rgba(23, 26, 34, 0.07); }
 
 .music-widget__file {
   margin: 0;
-  padding-right: 1.8rem;
+  padding-right: 0;
   font-size: 12px;
   font-weight: 650;
   line-height: 1.25;
@@ -413,3 +484,164 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   outline-offset: 2px;
 }
 
+
+/* ---- Marks on the part ------------------------------------------------- */
+
+/*
+ * The marks sit above the page and never take the pointer: the page below owns
+ * the gesture, so a stroke is captured in one place and a tap still turns.
+ * `non-scaling-stroke` keeps the marker one weight on screen whatever the page
+ * is scaled to — a marker nib does not get bigger when you lean in.
+ */
+.practice-chart-ink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.practice-chart-ink path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+}
+
+/* With the marker out the page stops scrolling under the hand. */
+.practice-chart-page--marking { touch-action: none; cursor: crosshair; }
+
+/* ---- The way back out of rehearsal view -------------------------------- */
+
+/*
+ * The one thing left on screen when the tabs and the deck are away. Small and
+ * quiet enough to ignore while playing, and the only thing between a player
+ * and the record button, so it is never conditional on anything else.
+ */
+.practice-chart-restore {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  z-index: 2;
+}
+
+.practice-chart-restore span {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(23, 26, 34, 0.26);
+}
+
+.practice-chart-restore:active span { background: rgba(23, 26, 34, 0.45); }
+.practice-chart-restore:focus-visible { outline: 2px solid #69b5ff; outline-offset: 2px; }
+
+/* ---- Marker controls ---------------------------------------------------- */
+
+.music-widget__marker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.app-shell--audio-mode .music-widget__marker { background: rgba(23, 26, 34, 0.05); }
+
+.music-widget__marker button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 38px;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  color: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  opacity: 0.62;
+}
+
+.music-widget__marker button svg { width: 14px; height: 14px; }
+
+.music-widget__marker button i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.app-shell--audio-mode .music-widget__marker button i { border-color: rgba(23, 26, 34, 0.25); }
+
+.music-widget__marker button[aria-pressed='true'] {
+  background: rgba(77, 155, 255, 0.24);
+  opacity: 1;
+}
+
+.music-widget__nib {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.25rem;
+}
+
+.music-widget__nib button {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.app-shell--audio-mode .music-widget__nib button { background: rgba(23, 26, 34, 0.04); }
+
+.music-widget__nib button i {
+  display: block;
+  border-radius: 50%;
+}
+
+.music-widget__nib button[aria-pressed='true'] {
+  background: rgba(77, 155, 255, 0.24);
+  opacity: 1;
+}
+
+/* ---- The takes, folded -------------------------------------------------- */
+
+.takes-widget {
+  width: min(19rem, calc(100vw - 1.5rem));
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.2));
+}
+
+.takes-widget__panel {
+  padding: 0.6rem;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  background: rgba(10, 16, 28, 0.78);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: #eef4ff;
+}
+
+.app-shell--audio-mode .takes-widget__panel {
+  background: var(--audio-surface, #ffffff);
+  border-color: rgba(23, 26, 34, 0.1);
+  color: var(--audio-text-primary, #171a22);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

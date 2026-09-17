@@ -11,7 +11,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
-import { animate, motion, useDragControls, useMotionValue, useReducedMotion } from 'framer-motion'
+import { motion, useDragControls, useMotionValue, useReducedMotion } from 'framer-motion'
 import { ArrowLeftRight, Pin, RotateCcw, Share, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
@@ -162,7 +162,7 @@ function CompactTakeCaption({
         tabIndex={0}
         className={captionClassName}
         data-tutorial={dataTutorial}
-        aria-label={`Drag ${label} directly to the other card, or tap to enlarge. Long press the card to reposition it.`}
+        aria-label={`Drag ${label} directly to the other card, or tap to open full screen. Long press the card to reposition it.`}
         onKeyDown={handleKeyDown}
         {...dragSourceProps}
       >
@@ -181,7 +181,7 @@ function CompactTakeCaption({
       className={captionClassName}
       data-tutorial={dataTutorial}
       onClick={onOpen}
-      aria-label={`Enlarge ${label}`}
+      aria-label={`Open ${label} in full screen`}
     >
       {content}
     </Pressable>
@@ -197,8 +197,7 @@ const TAKE_CARD_DRAG_COMPLETION_PX = 3
 
 function MovableTakeSlot({
   movable,
-  enlarged,
-  onEnlarge,
+  onOpenFullScreen,
   editing,
   onEnterEditing,
   onLayoutDragCompleted,
@@ -213,8 +212,7 @@ function MovableTakeSlot({
   children,
 }: {
   movable: boolean
-  enlarged: boolean
-  onEnlarge: () => void
+  onOpenFullScreen: () => void
   editing: boolean
   onEnterEditing: () => void
   onLayoutDragCompleted: () => void
@@ -231,34 +229,6 @@ function MovableTakeSlot({
   const dragControls = useDragControls()
   const slotNodeRef = useRef<HTMLDivElement | null>(null)
   const reduceMotion = useReducedMotion()
-  const [focusOffset, setFocusOffset] = useState({ x: 0, y: 0 })
-  const focusTranslate = useMotionValue('0px 0px')
-  const focused = enlarged && !editing
-  useLayoutEffect(() => {
-    const animation = animate(focusTranslate, focused ? `${focusOffset.x}px ${focusOffset.y}px` : '0px 0px',
-      reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 30, mass: 0.9 })
-    return () => animation.stop()
-  }, [focusTranslate, focused, focusOffset, reduceMotion])
-  useLayoutEffect(() => {
-    if (!focused) { setFocusOffset({ x: 0, y: 0 }); return }
-    const measure = () => {
-      const node = slotNodeRef.current
-      if (!node) return
-      const rect = node.getBoundingClientRect()
-      const translation = getComputedStyle(node).translate.split(' ')
-      const currentX = parseFloat(translation[0]) || 0
-      const currentY = parseFloat(translation[1]) || 0
-      const viewport = window.visualViewport
-      const centerX = (viewport?.offsetLeft ?? 0) + (viewport?.width ?? window.innerWidth) / 2
-      const centerY = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight) / 2
-      // Move partway toward center; keep the saved drag position independent.
-      setFocusOffset({ x: (centerX - (rect.left + rect.width / 2 - currentX)) * 0.55,
-        y: (centerY - (rect.top + rect.height / 2 - currentY)) * 0.55 })
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [focused])
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
   const layoutReady = useRef(false)
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
@@ -280,7 +250,7 @@ function MovableTakeSlot({
   const [dragging, setDragging] = useState(false)
 
   const clampPositionToBoundary = useCallback(() => {
-    if (!layoutReady.current || !movable || enlarged || editing || draggingRef.current) return
+    if (!layoutReady.current || !movable || editing || draggingRef.current) return
     // Dialog/keyboard geometry is temporary, not a new position for the cards.
     if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
     const node = slotNodeRef.current
@@ -296,11 +266,8 @@ function MovableTakeSlot({
       return
     }
 
-    // Focus animation is temporary. Clamp the resting layout, never its
-    // interpolated scale/translation while the card is shrinking.
-    const [liftX = 0, liftY = 0] = focusTranslate.get().split(' ').map(value => parseFloat(value) || 0)
-    const centerX = (rect.left + rect.right) / 2 - currentX - liftX
-    const centerY = (rect.top + rect.bottom) / 2 - currentY - liftY
+    const centerX = (rect.left + rect.right) / 2 - currentX
+    const centerY = (rect.top + rect.bottom) / 2 - currentY
     const baseLeft = centerX - node.offsetWidth / 2
     const baseRight = centerX + node.offsetWidth / 2
     const baseTop = centerY - node.offsetHeight / 2
@@ -322,7 +289,7 @@ function MovableTakeSlot({
     dragX.set(nextX)
     dragY.set(nextY)
     // Viewport correction is temporary; only a deliberate drag is persisted.
-  }, [boundaryRef, dragX, dragY, editing, enlarged, focusTranslate, movable, positionId])
+  }, [boundaryRef, dragX, dragY, editing, movable, positionId])
 
   useLayoutEffect(() => {
     clampPositionToBoundary()
@@ -455,13 +422,6 @@ function MovableTakeSlot({
       holdTimerRef.current = window.setTimeout(() => {
         const press = pressRef.current
         if (!press) return
-        // Transfer the visual lift into the drag position before move mode starts,
-        // so an enlarged card does not slide away from the held pointer.
-        focusTranslate.stop()
-        const [liftX = 0, liftY = 0] = focusTranslate.get().split(' ').map(value => parseFloat(value) || 0)
-        dragX.set(dragX.get() + liftX)
-        dragY.set(dragY.get() + liftY)
-        focusTranslate.set('0px 0px')
         suppressClickRef.current = true
         setArmed(true)
         enteringEditingRef.current = true
@@ -475,9 +435,6 @@ function MovableTakeSlot({
     [
       clearHoldTimer,
       dragControls,
-      dragX,
-      dragY,
-      focusTranslate,
       editing,
       hapticFeedback,
       movable,
@@ -568,10 +525,10 @@ function MovableTakeSlot({
       onClickCapture={(event) => {
         if (!suppressClickRef.current) {
           // Captions own their tap (including transfer-hook pointer taps).
-          // Running both handlers reopens a card immediately after collapsing it.
+          // Skip them here so a label drag-tap does not also open fullscreen.
           const target = event.target as HTMLElement
           if (movable && !editing && slotNodeRef.current?.contains(target) &&
-              !target.closest('.compact-take-caption, button, a, input, [data-card-move-ignore]')) onEnlarge()
+              !target.closest('.compact-take-caption, button, a, input, [data-card-move-ignore]')) onOpenFullScreen()
           return
         }
         event.preventDefault()
@@ -587,7 +544,7 @@ function MovableTakeSlot({
                   ? [-0.38, 0.38, -0.38]
                   : [0.38, -0.38, 0.38],
             }
-          : { scale: armed || dragging ? 1.04 : focused ? 1.2 : 1, rotate: 0 }
+          : { scale: armed || dragging ? 1.04 : 1, rotate: 0 }
       }
       transition={
         editing && !dragging
@@ -597,7 +554,7 @@ function MovableTakeSlot({
             }
           : reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 30, mass: 0.9 }
       }
-      style={movable ? { x: dragX, y: dragY, translate: focusTranslate, transformOrigin: 'center center', zIndex: enlarged ? 15 : undefined } : undefined}
+      style={movable ? { x: dragX, y: dragY, transformOrigin: 'center center' } : undefined}
     >
       {children}
     </motion.div>
@@ -852,24 +809,19 @@ export default memo(function PipCompareRow({
   const cancelTransferDragsRef = useRef<() => void>(() => {})
   const layoutMovedRef = useRef(false)
   const [layoutEditing, setLayoutEditing] = useState(false)
-  const [enlargedTake, setEnlargedTake] = useState<'best' | 'current' | null>(null)
-  const toggleTake = useCallback((take: 'best' | 'current') => {
+  const openBestFullScreen = useCallback(() => {
     if (layoutEditing) return
-    setEnlargedTake(current => current === take ? null : take)
-  }, [layoutEditing])
-  useEffect(() => {
-    const dismiss = (event: globalThis.PointerEvent) => {
-      if (!(event.target as Element).closest('.compact-take-slot')) setEnlargedTake(null)
-    }
-    document.addEventListener('pointerdown', dismiss, true)
-    return () => document.removeEventListener('pointerdown', dismiss, true)
-  }, [])
+    onExpandBenchmark?.()
+  }, [layoutEditing, onExpandBenchmark])
+  const openCurrentFullScreen = useCallback(() => {
+    if (layoutEditing) return
+    onExpandChallenger?.()
+  }, [layoutEditing, onExpandChallenger])
   const [layoutResetNonce, setLayoutResetNonce] = useState(0)
 
   const enterLayoutEditing = useCallback(() => {
     cancelTransferDragsRef.current()
     layoutMovedRef.current = false
-    setEnlargedTake(null)
     setLayoutEditing(true)
     notifyTutorial?.('take-card-layout-entered')
   }, [notifyTutorial])
@@ -898,7 +850,6 @@ export default memo(function PipCompareRow({
       const completedLayoutDrag = layoutMovedRef.current
       layoutMovedRef.current = false
       setLayoutEditing(false)
-      setEnlargedTake(null)
       if (completedLayoutDrag) {
         notifyTutorial?.('take-card-layout-finished')
       }
@@ -970,7 +921,7 @@ export default memo(function PipCompareRow({
     deleteDropTargetRef: deleteDropRef,
     onPin: transferCurrentToBest,
     onDelete: onDeleteTake,
-    onTap: compact ? () => toggleTake('current') : onExpandChallenger,
+    onTap: compact ? openCurrentFullScreen : onExpandChallenger,
     onDragStateChange,
     enabled: challengerTransferEnabled,
     activationMode: compact ? 'move' : 'hold',
@@ -988,7 +939,7 @@ export default memo(function PipCompareRow({
     sourceTakeId: libraryBenchmarkPlayback || youtubeEmbedUrl ? null : benchmarkTake?.id ?? null,
     dropTargetRef: challengerDropRef,
     onPin: transferBestToCurrent,
-    onTap: compact ? () => toggleTake('best') : onExpandBenchmark,
+    onTap: compact ? openBestFullScreen : onExpandBenchmark,
     enabled:
       !layoutEditing &&
       takeHasPlaybackMedia(benchmarkTake) &&
@@ -1029,8 +980,7 @@ export default memo(function PipCompareRow({
       >
         <MovableTakeSlot
           movable={compact}
-          enlarged={compact && enlargedTake === 'best'}
-          onEnlarge={() => toggleTake('best')}
+          onOpenFullScreen={openBestFullScreen}
           editing={layoutEditing}
           onEnterEditing={enterLayoutEditing}
           onLayoutDragCompleted={markLayoutDragCompleted}
@@ -1101,7 +1051,7 @@ export default memo(function PipCompareRow({
               hasMedia={compactBenchmarkHasMedia}
               youtube={Boolean(youtubeEmbedUrl)}
               library={Boolean(libraryBenchmarkPlayback)}
-              onOpen={() => toggleTake('best')}
+              onOpen={openBestFullScreen}
               hapticFeedback={hapticFeedback}
               dragSourceProps={
                 benchmarkAcceptsTakeTransfer &&
@@ -1145,8 +1095,7 @@ export default memo(function PipCompareRow({
 
         <MovableTakeSlot
           movable={compact}
-          enlarged={compact && enlargedTake === 'current'}
-          onEnlarge={() => toggleTake('current')}
+          onOpenFullScreen={openCurrentFullScreen}
           editing={layoutEditing}
           onEnterEditing={enterLayoutEditing}
           onLayoutDragCompleted={markLayoutDragCompleted}
@@ -1213,7 +1162,7 @@ export default memo(function PipCompareRow({
               timestamp={challengerTake?.timestamp}
               duration={challengerTake?.duration}
               hasMedia={compactCurrentHasMedia}
-              onOpen={() => toggleTake('current')}
+              onOpen={openCurrentFullScreen}
               hapticFeedback={hapticFeedback}
               dragSourceProps={
                 challengerTransferEnabled && compactCurrentHasMedia
