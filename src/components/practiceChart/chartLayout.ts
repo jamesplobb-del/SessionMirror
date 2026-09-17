@@ -60,20 +60,37 @@ export function resolveChartFit(
   return chartSpreadFits(pages, viewWidth, viewHeight) ? 'spread' : 'page'
 }
 
+/**
+ * One row of the strip: a page, or a two-page spread, in a slot exactly one
+ * screen tall.
+ *
+ * The slot is what makes a forScore half turn exact. A fitted page is rarely
+ * the same shape as the screen — a letter page on a portrait iPad comes up
+ * about 90% of the height — so a strip of bare pages would put the halfway
+ * point somewhere other than the middle of the screen, and a half turn would
+ * show 45% of one page and 55% of the next. Slotting each row into a full
+ * screen and centring the page in it means half a slot is half the screen,
+ * always: the bottom half of what you are playing stays up top and the top
+ * half of the next page comes up underneath it.
+ */
+export interface ChartRow {
+  top: number
+  height: number
+}
+
 export interface ChartStripLayout {
   scale: number
   widths: number[]
+  /** Each page's own drawn height — never a row's, so nothing is stretched. */
   heights: number[]
-  /** Scroll offset at which each page's top edge reaches the top of the view. */
+  /** Where the page's top edge sits in the strip, centred in its slot. */
   tops: number[]
   /** Distance from the left edge of the strip. Two pages in a spread differ. */
   lefts: number[]
-  /**
-   * The page's own drawn height. In a spread a row is as tall as its tallest
-   * page, and a title page of a different size must sit in that row at its own
-   * proportions rather than be stretched to fill it.
-   */
-  drawHeights: number[]
+  /** The slots a turn moves between. */
+  rows: ChartRow[]
+  /** Which row each page belongs to. */
+  rowOfPage: number[]
   /** 1, or 2 when pages are laid out as spreads. */
   columns: number
   total: number
@@ -81,7 +98,7 @@ export interface ChartStripLayout {
 }
 
 const EMPTY: ChartStripLayout = {
-  scale: 1, widths: [], heights: [], tops: [], lefts: [], drawHeights: [],
+  scale: 1, widths: [], heights: [], tops: [], lefts: [], rows: [], rowOfPage: [],
   columns: 1, total: 0, maxScroll: 0,
 }
 
@@ -108,48 +125,56 @@ export function layoutChartStrip(
   const heights: number[] = []
   const tops: number[] = []
   const lefts: number[] = []
-  const drawHeights: number[] = []
+  const rowOfPage: number[] = []
+  const rows: ChartRow[] = []
   let offset = 0
   /*
-   * Pages go into rows of `columns`. Two pages in the same row share a top and
-   * a height, which is what lets a turn move by a whole spread and a half turn
-   * still mean "half of what is on the stand" — the stops, the page numbering
-   * and the render window all keep working off the same per-page arrays.
+   * Pages go into rows of `columns`, and every row gets a slot. Fitting a page
+   * or a spread gives the slot a full screen; filling the width gives it the
+   * page's own height, because there the player is scrolling a tall page
+   * rather than turning between screens.
    */
   for (let index = 0; index < pages.length; index += columns) {
     const row = pages.slice(index, index + columns)
     const rowHeight = Math.max(...row.map(page => page.height)) * scale
+    const slotHeight = fit === 'width' ? rowHeight : Math.max(rowHeight, viewHeight)
     const rowWidth = row.reduce((total, page) => total + page.width * scale, 0)
       + (row.length - 1) * SPREAD_GUTTER
     let x = (viewWidth - rowWidth) / 2
     for (const page of row) {
+      const height = page.height * scale
       widths.push(page.width * scale)
-      heights.push(rowHeight)
-      drawHeights.push(page.height * scale)
-      tops.push(offset)
+      heights.push(height)
+      // Centred in the slot, so a page shorter than the screen has its margin
+      // split evenly instead of all of it falling below the last system.
+      tops.push(offset + (slotHeight - height) / 2)
       lefts.push(Math.max(0, x))
+      rowOfPage.push(rows.length)
       x += page.width * scale + SPREAD_GUTTER
     }
-    offset += rowHeight
+    rows.push({ top: offset, height: slotHeight })
+    offset += slotHeight
   }
   return {
-    scale, widths, heights, tops, lefts, drawHeights, columns,
+    scale, widths, heights, tops, lefts, rows, rowOfPage, columns,
     total: offset, maxScroll: Math.max(0, offset - viewHeight),
   }
 }
 
 /**
- * Where a turn is allowed to land: every page top, plus every page middle when
- * half turns are on. Stops past the end of the strip collapse onto the last
- * scrollable offset, so the final turn still moves and never leaves a dead tap.
+ * Where a turn is allowed to land: the top of every slot, plus the middle of
+ * every slot when half turns are on. Stops past the end of the strip collapse
+ * onto the last scrollable offset, so the final turn still moves and never
+ * leaves a dead tap.
+ *
+ * Slots, not pages: half of a slot is half of the screen, which is what a half
+ * turn means. Half of a *page* would be a different distance on every part.
  */
 export function chartTurnStops(layout: ChartStripLayout, halfTurn: boolean): number[] {
   const stops = new Set<number>([0])
-  for (let index = 0; index < layout.tops.length; index += 1) {
-    stops.add(Math.min(layout.tops[index], layout.maxScroll))
-    if (halfTurn) {
-      stops.add(Math.min(layout.tops[index] + layout.heights[index] / 2, layout.maxScroll))
-    }
+  for (const row of layout.rows) {
+    stops.add(Math.min(row.top, layout.maxScroll))
+    if (halfTurn) stops.add(Math.min(row.top + row.height / 2, layout.maxScroll))
   }
   stops.add(layout.maxScroll)
   return [...stops].sort((a, b) => a - b)
@@ -228,78 +253,4 @@ export function nearestChartStop(stops: readonly number[], offset: number): numb
     if (Math.abs(stop - offset) < Math.abs(best - offset)) best = stop
   }
   return best
-}
-
-/**
- * forScore-style half turn: the bottom half of the page stays put and the top
- * half is replaced with the top of the next page, with a line between them.
- *
- * `row` is a layout row (one page, or a two-page spread). `peek` means the
- * two halves are out of phase — bottom still on this row, top already on the
- * next. Fill-width still uses the scroll stops above; this is the page/spread
- * turn, where a scroll would move the bottom of the page up the screen.
- */
-export interface ChartHalfTurn {
-  row: number
-  peek: boolean
-}
-
-export function chartRowCount(pageCount: number, columns: number): number {
-  if (pageCount <= 0) return 0
-  return Math.ceil(pageCount / Math.max(1, columns))
-}
-
-export function chartRowPages(row: number, columns: number, pageCount: number): number[] {
-  const start = row * Math.max(1, columns)
-  const pages: number[] = []
-  for (let index = 0; index < Math.max(1, columns) && start + index < pageCount; index += 1) {
-    pages.push(start + index)
-  }
-  return pages
-}
-
-export function nextChartHalfTurn(
-  current: ChartHalfTurn,
-  rows: number,
-  direction: 1 | -1,
-): ChartHalfTurn | null {
-  if (rows <= 0) return null
-  if (direction === 1) {
-    if (!current.peek) {
-      if (current.row >= rows - 1) return null
-      return { row: current.row, peek: true }
-    }
-    if (current.row >= rows - 1) return null
-    return { row: current.row + 1, peek: false }
-  }
-  if (current.peek) return { row: current.row, peek: false }
-  if (current.row <= 0) return null
-  return { row: current.row - 1, peek: true }
-}
-
-export function chartHalfTurnView(
-  turn: ChartHalfTurn,
-  columns: number,
-  pageCount: number,
-): { first: number; last: number } {
-  const bottom = chartRowPages(turn.row, columns, pageCount)
-  const top = turn.peek ? chartRowPages(turn.row + 1, columns, pageCount) : bottom
-  const pages = [...bottom, ...top]
-  if (pages.length === 0) return { first: 0, last: 0 }
-  return { first: Math.min(...pages), last: Math.max(...pages) }
-}
-
-export function chartFractionFromHalfTurn(turn: ChartHalfTurn, rows: number): number {
-  if (rows <= 1) return 0
-  const stops = rows * 2 - 1
-  const index = turn.row * 2 + (turn.peek ? 1 : 0)
-  return Math.min(1, Math.max(0, index / (stops - 1)))
-}
-
-export function chartHalfTurnFromFraction(fraction: number, rows: number): ChartHalfTurn {
-  if (rows <= 1) return { row: 0, peek: false }
-  const stops = rows * 2 - 1
-  const index = Math.round(Math.min(1, Math.max(0, fraction)) * (stops - 1))
-  const row = Math.min(rows - 1, Math.floor(index / 2))
-  return { row, peek: index % 2 === 1 && row < rows - 1 }
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { Maximize2, Minimize2, X } from 'lucide-react'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
   DEFAULT_CHART_VIEW, deletePracticeChart, isChartVisible, loadChartView, loadPracticeChart,
@@ -310,6 +311,8 @@ export default function PracticeChartLayer({
     // With the marker out every tap is a mark, never a page turn.
     if (marker) return
     if (!start || start.id !== event.pointerId) return
+    // The corner controls sit inside the turn zones; pressing one is not a turn.
+    if (event.target instanceof Element && event.target.closest('.practice-chart-control')) return
     if (Date.now() - start.at > TAP_MS) return
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return
     const box = event.currentTarget.getBoundingClientRect()
@@ -374,16 +377,31 @@ export default function PracticeChartLayer({
           inkWidth={inkWidth}
           onStroke={handleStroke}
         />
-        {chromeHidden && !marker && (
+        {/*
+          * The two things a player needs from the page itself, in the corners
+          * where no music is: how much screen the part gets, and the way out.
+          * They stay put in full screen — hiding the exit inside the thing it
+          * exits is how a player gets stranded on a page with no deck.
+          */}
+        <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
           <button
             type="button"
-            className="practice-chart-restore"
-            aria-label="Show the tabs and the deck"
-            onClick={() => setChromeOff(false)}
+            className="practice-chart-control practice-chart-control--start"
+            aria-pressed={chromeOff}
+            onClick={() => setChromeOff(!chromeOff)}
           >
-            <span aria-hidden />
+            {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
+            <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-        )}
+          <button
+            type="button"
+            className="practice-chart-control practice-chart-control--end"
+            onClick={onClose}
+          >
+            <X aria-hidden />
+            <span>Exit music</span>
+          </button>
+        </div>
         {loadFailed ? (
           <div className="practice-chart-failed" role="alert">
             <p>{error || 'This file could not be opened.'}</p>
@@ -431,7 +449,6 @@ export default function PracticeChartLayer({
       onFitChange={fit => updateView({ fit })}
       onHalfTurnChange={halfTurn => updateView({ halfTurn })}
       onPaperVisibleChange={handlePaperVisible}
-      onClose={onClose}
     />
   </>
 }

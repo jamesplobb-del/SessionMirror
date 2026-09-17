@@ -37,10 +37,16 @@ pages, a half turn by half a row.
 **One chart per project.** A vault project is the folder for one excerpt; the file sits next to
 that excerpt's takes. Switching project switches the music.
 
-**Turning is scrolling.** Pages are laid out in one continuous column with no gap, and a turn
-moves the scroller to the next stop — a whole page, or half of one when half turns are on. The
-no-gap column is the whole trick: stopping halfway leaves the bottom of the page being played on
-top of the screen and brings the top of the next one up underneath it.
+**Turning is scrolling, and a turn is a screen — not a page.** Pages are laid out in one
+continuous column with no gap, and a turn moves the scroller to the next stop. Each row of that
+column gets a *slot* exactly one screen tall with the page centred in it (`ChartRow` in
+`chartLayout.ts`). That slot is the whole trick, and it is what makes a forScore half turn exact:
+a fitted page is rarely the screen's shape — a letter page on a portrait iPad comes up about 90%
+of the height — so halving a *page* would show 45% of one and 55% of the next, and the halfway
+point would sit somewhere different on every part. Halving a *slot* is halving the screen, always.
+Stop halfway and the bottom half of what you are playing stays on top of the screen while the top
+half of the next page comes up underneath it. In fill-width the slot is the page's own height,
+because there the player is scrolling a tall page rather than turning between screens.
 
 ## Files
 
@@ -156,6 +162,38 @@ stack of screenshots: page count, page sizes and the original text all survive,
 which `scripts/verify-practice-chart-ink.mjs` asserts. A photo of a part becomes
 a one-page PDF the same way.
 
+## Third pass: the half turn, the widget × and the corner controls
+
+A half turn had been built out of three mutually exclusive render trees — a top pane, a bottom
+pane and a whole-page tree, each with its own keys (`top-N`, `bottom-N`, `center-N`, `N`) under
+different parents. Every tap therefore unmounted and remounted `ChartPdfPage`, which threw away
+the canvas and made pdf.js redraw the page from scratch. That is exactly what "it reloads the
+entire page when it's supposed to really only reload the one half" was, and it is also why tapping
+back and forward was unreliable: a discrete `{row, peek}` state machine tracked a position the
+scroller no longer agreed with.
+
+It is now **one strip, one element per page, keyed by page index, never moved between parents**,
+and a turn is a scroll in every mode. The canvas a page was drawn into stays mounted across a
+turn, so a half turn costs a scroll and nothing else. There is no such thing as re-rendering half
+a page: the half that is already on screen is the same pixels it was a frame earlier.
+
+`chartLayout.ts` lost the state machine with it — `ChartHalfTurn`, `chartRowCount`,
+`chartRowPages`, `nextChartHalfTurn`, `chartHalfTurnView`, `chartFractionFromHalfTurn`,
+`chartHalfTurnFromFraction` and `drawHeights` are all gone. `chartTurnStops` now walks
+`layout.rows` (slot tops, plus slot midpoints when half turns are on) instead of page tops, and
+`PracticeChartPaper` lost `splitMode`, the `half` state, `renderSheet` and the
+`.practice-chart-split` / `.practice-chart-stage` CSS.
+
+**The widget's × folds the widget, not the feature.** Both close buttons in `MusicWidget` now
+call `fold.collapse()` and read "Collapse music"; the `onClose` prop is gone. Closing the panel
+gives you the ball, the same as every other widget in the app.
+
+**Exit lives on the page, in the corner.** `.practice-chart-controls` puts two pills in the top
+corners of the paper: **Full screen / Exit full screen** on the left (the rehearsal-view toggle
+that used to be a grab handle at the bottom) and **Exit music** on the right, which is the only
+control that turns the tool off. They dim while the marker is up and are excluded from
+tap-to-turn, so hitting one never also turns the page.
+
 ## Bugs this pass found and fixed
 
 Everything below was found by driving the real UI, not by reading it.
@@ -217,6 +255,23 @@ Games is unreachable, because the tab bar is covered while a game is up.
   exactly the marker's.
 - The record control stays hit-testable with a part up, and the page stays visible through a
   record attempt. Whether a take actually lands is a microphone question for a device.
+
+- Third pass, on the rewritten half turn. `verify-practice-chart.mjs` was rebuilt around slots:
+  every slot is exactly one screen at landscape, portrait and phone sizes; a short page is centred
+  in its slot; a whole turn moves exactly one screen; a half turn leaves the bottom of the current
+  page on screen and brings the next page's top up, `chartPagesInView` reports both, and it is
+  reversible one half at a time; no stop is a dead tap; fill-width slots equal the page height;
+  rotation lands on the same page; spreads turn by a row.
+- And the same rewrite driven through the real UI: canvas identity stamps survive every half and
+  whole turn (the reload is gone), scrollTop moves 0 → 486 of a 972 viewport, the widget label
+  reads `1/4 → 1–2/4 → 2/4` forward and `2/4 → 1–2/4 → 1/4` back, a spread half turn is exactly
+  half a row and keeps its stamps, the widget × leaves `showMusic: true` with the panel collapsed,
+  Full screen grows the page 972 → 1079 and flips its label, Exit music clears `showMusic` and
+  gives back the tabs and the deck, tapping a corner control does not turn the page, marking still
+  lands on the right page in the one strip and turning resumes when the marker is capped, and a
+  rotation mid-part keeps the page, the stop and the ink.
+- `npx tsc -b --force` clean, `npm run build` clean, and the ten verify scripts covering this
+  area all pass.
 
 **Geometry in the browser preview is only meaningful with an emulated viewport** — the pane reports
 `innerWidth: 0` when collapsed, which reads as "the page rendered nothing".

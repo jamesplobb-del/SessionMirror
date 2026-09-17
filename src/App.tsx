@@ -4286,7 +4286,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     showPitch && mainAudioPitchSource !== null && !isAudioPracticeTunerTab
 
   useEffect(() => {
-    if (!musicPageVisible || !pitchTrackerActive || recordingMode !== 'audio' || isRecording) return
+    if (!pitchTrackerActive || recordingMode !== 'audio' || isRecording) return
     let cancelled = false
     void acquireNativeTunerMonitor(settings.micInputPreference).then((active) => {
       if (cancelled && active) void releaseNativeTunerMonitor()
@@ -4297,7 +4297,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [
     isRecording,
-    musicPageVisible,
     pitchTrackerActive,
     recordingMode,
     settings.micInputPreference,
@@ -5950,7 +5949,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           takeName={mainAudioPitchSource.take?.name}
                           label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
                           pitchSource="microphone"
-                          nativePitchProcessing={musicPageVisible}
+                          nativePitchProcessing
                           positionId="main-pitch-audio"
                           liveMicEnabled={
                             (settings.liveMicTunerEnabled ||
@@ -6116,6 +6115,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             mediaKey={mainVideoPitchSource.mediaKey}
                             label="Live Pitch"
                             pitchSource="microphone"
+                            nativePitchProcessing
                             micStreamRef={streamRef}
                             layoutRegion="main"
                             positionId="main-pitch-video"

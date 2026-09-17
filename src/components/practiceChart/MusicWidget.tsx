@@ -36,7 +36,6 @@ interface MusicWidgetProps {
   onFitChange: (fit: ChartFitPreference) => void
   onHalfTurnChange: (halfTurn: boolean) => void
   onPaperVisibleChange: (visible: boolean) => void
-  onClose: () => void
   /** Rehearsal view: the tabs and the deck stand down so the part gets it all. */
   chromeHidden: boolean
   onChromeHiddenChange: (hidden: boolean) => void
@@ -66,7 +65,7 @@ function pageLabel(view: ChartPaperView | null): string {
 export default function MusicWidget({
   boundaryRef, visible, collapseResetKey, hasChart, fileName, pageView, paperVisible,
   busy, error, fit, spreadAvailable, halfTurn, onAdd, onRemove, onTurn, onFitChange,
-  onHalfTurnChange, onPaperVisibleChange, onClose, chromeHidden, onChromeHiddenChange,
+  onHalfTurnChange, onPaperVisibleChange, chromeHidden, onChromeHiddenChange,
   marker, inkWidth, markCount, saving, onMarkerChange, onInkWidthChange, onUndoMark, onClearMarks, onSaveMarked,
 }: MusicWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -134,6 +133,9 @@ export default function MusicWidget({
       transition={iosDragRelease}
       style={{ x: dragX, y: dragY, touchAction: 'none' }}
     >
+      {/* Both the chevron and the x fold this panel away. Leaving the room is
+          Exit music, in the corner of the page: a control that closes a panel
+          and a control that closes a feature must not look the same. */}
       <WidgetCollapseButton label="music" onCollapse={fold.collapse} />
       <div className="music-widget__panel ui-orient-spin">
         {hasChart ? <>
@@ -142,8 +144,8 @@ export default function MusicWidget({
             <button
               type="button"
               className="music-widget__close"
-              aria-label="Turn music off"
-              onClick={event => { event.stopPropagation(); onClose() }}
+              aria-label="Collapse music"
+              onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >
               <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
@@ -271,8 +273,8 @@ export default function MusicWidget({
             <button
               type="button"
               className="music-widget__close"
-              aria-label="Turn music off"
-              onClick={event => { event.stopPropagation(); onClose() }}
+              aria-label="Collapse music"
+              onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >
               <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>

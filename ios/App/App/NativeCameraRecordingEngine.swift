@@ -114,6 +114,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var isPreviewActive = false
     private var isBridgePreviewActive = false
     private var previewUsesFrontCamera = true
+    private var lastPadInputOrientation: AVAudioSession.StereoOrientation?
 
     /// Delivers JPEG base64 (no data-URL prefix) to the Capacitor plugin for canvas preview in the WebView.
     var onPreviewFrame: ((_ jpegBase64: String, _ width: Int, _ height: Int, _ frameId: UInt64) -> Void)?
@@ -645,6 +646,64 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         }
 
         _ = NativeCameraTestAudio.sessionDiagnostics(profile: profile)
+        applyPadAudioInputOrientation()
+    }
+
+    /// iPad mics are directional. If AVAudioSession still thinks the device is
+    /// portrait while the player has it on a stand in landscape, the chosen
+    /// polar pattern points at the table instead of the instrument.
+    private func applyPadAudioInputOrientation() {
+        guard isPad else { return }
+        let stereo: AVAudioSession.StereoOrientation
+        switch Self.currentInterfaceOrientation() {
+        case .landscapeLeft:
+            stereo = .landscapeLeft
+        case .landscapeRight:
+            stereo = .landscapeRight
+        case .portraitUpsideDown:
+            stereo = .portraitUpsideDown
+        default:
+            stereo = .portrait
+        }
+        if lastPadInputOrientation == stereo { return }
+        do {
+            try AVAudioSession.sharedInstance().setPreferredInputOrientation(stereo)
+            lastPadInputOrientation = stereo
+        } catch {
+            print("[PitchTap] preferred input orientation failed: \(error.localizedDescription)")
+        }
+    }
+
+    private static func currentInterfaceOrientation() -> UIInterfaceOrientation {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let orientation = scenes.first?.interfaceOrientation, orientation != .unknown {
+            return orientation
+        }
+        return .portrait
+    }
+
+    /// Pitch needs this output more than the JPEG preview pump does. iPad's
+    /// 1080p movie + video-data combo can exhaust `canAddOutput` if the tap
+    /// is attached last, which left the widget with no native audio at all.
+    @discardableResult
+    private func addAudioTapOutput(to session: AVCaptureSession) -> Bool {
+        let audioTapOutput = AVCaptureAudioDataOutput()
+        audioTapOutput.setSampleBufferDelegate(self, queue: audioTapQueue)
+        guard session.canAddOutput(audioTapOutput) else {
+            audioDataOutput = nil
+            print("[PitchTap] audio data output UNAVAILABLE — canAddOutput=false. Pitch widget will have no native audio source.")
+            AudioRouteConfigurator.debugCaptureEvent(
+                "NativeCameraRecordingEngine.addAudioTapOutput.unavailable"
+            )
+            return false
+        }
+        session.addOutput(audioTapOutput)
+        audioDataOutput = audioTapOutput
+        if let connection = audioTapOutput.connection(with: .audio) {
+            connection.isEnabled = true
+        }
+        print("[PitchTap] audio data output ADDED to capture session")
+        return true
     }
 
     private func preferredAudioCaptureDevice() -> AVCaptureDevice? {
@@ -925,6 +984,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         // pinch-zoom transform is applied to the layer.
         previewLayer?.bounds = container.bounds
         previewLayer?.position = CGPoint(x: container.bounds.midX, y: container.bounds.midY)
+        applyPadAudioInputOrientation()
     }
 
     /// Preview-only pinch zoom (mirrors the CSS `--camera-preview-zoom` behavior):
@@ -1249,6 +1309,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addOutput(movieOutput)
         AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.configureCaptureSession addMovieOutput.end")
 
+        // Pitch needs this output more than the JPEG preview pump does, so the
+        // tap goes on before the video data output below. It must NOT go on
+        // before the movie output above: `addAudioTapOutput` degrades quietly
+        // when `canAddOutput` says no, but the movie and video-data outputs
+        // both *throw*, so an optional output that takes a slot one of them
+        // needs does not cost us a pitch graph — it costs the whole capture
+        // session. Before iOS 16 an AVCaptureAudioDataOutput and an
+        // AVCaptureMovieFileOutput could not coexist at all, and this app
+        // still deploys to 15.0, so that is a live case and not a theory.
+        _ = addAudioTapOutput(to: session)
+
         if let audioConnection = movieOutput.connection(with: .audio) {
             audioConnection.isEnabled = true
         }
@@ -1289,21 +1360,8 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         session.addOutput(videoDataOutput)
         self.videoDataOutput = videoDataOutput
 
-        // Audio tap for the JS pitch tracker. iOS 16+ allows an audio data output
-        // alongside AVCaptureMovieFileOutput (same coexistence rule the video data
-        // output above relies on); degrade silently on older systems.
-        let audioTapOutput = AVCaptureAudioDataOutput()
-        audioTapOutput.setSampleBufferDelegate(self, queue: audioTapQueue)
-        if session.canAddOutput(audioTapOutput) {
-            session.addOutput(audioTapOutput)
-            self.audioDataOutput = audioTapOutput
-            print("[PitchTap] audio data output ADDED to capture session")
-        } else {
-            self.audioDataOutput = nil
-            print("[PitchTap] audio data output UNAVAILABLE — canAddOutput=false (movie-file-output conflict). Pitch widget will have no native audio source.")
-            AudioRouteConfigurator.debugCaptureEvent(
-                "NativeCameraRecordingEngine.configureCaptureSession audioTapOutput.unavailable"
-            )
+        if audioDataOutput == nil {
+            _ = addAudioTapOutput(to: session)
         }
 
         if let connection = videoDataOutput.connection(with: .video) {
@@ -2853,7 +2911,16 @@ extension NativeCameraRecordingEngine {
             for frame in 0..<frames {
                 mono[frame] = Float(samples[frame * stride]) / 32768.0
             }
+        } else if isSignedInt && asbd.mBitsPerChannel == 32 {
+            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Int32>.size
+            let samples = rawData.bindMemory(to: Int32.self, capacity: sampleCount)
+            let frames = sampleCount / stride
+            mono = [Float](repeating: 0, count: frames)
+            for frame in 0..<frames {
+                mono[frame] = Float(samples[frame * stride]) / Float(Int32.max)
+            }
         } else {
+            print("[PitchTap] unsupported audio format bits=\(asbd.mBitsPerChannel) flags=\(asbd.mFormatFlags) rate=\(asbd.mSampleRate) channels=\(channelCount)")
             return
         }
 

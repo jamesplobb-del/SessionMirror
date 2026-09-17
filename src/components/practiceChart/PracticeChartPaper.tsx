@@ -4,11 +4,10 @@ import {
 } from 'react'
 import type { PracticeChart } from '../../utils/practiceChartStorage'
 import {
-  chartFractionFromHalfTurn, chartHalfTurnFromFraction, chartHalfTurnView,
-  chartOffsetForFraction, chartPagesInView, chartRowCount, chartRowPages,
+  chartOffsetForFraction, chartPagesInView,
   chartScrollFraction, chartSpreadFits, chartTurnStops, layoutChartStrip,
-  nearestChartStop, nextChartHalfTurn, nextChartStop, resolveChartFit,
-  type ChartFitPreference, type ChartHalfTurn, type ChartPageSize, type ChartStripLayout,
+  nearestChartStop, nextChartStop, resolveChartFit,
+  type ChartFitPreference, type ChartPageSize, type ChartStripLayout,
 } from './chartLayout'
 import { isChartRenderCancelled, openCachedPdfChart, type ChartDocument } from './chartDocument'
 import {
@@ -132,9 +131,6 @@ export default function PracticeChartPaper({
   )
   useEffect(() => { onSpreadAvailable(spreadFits) }, [onSpreadAvailable, spreadFits])
   const stops = useMemo(() => chartTurnStops(layout, halfTurn), [layout, halfTurn])
-  const rows = chartRowCount(layout.tops.length, layout.columns)
-  const splitMode = halfTurn && resolvedFit !== 'width' && rows > 0
-  const [half, setHalf] = useState<ChartHalfTurn>({ row: 0, peek: false })
 
   /* ---- Reading position ------------------------------------------------- */
 
@@ -148,7 +144,6 @@ export default function PracticeChartPaper({
   // coming back to a part lands on a real turn stop rather than half a system
   // into one, where the first tap would only move a sliver.
   useLayoutEffect(() => {
-    if (splitMode) return
     const element = scrollRef.current
     if (!element || layout.total <= 0) return
     const wanted = chartOffsetForFraction(layout, fractionRef.current)
@@ -160,15 +155,7 @@ export default function PracticeChartPaper({
     // `stops` only refines where a restore may land; it must not re-seek on a
     // half-turn toggle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, reportView, splitMode])
-
-  useLayoutEffect(() => {
-    if (!splitMode || rows <= 0) return
-    const next = chartHalfTurnFromFraction(fractionRef.current, rows)
-    setHalf(next)
-    const { first, last } = chartHalfTurnView(next, layout.columns, layout.tops.length)
-    onView({ first, last, count: layout.tops.length })
-  }, [layout.columns, layout.tops.length, onView, rows, splitMode])
+  }, [layout, reportView])
 
   /*
    * A mark in progress. It is kept as page-normalised points from the first
@@ -254,17 +241,6 @@ export default function PracticeChartPaper({
    * page does: it is there, or it is not.
    */
   const turn = useCallback((direction: 1 | -1) => {
-    if (splitMode) {
-      const next = nextChartHalfTurn(half, rows, direction)
-      if (!next) return
-      setHalf(next)
-      const fraction = chartFractionFromHalfTurn(next, rows)
-      fractionRef.current = fraction
-      const { first, last } = chartHalfTurnView(next, layout.columns, layout.tops.length)
-      onView({ first, last, count: layout.tops.length })
-      onFraction(fraction)
-      return
-    }
     const element = scrollRef.current
     if (!element) return
     const target = nextChartStop(stops, element.scrollTop, direction)
@@ -274,7 +250,7 @@ export default function PracticeChartPaper({
     fractionRef.current = chartScrollFraction(layout, target)
     reportView(target)
     onFraction(fractionRef.current)
-  }, [half, layout, onFraction, onView, reportView, rows, splitMode, stops])
+  }, [layout, onFraction, reportView, stops])
 
   useEffect(() => {
     handleRef.current = { turn }
@@ -301,14 +277,12 @@ export default function PracticeChartPaper({
   }, [strokes])
 
   const ready = layout.tops.length > 0
-  const peeking = splitMode && half.peek
-  const stagePages = splitMode
-    ? chartRowPages(half.row, layout.columns, layout.tops.length)
-    : null
-  const peekPages = peeking
-    ? chartRowPages(half.row + 1, layout.columns, layout.tops.length)
-    : null
 
+  /*
+   * Only pages near the viewport carry a canvas. The element itself always
+   * exists, so scrolling in and out of the window never disturbs the page's
+   * position or its marks — only the expensive part comes and goes.
+   */
   const renderPageFace = (index: number) => (
     <>
       {index >= window_.first - 1 && index <= window_.last + 1 && (
@@ -330,96 +304,50 @@ export default function PracticeChartPaper({
     </>
   )
 
-  const renderSheet = (index: number, pin: 'top' | 'bottom' | 'center') => {
-    const height = layout.drawHeights[index]
-    const width = layout.widths[index]
-    const left = layout.lefts[index]
-    const style = pin === 'center'
-      ? {
-          left, width, height,
-          top: Math.max(0, (viewport.height - height) / 2),
-        }
-      : pin === 'top'
-        ? { left, width, height, top: 0 }
-        : { left, width, height, bottom: 0, top: 'auto' as const }
-    return (
-      <div
-        key={`${pin}-${index}`}
-        className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}${pin === 'center' ? '' : ' practice-chart-split__sheet'}`}
-        style={style}
-        onPointerDown={marker ? event => beginStroke(index, event) : undefined}
-        onPointerMove={marker ? extendStroke : undefined}
-        onPointerUp={marker ? endStroke : undefined}
-        onPointerCancel={marker ? endStroke : undefined}
-      >
-        {document_
-          ? <ChartPdfPage
-              document={document_}
-              index={index}
-              cssWidth={width}
-              onError={onError}
-            />
-          : <img src={chart.objectUrl} alt="" draggable={false} />}
-        <ChartPageInk
-          strokes={strokesByPage.get(index)}
-          live={drawing?.page === index ? drawing.points : null}
-          liveColour={marker}
-          liveWidth={inkWidth}
-        />
-      </div>
-    )
-  }
-
   return (
     <div
       ref={scrollRef}
-      className={`practice-chart-scroll${peeking ? ' practice-chart-scroll--split' : ''}`}
-      onScroll={peeking ? undefined : handleScroll}
+      className="practice-chart-scroll"
+      onScroll={handleScroll}
       role="document"
       aria-label={`${chart.fileName}${ready ? `, ${layout.tops.length} page${layout.tops.length === 1 ? '' : 's'}` : ''}`}
     >
-      {peeking && peekPages && stagePages ? (
-        <div className="practice-chart-split">
-          <div className="practice-chart-split__pane practice-chart-split__pane--top">
-            {peekPages.map(index => renderSheet(index, 'top'))}
+      {/*
+        * One strip, one element per page, keyed by page index and never moved
+        * between parents. That is the whole reason a half turn is instant: the
+        * canvas a page was drawn into stays mounted, and turning only changes
+        * where the strip is scrolled to. Composing the two halves out of
+        * separate panes re-mounted every visible page on every tap, which is
+        * what "it reloads the whole page" was.
+        */}
+      <div className="practice-chart-strip" style={{ height: ready ? layout.total : '100%' }}>
+        {layout.tops.map((top, index) => (
+          <div
+            key={index}
+            className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}`}
+            style={{
+              top, left: layout.lefts[index],
+              height: layout.heights[index], width: layout.widths[index],
+            }}
+            onPointerDown={marker ? event => beginStroke(index, event) : undefined}
+            onPointerMove={marker ? extendStroke : undefined}
+            onPointerUp={marker ? endStroke : undefined}
+            onPointerCancel={marker ? endStroke : undefined}
+          >
+            {renderPageFace(index)}
           </div>
-          <div className="practice-chart-split__rule" role="separator" aria-hidden />
-          <div className="practice-chart-split__pane practice-chart-split__pane--bottom">
-            {stagePages.map(index => renderSheet(index, 'bottom'))}
-          </div>
-        </div>
-      ) : splitMode && stagePages ? (
-        <div className="practice-chart-stage">
-          {stagePages.map(index => renderSheet(index, 'center'))}
-        </div>
-      ) : (
-        <div className="practice-chart-strip" style={{ height: ready ? layout.total : '100%' }}>
-          {layout.tops.map((top, index) => (
-            <div
-              key={index}
-              className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}`}
-              style={{
-                top, left: layout.lefts[index],
-                height: layout.drawHeights[index], width: layout.widths[index],
-              }}
-              onPointerDown={marker ? event => beginStroke(index, event) : undefined}
-              onPointerMove={marker ? extendStroke : undefined}
-              onPointerUp={marker ? endStroke : undefined}
-              onPointerCancel={marker ? endStroke : undefined}
-            >
-              {renderPageFace(index)}
-            </div>
-          ))}
-          {halfTurn && layout.tops.slice(1).map((top, index) => (
-            <div
-              key={`join-${index}`}
-              className="practice-chart-join"
-              style={{ top }}
-              aria-hidden
-            />
-          ))}
-        </div>
-      )}
+        ))}
+        {/* The join between two slots, so a half turn reads as two pages and
+            not as one long one. */}
+        {halfTurn && layout.rows.slice(1).map((row, index) => (
+          <div
+            key={`join-${index}`}
+            className="practice-chart-join"
+            style={{ top: row.top }}
+            aria-hidden
+          />
+        ))}
+      </div>
     </div>
   )
 }
