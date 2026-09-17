@@ -6060,6 +6060,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   player puts away for a rehearsal. */}
               {musicPageVisible && settings.showTakeCards && (
                 <Suspense fallback={null}>
+                  {/* `isRecording` freezes the cards, so it is only the live
+                      mic — not the save afterwards. A take that is still being
+                      written is already reported by `takeReadiness`, which
+                      spins on its own card and disables its own play button;
+                      freezing the whole panel through the save instead made the
+                      take you had just recorded refuse to play for no visible
+                      reason. */}
                   <DraggableTakesWidget
                     boundaryRef={appShellRef}
                     collapseResetKey={routineActiveStep?.id}
@@ -6075,7 +6082,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onRetryTakePreparation={handleRetryAudioTakePreparation}
                     onShareBenchmark={benchmarkTake ? () => handleShareTake(benchmarkTake) : undefined}
                     onShareChallenger={challengerTake ? () => handleShareTake(challengerTake) : undefined}
-                    isRecording={isRecording || isStopping}
+                    isRecording={isRecording}
                   />
                 </Suspense>
               )}

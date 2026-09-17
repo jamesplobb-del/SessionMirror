@@ -770,7 +770,45 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 .takes-widget .audio-mode-take-card__pill { font-size: 12px; font-weight: 650; }
 .takes-widget .audio-mode-take-card__actions { gap: 2px; }
 .takes-widget .audio-mode-take-card__mini-btn { min-width: 44px; min-height: 44px; }
-.takes-widget .audio-mode-take-card__mini-btn--best { display: flex; gap: 4px; align-items: center; }
+/*
+ * "Best Take" is a labelled pill, not an icon button.
+ *
+ * The rule that makes it one is scoped to `.audio-mode-home--inplace`, and the
+ * widget renders the same card outside that ancestor — so it fell back to the
+ * base `2rem` circle with a pin *and* a word inside it, which pushed the pin
+ * off centre and the label out of the button. This is that rule, for the desk.
+ */
+.takes-widget .audio-mode-take-card__mini-btn--best {
+  display: inline-flex !important;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  /*
+   * `!important`, for the same reason the in-place rule uses it: the refinement
+   * themes style every `__mini-btn` as a round glass chip at a higher
+   * specificity than this selector can reach, which on a labelled 88px pill
+   * comes out as an ellipse in the wrong colour.
+   */
+  width: auto !important;
+  min-width: 80px;
+  padding-inline: 9px;
+  gap: 5px;
+  border-radius: 999px !important;
+  background: #fff0bd !important;
+  color: #75510b !important;
+  border: 1px solid #dba72d !important;
+}
+
+.takes-widget .audio-mode-take-card__mini-btn--best span {
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+html.app-dark-mode .takes-widget .audio-mode-take-card__mini-btn--best {
+  background: #493c1e !important;
+  color: #ffdc7b !important;
+}
 .takes-widget .audio-mode-take-card__media { padding-left: 54px; min-height: 86px; margin-top: 0; }
 /*
  * An empty card has no play button and no waveform, so it should not hold a
