@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
-import { GAME_TEST_INPUT } from '../gameTestInput'
+import { GAME_TEST_INPUT, syntheticReadout, TEST_HOLD_FRAME_MS } from '../gameTestInput'
+import { BOT_QA_MODE } from '../../utils/botQaMode'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw, Settings } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
@@ -96,7 +97,9 @@ export default function LearnInstrumentScreen({
     streamRef.current?.getAudioTracks().some((track) => track.readyState === 'live'),
   )
   const pitchEnabled =
-    game.state.phase !== 'complete' && (sharedMicReady || micPermissionPending)
+    !GAME_TEST_INPUT &&
+    game.state.phase !== 'complete' &&
+    (sharedMicReady || micPermissionPending)
 
   /*
    * Coming back from the background, the stream is usually dead while
@@ -142,14 +145,50 @@ export default function LearnInstrumentScreen({
   const micConnecting = micPermissionPending || sourceHealth === 'connecting'
 
   const handleStart = () => {
-    onRequestMicStream()
+    if (!GAME_TEST_INPUT) onRequestMicStream()
     game.start()
   }
 
   const handleRestart = () => {
-    onRequestMicStream()
+    if (!GAME_TEST_INPUT) onRequestMicStream()
     game.restart()
   }
+
+  const testHoldRef = useRef<number | null>(null)
+  const targetConcertMidiRef = useRef<number | null>(null)
+  targetConcertMidiRef.current = game.currentTarget?.concertMidi ?? null
+  const gameRef = useRef(game)
+  gameRef.current = game
+
+  const stopTestHold = () => {
+    if (testHoldRef.current == null) return
+    window.clearInterval(testHoldRef.current)
+    testHoldRef.current = null
+    gameRef.current.handleAcceptedPitchFrame(null)
+  }
+
+  const startTestHold = () => {
+    if (testHoldRef.current != null) return
+    const pushFrame = () => {
+      const midi = targetConcertMidiRef.current
+      if (midi == null) return
+      gameRef.current.handleAcceptedPitchFrame({
+        readout: syntheticReadout(midi),
+        confidence: 1,
+        timestamp: Date.now(),
+      })
+    }
+    pushFrame()
+    testHoldRef.current = window.setInterval(pushFrame, TEST_HOLD_FRAME_MS)
+  }
+
+  useEffect(() => () => stopTestHold(), [])
+
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    if (game.state.phase === 'playing') startTestHold()
+    else stopTestHold()
+  }, [game.state.phase, game.state.targetIndex])
 
   /* ── Finished ────────────────────────────────────────────────────────── */
   if (game.state.phase === 'complete') {
@@ -360,7 +399,21 @@ export default function LearnInstrumentScreen({
   const micLine = GAME_TEST_INPUT ? `${statusText} · mic ${micEpoch}` : statusText
 
   return (
-    <main className="li-screen li-play" data-status={status}>
+    <main
+      className={`li-screen li-play${GAME_TEST_INPUT ? ' li-play--test-input' : ''}`}
+      data-status={status}
+      {...(GAME_TEST_INPUT
+        ? {
+            onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+              if ((event.target as HTMLElement).closest('button')) return
+              startTestHold()
+            },
+            onPointerUp: stopTestHold,
+            onPointerCancel: stopTestHold,
+            onPointerLeave: stopTestHold,
+          }
+        : {})}
+    >
       <h1 ref={headingRef} className="li-sr-only" tabIndex={-1}>
         {game.selectedInstrument.name}: play {target.writtenLabel}
       </h1>
@@ -484,6 +537,11 @@ export default function LearnInstrumentScreen({
           </span>
         )}
       </footer>
+      {GAME_TEST_INPUT ? (
+        <span className="li-test-input-badge" aria-hidden>
+          {BOT_QA_MODE ? 'auto = play the note' : 'hold anywhere = play the note'}
+        </span>
+      ) : null}
     </main>
   )
 }

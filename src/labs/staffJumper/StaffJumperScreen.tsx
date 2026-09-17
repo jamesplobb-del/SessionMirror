@@ -15,6 +15,8 @@ import './staff-jumper.css'
 import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
+import { BOT_QA_MODE } from '../../utils/botQaMode'
+import { getTunerTransposition } from '../../utils/tunerTransposition'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
@@ -293,10 +295,11 @@ export default function StaffJumperScreen({
   }
 
   useEffect(() => {
+    if (GAME_TEST_INPUT) return
     onRequestMicStream()
   }, [onRequestMicStream, streamGeneration])
 
-  const pitchEnabled = true
+  const pitchEnabled = !GAME_TEST_INPUT
   /*
    * Coming back from the background, the stream is usually dead while
    * still looking present. This re-acquires it and, through the epoch in
@@ -364,12 +367,30 @@ export default function StaffJumperScreen({
     noteRemainingMs,
     noteTimeoutMs,
     beatInBar,
-  } = useStaffJumperGame(effectiveReadout, pitchEnabled, hapticFeedback)
+  } = useStaffJumperGame(effectiveReadout, true, hapticFeedback)
 
-  targetMidiRef.current =
-    state.config && state.phase === 'playing'
-      ? getTargetNoteAtStep(state.config, state.sequenceStep).midi
+  const soundingMidi =
+    state.config && state.phase === 'playing' && !state.isCountingIn
+      ? (() => {
+          const config = state.config
+          if (!config) return null
+          const note = getTargetNoteAtStep(config, state.sequenceStep)
+          if (note.isRest) return null
+          const offset = getTunerTransposition(config.transposition).writtenOffsetSemitones
+          return note.midi - offset
+        })()
       : null
+  targetMidiRef.current = soundingMidi
+
+  /**
+   * Grok Bot long runs: hold the sounding (concert) target after count-in so
+   * rhythm-mode attacks land on the beat instead of a delayed tap that misses.
+   */
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    setTapMidi(soundingMidi)
+  }, [soundingMidi])
+
   const draftConfig = useMemo(
     () => ({
       key: draftKey,
@@ -907,7 +928,9 @@ export default function StaffJumperScreen({
       }}
     >
       {game}
-      <span className="sj-test-input__badge" aria-hidden>tap = play note</span>
+      <span className="sj-test-input__badge" aria-hidden>
+        {BOT_QA_MODE ? 'auto = play note' : 'tap = play note'}
+      </span>
     </div>
   )
 }
