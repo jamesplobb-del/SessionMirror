@@ -214,7 +214,7 @@ Complete at least one short lesson with auto pitch. Confirm “You played them a
 
 Entry: QA **Multitrack**, or Camera mode → long-press settings wheel → **Multitrack**.
 
-Seeded takes should already sit in boxes. If boxes are empty, tap a tile → **Take Vault** and pick `QA Melody` / `QA Harmony` / `QA Bass`. The picker must list **video** takes only (audio belongs in Backing Track).
+Seeded takes should already sit in boxes **after a few seconds** (they are recorded in the browser). Wait until tile names show `QA Melody` / `QA Harmony` / `QA Bass` and the transport duration is not `0:00 / 0:00` before tapping Play all. If boxes are empty, tap a tile → **Take Vault** and pick those takes. The picker must list **video** takes only (audio belongs in Backing Track).
 
 ### Header and mix strip
 

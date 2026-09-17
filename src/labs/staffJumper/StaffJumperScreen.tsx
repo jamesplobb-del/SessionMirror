@@ -16,6 +16,7 @@ import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
 import { GAME_TEST_INPUT, SILENT_READOUT, syntheticReadout, TEST_TAP_HOLD_MS } from '../gameTestInput'
 import { BOT_QA_MODE } from '../../utils/botQaMode'
+import { getTunerTransposition } from '../../utils/tunerTransposition'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
@@ -368,10 +369,28 @@ export default function StaffJumperScreen({
     beatInBar,
   } = useStaffJumperGame(effectiveReadout, true, hapticFeedback)
 
-  targetMidiRef.current =
-    state.config && state.phase === 'playing'
-      ? getTargetNoteAtStep(state.config, state.sequenceStep).midi
+  const soundingMidi =
+    state.config && state.phase === 'playing' && !state.isCountingIn
+      ? (() => {
+          const config = state.config
+          if (!config) return null
+          const note = getTargetNoteAtStep(config, state.sequenceStep)
+          if (note.isRest) return null
+          const offset = getTunerTransposition(config.transposition).writtenOffsetSemitones
+          return note.midi - offset
+        })()
       : null
+  targetMidiRef.current = soundingMidi
+
+  /**
+   * Grok Bot long runs: hold the sounding (concert) target after count-in so
+   * rhythm-mode attacks land on the beat instead of a delayed tap that misses.
+   */
+  useEffect(() => {
+    if (!BOT_QA_MODE) return
+    setTapMidi(soundingMidi)
+  }, [soundingMidi])
+
   const draftConfig = useMemo(
     () => ({
       key: draftKey,
@@ -404,16 +423,6 @@ export default function StaffJumperScreen({
       tunerInstrument,
     ],
   )
-  /**
-   * Grok Bot long runs: once a round has started, sound each new target so
-   * scoring, lives, and the staff actually advance without a horn.
-   */
-  useEffect(() => {
-    if (!BOT_QA_MODE || state.phase !== 'playing' || state.isCountingIn) return
-    const timer = window.setTimeout(() => playTestNote(), 420)
-    return () => window.clearTimeout(timer)
-  }, [state.phase, state.sequenceStep, state.isCountingIn])
-
   const rangePreview = useMemo(() => getScaleRangePreview(draftConfig), [draftConfig])
   const previewConfig = useMemo(
     () => ({ ...draftConfig, sessionSeed: previewSeed }),
