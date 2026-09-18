@@ -397,6 +397,7 @@ function LiveCameraBackground({
       try {
         await preparePlaybackRoute({ suspendCamera: true })
       } catch (error) {
+        if (cancelled) return
         console.warn('[HandsFree] playback route prep failed', error)
         onHandsFreePlaybackComplete?.()
         return
@@ -409,6 +410,7 @@ function LiveCameraBackground({
       setHandsFreePlaybackReady(true)
 
       await applyAutoPlaybackLeadIn(media, undefined, handsFreePlaybackPerformanceStartSeconds)
+      if (cancelled || !handsFreePlaybackSessionRef.current) return
 
       const stopStallRecovery = () => {
         handsFreeStallRecoveryRef.current?.()
@@ -416,7 +418,7 @@ function LiveCameraBackground({
       }
 
       const onEnded = () => {
-        if (!handsFreePlaybackSessionRef.current) return
+        if (cancelled || !handsFreePlaybackSessionRef.current) return
         handsFreePlaybackSessionRef.current = false
         media.removeEventListener('ended', onEnded)
         stopTailSkip?.()
@@ -442,9 +444,10 @@ function LiveCameraBackground({
       const started = await playTakeMediaAudible(media, {
         skipRoutePrep: true,
         suspendCameraForRoute: false,
-        onFailure: () => onHandsFreePlaybackPlayingChange?.(false),
+        onFailure: () => { if (!cancelled) onHandsFreePlaybackPlayingChange?.(false) },
       })
       if (cancelled || !handsFreePlaybackSessionRef.current) {
+        media.pause()
         media.removeEventListener('ended', onEnded)
         stopTailSkip?.()
         stopTailSkip = null
@@ -462,7 +465,11 @@ function LiveCameraBackground({
         setHandsFreePlaybackReady(false)
         onHandsFreePlaybackComplete?.()
       }
-    })()
+    })().catch((error) => {
+      if (cancelled) return
+      console.warn('[HandsFree] background replay failed', error)
+      onHandsFreePlaybackComplete?.()
+    })
 
     return () => {
       cancelled = true

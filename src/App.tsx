@@ -1016,6 +1016,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Clear the replay UI and invalidate any in-flight native start
     // immediately. Route/mic cleanup can take a bridge round trip and must not
     // leave the interface stuck in "Playing your take back…" while it settles.
+    // Keep warmup blocked until the old playback route has fully released.
+    autoRecordStartSuppressedRef.current = true
+    setAutoRecordStartSuppressed(true)
     stopAutoPlaybackAudio()
     const completedGeneration = autoPlaybackGenerationRef.current
     void finalizeTakePlaybackCleanup().finally(() => {
@@ -1024,7 +1027,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (recordingModeRef.current === 'audio') {
         stabilizeViewportAfterMediaInteraction()
         window.requestAnimationFrame(() => {
-          void refreshCameraSessionRef.current()
+          if (autoSoundRecordingEnabledRef.current) {
+            restartHandsFreeMonitorRef.current({ force: true })
+          } else {
+            void refreshCameraSessionRef.current()
+          }
         })
       }
     })
@@ -2465,7 +2472,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
     registerAutoPlaybackHold(
       () =>
-        pendingAutoPlaybackRef.current || autoPlaybackPlayingRef.current || handsFreePlaybackPending
+        pendingAutoPlaybackRef.current || autoPlaybackPlayingRef.current || handsFreePlaybackPending ||
+        autoRecordStartSuppressedRef.current
     )
     registerRecordingRouteRestoredHandler(() => {
       if (isPlaybackRouteHoldActive()) return
@@ -2938,6 +2946,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
         if (isRecording) return
+        // Cancel the old surface's replay before its player unmounts and
+        // before the destination starts claiming the microphone.
+        if (handsFreePlaybackBusyRef.current || autoPlaybackTakeId !== null) finishAutoPlayback()
         // Tokens for Tools (`--audio-bg-base`) live on `html.app-audio-mode`.
         // Apply them before React paints the new overlay so the first frame is
         // already cream, not a black hole that then lerps.
@@ -3012,6 +3023,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [
       changeRecordingMode,
       isRecording,
+      autoPlaybackTakeId,
+      finishAutoPlayback,
       requestCameraAccess,
       requestCameraPreviewResume,
       warmAutoRecording,
@@ -3086,8 +3099,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       updateSettings({ autoSoundRecording: enabled })
 
       if (!enabled) {
-        stopAutoPlaybackAudio()
-        releaseAutoRecordSuppress(0)
+        finishAutoPlayback()
         void disarmAutoRecording()
         return
       }
@@ -3103,8 +3115,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     },
     [
       disarmAutoRecording,
-      releaseAutoRecordSuppress,
-      stopAutoPlaybackAudio,
+      finishAutoPlayback,
       updateSettings,
       warmAutoRecording,
     ]

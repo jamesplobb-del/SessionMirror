@@ -345,6 +345,7 @@ export function useCameraSession({
   const nativeExperimentalRecordingRef = useRef(false)
   const simulatorRecordingRef = useRef(false)
   const nativePreRollDiscardRef = useRef(false)
+  const nativePreRollDiscardInFlightRef = useRef<Promise<void> | null>(null)
   /** Settle promise of the in-flight native start — Stop awaits this so it never races didStartRecording. */
   const nativeStartSettleRef = useRef<Promise<boolean> | null>(null)
   const notifyHandsFreeMonitorRestartRef = useRef<(() => void) | null>(null)
@@ -1861,6 +1862,7 @@ export function useCameraSession({
       autoPreRollActiveRef.current ||
       warmAutoAudioInFlightRef.current ||
       nativePreRollRecycleInFlightRef.current ||
+      nativePreRollDiscardInFlightRef.current !== null ||
       isAutoPlaybackHoldingMicWarmup()
     ) {
       return
@@ -1883,6 +1885,7 @@ export function useCameraSession({
           isRecordingRef.current ||
           autoPreRollActiveRef.current ||
           nativePreRollRecycleInFlightRef.current ||
+          nativePreRollDiscardInFlightRef.current !== null ||
           !isAppInForeground() || isAutoPlaybackHoldingMicWarmup()
         ) {
           return
@@ -1893,6 +1896,7 @@ export function useCameraSession({
           recordingModeRef.current !== 'audio' ||
           isRecordingRef.current ||
           autoPreRollActiveRef.current ||
+          nativePreRollDiscardInFlightRef.current !== null ||
           !isAppInForeground() || isAutoPlaybackHoldingMicWarmup()
         ) {
           return
@@ -2310,13 +2314,12 @@ export function useCameraSession({
     void acquireStream('audio', undefined, { forceNew: true, liveCapture: true })
   }, [acquireStream])
 
-  const discardNativeAutoPreRollCapture = useCallback(async (options?: { restoreWebKit?: boolean }) => {
-    if (!autoPreRollActiveRef.current && !nativeExperimentalRecordingRef.current) {
-      return
-    }
-    if (autoPerformanceActiveRef.current && isRecordingRef.current) {
-      return
-    }
+  const discardNativeAutoPreRollCapture = useCallback((options?: { restoreWebKit?: boolean }): Promise<void> => {
+    // Off, Next, lifecycle cleanup and stall recovery can converge here.
+    // One operation owns the native stop and its JS flags.
+    if (nativePreRollDiscardInFlightRef.current) return nativePreRollDiscardInFlightRef.current
+    if (!autoPreRollActiveRef.current && !nativeExperimentalRecordingRef.current) return Promise.resolve()
+    if (autoPerformanceActiveRef.current && isRecordingRef.current) return Promise.resolve()
 
     const preRollMode = recordingModeRef.current
     nativePreRollDiscardRef.current = true
@@ -2325,44 +2328,47 @@ export function useCameraSession({
     autoPerformanceActiveRef.current = false
     autoPerformanceStartedAtRef.current = 0
     activeTakeIdRef.current = null
-
     const startSettle = nativeStartSettleRef.current
-    if (startSettle) {
-      await startSettle.catch(() => false)
-      nativeStartSettleRef.current = null
-    }
 
-    if (nativeExperimentalRecordingRef.current) {
-      nativeExperimentalRecordingRef.current = false
-      const stoppedVideoPreRoll = preRollMode === 'video'
-      const result = stoppedVideoPreRoll
-        ? await stopNativeCameraRecording()
-        : await stopNativeAudioRecording()
-      if (result?.filePath) {
-        await deleteTakeFile(result.filePath).catch(() => {})
+    const discard = Promise.resolve().then(async () => {
+      try {
+        // Audio start resolves only after its first sample. When the mic is
+        // stalled, stopAudioRecording is what rejects that pending start;
+        // awaiting start first deadlocks every subsequent warmup and toggle.
+        if (preRollMode === 'audio') {
+          if (nativeExperimentalRecordingRef.current || startSettle) {
+            const result = await stopNativeAudioRecording()
+            if (result?.filePath) await deleteTakeFile(result.filePath).catch(() => {})
+          }
+          if (startSettle) await startSettle.catch(() => false)
+        } else {
+          if (startSettle) await startSettle.catch(() => false)
+          if (nativeExperimentalRecordingRef.current) {
+            const result = await stopNativeCameraRecording()
+            if (result?.filePath) await deleteTakeFile(result.filePath).catch(() => {})
+          }
+        }
+      } finally {
+        if (nativeStartSettleRef.current === startSettle) nativeStartSettleRef.current = null
+        nativeExperimentalRecordingRef.current = false
+        isRecordingRef.current = false
+        recordingStartedAtRef.current = 0
+        nativePreRollDiscardRef.current = false
+        setIsRecording(false)
+        setIsStopping(false)
+        if (preRollMode === 'audio') {
+          setNativeAudioCaptureActive(false)
+          requestPitchGraphReattach()
+          if (options?.restoreWebKit !== false && recordingModeRef.current === 'audio') {
+            recoverAfterNativeAudioRecording()
+          }
+        }
       }
-    }
-
-    isRecordingRef.current = false
-    recordingStartedAtRef.current = 0
-    nativePreRollDiscardRef.current = false
-    setIsRecording(false)
-    setIsStopping(false)
-    if (preRollMode === 'audio') {
-      // Idle Hands-Free recycles this file every 20s. Opening WebKit in that
-      // gap contends for the same mic the next native pre-roll needs, and
-      // "Getting ready" never ends. Stay native unless the caller is really
-      // leaving capture.
-      if (options?.restoreWebKit === false) {
-        return
-      }
-      if (recordingModeRef.current === 'audio') {
-        recoverAfterNativeAudioRecording()
-      } else {
-        setNativeAudioCaptureActive(false)
-        requestPitchGraphReattach()
-      }
-    }
+    }).finally(() => {
+      if (nativePreRollDiscardInFlightRef.current === discard) nativePreRollDiscardInFlightRef.current = null
+    })
+    nativePreRollDiscardInFlightRef.current = discard
+    return discard
   }, [recoverAfterNativeAudioRecording])
 
   discardNativeAutoPreRollCaptureRef.current = discardNativeAutoPreRollCapture
@@ -2421,7 +2427,9 @@ export function useCameraSession({
       autoPreRollActiveRef.current = false
       autoPreRollStartedAtRef.current = 0
       recordingStartedAtRef.current = 0
-      recoverAfterNativeAudioRecording()
+      // Intentional cancellation owns route restoration. Opening WebKit
+      // here would race the next native pre-roll during a mode switch.
+      if (!nativePreRollDiscardRef.current) recoverAfterNativeAudioRecording()
       return false
     })
 
@@ -2880,6 +2888,7 @@ export function useCameraSession({
   const warmAutoRecording = useCallback(async () => {
     if (cameraSwitchInFlightRef.current) return
     if (!isAppInForeground()) return
+    if (nativePreRollDiscardInFlightRef.current || isAutoPlaybackHoldingMicWarmup()) return
 
     if (recordingModeRef.current === 'audio') {
       await warmAutoAudioRecorder()
