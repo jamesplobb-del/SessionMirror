@@ -2912,9 +2912,15 @@ html.physical-landscape-right .ui-orient-spin {
     inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
-.record-carousel-slot--hands-free {
-  transition: transform 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease,
-    background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, color 180ms ease;
+/* Hands-free keeps a steady record control through every automatic phase. */
+.record-carousel-slot--hands-free,
+.record-carousel-slot--hands-free::before,
+.record-carousel-slot--hands-free::after,
+.record-carousel-slot--hands-free *,
+.record-carousel-slot--hands-free *::before,
+.record-carousel-slot--hands-free *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 .record-carousel-slot--hands-free:not(.record-carousel-slot--recording)::before {

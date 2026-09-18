@@ -152,9 +152,9 @@ function HandsFreeStage({
         )}
         {notice && <div className="hands-free-panel__notice">
           <small>{notice === 'sensitive'
-            ? 'Room noise or very short takes? Try a higher start level so only louder playing triggers recording.'
-            : notice === 'microphone' ? 'Microphone signal interrupted. Check your audio connection before the next take.'
-            : 'Recording did not start. Try again or use manual Record.'}</small>
+            ? 'The start level may be too sensitive: background sound or repeated short takes were detected. Raise the start level to trigger only when you play.'
+            : notice === 'microphone' ? 'Microphone signal interrupted. Reconnecting automatically… Check your audio connection if this continues.'
+            : 'Recording did not start. Rearming automatically for your next take.'}</small>
           {notice === 'sensitive' && onTapForSettings && <button type="button" onClick={onTapForSettings}>Adjust start level</button>}
         </div>}
         {/* The centre treatment has room for the words; the compact pill on the

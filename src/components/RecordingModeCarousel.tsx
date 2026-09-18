@@ -128,7 +128,7 @@ function ModeSlot({
       } ${handsFreePhase ? `record-carousel-slot--hands-free-${handsFreePhase}` : ''} ${
         recordStartBlocked ? 'record-carousel-slot--not-ready' : ''
       } ${cameraPresentation ? 'record-carousel-slot--camera' : ''} ${
-        isCenter && againPulse && !isRecording ? 'record-carousel-slot--again' : ''
+        isCenter && againPulse && !isRecording && !longPressActive ? 'record-carousel-slot--again' : ''
       }`}
     >
       {isCenter && handsFreePhase === 'playback' ? (

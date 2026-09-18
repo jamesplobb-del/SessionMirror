@@ -6,10 +6,11 @@ let now = 0, seq = 0, slots = [], cursor = 0, effects = [], dirty = true, output
 const timers = new Map()
 const schedule = (fn, ms, repeat = false) => { const id = ++seq; timers.set(id, { fn, at: now + ms, ms, repeat }); return id }
 globalThis.window = { setTimeout: (f,m)=>schedule(f,m), clearTimeout:id=>timers.delete(id), setInterval:(f,m)=>schedule(f,m,true), clearInterval:id=>timers.delete(id) }
-globalThis.document = { visibilityState:'visible', addEventListener(){}, removeEventListener(){} }
+const visibilityListeners = new Set()
+globalThis.document = { visibilityState:'visible', addEventListener(type,fn){visibilityListeners.add(fn)}, removeEventListener(type,fn){visibilityListeners.delete(fn)} }
 Object.defineProperty(globalThis,'performance',{value:{now:()=>now},configurable:true})
 let rms = 0, starts = 0, stops = 0, finished = 0
-const context = { state:'running', createAnalyser:()=>({fftSize:128,smoothingTimeConstant:0}), createMediaStreamSource:()=>({connect(){},disconnect(){}}) }
+const context = { state:'running', resume:async()=>{context.state='running'}, createAnalyser:()=>({fftSize:128,smoothingTimeConstant:0}), createMediaStreamSource:()=>({connect(){},disconnect(){}}) }
 const changed = (a,b) => !a || !b || a.length!==b.length || a.some((v,i)=>v!==b[i])
 const hooks = {
  useRef(value){const i=cursor++;return slots[i]??= {current:value}},
@@ -24,8 +25,8 @@ const stubs = {
  'audioLevel': 'export const readAnalyserMetrics=()=>globalThis.__handsfreeTest.metrics(); export const combinedGateLevel=m=>m.rms',
  'appSettings': 'export const getAutoRecordProfile=()=>({gate:.1,holdMs:140,noiseHeadroom:1.2,noiseMargin:.01,gateCapMultiplier:2,stopGateRatio:.6,usePeak:false})',
  'appForeground': 'export const isAppInForeground=()=>true; export const subscribeAppForeground=()=>()=>{}',
- 'playbackAudioContext': 'export const getPlaybackAudioContext=async()=>globalThis.__handsfreeTest.context; export const isSharedPlaybackContext=()=>true',
- 'nativeAudioPitchTap': 'export const acquireNativeAudioTap=async()=>{}; export const releaseNativeAudioTap=async()=>{}; export const subscribeNativeAudioPitchFrames=async()=>null',
+ 'playbackAudioContext': 'export const getPlaybackAudioContext=async()=>{if(globalThis.__handsfreeTest.failSetup)throw Error("mic unavailable");if(globalThis.__handsfreeTest.setupGate)await globalThis.__handsfreeTest.setupGate;return globalThis.__handsfreeTest.context}; export const isSharedPlaybackContext=()=>true',
+ 'nativeAudioPitchTap': 'export const acquireNativeAudioTap=async()=>{}; export const releaseNativeAudioTap=async()=>{}; export const subscribeNativeAudioPitchFrames=async(fn)=>{globalThis.__handsfreeTest.nativeListener=fn;return {remove:async()=>{if(globalThis.__handsfreeTest.nativeListener===fn)globalThis.__handsfreeTest.nativeListener=null}}}',
  'cameraSessionState': 'export const isNativeCameraPreviewActive=()=>false; export const isNativeCaptureSessionActive=()=>globalThis.__handsfreeTest.nativeSession?.()??false',
  'sharedMetronomeEngine': 'export const sharedMetronomeEngine={subscribeTick:()=>()=>{},getSnapshot:()=>({playing:false})}',
  'autoRecordPlayback': 'export const AUTO_RECORD_MAX_IDLE_PREROLL_MS=20000',
@@ -76,3 +77,75 @@ await advance(200)
 assert.ok(warms>0,'Hands-free must warm capture when no WebKit stream is live yet')
 assert.equal(output.handsFreeListeningReady,false,'Listening is not ready until audio actually arrives')
 console.log('PASS: missing microphone warms native capture instead of sitting idle')
+
+// Leaving a surface and coming back must rearm without toggling hands-free.
+options.enabled=false;dirty=true;await flush()
+options.streamRef=streamRef;options.ready=true;options.enabled=true
+options.monitoringAllowed=false;dirty=true;await advance(1000)
+assert.equal(output.handsFreeListeningReady,false)
+options.monitoringAllowed=true;dirty=true;await advance(1000)
+assert.equal(output.handsFreeListeningReady,true)
+for(const listener of visibilityListeners)listener()
+await advance(1000)
+assert.equal(output.handsFreeListeningReady,true,'Returning to a visible tab rearms')
+await advance(60000)
+assert.equal(output.handsFreeListeningReady,true,'Idle time does not disable listening')
+console.log('PASS: surface return, visibility return, and one minute idle')
+
+// A transient setup error must recover with no user toggle.
+options.enabled=false;dirty=true;await flush()
+globalThis.__handsfreeTest.failSetup=true
+options.enabled=true;dirty=true;await advance(1000)
+assert.equal(output.handsFreeNotice,'microphone')
+globalThis.__handsfreeTest.failSetup=false
+await advance(3500)
+assert.equal(output.handsFreeListeningReady,true,'Setup failure retries automatically')
+console.log('PASS: failed microphone setup automatically retries')
+
+// Cold launch: the widget is already on but Web Audio setup has not resolved.
+options.enabled=false;dirty=true;await flush()
+let releaseSetup
+const heldSetup = new Promise(resolve=>{releaseSetup=resolve})
+globalThis.__handsfreeTest.setupGate=heldSetup
+options.enabled=true;dirty=true;await advance(1000)
+assert.equal(output.handsFreeListeningReady,false)
+globalThis.__handsfreeTest.setupGate=null
+await advance(3000)
+assert.equal(output.handsFreeListeningReady,true,'Cold-start watchdog retries a hung setup without toggling the widget')
+releaseSetup();await flush()
+assert.equal(output.handsFreeListeningReady,true,'Late original setup cannot replace recovered monitoring')
+context.state='interrupted'
+await advance(500)
+assert.equal(context.state,'running','Interrupted Web Audio is resumed as well as suspended audio')
+console.log('PASS: saved-on cold launch, hung setup, and interrupted audio recovery')
+
+// Native session flags may say active even when no frames ever arrive.
+options.enabled=false;dirty=true;await flush()
+options.streamRef={current:{getAudioTracks:()=>[]}}
+globalThis.__handsfreeTest.nativeSession=()=>true
+options.isNativeAudioCaptureActive=()=>true
+options.isAutoPreRollCaptureActive=()=>true
+let recycles=0
+options.restartAutoPreRollCapture=()=>{recycles++}
+options.enabled=true;dirty=true;await advance(5500)
+assert.ok(recycles>0,'An active native session without frames must rebuild idle capture')
+assert.equal(output.handsFreeNotice,'microphone')
+assert.equal(output.handsFreeListeningReady,false)
+async function nativeFrames(ms){for(let t=0;t<ms;t+=48){globalThis.__handsfreeTest.nativeListener?.({samples:new Float32Array(128),sampleRate:48000});await advance(48)}}
+await nativeFrames(1000)
+assert.equal(output.handsFreeListeningReady,true,'New native frames rearm after recovery')
+const previousRecycles=recycles
+await advance(6000)
+assert.ok(recycles>previousRecycles,'Previously flowing native audio must recover when frames stop')
+await nativeFrames(1000)
+assert.equal(output.handsFreeListeningReady,true)
+// Never recycle a visible take as if it were disposable pre-roll.
+options.isRecording=true;dirty=true;await flush()
+const duringTakeRecycles=recycles
+await advance(6000)
+assert.equal(recycles,duringTakeRecycles,'Missing frames must not discard a real take')
+assert.equal(output.handsFreeListeningReady,false)
+await nativeFrames(1000)
+assert.equal(output.handsFreeListeningReady,true,'Active-take monitor also reattaches without discarding capture')
+options.enabled=false;dirty=true;await flush()
+console.log('PASS: native first-frame failure, native stall recovery, and active-take protection')

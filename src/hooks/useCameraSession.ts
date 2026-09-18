@@ -60,7 +60,7 @@ import {
 import { applyMicInputPreference } from '../utils/audioSessionRoute'
 import { resolveMicPreferenceForLiveCapture, resolveNativeBridgeMicPreference } from '../utils/liveMicRoute'
 import { releaseAllLiveMicPitchGraphs, requestPitchGraphReattach } from './useLivePitchTracker'
-import { acquireNativeAudioTap } from '../utils/nativeAudioPitchTap'
+import { acquireNativeAudioTap, releaseNativeAudioTap } from '../utils/nativeAudioPitchTap'
 import { nativeTunerOwnsMicrophone, requestWebAudioStream, subscribeTunerMicrophoneOwnership } from '../utils/tunerMicrophoneOwnership'
 import {
   forceNativeRecordingMode,
@@ -363,6 +363,12 @@ export function useCameraSession({
   const nativePreviewStartTokenRef = useRef(0)
   const nativeBridgeAcquireInFlightRef = useRef<Promise<boolean> | null>(null)
   const nativeBridgeReleaseInFlightRef = useRef<Promise<void> | null>(null)
+  /**
+   * Camera → Tools: discarding the video pre-roll and stopping the bridge.
+   * Audio warm / getUserMedia must wait for this, otherwise they grab the mic
+   * while AVCapture is still tearing down and Hands-Free stays on Getting ready.
+   */
+  const nativeSurfaceHandoffRef = useRef<Promise<void> | null>(null)
   const queuedAfterNativeReleaseModeRef = useRef<RecordingMode | null>(null)
   const nativeReleaseResumeArmedRef = useRef(false)
   const ensureRecordableStreamRef = useRef<(() => Promise<MediaStream | null>) | null>(null)
@@ -920,10 +926,19 @@ export function useCameraSession({
       setError(null)
 
       if (mode === 'audio') {
-        const pendingNativeRelease = nativeBridgeReleaseInFlightRef.current
+        const pendingNativeRelease =
+          nativeSurfaceHandoffRef.current ?? nativeBridgeReleaseInFlightRef.current
         if (pendingNativeRelease) {
           await pendingNativeRelease
           if (isCaptureSessionStale(epoch, mode, cancelled)) return null
+        }
+        if (
+          isNativeVideoRecordingEnabled() &&
+          (autoPreRollActiveRef.current ||
+            nativeExperimentalRecordingRef.current ||
+            nativeStartSettleRef.current !== null)
+        ) {
+          return streamRef.current
         }
       }
 
@@ -1079,8 +1094,22 @@ export function useCameraSession({
     const mode = requestedMode ?? recordingModeRef.current
     if (isRecordingRef.current) return
     if (mode === 'audio' && nativeTunerOwnsMicrophone()) return
+    // Native Hands-Free already owns the mic. Opening WebKit here is the
+    // Camera → Tools stall: getUserMedia contends with the audio pre-roll
+    // and "Getting ready" never ends.
+    if (
+      mode === 'audio' &&
+      isNativeVideoRecordingEnabled() &&
+      (autoPreRollActiveRef.current ||
+        nativeExperimentalRecordingRef.current ||
+        nativeStartSettleRef.current !== null)
+    ) {
+      setNeedsPermission(false)
+      return
+    }
 
-    const pendingNativeRelease = nativeBridgeReleaseInFlightRef.current
+    const pendingNativeRelease =
+      nativeSurfaceHandoffRef.current ?? nativeBridgeReleaseInFlightRef.current
     if (mode === 'audio' && pendingNativeRelease) {
       queuedAfterNativeReleaseModeRef.current = mode
       if (!nativeReleaseResumeArmedRef.current) {
@@ -1211,6 +1240,7 @@ export function useCameraSession({
     acquireNativeVideoBridge,
     detachAllPreviewTargets,
     isNativeAudioBridgeEnabled,
+    isNativeVideoRecordingEnabled,
     normalizeReusableVideoPreview,
     stopStreamTracks,
     syncPreviewTargets,
@@ -1838,12 +1868,32 @@ export function useCameraSession({
 
     if (isNativeVideoRecordingEnabled()) {
       warmAutoAudioInFlightRef.current = true
+      let acquiredTap = false
       try {
-        await acquireNativeAudioTap()
+        const surfaceHandoff = nativeSurfaceHandoffRef.current
+        const waitedForCameraHandoff = surfaceHandoff != null
+        if (surfaceHandoff) await surfaceHandoff.catch(() => {})
+        const pendingRelease = nativeBridgeReleaseInFlightRef.current
+        if (pendingRelease) await pendingRelease.catch(() => {})
+        if (waitedForCameraHandoff && Capacitor.isNativePlatform()) {
+          await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
+        }
         if (
           recordingModeRef.current !== 'audio' ||
           isRecordingRef.current ||
-          autoPreRollActiveRef.current
+          autoPreRollActiveRef.current ||
+          nativePreRollRecycleInFlightRef.current ||
+          !isAppInForeground() || isAutoPlaybackHoldingMicWarmup()
+        ) {
+          return
+        }
+        await acquireNativeAudioTap()
+        acquiredTap = true
+        if (
+          recordingModeRef.current !== 'audio' ||
+          isRecordingRef.current ||
+          autoPreRollActiveRef.current ||
+          !isAppInForeground() || isAutoPlaybackHoldingMicWarmup()
         ) {
           return
         }
@@ -1859,6 +1909,9 @@ export function useCameraSession({
       } catch {
         /* cold start on trigger if warm fails */
       } finally {
+        // The monitor owns its own tap lease. This temporary startup lease
+        // must not accumulate across takes or keep capture alive in playback.
+        if (acquiredTap) void releaseNativeAudioTap()
         warmAutoAudioInFlightRef.current = false
       }
       return
@@ -3115,21 +3168,24 @@ export function useCameraSession({
           setNativeLivePreviewActive(false)
           setNativeLivePreviewSeedUrl(null)
           nativePreviewActiveRef.current = false
-          void preRollDiscard
-            .catch(() => {})
-            .then(() => {
-              // Discarding the pre-roll's movie file takes long enough for a
-              // quick Tools → Camera round trip to have started a *new* bridge
-              // underneath us. Stopping it here left the camera off with
-              // nothing queued to bring it back — the preview simply never
-              // came on again. Only tear down if audio is still the mode that
-              // owns this teardown.
-              if (recordingModeRef.current !== 'audio') return undefined
-              return stopNativeVideoBridge()
-            })
-        } else {
-          void stopNativeVideoBridge()
         }
+        const handoff = (async () => {
+          if (preRollDiscard) await preRollDiscard.catch(() => {})
+          // Discarding the pre-roll's movie file takes long enough for a
+          // quick Tools → Camera round trip to have started a *new* bridge
+          // underneath us. Stopping it here left the camera off with
+          // nothing queued to bring it back — the preview simply never
+          // came on again. Only tear down if audio is still the mode that
+          // owns this teardown.
+          if (recordingModeRef.current !== 'audio') return
+          await stopNativeVideoBridge()
+        })()
+        nativeSurfaceHandoffRef.current = handoff
+        void handoff.finally(() => {
+          if (nativeSurfaceHandoffRef.current === handoff) {
+            nativeSurfaceHandoffRef.current = null
+          }
+        })
       }
 
       if (!softAudioHandoff) {

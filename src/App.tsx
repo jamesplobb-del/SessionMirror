@@ -730,6 +730,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
   const autoPlaybackAudioRef = useRef<HTMLAudioElement | null>(null)
   const autoPlaybackUsesNativeRef = useRef(false)
+  const autoPlaybackStartTimerRef = useRef<number | null>(null)
   const autoPlaybackTailCleanupRef = useRef<(() => void) | null>(null)
   const liveMicPlaceholderRef = useRef<HTMLMediaElement | null>(null)
   const queuedAutoPlayRef = useRef<{ url: string; takeId: string } | null>(null)
@@ -951,6 +952,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const teardownAutoPlaybackMedia = useCallback(() => {
+    if (autoPlaybackStartTimerRef.current !== null) {
+      window.clearTimeout(autoPlaybackStartTimerRef.current)
+      autoPlaybackStartTimerRef.current = null
+    }
     autoPlaybackTailCleanupRef.current?.()
     autoPlaybackTailCleanupRef.current = null
     if (autoPlaybackUsesNativeRef.current) {
@@ -1012,7 +1017,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // immediately. Route/mic cleanup can take a bridge round trip and must not
     // leave the interface stuck in "Playing your take back…" while it settles.
     stopAutoPlaybackAudio()
+    const completedGeneration = autoPlaybackGenerationRef.current
     void finalizeTakePlaybackCleanup().finally(() => {
+      if (autoPlaybackGenerationRef.current !== completedGeneration) return
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
       if (recordingModeRef.current === 'audio') {
         stabilizeViewportAfterMediaInteraction()
@@ -1055,10 +1062,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
+      autoRecordStartSuppressedRef.current = true
       setAutoRecordStartSuppressed(true)
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
       setAutoPlaybackTakeId(takeId)
+
+      const isCurrentPlayback = () => autoPlaybackGenerationRef.current === playbackGeneration
+      const clearStartTimeout = () => {
+        if (!isCurrentPlayback()) return
+        if (autoPlaybackStartTimerRef.current !== null) {
+          window.clearTimeout(autoPlaybackStartTimerRef.current)
+          autoPlaybackStartTimerRef.current = null
+        }
+      }
+      const failPlayback = () => {
+        if (!isCurrentPlayback()) return
+        setTakeDeleteError('Playback could not start. Your take is saved in Vault; try playing it there.')
+        setActivePlaybackDiagSession(null)
+        finishAutoPlayback()
+      }
+      // A lost bridge/media callback must never leave hands-free waiting forever.
+      autoPlaybackStartTimerRef.current = window.setTimeout(failPlayback, 15000)
 
       const useNativeAudioPlayback =
         Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' && Boolean(filePath)
@@ -1077,6 +1102,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             await waitMs(16)
             playNativeAudio = audioModePlaybackControlsRef.play
           }
+          if (!isCurrentPlayback()) return
           if (!playNativeAudio) {
             console.error(
               '[Playback] native audio controller unavailable; WebKit fallback disabled',
@@ -1090,7 +1116,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             return
           }
 
-          if (!(await nativeDataFileExists(filePath))) {
+          const fileExists = await nativeDataFileExists(filePath)
+          if (!isCurrentPlayback()) return
+          if (!fileExists) {
             console.warn('[Playback] native auto-playback aborted — recording file missing', {
               takeId,
               filePath,
@@ -1135,10 +1163,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             {
               startTime,
               onStarted: (duration) => {
-                if (autoPlaybackGenerationRef.current !== playbackGeneration) {
-                  audioModePlaybackControlsRef.pause?.()
-                  return
-                }
+                // A late callback belongs to the old request; never pause
+                // the newer take using the shared player.
+                if (!isCurrentPlayback()) return
+                clearStartTimeout()
                 setHandsFreePlaybackPending(false)
                 setAutoPlaybackPlaying(true)
                 const remainingPlaybackSeconds = duration - startTime
@@ -1160,7 +1188,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               onEnded: completeNativeAutoPlayback,
             }
           )
-        })()
+        })().catch(failPlayback)
         return
       }
 
@@ -1227,6 +1255,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             await preparePlaybackRoute({ suspendCamera: false })
           }
         } catch (error) {
+          if (!isCurrentPlayback()) { detachPipeline(); return }
           console.warn('[PlaybackRoute] auto-playback prep failed', error)
           detachPipeline()
           setActivePlaybackDiagSession(null)
@@ -1234,6 +1263,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           return
         }
 
+        if (!isCurrentPlayback()) { detachPipeline(); return }
         audio.pause()
         audio.onended = null
         audio.onerror = null
@@ -1291,10 +1321,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           durationSeconds: audio.duration,
         })
 
+        if (!isCurrentPlayback()) { detachPipeline(); return }
         await applyAutoPlaybackLeadIn(audio, undefined, performanceStartSeconds)
+        if (!isCurrentPlayback()) { detachPipeline(); return }
 
         const completeAutoPlayback = () => {
-          if (autoPlaybackComplete) return
+          if (autoPlaybackComplete || !isCurrentPlayback()) return
           autoPlaybackComplete = true
           detachTailSkip?.()
           detachTailSkip = null
@@ -1308,12 +1340,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           settings.soundSilenceSeconds,
           completeAutoPlayback
         )
+        autoPlaybackTailCleanupRef.current = () => {
+          detachTailSkip?.()
+          detachPipeline()
+        }
         audio.onended = completeAutoPlayback
         audio.onerror = completeAutoPlayback
 
         const started = await playTakeMediaAudible(audio, {
           skipRoutePrep: true,
-          onFailure: () => setAutoPlaybackPlaying(false),
+          onFailure: () => { if (isCurrentPlayback()) setAutoPlaybackPlaying(false) },
         })
         if (autoPlaybackGenerationRef.current !== playbackGeneration) {
           detachTailSkip?.()
@@ -1329,7 +1365,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           { started }
         )
 
+        if (!isCurrentPlayback()) return
         if (started) {
+          clearStartTimeout()
           setHandsFreePlaybackPending(false)
           setAutoPlaybackPlaying(true)
         } else {
@@ -1337,7 +1375,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           setActivePlaybackDiagSession(null)
           finishAutoPlayback()
         }
-      })()
+      })().catch(() => {
+        detachTailSkip?.()
+        detachPipeline()
+        failPlayback()
+      })
     },
     [finishAutoPlayback, settings.soundSilenceSeconds, teardownAutoPlaybackMedia]
   )
@@ -1641,6 +1683,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         pendingAutoPlaybackRef.current &&
         ((mediaType === 'audio' && recordingModeRef.current === 'audio') ||
           (mediaType === 'video' && recordingModeRef.current === 'video'))
+      const replayGeneration = autoPlaybackGenerationRef.current
+      const replayStillRequested = () => shouldAutoPlay &&
+        autoPlaybackGenerationRef.current === replayGeneration &&
+        autoSoundRecordingEnabledRef.current && isAppInForeground()
       const playbackGainDb = resolveNativePlaybackGainDb(
         payload.captureDiagnostics?.playbackGainMetadata
       )
@@ -1914,7 +1960,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           })
 
           let readiness = await prepareAudioTakePlayback(takeId)
-          if (shouldAutoPlay) {
+          if (replayStillRequested()) {
             // A cold start can fail this preflight once for reasons that clear
             // on their own a moment later — the just-written file not yet
             // visible to the filesystem bridge, the playback URL not resolvable
@@ -1925,12 +1971,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             // take after it was fine.
             for (let attempt = 0; !readiness && attempt < 3; attempt++) {
               await waitMs(220 * (attempt + 1))
-              if (recordingModeRef.current !== 'audio') break
+              if (!replayStillRequested() || recordingModeRef.current !== 'audio') break
               console.info('[TakeReadiness] hands-free retry', { takeId, attempt: attempt + 1 })
               readiness = await prepareAudioTakePlayback(takeId)
             }
 
-            if (readiness) {
+            if (readiness && replayStillRequested()) {
               pendingAutoPlaybackRef.current = false
               playAutoTakeAudioRef.current(
                 readiness.playbackUrl,
@@ -1939,7 +1985,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 resolvedFilePath,
                 playbackGainDb
               )
-            } else {
+            } else if (replayStillRequested()) {
               console.warn('[TakeReadiness] hands-free playback skipped — take never became ready', {
                 takeId,
               })
@@ -2078,7 +2124,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           ...current,
           [takeId]: { status: 'error', message },
         }))
-        if (shouldAutoPlay) {
+        if (replayStillRequested()) {
           pendingAutoPlaybackRef.current = false
           setHandsFreePlaybackPending(false)
           releaseAutoRecordSuppress(0)
@@ -2933,8 +2979,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         // camera direction already waits for the paint; this now matches. The
         // Tools surface shows its own connecting state for the one frame it
         // costs.
+        //
+        // Hands-Free on iOS does not want WebKit here. Camera → Tools used to
+        // call getUserMedia while the camera session was still stopping; the
+        // native audio pre-roll then lost the mic and stayed on Getting ready.
         scheduleAfterPaint(() => {
           if (recordingModeRef.current !== 'audio') return
+          if (autoSoundRecordingEnabledRef.current) {
+            void warmAutoRecording().finally(() => {
+              if (
+                autoSoundRecordingEnabledRef.current &&
+                recordingModeRef.current === 'audio'
+              ) {
+                restartHandsFreeMonitorRef.current({ force: true })
+              }
+            })
+            return
+          }
           requestCameraAccess('audio')
         })
       }
@@ -2953,6 +3014,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       isRecording,
       requestCameraAccess,
       requestCameraPreviewResume,
+      warmAutoRecording,
     ]
   )
   const handleRecordingModeChangeRef = useRef(handleRecordingModeChange)
@@ -3003,8 +3065,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       return
     }
 
-    if (recordingModeRef.current === 'video' && isRecording && settings.autoSoundRecording) {
-      updateSettings({ autoSoundRecording: false })
+    if (isRecording && settings.autoSoundRecording) {
+      finishHandsFreeTake()
+      return
     }
 
     toggleRecording()
@@ -3014,7 +3077,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestCameraAccess,
     settings.autoSoundRecording,
     toggleRecording,
-    updateSettings,
+    finishHandsFreeTake,
   ])
 
   const handleAutoSoundRecordingChange = useCallback(

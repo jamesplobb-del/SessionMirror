@@ -169,6 +169,7 @@ export function useAutoSoundRecording({
   const pollTimerRef = useRef<number | null>(null)
   const warmRetryTimerRef = useRef<number | null>(null)
   const healthTimerRef = useRef<number | null>(null)
+  const setupRetryTimerRef = useRef<number | null>(null)
   const startFailureTimerRef = useRef<number | null>(null)
   const silenceSinceRef = useRef<number | null>(null)
   const silenceGateRef = useRef(createHandsFreeSilence())
@@ -447,6 +448,10 @@ export function useAutoSoundRecording({
       healthTimerRef.current = null
     }
 
+    if (setupRetryTimerRef.current !== null) {
+      window.clearTimeout(setupRetryTimerRef.current)
+      setupRetryTimerRef.current = null
+    }
     clearStartLatch()
 
     try {
@@ -558,6 +563,21 @@ export function useAutoSoundRecording({
     }
   }, [shouldMonitor, streamGeneration, streamRef])
 
+  // Setup itself can stall before its polling/health timers are installed
+  // (notably a cold Web Audio resume). Keep recovery independent of setup.
+  useEffect(() => {
+    if (!shouldMonitor) return
+    const watchdog = window.setInterval(() => {
+      if (!shouldMonitorRef.current || !isAppInForeground()) return
+      if (pollTimerRef.current !== null || setupRetryTimerRef.current !== null) return
+      setMonitorReady(false)
+      setHandsFreeNotice('microphone')
+      void warmRecorderRef.current()
+      bumpMonitorEpoch()
+    }, HEALTH_CHECK_MS)
+    return () => window.clearInterval(watchdog)
+  }, [shouldMonitor])
+
   useEffect(() => {
     if (!shouldMonitor) return
 
@@ -668,7 +688,7 @@ export function useAutoSoundRecording({
           return
         }
 
-        if (audioContext.state === 'suspended') {
+        if (audioContext.state !== 'running' && audioContext.state !== 'closed') {
           await audioContext.resume().catch(() => {})
         }
 
@@ -720,8 +740,13 @@ export function useAutoSoundRecording({
 
         if (!isNativePath) {
           const ctx = audioContextRef.current
-          if (ctx?.state === 'suspended') {
-            void ctx.resume().catch(() => {})
+          if (ctx && ctx.state !== 'running') {
+            if (ctx.state === 'closed') bumpMonitorEpoch()
+            else void ctx.resume().catch(() => {})
+            setMonitorReady(false)
+            silenceGateRef.current.pause()
+            loudSinceRef.current = null
+            return
           }
         }
 
@@ -930,15 +955,13 @@ export function useAutoSoundRecording({
             isNativeCaptureSessionActive() || isNativeAudioCaptureActiveRef.current?.() === true
           const framesWentQuiet = frameAt != null && now - frameAt > 4000
           const neverStarted = frameAt == null && now - setupStartedAt > 3500
-          if (sessionAlive && framesWentQuiet) {
-            void warmRecorderRef.current()
-            return
-          }
-          streamDead = !sessionAlive && (framesWentQuiet || neverStarted)
+          // Session flags can outlive the hardware or the tap subscription.
+          // Fresh samples, not a cached "active" flag, prove mic health.
+          streamDead = !sessionAlive || framesWentQuiet || neverStarted
         } else {
           streamDead = !isStreamAudioLive(streamRef.current)
           const ctx = audioContextRef.current
-          if (ctx?.state === 'suspended') {
+          if (ctx && ctx.state !== 'running') {
             void ctx?.resume().catch(() => {})
           }
         }
@@ -946,12 +969,20 @@ export function useAutoSoundRecording({
         if (streamDead) {
           setMonitorReady(false)
           setHandsFreeNotice('microphone')
-          // Report lost audio without tearing down a take that is still saving samples.
-          if (isRecordingRef.current) return
+          // Reattach the monitor while preserving a real take. Only idle
+          // pre-roll may be discarded and rebuilt below.
+          if (isRecordingRef.current) {
+            if (isAppInForeground()) bumpMonitorEpoch()
+            return
+          }
           if (isAppInForeground()) {
             // Warm native capture first. Asking the camera hook to reopen
             // WebKit here is what stalled Hands-Free on "Getting ready".
+            if (isNativePath && isAutoPreRollCaptureActiveRef.current?.()) {
+              restartAutoPreRollCaptureRef.current?.()
+            }
             void warmRecorderRef.current()
+            bumpMonitorEpoch()
             if (!isNativePath && !isNativeAudioCaptureActiveRef.current?.()) {
               onMonitorStalledRef.current?.()
             }
@@ -970,6 +1001,10 @@ export function useAutoSoundRecording({
         setMonitorReady(false)
         setHandsFreeNotice('microphone')
         teardownMonitor({ preserveActiveCapture: shouldPreserveActiveHandsFreeCapture() })
+        setupRetryTimerRef.current = window.setTimeout(() => {
+          setupRetryTimerRef.current = null
+          if (!cancelled && shouldMonitorRef.current) bumpMonitorEpoch()
+        }, HEALTH_CHECK_MS)
       }
       if (nativeTapListener) { void nativeTapListener.remove().catch(() => {}); nativeTapListener = null }
       if (acquiredNativeTap) { void releaseNativeAudioTap(); acquiredNativeTap = false }
