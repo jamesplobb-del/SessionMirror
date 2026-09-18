@@ -693,6 +693,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     (tab: AudioPracticeTab) => {
       if (tab === 'tuner' && audioPracticeTab !== 'tuner') {
         setShowTunerTakePills(false)
+        // Start native capture in this tap. Waiting for the tab effect left
+        // iPhone on "Tap to reactivate tuner" because the mic request ran
+        // after the gesture — and after a deferred tab transition.
+        void acquireNativeTunerMonitor(settings.micInputPreference)
+      } else if (tab !== 'tuner' && audioPracticeTab === 'tuner') {
+        void releaseNativeTunerMonitor()
       }
       setAudioPracticeTab(tab)
       if (tab === 'games') {
@@ -700,7 +706,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         setLabsRoute('menu')
       }
     },
-    [audioPracticeTab, setAudioPracticeTab]
+    [audioPracticeTab, setAudioPracticeTab, settings.micInputPreference]
   )
   /** Practice has no tab of its own — the metronome's Program button opens it. */
   const handleOpenProgram = useCallback(() => {
@@ -2485,10 +2491,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [])
 
-  // Native hands-free pre-roll intentionally stops the WebKit microphone. That
-  // makes `ready` briefly false even though the native recorder is actively
-  // listening; do not let the outer gate tear down that live pre-roll.
-  const nativeHandsFreeCaptureActive = isNativeAudioCaptureActive()
+  // Native hands-free pre-roll intentionally stops the WebKit microphone.
+  // Do not wait for `ready` before monitoring: that left Tools/audio stuck
+  // on "Getting ready" until a stream that the monitor itself has to start.
   const autoMonitoringAllowed =
     !practiceTransitionBusy &&
     !isSwitchingCamera &&
@@ -2498,8 +2503,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !isPracticeHubOpen &&
     focusPanel === null &&
     !isReviewOpen &&
-    !isExperimentalOpen &&
-    (ready || nativeHandsFreeCaptureActive)
+    !isExperimentalOpen
 
   const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake, handsFreeNotice } =
     useAutoSoundRecording({
@@ -2513,7 +2517,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         audioModeTakePlaying ||
         benchmarkPipPlaying ||
         challengerPipPlaying ||
-        isPreviewRecovering,
+        (recordingMode === 'video' && isPreviewRecovering),
       ready,
       isRecording,
       streamRef,
@@ -2540,6 +2544,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       },
       onMonitorStalled: () => {
         if (!isAppInForeground()) return
+        if (settings.autoSoundRecording && recordingModeRef.current === 'audio') {
+          void warmAutoRecording()
+          return
+        }
         void refreshCameraSession()
       },
     })
@@ -3470,6 +3478,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setQuickSettingsOpen(false)
     setLabsRoute(null)
     openMusicAfterCrossingRef.current = recordingModeRef.current !== 'audio'
+    setMusicPageVisible(true)
     handleRecordingModeChange('audio')
     handleAudioPracticeTabChange('audio')
     updateSettings({ showMusic: true })
@@ -4153,7 +4162,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // large free-floating copy. Every other Tools tab packs controls from top to
   // bottom and needs the compact backed pill instead.
   const handsFreeStagePlacement =
-    recordingMode === 'audio' && audioPracticeTab !== 'tuner' ? 'chip' : 'center'
+    musicPageVisible ? 'center' : recordingMode === 'audio' && audioPracticeTab !== 'tuner' ? 'chip' : 'center'
 
   const takePlaybackActive =
     autoPlaybackPlaying ||
@@ -4384,6 +4393,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setShowPitch(true)
   }, [pitchHudSuspended, pitchTrackerActive])
 
+  const handleCloseHandsFree = useCallback(() => {
+    handleAutoSoundRecordingChange(false)
+  }, [handleAutoSoundRecordingChange])
+
   /** Closing the widget means off, so the toggle has to go off with it. */
   const handleClosePitch = useCallback(() => {
     handlePitchTrackerSettingChange(false)
@@ -4426,9 +4439,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
    */
   const handleShowMusicSettingChange = useCallback(
     (show: boolean) => {
+      if (show) {
+        openMusicAfterCrossingRef.current = recordingModeRef.current !== 'audio'
+        setMusicPageVisible(true)
+        if (recordingModeRef.current !== 'audio') handleRecordingModeChange('audio')
+        handleAudioPracticeTabChange('audio')
+      } else {
+        setMusicPageVisible(false)
+        setMusicChromeHidden(false)
+      }
       updateSettings({ showMusic: show })
     },
-    [updateSettings],
+    [handleAudioPracticeTabChange, handleRecordingModeChange, updateSettings],
   )
 
   const handleCloseMusic = useCallback(() => {
@@ -6199,6 +6221,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   reportFeatureAction('hands-free-settings-opened')
                   setHandsFreeCardOpen(true)
                 }}
+                onClose={handleCloseHandsFree}
               />
               <HandsFreeSettingsCard
                 open={handsFreeCardOpen && hudModalState === 'idle'}
@@ -6299,7 +6322,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                 >
 
-                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && !musicChromeHidden && (
+                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && !musicPageVisible && (
                     <div data-tutorial="audio-mode-tabs">
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
@@ -6620,7 +6643,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneToggleVisible={onRecordSurface}
                         onShowDroneChange={handleShowDroneSettingChange}
                         showMusic={hudQuickSettings.showMusic}
-                        musicToggleVisible={isAudioPracticeRecordTab && Boolean(activeProjectId)}
+                        musicToggleVisible={Boolean(activeProjectId)}
                         onShowMusicChange={handleShowMusicSettingChange}
                         againPulse={againPulse}
                         audioEnhancerToggleVisible={!musicRoomActive}

@@ -1,6 +1,6 @@
 import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
 import DailyChallenges from './DailyChallenges'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -26,7 +26,6 @@ import {
   type TunerTranspositionId,
 } from '../utils/tunerTransposition'
 import { loadMetronomePrefs, type MetronomePrefs } from '../utils/metronomeConfig'
-import { isTabletViewport, subscribeFormFactor } from '../utils/deviceFormFactor'
 import type { Project } from '../db'
 import type { Take } from '../types'
 import type { DeskSnapshot } from '../utils/workspaceDesks'
@@ -77,7 +76,7 @@ interface PracticeHubProps {
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
-  /** iPad home only — music is a stand, not a phone tool. */
+  /** Opens Music as its own room, not as a Tools tab. */
   onOpenMusic?: () => void
 
   /* ---- Daily routine ---- */
@@ -141,7 +140,6 @@ export default function PracticeHub({
   const [launchError, setLaunchError] = useState('')
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
-  const isIpadHome = useSyncExternalStore(subscribeFormFactor, isTabletViewport, () => false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -522,7 +520,7 @@ export default function PracticeHub({
                           <strong>Tuner</strong>
                           <small>{instrumentId ? instrumentHeading(instrumentId) : tunerKey.shortLabel}</small>
                         </Pressable>
-                        {isIpadHome && onOpenMusic && (
+                        {onOpenMusic && (
                           <Pressable
                             type="button"
                             intensity="soft"

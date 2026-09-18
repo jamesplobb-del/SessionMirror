@@ -1,13 +1,11 @@
 .hands-free-stage--movable{padding:0}
 .hands-free-stage--movable .hands-free-stage__wash,.hands-free-stage--movable .hands-free-stage__rim,.hands-free-stage--movable .hands-free-stage__pulse{display:none}
-.hands-free-stage--movable .hands-free-stage__center{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 18px 44px;border-radius:20px;max-height:calc(100dvh - 24px);max-width:calc(100vw - 24px);overflow:auto;background:rgba(245,250,255,.22);color:#172c45;pointer-events:auto;border:1px solid #ffffff55;box-shadow:0 6px 20px #102c4512;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.hands-free-stage--movable .hands-free-stage__center{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 18px 14px;border-radius:20px;max-height:calc(100dvh - 24px);max-width:calc(100vw - 24px);overflow:auto;background:rgba(245,250,255,.22);color:#172c45;pointer-events:auto;border:1px solid #ffffff55;box-shadow:0 6px 20px #102c4512;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .hands-free-stage--movable .hands-free-stage__title{font-size:18px;color:inherit;-webkit-text-stroke:0;text-shadow:none}
 .hands-free-stage--movable .hands-free-stage__detail{font-size:12px;white-space:normal;color:inherit;text-shadow:none;-webkit-text-stroke:0}
-.hands-free-stage .hands-free-panel__move,.hands-free-stage .hands-free-panel__resize{pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;min-height:44px;min-width:44px;font:inherit;font-size:11px;cursor:grab}
+.hands-free-stage .hands-free-panel__move{pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;min-height:44px;min-width:44px;font:inherit;font-size:11px;cursor:grab}
 .hands-free-panel__move{width:100%}
 .hands-free-panel__move svg{width:20px;height:20px}
-.hands-free-panel__resize{position:absolute;right:0;bottom:0;cursor:nwse-resize!important}
-.hands-free-panel__resize svg{width:16px;height:16px}
 .hands-free-stage .hands-free-panel__notice{max-width:300px;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:rgba(245,250,255,.2);color:inherit;font-size:12px;text-shadow:none;-webkit-text-stroke:0}
 .hands-free-stage .hands-free-panel__notice button{pointer-events:auto;min-height:44px;border:1px solid #ffffff55;border-radius:8px;background:#ffffff22;color:inherit;font:inherit}
 .hands-free-stage button:focus-visible{outline:2px solid #8dcaff;outline-offset:2px}

@@ -177,15 +177,17 @@ export default function AudioTunerTab({
     void recovery.run(async (isCurrent) => {
       let sourceActive = false
       try {
-        if (handsFreeEnabled) {
+        // Take the native lease before any other await so StrictMode cleanup
+        // can release it. Hands-free pre-roll may already own capture; that
+        // start fails quickly and we still treat the live session as ready.
+        sourceActive = await acquireNativeTunerMonitor(micInputPreference)
+        if (!sourceActive && handsFreeEnabled) {
           await ensureNativeCameraSessionHealthy()
           sourceActive = isNativeCaptureSessionActive()
-        } else {
-          sourceActive = await acquireNativeTunerMonitor(micInputPreference)
-          if (!cancelled && isCurrent() && micAccessRef.current.active && isAppInForeground() &&
-              !sourceActive && !micAccessRef.current.isRecording && !micAccessRef.current.permissionRequestInFlight) {
-            sourceActive = Boolean(await micAccessRef.current.onRequestMicStream({ forceRecovery: true }))
-          }
+        }
+        if (!cancelled && isCurrent() && micAccessRef.current.active && isAppInForeground() &&
+            !sourceActive && !micAccessRef.current.isRecording && !micAccessRef.current.permissionRequestInFlight) {
+          sourceActive = Boolean(await micAccessRef.current.onRequestMicStream({ forceRecovery: true }))
         }
       } catch (error) {
         console.warn('[AudioTuner] microphone startup failed', error)
@@ -197,8 +199,9 @@ export default function AudioTunerTab({
       if (sourceActive) {
         setMicLiveEpoch((epoch) => epoch + 1)
       } else {
+        // Stay on stalled without the overlay. The retry effect asks for a
+        // tap only after two automatic recoveries fail.
         setSourceHealth('stalled')
-        setShowRecoveryPrompt(true)
       }
     })
 
@@ -206,7 +209,7 @@ export default function AudioTunerTab({
       cancelled = true
       recovery.cancel()
       setMicSessionReady(false)
-      if (!handsFreeEnabled) void releaseNativeTunerMonitor()
+      void releaseNativeTunerMonitor()
     }
   }, [
     active,
@@ -272,10 +275,12 @@ export default function AudioTunerTab({
       if (nativeActive) {
         setMicLiveEpoch((epoch) => epoch + 1)
       } else {
-        // A failed recovery must leave connecting so the bounded retry effect
+        // A failed recovery must leave stalled so the bounded retry effect
         // can run again after first-launch permission/capture transitions.
         setSourceHealth('stalled')
-        setShowRecoveryPrompt(true)
+        if (reason !== 'tuner-auto-source-stalled' || automaticRecoveryAttemptsRef.current >= 2) {
+          setShowRecoveryPrompt(true)
+        }
       }
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)

@@ -26,7 +26,7 @@ const stubs = {
  'appForeground': 'export const isAppInForeground=()=>true; export const subscribeAppForeground=()=>()=>{}',
  'playbackAudioContext': 'export const getPlaybackAudioContext=async()=>globalThis.__handsfreeTest.context; export const isSharedPlaybackContext=()=>true',
  'nativeAudioPitchTap': 'export const acquireNativeAudioTap=async()=>{}; export const releaseNativeAudioTap=async()=>{}; export const subscribeNativeAudioPitchFrames=async()=>null',
- 'cameraSessionState': 'export const isNativeCameraPreviewActive=()=>false',
+ 'cameraSessionState': 'export const isNativeCameraPreviewActive=()=>false; export const isNativeCaptureSessionActive=()=>globalThis.__handsfreeTest.nativeSession?.()??false',
  'sharedMetronomeEngine': 'export const sharedMetronomeEngine={subscribeTick:()=>()=>{},getSnapshot:()=>({playing:false})}',
  'autoRecordPlayback': 'export const AUTO_RECORD_MAX_IDLE_PREROLL_MS=20000',
 }
@@ -65,3 +65,14 @@ mark='started';await advance(1000)
 assert.equal(starts,2,'A pending entrance that went quiet must not trigger late')
 options.enabled=false;dirty=true;await flush()
 console.log('PASS: stale pending entrance cancelled and monitor disabled cleanly')
+
+options.enabled=true
+options.ready=false
+options.streamRef={current:{getAudioTracks:()=>[]}}
+let warms=0
+options.warmRecorder=()=>{warms++}
+dirty=true
+await advance(200)
+assert.ok(warms>0,'Hands-free must warm capture when no WebKit stream is live yet')
+assert.equal(output.handsFreeListeningReady,false,'Listening is not ready until audio actually arrives')
+console.log('PASS: missing microphone warms native capture instead of sitting idle')

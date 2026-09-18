@@ -43,12 +43,12 @@ export default function AudioPracticeTopTabs({
             haptic="light"
             onClick={() => {
               if (isActive) return
-              // Paint selection first; a new media panel can mount in an
-              // interruptible render. React reconciles rapid taps/external
-              // routine navigation with the authoritative activeTab prop.
+              // Tuner (and other media tabs) must change in this tap so native
+              // mic startup still counts as a user gesture on iPhone. Only the
+              // optimistic highlight is interruptible.
+              onTabChange(tab.id)
               startTabTransition(() => {
                 setSelectedTab(tab.id)
-                onTabChange(tab.id)
               })
             }}
             data-tutorial={`audio-tab-${tab.id}`}

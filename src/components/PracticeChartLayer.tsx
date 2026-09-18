@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { AudioLines, Columns2, Ear, FileMusic, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, Upload, X } from 'lucide-react'
+import { AudioLines, Columns2, Ear, FileMusic, LayoutGrid, Maximize2, MicVocal, Minimize2, Music2, Radio, Square, Upload, X } from 'lucide-react'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
@@ -174,12 +174,14 @@ export default function PracticeChartLayer({
    * An empty stand is still the music page. Without it, turning Music on for an
    * item with no part left the room exactly as it was apart from a ball on the
    * edge — it read as landing on Tools. The page comes up blank with the one
-   * thing to do on it.
+   * thing to do on it. The same is true while the file is still opening: the
+   * stand has to be the room on the first frame, not Tools for a beat.
    */
   const showingEmpty = active && paperVisible && loaded && chart === null
+  const showingLoading = active && paperVisible && !loaded
   useEffect(() => {
-    onPaperVisibleChange(showing || showingEmpty)
-  }, [onPaperVisibleChange, showing, showingEmpty])
+    onPaperVisibleChange(showing || showingEmpty || showingLoading)
+  }, [onPaperVisibleChange, showing, showingEmpty, showingLoading])
 
   /*
    * A part opens full screen.
@@ -563,6 +565,9 @@ export default function PracticeChartLayer({
                 <Icon aria-hidden /><span>{label}</span>
               </button>
             ))}
+            <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
+              <MicVocal aria-hidden /><span>Hands-Free</span>
+            </button>
           </div>
         )}
         </div>
@@ -620,6 +625,16 @@ export default function PracticeChartLayer({
             <span>Tap to turn</span>
           </div>
         )}
+      </div>
+    )}
+
+    {showingLoading && (
+      <div className="practice-chart-paper practice-chart-paper--empty">
+        <div className="practice-chart-empty" role="status" aria-live="polite">
+          <FileMusic aria-hidden />
+          <h2>Opening music</h2>
+          <p>Your part is coming onto the stand.</p>
+        </div>
       </div>
     )}
 

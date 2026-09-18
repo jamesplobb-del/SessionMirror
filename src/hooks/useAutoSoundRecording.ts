@@ -13,7 +13,9 @@ import {
   releaseNativeAudioTap,
   subscribeNativeAudioPitchFrames,
 } from '../utils/nativeAudioPitchTap'
-import { isNativeCameraPreviewActive } from '../utils/cameraSessionState'
+import {
+  isNativeCaptureSessionActive,
+} from '../utils/cameraSessionState'
 import { sharedMetronomeEngine } from '../metronome/sharedMetronomeEngine'
 import type { PluginListenerHandle } from '@capacitor/core'
 
@@ -110,13 +112,14 @@ function measureNativeFrameMetrics(buffer: Float32Array): {
 }
 
 /** Same path selection camera mode uses: native tap whenever the native capture
- *  session is live (preview or recording) and WebKit mic is suspended. */
+ *  session is live (preview, audio-only pre-roll, or tuner monitor) and WebKit
+ *  mic is suspended. */
 function resolveHandsFreeMonitorPath(options: {
   webKitLive: boolean
   nativeCaptureActive: boolean
   recordingActive: boolean
 }): 'native-tap' | 'webkit' | 'none' {
-  const nativeSessionActive = isNativeCameraPreviewActive()
+  const nativeSessionActive = isNativeCaptureSessionActive()
   const preferNativeMonitor =
     options.nativeCaptureActive ||
     (!options.webKitLive && nativeSessionActive) ||
@@ -128,7 +131,7 @@ function resolveHandsFreeMonitorPath(options: {
 }
 
 function shouldReadNativeTapDuringRecording(nativeCaptureActive: boolean): boolean {
-  return nativeCaptureActive || isNativeCameraPreviewActive()
+  return nativeCaptureActive || isNativeCaptureSessionActive()
 }
 
 export function useAutoSoundRecording({
@@ -137,7 +140,6 @@ export function useAutoSoundRecording({
   suppressStart,
   monitoringPaused = false,
   isNativeAudioCaptureActive,
-  ready,
   isRecording,
   streamRef,
   streamGeneration,
@@ -230,15 +232,14 @@ export function useAutoSoundRecording({
 
   // Native audio hands-free deliberately stops WebKit's microphone once the
   // hidden pre-roll owns the hardware. That can briefly make the WebKit
-  // session report not-ready; the native capture is still a fully valid
-  // listening source and must not be torn down because of that handoff.
-  const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
+  // session report not-ready. Do not require `ready` here: that chicken-egg
+  // left Tools/audio sitting on "Getting ready" whenever neither WebKit nor
+  // the pre-roll had started yet. The monitor warms native capture itself.
   const shouldMonitor =
     enabled &&
     monitoringAllowed &&
     !monitoringPaused &&
-    appForeground &&
-    (ready || nativeCaptureActive)
+    appForeground
   const shouldMonitorRef = useRef(shouldMonitor)
   shouldMonitorRef.current = shouldMonitor
 
@@ -527,21 +528,29 @@ export function useAutoSoundRecording({
   useEffect(() => {
     if (!shouldMonitor) return
     if (isNativeAudioCaptureActiveRef.current?.() === true) return
-    if (isStreamAudioLive(streamRef.current) || isNativeCameraPreviewActive()) return
+    if (isStreamAudioLive(streamRef.current) || isNativeCaptureSessionActive()) return
     if (!isAppInForeground()) return
 
-    onMonitorStalledRef.current?.()
+    // Start the hidden pre-roll before asking the camera hook to reopen
+    // WebKit. A stall refresh that raced native startup contended for the
+    // same input and left the UI on "Getting ready".
+    void warmRecorderRef.current()
 
     let cancelled = false
     const retryTimer = window.setInterval(() => {
       if (cancelled || !isAppInForeground()) return
-      if (isStreamAudioLive(streamRef.current)) {
+      if (
+        isNativeAudioCaptureActiveRef.current?.() === true ||
+        isStreamAudioLive(streamRef.current) ||
+        isNativeCaptureSessionActive()
+      ) {
         window.clearInterval(retryTimer)
         bumpMonitorEpoch()
         return
       }
+      void warmRecorderRef.current()
       onMonitorStalledRef.current?.()
-    }, 450)
+    }, 800)
 
     return () => {
       cancelled = true
@@ -562,6 +571,7 @@ export function useAutoSoundRecording({
         recordingActive: isRecordingRef.current,
       }) === 'none'
     ) {
+      void warmRecorderRef.current()
       return
     }
 
@@ -579,7 +589,7 @@ export function useAutoSoundRecording({
       const streamAtSetup = streamRef.current
       const webKitLive = isStreamAudioLive(streamAtSetup)
       const nativeCaptureActive = isNativeAudioCaptureActiveRef.current?.() === true
-      const path = preserveActiveCapture && (nativeCaptureActive || isNativeCameraPreviewActive())
+      const path = preserveActiveCapture && (nativeCaptureActive || isNativeCaptureSessionActive())
         ? 'native-tap'
         : resolveHandsFreeMonitorPath({
             webKitLive,
@@ -590,7 +600,7 @@ export function useAutoSoundRecording({
       console.info('[AutoSound] monitor setup', { path })
 
       if (path === 'none') {
-        onMonitorStalledRef.current?.()
+        void warmRecorderRef.current()
         return
       }
 
@@ -717,12 +727,12 @@ export function useAutoSoundRecording({
 
         if (isNativePath) {
           if (
-            !isNativeCameraPreviewActive() &&
+            !isNativeCaptureSessionActive() &&
             !isRecordingRef.current &&
             !isNativeAudioCaptureActiveRef.current?.()
           ) {
             if (isAppInForeground()) {
-              onMonitorStalledRef.current?.()
+              void warmRecorderRef.current()
             }
             return
           }
@@ -915,9 +925,16 @@ export function useAutoSoundRecording({
 
         let streamDead = false
         if (isNativePath || isNativeAudioCaptureActiveRef.current?.()) {
-          streamDead =
-            (!isNativeCameraPreviewActive() && !isNativeAudioCaptureActiveRef.current?.()) ||
-            now - (nativeFrameRef?.timestamp ?? 0) > 2000
+          const frameAt = nativeFrameRef?.timestamp
+          const sessionAlive =
+            isNativeCaptureSessionActive() || isNativeAudioCaptureActiveRef.current?.() === true
+          const framesWentQuiet = frameAt != null && now - frameAt > 4000
+          const neverStarted = frameAt == null && now - setupStartedAt > 3500
+          if (sessionAlive && framesWentQuiet) {
+            void warmRecorderRef.current()
+            return
+          }
+          streamDead = !sessionAlive && (framesWentQuiet || neverStarted)
         } else {
           streamDead = !isStreamAudioLive(streamRef.current)
           const ctx = audioContextRef.current
@@ -932,7 +949,12 @@ export function useAutoSoundRecording({
           // Report lost audio without tearing down a take that is still saving samples.
           if (isRecordingRef.current) return
           if (isAppInForeground()) {
-            onMonitorStalledRef.current?.()
+            // Warm native capture first. Asking the camera hook to reopen
+            // WebKit here is what stalled Hands-Free on "Getting ready".
+            void warmRecorderRef.current()
+            if (!isNativePath && !isNativeAudioCaptureActiveRef.current?.()) {
+              onMonitorStalledRef.current?.()
+            }
           }
           return
         }

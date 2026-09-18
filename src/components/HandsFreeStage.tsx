@@ -4,7 +4,7 @@ import { useMotionValue } from 'framer-motion'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useHandsFreePanelLayout } from '../hooks/useHandsFreePanelLayout'
 import '../styles/hands-free-panel.css'
-import { Settings2, GripHorizontal, MoveDiagonal2, Mic } from 'lucide-react'
+import { Settings2, GripHorizontal, Mic } from 'lucide-react'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
 /**
@@ -31,6 +31,8 @@ interface HandsFreeStageProps {
   placement?: HandsFreeStagePlacement
   /** Opens quiet-gap / start-level settings before recording. */
   onTapForSettings?: () => void
+  /** Turns hands-free off — same as closing any other widget with its ×. */
+  onClose?: () => void
 }
 
 const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
@@ -65,6 +67,7 @@ function HandsFreeStage({
   onLightBackground = false,
   placement = 'center',
   onTapForSettings,
+  onClose,
 }: HandsFreeStageProps) {
   const panel = useHandsFreePanelLayout(movable)
   const boundaryRef = useRef<HTMLDivElement>(null)
@@ -108,6 +111,30 @@ function HandsFreeStage({
           if (rect) { x.set(rect.left); y.set(rect.top) }
           fold.collapse()
         }} />
+        {onClose && (
+          <button
+            type="button"
+            data-no-drag
+            className={`pitch-widget-close hands-free-stage__close ${
+              onLightBackground ? 'pitch-widget-close--elevated' : ''
+            }`}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              onClose()
+            }}
+            aria-label="Turn off hands-free"
+          >
+            <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
+              <path
+                d="M2.5 2.5l7 7M9.5 2.5l-7 7"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        )}
         {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><GripHorizontal aria-hidden />Move</button>}
         <span className="hands-free-stage__pulse" aria-hidden />
         <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
@@ -130,7 +157,6 @@ function HandsFreeStage({
             : 'Recording did not start. Try again or use manual Record.'}</small>
           {notice === 'sensitive' && onTapForSettings && <button type="button" onClick={onTapForSettings}>Adjust start level</button>}
         </div>}
-        {movable && <button type="button" className="hands-free-panel__resize" aria-label="Resize hands-free controls" {...panel.controls(true)}><MoveDiagonal2 aria-hidden /></button>}
         {/* The centre treatment has room for the words; the compact pill on the
           * dense Tools tabs takes a glyph instead, so the status copy is never
           * squeezed on a narrow phone. Both open the same card. */}

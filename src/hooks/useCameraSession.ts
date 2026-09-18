@@ -348,7 +348,10 @@ export function useCameraSession({
   /** Settle promise of the in-flight native start — Stop awaits this so it never races didStartRecording. */
   const nativeStartSettleRef = useRef<Promise<boolean> | null>(null)
   const notifyHandsFreeMonitorRestartRef = useRef<(() => void) | null>(null)
-  const discardNativeAutoPreRollCaptureRef = useRef<() => Promise<void>>(async () => {})
+  const discardNativeAutoPreRollCaptureRef = useRef<
+    (options?: { restoreWebKit?: boolean }) => Promise<void>
+  >(async () => {})
+  const nativePreRollRecycleInFlightRef = useRef(false)
   /** While true (multitrack stage open), native failures must not tear down the bridge preview. */
   const suppressBridgeRecoveryRef = useRef(false)
   const nativeCameraRecordingEnabledRef = useRef(nativeCameraRecordingEnabled)
@@ -1827,6 +1830,7 @@ export function useCameraSession({
       isRecordingRef.current ||
       autoPreRollActiveRef.current ||
       warmAutoAudioInFlightRef.current ||
+      nativePreRollRecycleInFlightRef.current ||
       isAutoPlaybackHoldingMicWarmup()
     ) {
       return
@@ -1902,11 +1906,30 @@ export function useCameraSession({
 
   const restartAutoPreRollCapture = useCallback(() => {
     if (!autoPreRollActiveRef.current || autoPerformanceActiveRef.current) return
+    if (nativePreRollRecycleInFlightRef.current) return
+
+    const recycleNativeAudio =
+      isNativeVideoRecordingEnabled() &&
+      recordingModeRef.current === 'audio' &&
+      (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current !== null)
+
+    if (recycleNativeAudio) {
+      nativePreRollRecycleInFlightRef.current = true
+      void discardNativeAutoPreRollCaptureRef
+        .current({ restoreWebKit: false })
+        .catch(() => {})
+        .finally(() => {
+          nativePreRollRecycleInFlightRef.current = false
+        })
+        .then(() => warmAutoRecordingRef.current())
+      return
+    }
+
     cancelAutoPreRollCapture()
     window.setTimeout(() => {
       void warmAutoRecordingRef.current()
     }, 120)
-  }, [cancelAutoPreRollCapture])
+  }, [cancelAutoPreRollCapture, isNativeVideoRecordingEnabled])
 
   scheduleWarmAutoAudioRef.current = () => {
     if (recordingModeRef.current !== 'audio') return
@@ -2234,7 +2257,7 @@ export function useCameraSession({
     void acquireStream('audio', undefined, { forceNew: true, liveCapture: true })
   }, [acquireStream])
 
-  const discardNativeAutoPreRollCapture = useCallback(async () => {
+  const discardNativeAutoPreRollCapture = useCallback(async (options?: { restoreWebKit?: boolean }) => {
     if (!autoPreRollActiveRef.current && !nativeExperimentalRecordingRef.current) {
       return
     }
@@ -2273,12 +2296,16 @@ export function useCameraSession({
     setIsRecording(false)
     setIsStopping(false)
     if (preRollMode === 'audio') {
+      // Idle Hands-Free recycles this file every 20s. Opening WebKit in that
+      // gap contends for the same mic the next native pre-roll needs, and
+      // "Getting ready" never ends. Stay native unless the caller is really
+      // leaving capture.
+      if (options?.restoreWebKit === false) {
+        return
+      }
       if (recordingModeRef.current === 'audio') {
         recoverAfterNativeAudioRecording()
       } else {
-        // The pre-roll was discarded because the player left Tools. Camera is
-        // acquiring its own session now — reopening a WebKit mic here would
-        // only fight it. Just drop the native-capture flag.
         setNativeAudioCaptureActive(false)
         requestPitchGraphReattach()
       }
