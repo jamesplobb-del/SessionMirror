@@ -888,14 +888,17 @@
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode)
     .app-pip-row--compact
+    > .compact-take-slot,
+  :root .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row--compact
     > .compact-take-slot {
-    --camera-take-card-height: clamp(5.5rem, 7.2vw, 6.35rem);
-    --camera-take-thumb-size: clamp(4.5rem, 6vw, 5.3rem);
+    --camera-take-card-height: clamp(10.5rem, 14vw, 12.25rem);
+    --camera-take-thumb-size: calc(var(--camera-take-card-height) - 2.45rem);
     width: 100% !important;
     min-width: 0;
     flex: none !important;
-    gap: clamp(0.7rem, 1.25vw, 1rem);
-    padding: 0.5rem 0.7rem;
+    gap: clamp(0.75rem, 1.4vw, 1.1rem);
+    padding: 1.85rem 0.9rem 0.6rem 0.7rem;
   }
 
   .compact-take-caption__label {
@@ -908,6 +911,41 @@
 
   .compact-take-caption__detail {
     font-size: clamp(0.66rem, 0.95vw, 0.78rem);
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .compact-take-slot
+    > .pip-video-container--compact {
+    border-radius: 0.9rem;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .compact-take-slot
+    .pip-video-container--compact
+    > .ui-orient-spin
+    > .relative {
+    border: 1px solid rgba(255, 255, 255, 0.32) !important;
+    border-radius: 0.9rem !important;
+    background: #05080d !important;
+    box-shadow:
+      0 0.7rem 1.6rem rgba(0, 0, 0, 0.42),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .pip-video-container--compact
+    img {
+    filter: saturate(1.1) contrast(1.08) brightness(1.05);
+  }
+
+  .compact-take-card__play-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+
+  .compact-take-card__play-icon svg {
+    width: 1.05rem;
+    height: 1.05rem;
   }
 
   /* Camera: Vault at the leading edge, Settings at the trailing edge, with
@@ -1284,9 +1322,12 @@
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode)
     .app-pip-row--compact
+    > .compact-take-slot,
+  :root .app-ui-overlay:not(.app-ui-overlay--audio-mode)
+    .app-pip-row--compact
     > .compact-take-slot {
-    --camera-take-card-height: 5rem;
-    --camera-take-thumb-size: 4rem;
+    --camera-take-card-height: clamp(10.25rem, 24vh, 12rem);
+    --camera-take-thumb-size: calc(var(--camera-take-card-height) - 2.35rem);
   }
 }
 

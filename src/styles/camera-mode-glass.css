@@ -1696,22 +1696,22 @@ button.compact-take-caption:active {
 
 .compact-take-card__play-icon {
   display: flex;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.85rem;
+  height: 1.85rem;
   align-items: center;
   justify-content: center;
-  border: 0.5px solid rgba(255, 255, 255, 0.3);
+  border: 0.5px solid rgba(255, 255, 255, 0.55);
   border-radius: 999px;
-  background: rgba(3, 6, 10, 0.48);
-  box-shadow: 0 0.18rem 0.45rem rgba(0, 0, 0, 0.24);
-  color: rgba(255, 255, 255, 0.96);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgba(3, 6, 10, 0.66);
+  box-shadow: 0 0.28rem 0.7rem rgba(0, 0, 0, 0.42);
+  color: rgba(255, 255, 255, 0.98);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .compact-take-card__play-icon svg {
-  width: 0.58rem;
-  height: 0.58rem;
+  width: 0.82rem;
+  height: 0.82rem;
   stroke-width: 2.2;
 }
 
@@ -1732,9 +1732,10 @@ button.compact-take-caption:active {
 }
 
 .compact-take-card__empty-placeholder {
-  width: 1.15rem;
-  height: 1.15rem;
-  stroke-width: 1.4;
+  width: 1.65rem;
+  height: 1.65rem;
+  stroke-width: 1.5;
+  opacity: 0.85;
 }
 
 .compact-take-card__empty-actions {

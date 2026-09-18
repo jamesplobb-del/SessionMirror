@@ -644,26 +644,13 @@ function PipWindow({
                 intensity="icon"
                 squish={false}
                 haptic="light"
-                onPointerDown={compact ? undefined : stopEventBubble}
-                onTouchStart={compact ? undefined : stopEventBubble}
-                onTouchEnd={compact ? undefined : stopEventBubble}
-                onClick={(event) => {
-                  if (compact && onExpand) {
-                    event.stopPropagation()
-                    stopEventBubble(event)
-                    onExpand()
-                    return
-                  }
-                  handlePlayPauseClick(event)
-                }}
+                data-card-move-ignore
+                onPointerDown={stopEventBubble}
+                onTouchStart={stopEventBubble}
+                onTouchEnd={stopEventBubble}
+                onClick={handlePlayPauseClick}
                 className={pipPlayButtonClass}
-                aria-label={
-                  compact && onExpand
-                    ? `Open ${label} in full screen`
-                    : isPlaying
-                      ? 'Pause inline preview'
-                      : 'Play inline preview'
-                }
+                aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
                 <span className={pipTouchIconClass}>
                   {isPlaying ? (
