@@ -115,6 +115,31 @@ final class MetronomeEngine {
     /// Guarded by stateLock; only the newest scheduled recovery runs.
     private var configurationRecoveryGeneration: UInt64 = 0
 
+    /*
+     * Render watchdog. `globalSampleIndex` only moves while the engine is
+     * really rendering, and the scheduler only books clicks a little ahead of
+     * it — so an engine that stops rendering after its first buffer plays one
+     * click and then nothing, while every flag still says "playing". That was
+     * the start glitch: one click, then a second tap needed. The scheduler
+     * already wakes every 25 ms; it now notices when the sample clock has not
+     * moved and asks for a recovery. All fields guarded by stateLock.
+     */
+    private var watchdogLastSample: Int64 = -1
+    private var watchdogLastProgressAt: CFTimeInterval = 0
+    /// True from a (re)start until the first rendered buffer. Bluetooth routes
+    /// can take most of a second to begin pulling, so this gets a longer grace.
+    private var watchdogAwaitingFirstRender = true
+    private var watchdogRecoveryRequested = false
+    /// Recoveries run since the sample clock last moved. Reset by real progress.
+    private var recoveryRunsWithoutProgress = 0
+    private static let firstRenderGrace: CFTimeInterval = 2.0
+    private static let renderStallThreshold: CFTimeInterval = 0.5
+    /// Delays between recovery attempts that could not restart the engine.
+    private static let recoveryRetryDelays: [TimeInterval] = [0.25, 0.5, 1.0, 2.0]
+    /// After this many recoveries with a frozen clock the click is stopped and
+    /// JS is told, so the button reads stopped rather than playing in silence.
+    private static let maxRecoveryRunsWithoutProgress = 6
+
     private init() {
         // A call or Siri pauses the click in native code even if WebKit is
         // suspended. Resume is an explicit Play; configuration notifications
@@ -125,6 +150,20 @@ final class MetronomeEngine {
         ) { [weak self] notification in
             guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
                   raw == AVAudioSession.InterruptionType.began.rawValue else { return }
+            // Not every "began" silences this engine. One delivered for an app
+            // suspension is stale by the time it arrives, and a muted built-in
+            // microphone (an iPad cover closing) says nothing about output.
+            // Both used to stop the click outright.
+            if notification.userInfo?[AVAudioSessionInterruptionWasSuspendedKey] as? Bool == true {
+                print("[MetronomeEngine] ignoring stale interruption (app was suspended)")
+                return
+            }
+            if #available(iOS 14.5, *),
+               let reasonRaw = notification.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt,
+               AVAudioSession.InterruptionReason(rawValue: reasonRaw) == .builtInMicMuted {
+                print("[MetronomeEngine] ignoring interruption for muted built-in mic")
+                return
+            }
             self?.recoveryQueue.async { [weak self] in self?.stop() }
         }
         // Deliberately NOT queue: .main. Recovery does blocking AVAudioSession
@@ -135,7 +174,7 @@ final class MetronomeEngine {
             object: engine,
             queue: nil
         ) { [weak self] _ in
-            self?.scheduleConfigurationRecovery()
+            self?.scheduleConfigurationRecovery(reason: "configuration change")
         }
 
         engine.attach(outputMixer)
@@ -202,6 +241,8 @@ final class MetronomeEngine {
         self.pendingClicks.removeAll()
         self.firstClickHostTimeSec = leadSec
         self.firstClickPerfMs = Date().timeIntervalSince1970 * 1000 + leadSec * 1000
+        self.recoveryRunsWithoutProgress = 0
+        resetRenderWatchdogLocked()
         stateLock.unlock()
 
         try preparePlaybackSession()
@@ -297,11 +338,15 @@ final class MetronomeEngine {
         defer { controlLock.unlock() }
         guard schedulerTimer != nil else { return }
         outputPausedForCaptureHandoff = false
+        stateLock.lock()
+        resetRenderWatchdogLocked()
+        stateLock.unlock()
         do {
             try preparePlaybackSession()
             try ensureEngineRunning()
         } catch {
             print("[MetronomeEngine] resume after capture handoff failed: \(error.localizedDescription)")
+            scheduleConfigurationRecovery(reason: "capture handoff resume failure")
         }
     }
 
@@ -324,35 +369,110 @@ final class MetronomeEngine {
      * is reconfigured once against the final route rather than once per
      * intermediate one.
      */
-    private func scheduleConfigurationRecovery() {
+    private func scheduleConfigurationRecovery(
+        reason: String,
+        delay: TimeInterval = MetronomeEngine.configurationRecoveryDebounce,
+        forceActivate: Bool = false
+    ) {
         stateLock.lock()
         configurationRecoveryGeneration &+= 1
         let generation = configurationRecoveryGeneration
         stateLock.unlock()
 
-        recoveryQueue.asyncAfter(deadline: .now() + Self.configurationRecoveryDebounce) { [weak self] in
+        recoveryQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self else { return }
             self.stateLock.lock()
             let isLatest = generation == self.configurationRecoveryGeneration
             self.stateLock.unlock()
             // A newer notification landed while this one waited; let that one win.
             guard isLatest else { return }
-            self.performConfigurationRecovery()
+            self.performConfigurationRecovery(reason: reason, forceActivate: forceActivate)
         }
     }
 
-    private func performConfigurationRecovery() {
+    private func performConfigurationRecovery(reason: String, forceActivate: Bool) {
         controlLock.lock()
         defer { controlLock.unlock() }
         guard !outputPausedForCaptureHandoff else { return }
         guard schedulerTimer != nil else { return }
-        do {
-            try preparePlaybackSession()
-            try ensureEngineRunning()
-            print("[MetronomeEngine] restarted after configuration change")
-        } catch {
-            print("[MetronomeEngine] configuration change restart failed: \(error.localizedDescription)")
+
+        stateLock.lock()
+        recoveryRunsWithoutProgress += 1
+        let runs = recoveryRunsWithoutProgress
+        stateLock.unlock()
+        if runs > Self.maxRecoveryRunsWithoutProgress {
+            print("[MetronomeEngine] \(reason): \(runs - 1) recoveries without the clock moving — stopping")
+            stop()
+            return
         }
+
+        do {
+            let session = AVAudioSession.sharedInstance()
+            if forceActivate {
+                // A cached "already active" can be stale after someone else
+                // deactivated the shared session. Retries activate for real,
+                // and first: preparing an inactive session is itself what
+                // fails, so activating after it would never be reached.
+                try AudioRouteConfigurator.debugSetActive(session, active: true, caller: "MetronomeEngine.recovery")
+            }
+            try preparePlaybackSession()
+            if !forceActivate {
+                try AudioRouteConfigurator.ensureSessionActive(session, caller: "MetronomeEngine.recovery")
+            }
+            AudioRouteConfigurator.keepPlaybackOffReceiver(session, caller: "MetronomeEngine.recovery")
+            try restartEngineOutput()
+            print("[MetronomeEngine] restarted after \(reason) (attempt \(runs))")
+        } catch {
+            print("[MetronomeEngine] \(reason) restart failed (attempt \(runs)): \(error.localizedDescription)")
+            let retryIndex = min(runs - 1, Self.recoveryRetryDelays.count - 1)
+            scheduleConfigurationRecovery(
+                reason: reason,
+                delay: Self.recoveryRetryDelays[retryIndex],
+                forceActivate: true
+            )
+        }
+    }
+
+    /**
+     * A configuration change stops the engine, and the mixer→output connection
+     * made at launch is formatted for hardware that may be gone — a different
+     * sample rate or channel count after a route change. Restarting over that
+     * connection could fail, or run without rendering. Reconnect against what
+     * the output node reports now, then start.
+     */
+    private func restartEngineOutput() throws {
+        if engine.isRunning {
+            engine.stop()
+        }
+        isRunning = false
+        // Mid-route-change the hardware can briefly report no output format,
+        // and connecting to it then raises an Objective-C exception rather
+        // than a Swift error. Treat it as "not yet" and let the retry run.
+        let hardware = engine.outputNode.outputFormat(forBus: 0)
+        guard hardware.sampleRate > 0, hardware.channelCount > 0 else {
+            throw NSError(
+                domain: "MetronomeEngine",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Output route not ready"]
+            )
+        }
+        engine.disconnectNodeOutput(outputMixer)
+        engine.connect(outputMixer, to: engine.outputNode, format: nil)
+        outputMixer.outputVolume = 1
+        engine.prepare()
+        stateLock.lock()
+        resetRenderWatchdogLocked()
+        stateLock.unlock()
+        try engine.start()
+        isRunning = true
+    }
+
+    /// Caller holds stateLock.
+    private func resetRenderWatchdogLocked() {
+        watchdogLastSample = -1
+        watchdogLastProgressAt = CACurrentMediaTime()
+        watchdogAwaitingFirstRender = true
+        watchdogRecoveryRequested = false
     }
 
     private func ensureEngineRunning() throws {
@@ -399,7 +519,38 @@ final class MetronomeEngine {
         schedulerTimer = nil
         stateLock.lock()
         eventGeneration += 1
+        // A recovery queued for the previous run must not restart this one.
+        configurationRecoveryGeneration &+= 1
         stateLock.unlock()
+    }
+
+    /// Runs on the scheduler tick. Cheap: two comparisons unless the clock
+    /// has actually frozen.
+    private func checkRenderProgress(currentSample: Int64) {
+        let now = CACurrentMediaTime()
+        stateLock.lock()
+        if currentSample != watchdogLastSample {
+            if watchdogLastSample >= 0 {
+                // The clock moved since the last look: rendering is real.
+                watchdogAwaitingFirstRender = false
+                recoveryRunsWithoutProgress = 0
+                watchdogRecoveryRequested = false
+            }
+            watchdogLastSample = currentSample
+            watchdogLastProgressAt = now
+            stateLock.unlock()
+            return
+        }
+        let limit = watchdogAwaitingFirstRender ? Self.firstRenderGrace : Self.renderStallThreshold
+        let stalledFor = now - watchdogLastProgressAt
+        let shouldRecover = stalledFor > limit && !watchdogRecoveryRequested
+        if shouldRecover {
+            watchdogRecoveryRequested = true
+        }
+        stateLock.unlock()
+        guard shouldRecover else { return }
+        print("[MetronomeEngine] render clock frozen for \(Int(stalledFor * 1000))ms — recovering")
+        scheduleConfigurationRecovery(reason: "render stall", delay: 0)
     }
 
     private func scheduleAhead() {
@@ -419,6 +570,8 @@ final class MetronomeEngine {
         var scheduledClicks: [PendingClick] = []
         let pulseCount = max(1, barTicks / max(1, pulseTickCount))
         stateLock.unlock()
+
+        checkRenderProgress(currentSample: currentSample)
 
         guard !pattern.isEmpty, barTicks > 0 else { return }
 

@@ -214,6 +214,8 @@ import {
   stabilizeViewportAfterMediaInteraction,
 } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
+import { hasPracticeChart, savePracticeChart, setChartVisible } from './utils/practiceChartStorage'
+import { sheetMusicAcceptAttribute } from './multitrack/sheetMusic/sheetMusicUtils'
 import {
   APP_BACKGROUND_SUSPEND_EVENT,
   APP_FOREGROUND_RECOVERY_EVENT,
@@ -597,6 +599,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   /** The part is actually covering the room, so the HUD stops painting over it. */
   const [musicPageVisible, setMusicPageVisible] = useState(false)
+  /** Bumped when music is saved or re-shown from outside the page, so it reloads. */
+  const [musicChartRevision, setMusicChartRevision] = useState(0)
+  const musicFileInputRef = useRef<HTMLInputElement>(null)
+  /** The item the Music tile already asked for a file for; the page must not ask twice. */
+  const musicFilePromptedForRef = useRef<string | null>(null)
   /** Rehearsal view: the player has put the tabs and the deck away as well. */
   const [musicChromeHidden, setMusicChromeHidden] = useState(false)
   const [pendingPitchTrackerEnabled, setPendingPitchTrackerEnabled] = useState<boolean | null>(null)
@@ -2864,6 +2871,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
    */
   const workspaceModeRef = useRef(recordingModeRef.current)
   const keepWorkspaceAcrossModeRef = useRef(false)
+  /**
+   * The Music tile crosses from Camera to Tools and asks for the page in the
+   * same tap. The crossing clears every desk tool — including the music it was
+   * just asked for, which is why the tile landed on a bare Tools room. The
+   * crossing still clears the desk; it then turns Music on when this is set.
+   */
+  const openMusicAfterCrossingRef = useRef(false)
 
   const handleRecordingModeChange = useCallback(
     (mode: RecordingMode) => {
@@ -3435,12 +3449,27 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [handleOpenFullPracticeTool])
 
   const handleOpenMusicFromPracticeHub = useCallback(() => {
+    // Ask for the file inside this tap: it is the only moment WebKit lets a
+    // page open the file picker. The music page's own request comes after it
+    // has loaded, too late to count as the tap, so it was silently ignored and
+    // the tile seemed to land on plain Tools.
+    const projectId = activeProjectIdRef.current
+    if (projectId && hasPracticeChart(projectId)) {
+      // Music is on the stand: open on the page even if it was put away.
+      setChartVisible(projectId, true)
+      musicFilePromptedForRef.current = null
+      setMusicChartRevision((value) => value + 1)
+    } else {
+      musicFilePromptedForRef.current = projectId
+      musicFileInputRef.current?.click()
+    }
     triggerLightHaptic(settings.hapticFeedback)
     dismissPracticeHub()
     setIsSettingsOpen(false)
     setIsVaultOpen(false)
     setQuickSettingsOpen(false)
     setLabsRoute(null)
+    openMusicAfterCrossingRef.current = recordingModeRef.current !== 'audio'
     handleRecordingModeChange('audio')
     handleAudioPracticeTabChange('audio')
     updateSettings({ showMusic: true })
@@ -3453,6 +3482,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     settings.hapticFeedback,
     updateSettings,
   ])
+
+  const handleMusicFileChosen = useCallback(async (file: File) => {
+    try {
+      const projectId = activeProjectIdRef.current ?? (await handleCreateProject('Music')).id
+      await savePracticeChart(projectId, file)
+      musicFilePromptedForRef.current = null
+      updateSettings({ showMusic: true })
+      setMusicChartRevision((value) => value + 1)
+    } catch (error) {
+      setTakeDeleteError(error instanceof Error ? error.message : 'Could not open this music.')
+    }
+  }, [handleCreateProject, updateSettings])
 
   const handleOpenVaultFromPracticeHub = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
@@ -4050,8 +4091,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     () => false
   )
 
+  /*
+   * Reconcile the click only when the surface changes underneath it. Starting
+   * the click already prepares its route; reconciling on that same transition
+   * released the playback route through the recording route and re-engaged it
+   * straight after the first click — the engine stopped for the session
+   * change, which is the "one click, then tap play again" start.
+   */
+  const metronomeSurfaceRef = useRef({ recordingMode, nativeLivePreviewActive })
   useEffect(() => {
+    const previous = metronomeSurfaceRef.current
+    metronomeSurfaceRef.current = { recordingMode, nativeLivePreviewActive }
     if (!metronomePlaying) return
+    if (
+      previous.recordingMode === recordingMode &&
+      previous.nativeLivePreviewActive === nativeLivePreviewActive
+    ) {
+      return
+    }
     if (recordingMode === 'video' && !nativeLivePreviewActive) return
     sharedMetronomeEngine.reconcileAfterModeSwitch(recordingMode)
   }, [recordingMode, nativeLivePreviewActive, metronomePlaying])
@@ -4393,6 +4450,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   useEffect(() => {
     if (workspaceModeRef.current === recordingMode) return
     workspaceModeRef.current = recordingMode
+    const openMusic = openMusicAfterCrossingRef.current
+    openMusicAfterCrossingRef.current = false
     if (keepWorkspaceAcrossModeRef.current) {
       keepWorkspaceAcrossModeRef.current = false
       return
@@ -4410,7 +4469,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       pitchTrackerEnabled: false,
       showMetronome: false,
       showDrone: false,
-      showMusic: false,
+      showMusic: openMusic && recordingMode === 'audio',
       audioEnhancerEnabled: false,
     })
     sharedMetronomeEngine.stop()
@@ -5912,11 +5971,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
               />
 
+              <input
+                ref={musicFileInputRef}
+                type="file"
+                hidden
+                accept={sheetMusicAcceptAttribute()}
+                data-music-tile-input=""
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) void handleMusicFileChosen(file)
+                }}
+              />
               {activeProjectId && settings.showMusic && (
                 <Suspense fallback={null}>
                   <PracticeChartLayer
-                    key={activeProjectId}
+                    key={`${activeProjectId}:${musicChartRevision}`}
                     projectId={activeProjectId}
+                    offerFileOnOpen={musicFilePromptedForRef.current !== activeProjectId}
                     workspace={hudQuickSettings}
                     onWorkspaceChange={(key, enabled) => {
                       switch (key) {

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		B7C0DE012026091300000001 /* OfferCodesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C0DE012026091300000002 /* OfferCodesPlugin.swift */; };
 		02AB3A7C96C84CAA80A2A948 /* QuickTunerControl.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F0DF5106155249CF971FED8B /* QuickTunerControl.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1374E93445FE40A6A1560F62 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
 		2C57C5F4B910493DB389289B /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
@@ -24,6 +23,7 @@
 		A0F6F8A0FA374FA6A0FA9C08 /* QuickTunerControlBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */; };
 		AUDIOENH2FED79650016851F /* AudioEnhancerRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */; };
 		AUDIOROUTE2FED79650016851F /* AudioRouteConfigurator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */; };
+		B7C0DE012026091300000001 /* OfferCodesPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7C0DE012026091300000002 /* OfferCodesPlugin.swift */; };
 		BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
 		BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
 		BESTTAKE2FED79650016851F /* BestTakeAudioPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */; };
@@ -71,7 +71,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		B7C0DE012026091300000002 /* OfferCodesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferCodesPlugin.swift; sourceTree = "<group>"; };
 		180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerPlugin.swift; sourceTree = "<group>"; };
 		26CC1F5F8BFD47979B1C9E03 /* QuickTunerControl.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickTunerControl.entitlements; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -91,6 +90,7 @@
 		AE0B12399785435AA9D3D917 /* QuickTunerControlBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControlBundle.swift; sourceTree = "<group>"; };
 		AUDIOENH1FED79650016851F /* AudioEnhancerRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEnhancerRenderer.swift; sourceTree = "<group>"; };
 		AUDIOROUTE1FED79650016851F /* AudioRouteConfigurator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRouteConfigurator.swift; sourceTree = "<group>"; };
+		B7C0DE012026091300000002 /* OfferCodesPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferCodesPlugin.swift; sourceTree = "<group>"; };
 		BESTTAKE1FED79650016851F /* BestTakeAudioPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BestTakeAudioPlugin.swift; sourceTree = "<group>"; };
 		BESTTAKE3FED79650016851F /* BestTakeAudioPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BestTakeAudioPlugin.m; sourceTree = "<group>"; };
 		C06A9742E4D44245B6B437BB /* QuickTunerControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerControl.swift; sourceTree = "<group>"; };
@@ -590,12 +590,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = X24D9LKQ58;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.2;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -612,12 +612,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = X24D9LKQ58;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.besttake.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

@@ -81,13 +81,39 @@ export function requestInteractiveMediaRecovery(reason: string): void {
 }
 
 function markForeground(reason: string): void {
+  const wasForeground = appInForeground
   setAppInForeground(true)
+  // focus and pageshow also fire while the app never left — after the
+  // keyboard, a picker, or a system overlay. Treating those as a resume re-ran
+  // every recovery (microphone and camera refresh, playback route release,
+  // context resume) under whatever was sounding. Only a real return does now.
+  if (wasForeground && (reason === 'window-focus' || reason === 'pageshow')) return
   dispatchForeground(reason)
 }
 
 function markBackground(reason: string): void {
   setAppInForeground(false)
   dispatchBackground(reason)
+}
+
+/**
+ * iOS reports "inactive" for Control Center, a pulled-down notification, a
+ * system prompt or the volume overlay while the app never leaves the screen.
+ * Each of those ran a full background suspend and then a full foreground
+ * recovery: microphone and camera torn down and rebuilt, playback routes
+ * released, the audio session reconfigured twice under a running metronome —
+ * which is how adjusting the volume froze the click and jumped the level. A
+ * real background still hides the page and is marked at once; "inactive" on
+ * its own now has to outlast this grace.
+ */
+const INACTIVE_GRACE_MS = 1500
+let inactiveTimer: number | null = null
+let inactiveSince = 0
+
+function clearInactiveGrace(): void {
+  if (inactiveTimer === null) return
+  window.clearTimeout(inactiveTimer)
+  inactiveTimer = null
 }
 
 export function isAppInForeground(): boolean {
@@ -110,6 +136,7 @@ export function registerAppForegroundLifecycle(): void {
       markForeground('visibility-visible')
       return
     }
+    clearInactiveGrace()
     markBackground('visibility-hidden')
   }
 
@@ -125,7 +152,10 @@ export function registerAppForegroundLifecycle(): void {
     }
   }
 
-  const onPageHide = () => markBackground('pagehide')
+  const onPageHide = () => {
+    clearInactiveGrace()
+    markBackground('pagehide')
+  }
 
   document.addEventListener('visibilitychange', onVisibilityChange)
   window.addEventListener('pageshow', onPageShow)
@@ -136,10 +166,23 @@ export function registerAppForegroundLifecycle(): void {
     void import('@capacitor/app').then(({ App }) => {
       void App.addListener('appStateChange', ({ isActive }) => {
         if (isActive) {
+          if (inactiveTimer !== null) {
+            // A timer still pending after more than twice its delay means
+            // WebKit was suspended and it never got to run: a real absence.
+            const overlayOnly = Date.now() - inactiveSince < INACTIVE_GRACE_MS * 2
+            clearInactiveGrace()
+            if (overlayOnly && appInForeground) return
+            if (appInForeground) markBackground('capacitor-inactive')
+          }
           markForeground('capacitor-active')
           return
         }
-        markBackground('capacitor-inactive')
+        if (!appInForeground || inactiveTimer !== null) return
+        inactiveSince = Date.now()
+        inactiveTimer = window.setTimeout(() => {
+          inactiveTimer = null
+          markBackground('capacitor-inactive')
+        }, INACTIVE_GRACE_MS)
       })
     })
     return

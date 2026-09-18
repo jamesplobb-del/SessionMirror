@@ -184,6 +184,26 @@ enum AudioRouteConfigurator {
         try session.overrideOutputAudioPort(.speaker)
     }
 
+    /**
+     * A playAndRecord session that lost defaultToSpeaker plays out of an
+     * iPhone's earpiece, which a player hears as the volume suddenly dropping
+     * by itself. A capture or WebKit reconfigure can land the session there
+     * while the native click or drone is sounding. Move output back to the
+     * speaker without touching category or mode. A no-op on iPad (it has no
+     * receiver) and whenever headphones or Bluetooth are connected.
+     */
+    static func keepPlaybackOffReceiver(_ session: AVAudioSession = .sharedInstance(), caller: String) {
+        guard session.category == .playAndRecord else { return }
+        guard session.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) else { return }
+        guard !hasExternalOutput(session) else { return }
+        do {
+            try session.overrideOutputAudioPort(.speaker)
+            print("[AudioRoute] moved output off the receiver caller=\(caller)")
+        } catch {
+            print("[AudioRoute] receiver→speaker override failed caller=\(caller): \(error.localizedDescription)")
+        }
+    }
+
     static func parseMicInputPreference(_ raw: String?) -> MicInputPreference {
         guard let raw = raw, let preference = MicInputPreference(rawValue: raw) else {
             return .auto

@@ -377,13 +377,18 @@ class SharedMetronomeEngine {
     await releaseStereoPlayback()
   }
 
+  /**
+   * Re-assert the playback route in place. This used to release first, which
+   * sent the session through the recording route (enableRecordingRoute) while
+   * the click was sounding, only to put the playback route straight back:
+   * two session reconfigurations, each of which stops the native engine.
+   * ensureNativeSpeakerRouteUnlocked already re-applies the loud/coexistent
+   * session when the hold is kept, which is all a surface change needs.
+   */
   private reassertNativeSpeakerRoute(): Promise<void> {
     return this.enqueueNativeRoute(async () => {
-      if (!this.snapshot.playing || !this.nativeSpeakerRouteHeld) return
-      await this.releaseNativeSpeakerRouteUnlocked()
-      if (this.snapshot.playing) {
-        await this.ensureNativeSpeakerRouteUnlocked()
-      }
+      if (!this.snapshot.playing) return
+      await this.ensureNativeSpeakerRouteUnlocked()
     })
   }
 

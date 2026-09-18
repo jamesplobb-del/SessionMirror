@@ -3410,6 +3410,19 @@ export function useCameraSession({
 
     const mode = recordingModeRef.current
 
+    // Hands-free's hidden pre-roll (and a native audio take) own the
+    // microphone natively. Reopening WebKit's here contended with that capture
+    // for the same input: the native tap went quiet, hands-free read the
+    // silence as a stall and asked for another refresh, and "Getting ready"
+    // never ended. Let native verify and heal its own session instead.
+    if (
+      mode === 'audio' &&
+      (nativeExperimentalRecordingRef.current || nativeStartSettleRef.current !== null)
+    ) {
+      await ensureNativeCameraSessionHealthy()
+      return
+    }
+
     if (isNativeVideoRecordingEnabled() && mode === 'video') {
       if (nativePreviewActiveRef.current) {
         previewHealthyRef.current = true

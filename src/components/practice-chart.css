@@ -152,6 +152,71 @@
 .practice-chart-failed button:first-child { background: #2f6fd0; border-color: #2f6fd0; color: #ffffff; }
 .practice-chart-failed button:disabled { opacity: 0.5; }
 
+/*
+ * An empty stand. Turning Music on for an item with no part used to leave the
+ * room as it was; the page now comes up blank, fitted between the same chrome
+ * as a real part, with the one thing to do on it.
+ */
+.practice-chart-empty {
+  position: absolute;
+  top: var(--music-page-top, var(--safe-top, env(safe-area-inset-top, 0px)));
+  right: 0;
+  bottom: var(--music-page-bottom, 0px);
+  left: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 16px;
+  text-align: center;
+  color: #4a4f57;
+}
+
+.practice-chart-empty > svg { width: 44px; height: 44px; color: #2f6fd0; }
+
+.practice-chart-empty h2 {
+  margin: 0.25rem 0 0;
+  color: #1d2430;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.practice-chart-empty p {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.practice-chart-empty .practice-chart-empty__error { color: #b42318; }
+
+.practice-chart-empty div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.practice-chart-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(23, 26, 34, 0.14);
+  background: #ffffff;
+  color: #1d2430;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.practice-chart-empty button svg { width: 17px; height: 17px; }
+.practice-chart-empty button:first-child { background: #2f6fd0; border-color: #2f6fd0; color: #ffffff; }
+.practice-chart-empty button:disabled { opacity: 0.5; }
+
 /* ---- The room stands down --------------------------------------------- */
 
 /*

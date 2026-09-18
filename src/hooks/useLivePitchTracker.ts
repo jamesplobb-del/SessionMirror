@@ -319,6 +319,17 @@ const CANVAS_DRAW_TUNER_MS = 1000 / 60
 /** Low-latency mic FFT for the camera widget (smaller window = less phase lag). */
 /** Native tap can survive while its AVCapture output stops delivering; rebuild when stale. */
 const NATIVE_TAP_STALE_MS = 2600
+/**
+ * How long a new native tap may take to deliver its first frame before the
+ * watchdog acts. Kept under NATIVE_TAP_STALE_MS so the watchdog, not the draw
+ * loop's stale check, decides between rebuilding and falling back.
+ */
+const NATIVE_TAP_FIRST_FRAME_MS = 2000
+/**
+ * Silent native taps rebuilt before falling back to WebKit: a slow capture
+ * start gets about six seconds instead of two.
+ */
+const NATIVE_TAP_SILENT_REBUILDS = 2
 
 export type PitchTrackerSource = 'media' | 'microphone'
 export type PitchSourceHealth = 'idle' | 'connecting' | 'healthy' | 'stalled'
@@ -2027,6 +2038,8 @@ export function useLivePitchTracker(
     let initTimer: number | null = null
     const nativeTapWatchdogs = new Set<number>()
     let attachAttempt = 0
+    /** Native taps rebuilt because they stayed silent; reset by any delivery. */
+    let silentNativeTapRebuilds = 0
     const MAX_ATTACH_ATTEMPTS = sourceRef.current === 'microphone' ? 120 : 36
 
     /**
@@ -2129,6 +2142,7 @@ export function useLivePitchTracker(
             isNativeCaptureSessionActive()
           ) {
             const graph = await createNativeTapPitchGraph(profileRef.current, () => {
+              silentNativeTapRebuilds = 0
               publishSourceHealth('healthy')
             }, nativePitchProcessing)
             if (cancelled) {
@@ -2143,20 +2157,35 @@ export function useLivePitchTracker(
             graphRef.current = graph
             registerMicPitchGraph(graph)
             publishSourceHealth('connecting')
-            // Watchdog: if the tap never delivers, temporarily fall back to
-            // WebKit. Foreground and interactive recovery retry the native tap.
+            // Watchdog: if the tap never delivers, rebuild it, and only then
+            // fall back to WebKit. While native capture owns the microphone the
+            // WebKit track is starved, so an early fallback swapped a silent tap
+            // for a silent graph — and the sticky flag kept the tuner there until
+            // it was reopened. Foreground and interactive recovery still retry
+            // the native tap after a fallback.
             const watchdog = window.setTimeout(() => {
               nativeTapWatchdogs.delete(watchdog)
               if (cancelled || graphRef.current !== graph) return
               if (graph.nativeTap?.receivedAny) return
               endAcceptedPitchEvent()
-              console.warn('[PitchTracker] native audio tap silent; falling back to WebKit mic path')
               publishSourceHealth('stalled')
-              nativeTapUnavailableRef.current = true
               safeDisposeMicGraph(graph)
               graphRef.current = null
+              if (
+                isNativeCaptureSessionActive() &&
+                silentNativeTapRebuilds < NATIVE_TAP_SILENT_REBUILDS
+              ) {
+                silentNativeTapRebuilds += 1
+                console.warn(
+                  `[PitchTracker] native audio tap silent; rebuilding it (${silentNativeTapRebuilds}/${NATIVE_TAP_SILENT_REBUILDS})`,
+                )
+                scheduleRetry(250)
+                return
+              }
+              console.warn('[PitchTracker] native audio tap silent; falling back to WebKit mic path')
+              nativeTapUnavailableRef.current = true
               scheduleRetry(50)
-            }, 2000)
+            }, NATIVE_TAP_FIRST_FRAME_MS)
             nativeTapWatchdogs.add(watchdog)
             return
           }

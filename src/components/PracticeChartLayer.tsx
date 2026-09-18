@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { AudioLines, Columns2, Ear, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, X } from 'lucide-react'
+import { AudioLines, Columns2, Ear, FileMusic, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, Upload, X } from 'lucide-react'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
@@ -74,6 +74,11 @@ interface PracticeChartLayerProps {
   handsFreeEnabled: boolean
   handsFreePhase: HandsFreePhase | null
   onToggleHandsFree: () => void
+  /**
+   * Ask for a file as soon as an empty page opens. False when the Music tile
+   * already asked inside its own tap, so the player is not asked twice.
+   */
+  offerFileOnOpen?: boolean
 }
 
 /** What the rail says while hands-free is running the sitting. */
@@ -103,7 +108,7 @@ function formatElapsed(seconds: number): string {
 export default function PracticeChartLayer({
   projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
-  handsFreeEnabled, handsFreePhase, onToggleHandsFree,
+  handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -112,6 +117,7 @@ export default function PracticeChartLayer({
   const [paperVisible, setPaperVisible] = useState(true)
   const [pageView, setPageView] = useState<ChartPaperView | null>(null)
   const [busy, setBusy] = useState(true)
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
   const [loadFailed, setLoadFailed] = useState(false)
   const [spreadAvailable, setSpreadAvailable] = useState(false)
@@ -145,10 +151,15 @@ export default function PracticeChartLayer({
     setMarker(null)
     setChromeOff(false)
     setPaperVisible(isChartVisible(projectId))
+    setLoaded(false)
     void loadPracticeChart(projectId)
       .then(value => { if (!cancelled) setChart(value) })
       .catch(() => { if (!cancelled) setError('Could not load this music. Try adding the file again.') })
-      .finally(() => { if (!cancelled) setBusy(false) })
+      .finally(() => {
+        if (cancelled) return
+        setBusy(false)
+        setLoaded(true)
+      })
     return () => { cancelled = true }
   }, [projectId])
 
@@ -159,7 +170,16 @@ export default function PracticeChartLayer({
   }, [paperKey])
 
   const showing = active && paperVisible && chart !== null
-  useEffect(() => { onPaperVisibleChange(showing) }, [onPaperVisibleChange, showing])
+  /*
+   * An empty stand is still the music page. Without it, turning Music on for an
+   * item with no part left the room exactly as it was apart from a ball on the
+   * edge — it read as landing on Tools. The page comes up blank with the one
+   * thing to do on it.
+   */
+  const showingEmpty = active && paperVisible && loaded && chart === null
+  useEffect(() => {
+    onPaperVisibleChange(showing || showingEmpty)
+  }, [onPaperVisibleChange, showing, showingEmpty])
 
   /*
    * A part opens full screen.
@@ -387,8 +407,11 @@ export default function PracticeChartLayer({
     if (!active || busy || chart !== null) return
     if (offered.current === projectId) return
     offered.current = projectId
-    pick()
-  }, [active, busy, chart, pick, projectId])
+    // WebKit only opens a picker inside a tap, so this can be ignored when
+    // the page arrives after an async load. The empty stand's own button is
+    // the dependable path; this just saves a tap where it is allowed.
+    if (offerFileOnOpen) pick()
+  }, [active, busy, chart, offerFileOnOpen, pick, projectId])
 
   const remove = useCallback(async () => {
     setBusy(true)
@@ -597,6 +620,23 @@ export default function PracticeChartLayer({
             <span>Tap to turn</span>
           </div>
         )}
+      </div>
+    )}
+
+    {showingEmpty && (
+      <div className="practice-chart-paper practice-chart-paper--empty">
+        <div className="practice-chart-empty" role="group" aria-labelledby="practice-chart-empty-title">
+          <FileMusic aria-hidden />
+          <h2 id="practice-chart-empty-title">No music on the stand</h2>
+          <p>Upload a PDF or a photo of the part to practice from it here.</p>
+          {error && <p className="practice-chart-empty__error" role="alert">{error}</p>}
+          <div>
+            <button type="button" disabled={busy} onClick={pick}>
+              <Upload aria-hidden />{busy ? 'Opening…' : 'Upload music'}
+            </button>
+            <button type="button" onClick={onClose}>Not now</button>
+          </div>
+        </div>
       </div>
     )}
 

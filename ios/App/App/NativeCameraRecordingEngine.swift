@@ -47,6 +47,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     private var isAudioTapEnabled = false
     private var tapAccumulator: [Float] = []
     private var didLogFirstTapSample = false
+    private var didLogTapExtractionFailure = false
     private var isSessionConfigured = false
     private var isRecording = false
     private var isStarting = false
@@ -468,7 +469,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             // session mid-playback causes visible preview glitches on the JPEG
             // bridge. A brief hold on the last frame during a quick take preview
             // is preferable to stuttery recovery.
-            if CameraSessionGuard.playbackRouteActive {
+            // An audio-only capture (the tuner, hands-free's pre-roll) has no
+            // preview to glitch, and the native metronome holds this same
+            // playback route for as long as it runs — and past it, since
+            // nothing clears the flag when the click stops. Deferring for it
+            // left the tuner and hands-free with no self-heal at all once the
+            // click had played.
+            let capturesVideo = self.isPreviewActive || self.isBridgePreviewActive ||
+                ((self.isRecording || self.isStarting) && !self.isAudioOnlyRecording)
+            if CameraSessionGuard.playbackRouteActive && capturesVideo {
                 self.deferredHealthCheckReason = reason
                 return
             }
@@ -2920,71 +2929,20 @@ extension NativeCameraRecordingEngine {
         appendAudioFallbackSample(sampleBuffer)
         lastAudioTapSampleTime = CACurrentMediaTime()
         guard isAudioTapEnabled || isAudioOnlyRecording || tunerPitchEnabled else { return }
-        if !didLogFirstTapSample {
-            didLogFirstTapSample = true
-            print("[PitchTap] FIRST audio sample received from capture session — tap is delivering")
-        }
         guard let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
               let asbdPointer = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) else {
             return
         }
         let asbd = asbdPointer.pointee
-
-        var blockBuffer: CMBlockBuffer?
-        var bufferList = AudioBufferList()
-        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
-            sampleBuffer,
-            bufferListSizeNeededOut: nil,
-            bufferListOut: &bufferList,
-            bufferListSize: MemoryLayout<AudioBufferList>.size,
-            blockBufferAllocator: kCFAllocatorDefault,
-            blockBufferMemoryAllocator: kCFAllocatorDefault,
-            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
-            blockBufferOut: &blockBuffer
-        )
-        guard status == noErr else { return }
-        // blockBuffer must stay alive while we read the pointers below.
-        defer { _ = blockBuffer }
-
-        let buffers = UnsafeMutableAudioBufferListPointer(&bufferList)
-        guard let firstBuffer = buffers.first, let rawData = firstBuffer.mData else { return }
-
-        let channelCount = max(1, Int(asbd.mChannelsPerFrame))
-        let isFloat = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0
-        let isSignedInt = (asbd.mFormatFlags & kAudioFormatFlagIsSignedInteger) != 0
-        // For non-interleaved formats the first buffer holds channel 0 only.
-        let isNonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
-        let stride = isNonInterleaved ? 1 : channelCount
-
-        var mono: [Float]
-        if isFloat && asbd.mBitsPerChannel == 32 {
-            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Float>.size
-            let samples = rawData.bindMemory(to: Float.self, capacity: sampleCount)
-            let frames = sampleCount / stride
-            mono = [Float](repeating: 0, count: frames)
-            for frame in 0..<frames {
-                mono[frame] = samples[frame * stride]
-            }
-        } else if isSignedInt && asbd.mBitsPerChannel == 16 {
-            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Int16>.size
-            let samples = rawData.bindMemory(to: Int16.self, capacity: sampleCount)
-            let frames = sampleCount / stride
-            mono = [Float](repeating: 0, count: frames)
-            for frame in 0..<frames {
-                mono[frame] = Float(samples[frame * stride]) / 32768.0
-            }
-        } else if isSignedInt && asbd.mBitsPerChannel == 32 {
-            let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Int32>.size
-            let samples = rawData.bindMemory(to: Int32.self, capacity: sampleCount)
-            let frames = sampleCount / stride
-            mono = [Float](repeating: 0, count: frames)
-            for frame in 0..<frames {
-                mono[frame] = Float(samples[frame * stride]) / Float(Int32.max)
-            }
-        } else {
-            print("[PitchTap] unsupported audio format bits=\(asbd.mBitsPerChannel) flags=\(asbd.mFormatFlags) rate=\(asbd.mSampleRate) channels=\(channelCount)")
-            return
+        if !didLogFirstTapSample {
+            didLogFirstTapSample = true
+            didLogTapExtractionFailure = false
+            print(
+                "[PitchTap] FIRST audio sample received from capture session — tap is delivering " +
+                "(\(Self.describeTapFormat(asbd)))"
+            )
         }
+        guard let mono = channelZeroSamples(from: sampleBuffer, format: asbd) else { return }
 
         if tunerPitchEnabled {
             if tunerPitchSampleRate != asbd.mSampleRate {
@@ -3044,6 +3002,121 @@ extension NativeCameraRecordingEngine {
                 self.audioTapBacklogLock.unlock()
             }
         }
+    }
+
+    /**
+     * Channel 0 of a capture buffer, as Float samples.
+     *
+     * The capture format is whatever the microphones deliver, and it is not
+     * always one channel in one buffer. An iPad's mic array can hand over two
+     * channels non-interleaved — one AudioBuffer each — and a list sized for a
+     * single buffer then fails with kCMSampleBufferError_ArrayTooSmall on every
+     * sample buffer. The capture session itself stays healthy and keeps
+     * refreshing `lastAudioTapSampleTime`, so nothing noticed: the tuner and
+     * hands-free simply never heard a note. Size the list from what the sample
+     * buffer says it needs.
+     */
+    private func channelZeroSamples(
+        from sampleBuffer: CMSampleBuffer,
+        format asbd: AudioStreamBasicDescription
+    ) -> [Float]? {
+        let flags = kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment
+        var neededSize = 0
+        var status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: &neededSize,
+            bufferListOut: nil,
+            bufferListSize: 0,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: flags,
+            blockBufferOut: nil
+        )
+        guard status == noErr, neededSize >= MemoryLayout<AudioBufferList>.size else {
+            logTapExtractionFailure(status: status, format: asbd)
+            return nil
+        }
+
+        let rawList = UnsafeMutableRawPointer.allocate(
+            byteCount: neededSize,
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { rawList.deallocate() }
+        let listPointer = rawList.bindMemory(to: AudioBufferList.self, capacity: 1)
+
+        var blockBuffer: CMBlockBuffer?
+        status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: listPointer,
+            bufferListSize: neededSize,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: flags,
+            blockBufferOut: &blockBuffer
+        )
+        guard status == noErr else {
+            logTapExtractionFailure(status: status, format: asbd)
+            return nil
+        }
+
+        // The block buffer owns the memory the list points into.
+        return withExtendedLifetime(blockBuffer) { () -> [Float]? in
+            let buffers = UnsafeMutableAudioBufferListPointer(listPointer)
+            guard let firstBuffer = buffers.first, let rawData = firstBuffer.mData else { return nil }
+
+            let isFloat = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+            let isSignedInt = (asbd.mFormatFlags & kAudioFormatFlagIsSignedInteger) != 0
+            // Non-interleaved: the first buffer is channel 0 alone. Interleaved:
+            // every channel is in it, frame by frame.
+            let isNonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
+            let interleavedChannels = Int(firstBuffer.mNumberChannels > 0
+                ? firstBuffer.mNumberChannels
+                : asbd.mChannelsPerFrame)
+            let stride = isNonInterleaved ? 1 : max(1, interleavedChannels)
+
+            func read<Sample>(_: Sample.Type, _ normalize: (Sample) -> Float) -> [Float] {
+                let sampleCount = Int(firstBuffer.mDataByteSize) / MemoryLayout<Sample>.size
+                let samples = rawData.bindMemory(to: Sample.self, capacity: sampleCount)
+                let frames = sampleCount / stride
+                var mono = [Float](repeating: 0, count: frames)
+                for frame in 0..<frames {
+                    mono[frame] = normalize(samples[frame * stride])
+                }
+                return mono
+            }
+
+            if isFloat && asbd.mBitsPerChannel == 32 {
+                return read(Float.self) { $0 }
+            }
+            if isSignedInt && asbd.mBitsPerChannel == 16 {
+                return read(Int16.self) { Float($0) / 32768.0 }
+            }
+            if isSignedInt && asbd.mBitsPerChannel == 32 {
+                return read(Int32.self) { Float($0) / Float(Int32.max) }
+            }
+            logTapExtractionFailure(status: noErr, format: asbd)
+            return nil
+        }
+    }
+
+    /// Once per tap enable: a format this cannot read, or a buffer it cannot
+    /// extract, must say so rather than leave the tuner quietly deaf.
+    private func logTapExtractionFailure(status: OSStatus, format asbd: AudioStreamBasicDescription) {
+        guard !didLogTapExtractionFailure else { return }
+        didLogTapExtractionFailure = true
+        print(
+            "[PitchTap] cannot read capture audio status=\(status) " +
+            "(\(Self.describeTapFormat(asbd))) — tuner and hands-free will hear nothing"
+        )
+    }
+
+    private static func describeTapFormat(_ asbd: AudioStreamBasicDescription) -> String {
+        let isFloat = (asbd.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+        let isNonInterleaved = (asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved) != 0
+        return "rate=\(asbd.mSampleRate) channels=\(asbd.mChannelsPerFrame) " +
+            "bits=\(asbd.mBitsPerChannel) \(isFloat ? "float" : "int") " +
+            "\(isNonInterleaved ? "non-interleaved" : "interleaved") flags=\(asbd.mFormatFlags)"
     }
 }
 
