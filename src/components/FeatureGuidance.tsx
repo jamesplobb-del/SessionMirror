@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   createGuidanceState, FEATURE_GUIDES, GUIDANCE_EVENT, GUIDANCE_PREFERENCES_EVENT, CONFIRMATION_EVENT,
@@ -6,6 +6,12 @@ import {
   type FeatureAction, type FeatureGuideId,
 } from '../utils/featureGuidance'
 import '../styles/feature-guidance.css'
+
+/*
+ * Lazy: most tips have no demo, and a player who has turned tips off should
+ * never pay for the stage at all.
+ */
+const TutorialDemo = lazy(() => import('./tutorials/TutorialDemo'))
 
 interface Props {
   surface?: 'recording' | 'music' | 'other'
@@ -259,6 +265,12 @@ export default function FeatureGuidance(props: Props) {
         {FEATURE_GUIDES[active.id].length > 1 && <span className="feature-guidance-progress">{active.step + 1} of {FEATURE_GUIDES[active.id].length}</span>}
         <h2 id="feature-guidance-title">{step.title}</h2>
         <p id="feature-guidance-body">{step.body}</p>
+        {/* Shown under the words, never instead of them. */}
+        {step.demo && (
+          <Suspense fallback={null}>
+            <TutorialDemo id={step.demo} playing={visible} />
+          </Suspense>
+        )}
         <div className="feature-guidance-actions">
           <button type="button" onClick={() => advance(true)}>{FEATURE_GUIDES[active.id].length > 1 ? 'Skip' : 'Dismiss'}</button>
           <button type="button" className="feature-guidance-next" onClick={() => advance(false)}>

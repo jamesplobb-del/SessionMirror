@@ -55,19 +55,27 @@ export function reportFeatureAction(action: string): void {
   window.dispatchEvent(new CustomEvent(GUIDANCE_EVENT, { detail: action }))
 }
 
+import type { TutorialId } from '../components/tutorials/tutorialDemos'
+
 export interface GuideStep {
   title: string
   body: string
   selector: string
   action?: FeatureAction
+  /**
+   * A moving picture of where the control is. The words above it always say the
+   * same thing on their own — the demo shows the place, it does not carry
+   * information the tip would otherwise be missing.
+   */
+  demo?: TutorialId
 }
 export const FEATURE_GUIDES: Record<FeatureGuideId, GuideStep[]> = {
   'tuner-quiet': [{ title: 'A little more input may help', body: 'The tuner is hearing a quiet note. Check Voice, Strings or Winds here first, then try moving closer to the mic.', selector: '[data-guidance="tuner-settings"]' }],
   'tuner-loud': [{ title: 'Give the mic a little space', body: 'The input is very loud. Move back a little, or lower the gain if you’re using an external mic.', selector: '[data-guidance="tuner-settings"]' }],
-  recording: [{ title: 'One tap to record', body: 'Tap Record to start, then tap again to stop. Your take saves automatically.', selector: '[data-tutorial="record-controls"]' }],
+  recording: [{ title: 'One tap to record', body: 'Tap Record to start, then tap again to stop. Your take saves automatically.', selector: '[data-tutorial="record-controls"]', demo: 'record-a-take' }],
   navigation: [{ title: 'Find your practice tools', body: 'Use these tabs for the metronome, tuner and games. Come back to Audio to record.', selector: '[data-tutorial="audio-mode-tabs"]' }],
-  'take-library': [{ title: 'Your recordings are here', body: 'Open the Take library to listen, rename or share a recording. Clearing a take from the screen keeps it here.', selector: '[data-guidance="take-library"]', action: 'take-library-opened' }],
-  'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace and choose Takes, Pitch, Metronome or Drone. Tap the tool’s small circle to expand it.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]' }],
+  'take-library': [{ title: 'Your recordings are here', body: 'Open the Take library to listen, rename or share a recording. Clearing a take from the screen keeps it here.', selector: '[data-guidance="take-library"]', action: 'take-library-opened', demo: 'take-library' }],
+  'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace and choose Takes, Pitch, Metronome or Drone. Tap the tool’s small circle to expand it.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]', demo: 'workspace-tools' }],
   multitrack: [{ title: 'Record a part over another', body: 'Multitrack lets you build a performance one part at a time. Use headphones to hear earlier parts as you record.', selector: '[data-tutorial="multitrack-button"]' }],
   'best-take': [
     { title: 'Keep your best take', body: 'Tap the pin to keep this take beside your next recording.',

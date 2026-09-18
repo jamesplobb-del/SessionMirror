@@ -5937,6 +5937,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     recordReady={ready || simulatorCaptureAvailable}
                     recordElapsed={elapsed}
                     onToggleRecord={handleToggleRecord}
+                    handsFreeEnabled={settings.autoSoundRecording}
+                    handsFreePhase={handsFreeStageVisiblePhase}
+                    onToggleHandsFree={() => {
+                      // Arming mid-take would stop the take the player is in
+                      // the middle of; turning it off mid-take is fine.
+                      if (isRecording && !settings.autoSoundRecording) return
+                      handleAutoSoundRecordingChange(!settings.autoSoundRecording)
+                      reportFeatureAction(settings.autoSoundRecording
+                        ? 'hands-free-disabled' : 'hands-free-enabled')
+                    }}
                   />
                 </Suspense>
               )}

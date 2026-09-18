@@ -3,25 +3,50 @@ import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/ro
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
-import { StepEditor, type RoutineBuilderProps } from './RoutineBuilder'
+import { kindNeedsDesk, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
+import RoutineDeskSetup from './RoutineDeskSetup'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
+import RoutineMusicSetup from './RoutineMusicSetup'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
+import { hasPracticeChart } from '../utils/practiceChartStorage'
 import { importPracticePlanFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
+import type { LabsRoute } from './labs/LabsOverlay'
 import '../styles/routine-guide.css'
 
-type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'detail' | 'library'
+type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'library'
 type ToolChoice = { key: string; kind: RoutineStepKind; mode?: 'audio' | 'video'; title: string; detail: string }
 const toolChoices: ToolChoice[] = [
   { key: 'camera', kind: 'record', mode: 'video', title: 'Camera', detail: 'Record video, review, and retry' },
   { key: 'audio', kind: 'record', mode: 'audio', title: 'Audio', detail: 'Record sound, review, and retry' },
+  { key: 'music', kind: 'record', mode: 'audio', title: 'Music', detail: 'Open on a PDF or photo of the part' },
   { key: 'tuner', kind: 'tune', mode: 'audio', title: 'Tuner', detail: 'Open pitch tracking and your saved desk' },
   { key: 'metronome', kind: 'metro', mode: 'audio', title: 'Metronome', detail: 'Open with a steady pulse ready' },
+  { key: 'game', kind: 'game', title: 'Game', detail: 'Staff Jumper, Balance, or Learn' },
   { key: 'none', kind: 'free', title: 'Nothing', detail: 'A simple item to complete' },
 ]
+const GAMES: Array<{ route: LabsRoute; label: string; hint: string }> = [
+  { route: 'staff-jumper', label: 'Staff Jumper', hint: 'Sight-reading' },
+  { route: 'balance', label: 'Balance', hint: 'Hold the centre' },
+  { route: 'learn-instrument', label: 'Learn', hint: 'Fingerings' },
+  { route: 'menu', label: 'Pick each time', hint: 'Opens the games menu' },
+]
+
+function toolKeyForStep(step: RoutineStep): string {
+  if (step.desk?.showMusic) return 'music'
+  if (step.kind === 'record' || step.kind === 'focus') return step.desk?.mode === 'video' ? 'camera' : 'audio'
+  if (step.kind === 'tune') return 'tuner'
+  if (step.kind === 'metro') return 'metronome'
+  if (step.kind === 'game') return 'game'
+  return 'none'
+}
+
+function toolSkipsDesk(key: string | null): boolean {
+  return key === 'none' || key === 'game'
+}
 
 function selectionForRoutine(routine: Routine): Record<string, string> {
   const choices = [
@@ -35,7 +60,7 @@ function selectionForRoutine(routine: Routine): Record<string, string> {
 }
 
 export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
-  const { mode, routine, projects, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, onCreatePracticeItem, todayStarted, onCancel } = props
+  const { mode, routine, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, onCreatePracticeItem, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
   const [showReorder, setShowReorder] = useState(false)
   const [goal, setGoal] = useState<PracticeGoal>('balanced')
@@ -56,18 +81,18 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     if (mode !== 'edit' || !routine) return {}
     return selectionForRoutine(routine)
   })
-  const [itemFooterTarget, setItemFooterTarget] = useState<HTMLDivElement | null>(null)
   const [configuredIds, setConfiguredIds] = useState<string[]>(() => mode === 'edit' && routine ? routine.steps.map(step => step.id) : [])
-  const [detailId, setDetailId] = useState<string | null>(null)
   const [customInput, setCustomInput] = useState('')
   const [customItems, setCustomItems] = useState<string[]>([])
   const [customIndex, setCustomIndex] = useState(0)
   const [customSteps, setCustomSteps] = useState<RoutineStep[]>([])
   const [customToolKey, setCustomToolKey] = useState<string | null>(null)
+  const [customGameRoute, setCustomGameRoute] = useState<LabsRoute>('menu')
   const [customSetup, setCustomSetup] = useState<RoutineStep | null>(null)
   const [customReference, setCustomReference] = useState('')
   const [customReferenceVideo, setCustomReferenceVideo] = useState<string | null>(null)
   const [useCurrent, setUseCurrent] = useState(false)
+  const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [direction, setDirection] = useState(1)
   const [error, setError] = useState('')
   const [instrumentReturn, setInstrumentReturn] = useState<Screen>('library')
@@ -78,6 +103,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const titleRef = useRef<HTMLHeadingElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const instrumentName = instrument ? getInstrumentProfile(instrument)?.label ?? 'Your instrument' : 'Any instrument'
+  const musicSetup = customToolKey === 'music'
   const templates = useMemo(() => getStepTemplates(instrument), [instrument])
   const presets = useMemo(() => getRoutinePresets(instrument), [instrument])
   const savedRoutines = useMemo(() => {
@@ -93,28 +119,36 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
         return b.updatedAt - a.updatedAt
       })
   }, [library, routine])
-  const detail = draft.steps.find(item => item.id === detailId)
+  const setupTitle = (editingStepId ? draft.steps.find(step => step.id === editingStepId)?.title : customItems[customIndex]) ?? 'Your item'
   const total = draft.steps.reduce((sum, step) => sum + step.minutes, 0)
   const titles: Record<Screen, string> = {
     routines: 'Your\nroutines.', goals: 'What would you like\nto build?', instrument: 'What do you play?', choose: 'Add an exercise.', lineup: 'Ready when\nyou are.',
-    'custom-settings': 'Set up your tools.', 'custom-reference': 'Add a reference.', 'custom-items': 'Build your own.', 'custom-tool': customItems[customIndex] ?? 'Choose a tool.', detail: detail?.title ?? 'Your exercise', library: 'Build your\nroutine.',
+    'custom-settings': 'Set up your tools.', 'custom-reference': musicSetup ? 'Add your music.' : 'Add a reference.', 'custom-items': 'Build your own.', 'custom-tool': setupTitle, library: 'Build your\nroutine.',
   }
   const subtitles: Record<Screen, string> = {
     routines: 'Create a new plan or open one you’ve already built.', goals: 'Choose what you want to practice. You can change the exercises later.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions for ${instrumentName.toLowerCase()}.`, lineup: 'Review your exercises and their order.',
-    'custom-settings': customItems[customIndex] ?? 'Your item', 'custom-reference': `Optional · ${customItems[customIndex] ?? 'Your item'}`, 'custom-items': 'Type every item in the order you want to practice it.', 'custom-tool': `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`, detail: 'Make this exercise work for you.', library: 'Build your own plan or start with a suggestion.',
+    'custom-settings': setupTitle, 'custom-reference': musicSetup ? `A PDF or photo · ${setupTitle}` : `Optional · ${setupTitle}`, 'custom-items': 'Type every item in the order you want to practice it.',
+    'custom-tool': editingStepId || customItems.length <= 1 ? 'What should open with it?' : `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`,
+    library: 'Build your own plan or start with a suggestion.',
   }
   const move = (next: Screen, backwards = false) => { setDirection(backwards ? -1 : 1); setError(''); setScreen(next) }
   useEffect(() => { scrollRef.current?.scrollTo(0, 0) }, [screen])
+  const clearItemSetup = () => {
+    setEditingStepId(null); setCustomToolKey(null); setCustomSetup(null); setCustomReference(''); setCustomReferenceVideo(null); setCustomGameRoute('menu'); setUseCurrent(false)
+  }
   const back = () => {
     if (screen === 'routines') onCancel()
     else if (screen === 'goals') move('library', true)
     else if (screen === 'custom-reference') move('custom-settings', true)
     else if (screen === 'custom-settings') move('custom-tool', true)
-    else if (screen === 'detail') move('lineup', true)
+    else if (screen === 'custom-tool' && editingStepId) { clearItemSetup(); move('lineup', true) }
     else if (screen === 'custom-tool' && customIndex > 0) {
-      setCustomReference(customSteps[customIndex - 1]?.referenceQuery ?? '')
-      setCustomReferenceVideo(customSteps[customIndex - 1]?.referenceVideoId ?? null)
-      setCustomIndex(index => index - 1); setCustomSteps(steps => steps.slice(0, -1)); setCustomToolKey(null); setDirection(-1)
+      const previous = customSteps[customIndex - 1]
+      setCustomReference(previous?.referenceQuery ?? '')
+      setCustomReferenceVideo(previous?.referenceVideoId ?? null)
+      setCustomToolKey(previous ? toolKeyForStep(previous) : null)
+      setCustomGameRoute(previous?.gameRoute ?? 'menu')
+      setCustomIndex(index => index - 1); setCustomSteps(steps => steps.slice(0, -1)); setDirection(-1)
     }
     else if (screen === 'custom-tool') move('custom-items', true)
     else if (screen === 'custom-items') move('library', true)
@@ -132,31 +166,45 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     const existingId = selection[key]
     if (existingId && draft.steps.some(step => step.id === existingId)) {
       setDraft(current => ({ ...current, steps: current.steps.filter(step => step.id !== existingId) }))
+      setConfiguredIds(ids => ids.filter(id => id !== existingId))
       return
     }
     if (draft.steps.length >= MAX_ROUTINE_STEPS) { setError(`Keep your routine to ${MAX_ROUTINE_STEPS} items or fewer.`); return }
     const step = create()
     setSelection(current => ({ ...current, [key]: step.id }))
+    setConfiguredIds(ids => [...ids, step.id])
     setDraft(current => ({ ...current, steps: [...current.steps, step] }))
   }
   const isSelected = (key: string) => draft.steps.some(step => step.id === selection[key])
   const startCustomRoutine = () => {
     setDraft(createRoutine('My practice', [], instrument)); setCustomItems([]); setCustomInput('')
-    setCustomIndex(0); setCustomSteps([]); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setUseCurrent(false); setLineupReturn('library'); move('custom-items')
+    setCustomIndex(0); setCustomSteps([]); clearItemSetup(); setLineupReturn('library'); move('custom-items')
   }
   const startNewRoutine = () => {
     setDraft(createRoutine('My practice', [], instrument))
-    setSelection({}); setConfiguredIds([]); setDetailId(null)
-    setCustomItems([]); setCustomInput(''); setCustomIndex(0); setCustomSteps([])
-    setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setUseCurrent(false)
+    setSelection({}); setConfiguredIds([]); setCustomItems([]); setCustomInput(''); setCustomIndex(0); setCustomSteps([])
+    clearItemSetup()
     setLibraryReturn('routines'); setLineupReturn('library')
     setInstrumentReturn('library'); setChangingInstrument(false)
     move(instrument ? 'library' : 'instrument')
   }
   const openSavedRoutine = (item: Routine) => {
     setDraft(item); setInstrument(item.instrumentId); setSelection(selectionForRoutine(item))
-    setConfiguredIds(item.steps.map(step => step.id)); setDetailId(null)
+    setConfiguredIds(item.steps.map(step => step.id)); clearItemSetup()
     setLineupReturn('routines'); move('lineup')
+  }
+  const openItemSetup = (step: RoutineStep) => {
+    setEditingStepId(step.id)
+    setCustomItems([step.title])
+    setCustomIndex(0)
+    setCustomSteps([])
+    setCustomToolKey(toolKeyForStep(step))
+    setCustomGameRoute(step.gameRoute ?? 'menu')
+    setCustomSetup(createStep(step))
+    setCustomReference(step.referenceQuery)
+    setCustomReferenceVideo(step.referenceVideoId)
+    setUseCurrent(false)
+    move('custom-tool')
   }
   const addCustomItem = () => {
     const title = customInput.trim().slice(0, MAX_STEP_TITLE)
@@ -170,49 +218,76 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   }
   const makeCustomStep = () => {
     const choice = toolChoices.find(item => item.key === customToolKey)
-    const title = customItems[customIndex]
+    const title = setupTitle
     if (!choice || !title) return null
-    const desk = choice.kind === 'free' ? null : useCurrent ? { ...liveDeskSnapshot, mode: choice.mode ?? 'audio' } : blankDesk(choice.mode ?? 'audio')
+    const keepDesk = customSetup && toolKeyForStep(customSetup) === choice.key && !useCurrent
+    const desk = choice.kind === 'free' || choice.kind === 'game'
+      ? null
+      : useCurrent ? { ...liveDeskSnapshot, mode: choice.mode ?? 'audio' }
+        : keepDesk && customSetup?.desk ? { ...customSetup.desk }
+          : blankDesk(choice.mode ?? 'audio')
     if (desk && choice.kind === 'metro') desk.showMetronome = true
     if (desk && choice.kind === 'tune') desk.pitchTrackerEnabled = true
-    return createStep({ title, kind: choice.kind, topic: 'other', minutes: 0, desk, referenceQuery: '',
-      referenceVideoId: choice.kind === 'free' ? null : customReferenceVideo })
+    if (desk && choice.key === 'music') {
+      desk.mode = 'audio'
+      desk.showMusic = true
+    } else if (desk && choice.key !== 'music') {
+      desk.showMusic = false
+    }
+    return createStep({
+      ...(customSetup ?? {}),
+      title,
+      kind: choice.kind,
+      topic: customSetup?.topic ?? 'other',
+      minutes: customSetup?.minutes ?? 0,
+      desk,
+      id: editingStepId ?? customSetup?.id,
+      projectId: customSetup?.projectId ?? null,
+      programId: desk ? customSetup?.programId ?? null : null,
+      gameRoute: choice.kind === 'game' ? customGameRoute : null,
+      referenceQuery: '',
+      referenceVideoId: toolSkipsDesk(choice.key) ? null : customReferenceVideo,
+    })
   }
   const openCustomTools = () => {
     const step = makeCustomStep()
-    if (!step) return
+    if (!step || !kindNeedsDesk(step.kind)) return
     setCustomSetup(step)
     move('custom-settings')
   }
   const saveCustomTool = () => {
-    const base = customToolKey === 'none' ? makeCustomStep() : customSetup
+    const base = toolSkipsDesk(customToolKey) ? makeCustomStep() : customSetup
     if (!base) return
-    const step = createStep({ ...base, referenceQuery: '', referenceVideoId: customToolKey === 'none' ? null : customReferenceVideo })
+    const step = createStep({
+      ...base,
+      referenceQuery: '',
+      referenceVideoId: toolSkipsDesk(customToolKey) ? null : customReferenceVideo,
+    })
+    if (editingStepId) {
+      try {
+        storeLibraryExercise({ instrumentId: instrument, step })
+        setExercises(loadExerciseLibrary())
+        setDraft(current => ({ ...current, steps: current.steps.map(item => item.id === editingStepId ? step : item) }))
+        setConfiguredIds(ids => [...ids.filter(id => id !== editingStepId), editingStepId])
+        clearItemSetup()
+        move('lineup', true)
+      } catch { setError('Could not save this exercise on your device. Please try again.') }
+      return
+    }
     const nextSteps = [...customSteps, step]
     if (customIndex < customItems.length - 1) {
-      setCustomSteps(nextSteps); setCustomIndex(index => index + 1); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setCustomReferenceVideo(null); setUseCurrent(false); move('custom-tool')
+      setCustomSteps(nextSteps); setCustomIndex(index => index + 1); setCustomToolKey(null); setCustomSetup(null); setCustomReferenceVideo(null); setCustomReference(''); setCustomGameRoute('menu'); setUseCurrent(false); move('custom-tool')
       return
     }
     try {
       nextSteps.forEach(item => storeLibraryExercise({ instrumentId: instrument, step: item }))
-      setConfiguredIds(nextSteps.map(item => item.id)); setExercises(loadExerciseLibrary()); setDraft(current => ({ ...current, steps: nextSteps })); setSelection({}); setLineupReturn('library'); move('lineup')
+      setConfiguredIds(nextSteps.map(item => item.id)); setExercises(loadExerciseLibrary()); setDraft(current => ({ ...current, steps: nextSteps })); setSelection({}); setLineupReturn('library'); clearItemSetup(); move('lineup')
     } catch { setError('Could not save these exercises on your device. Please try again.') }
   }
+  const customMusicPinned = Boolean(customSetup?.projectId && hasPracticeChart(customSetup.projectId))
   const pendingSetup = draft.steps.filter(step => !configuredIds.includes(step.id))
-  const configureNext = () => {
-    const next = pendingSetup[0]
-    if (next) { setDetailId(next.id); move('detail') }
-    else move('lineup')
-  }
-  const finishItem = () => {
-    if (!detail) return
-    setConfiguredIds(ids => [...ids.filter(id => id !== detail.id), detail.id])
-    const next = pendingSetup.find(step => step.id !== detail.id)
-    if (next) { setDetailId(next.id); move('detail') }
-    else move('lineup', true)
-  }
   const saveDraft = (start: boolean) => {
-    if (pendingSetup.length) { configureNext(); return }
+    if (pendingSetup.length) { openItemSetup(pendingSetup[0]); return }
     const next = { ...draft, steps: draft.steps.map(step => createStep(step)), name: draft.name.trim() || `${instrumentName} practice`, instrumentId: instrument, updatedAt: Date.now() }
     try {
       if (routine && routine.id !== next.id) storeLibraryRoutine(routine)
@@ -253,21 +328,20 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       openSavedRoutine(result.routine)
     }).catch(() => setError('Could not read that routine file. Please try again.'))
   }
-  // A finished lineup goes straight into practice; saving on its own stays one tap away.
   const canStart = screen === 'lineup' && !pendingSetup.length && Boolean(onSaveAndStart)
   const editingToday = routine?.id === draft.id
   const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
   const secondaryAction = canStart ? { label: editingToday ? 'Save changes' : 'Save for later', run: () => saveDraft(false) } : null
   const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('goals'); move('lineup') }
     : screen === 'instrument' ? () => move(instrumentReturn)
-    : screen === 'choose' ? configureNext
+    : screen === 'choose' ? () => move('lineup')
     : screen === 'lineup' ? () => saveDraft(canStart)
-    : screen === 'custom-items' ? () => { setCustomIndex(0); setCustomSteps([]); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); move('custom-tool') }
-    : screen === 'custom-tool' ? () => customToolKey === 'none' ? saveCustomTool() : openCustomTools()
+    : screen === 'custom-items' ? () => { setCustomIndex(0); setCustomSteps([]); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setCustomGameRoute('menu'); move('custom-tool') }
+    : screen === 'custom-tool' ? () => toolSkipsDesk(customToolKey) ? saveCustomTool() : openCustomTools()
+    : screen === 'custom-settings' ? () => move('custom-reference')
     : screen === 'custom-reference' ? () => { if (!customReferenceVideo) setCustomReference(''); saveCustomTool() }
-    : screen === 'detail' ? undefined
     : undefined
-  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? `Set up selected · ${pendingSetup.length || draft.steps.length}` : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? customToolKey === 'none' ? 'Save item' : 'Continue to tools' : screen === 'custom-reference' ? customReferenceVideo ? 'Save item' : 'Skip reference & save item' : screen === 'detail' ? 'Done' : 'Continue'
+  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? 'Done' : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? toolSkipsDesk(customToolKey) ? 'Save item' : 'Continue to tools' : screen === 'custom-settings' ? musicSetup ? 'Continue to music' : 'Continue to reference' : screen === 'custom-reference' ? musicSetup ? customMusicPinned ? 'Save item' : 'Skip music & save item' : customReferenceVideo ? 'Save item' : 'Skip reference & save item' : 'Continue'
   const disabled = screen === 'instrument' ? !instrument : screen === 'choose' || screen === 'lineup' ? !draft.steps.length : screen === 'custom-items' ? !customItems.length : screen === 'custom-tool' ? !customToolKey : false
   const renderTemplate = (template: typeof templates[number]) => <Pressable key={template.id} type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion}
     className="routine-guide-exercise" aria-pressed={isSelected(template.id)} onClick={() => toggle(template.id, () => stepFromTemplate(template, instrument))}>
@@ -288,7 +362,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     </div>}
     <div className="routine-guide-scroll" ref={scrollRef}>
       <AnimatePresence mode="wait" initial={false} custom={direction}>
-        <motion.div key={`${screen}-${screen === 'custom-tool' ? customIndex : 0}`} custom={direction}
+        <motion.div key={`${screen}-${screen === 'custom-tool' ? `${customIndex}-${editingStepId ?? ''}` : 0}`} custom={direction}
           variants={{ enter: (d: number) => ({ opacity: 0, x: reducedMotion ? 0 : d * 32 }), center: { opacity: 1, x: 0 }, leave: (d: number) => ({ opacity: 0, x: reducedMotion ? 0 : d * -20 }) }}
           initial="enter" animate="center" exit="leave" onAnimationComplete={definition => { if (definition === 'center') titleRef.current?.focus({ preventScroll: true }) }} transition={{ duration: reducedMotion ? .08 : .3, ease: [.22, 1, .36, 1] }}>
           <header className="routine-guide-heading">
@@ -396,7 +470,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <ol className="routine-guide-lineup">
               {draft.steps.map((step, index) => <SwipeRoutineItem key={step.id} title={step.title} onRemove={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}>
                 <span className="routine-guide-number">{String(index + 1).padStart(2, '0')}</span>
-                <button type="button" className="routine-guide-item" onClick={() => { setDetailId(step.id); move('detail') }}><strong>{step.title}</strong><small>{summarizeStep(step, tunerTransposition)}</small></button>
+                <button type="button" className="routine-guide-item" onClick={() => openItemSetup(step)}><strong>{step.title}</strong><small>{summarizeStep(step, tunerTransposition)}</small></button>
                 {showReorder ? <div className="routine-guide-reorder">
                   {[-1, 1].map(delta => <button key={delta} type="button" aria-label={`Move ${step.title} ${delta === -1 ? 'up' : 'down'}`} disabled={index + delta < 0 || index + delta >= draft.steps.length} onClick={() => setDraft(current => {
                     const steps = [...current.steps]; [steps[index], steps[index + delta]] = [steps[index + delta], steps[index]]; return { ...current, steps }
@@ -418,29 +492,37 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <ol className="routine-guide-custom-list">{customItems.map((item, index) => <SwipeRoutineItem key={`${item}-${index}`} title={item} onRemove={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item}</strong><div><button type="button" disabled={index === 0} onClick={() => moveCustomItem(index, -1)} aria-label={`Move ${item} up`}><ArrowUp aria-hidden /></button><button type="button" disabled={index === customItems.length - 1} onClick={() => moveCustomItem(index, 1)} aria-label={`Move ${item} down`}><ArrowDown aria-hidden /></button><button type="button" onClick={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item}`}><Trash2 aria-hidden /></button></div></SwipeRoutineItem>)}</ol>
           </div>}
           {screen === 'custom-tool' && <>
-            <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>
-            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => setCustomToolKey(choice.key)}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
-            {customToolKey && customToolKey !== 'none' && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
+            {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}
+            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
+            {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
+            {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
           </>}
-          {screen === 'custom-settings' && customSetup && <div className="routine-guide-editor"><StepEditor key={customSetup.id} toolsOnly initialPage="tools" footerTarget={itemFooterTarget}
-            step={customSetup} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback} onCreatePracticeItem={onCreatePracticeItem}
-            onChange={patch => setCustomSetup(current => current ? { ...current, ...patch } : current)}
-            onToolsDone={() => move('custom-reference')} onBackToOpening={() => move('custom-tool', true)} onDone={() => move('custom-reference')} onRemove={() => {}} /></div>}
-          {screen === 'custom-reference' && <RoutineReferenceSetup inline instrumentId={instrument} title={customItems[customIndex] ?? ''} value={customReference} onChange={setCustomReference}
-            videoId={customReferenceVideo} onVideoIdChange={setCustomReferenceVideo} />}
-          {screen === 'detail' && detail && <div className="routine-guide-editor"><StepEditor initialPage={configuredIds.includes(detail.id) ? 'item' : 'tools'} footerTarget={itemFooterTarget} key={detail.id} step={detail} instrumentId={instrument} projects={projects} tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition} hapticFeedback={hapticFeedback} onCreatePracticeItem={onCreatePracticeItem}
-            onChange={patch => setDraft(current => ({ ...current, steps: current.steps.map(step => step.id === detail.id ? { ...step, ...patch } : step) }))}
-            onDone={finishItem} onRemove={() => { setDraft(current => ({ ...current, steps: current.steps.filter(step => step.id !== detail.id) })); move('lineup', true) }} /></div>}
+          {screen === 'custom-settings' && customSetup && <div className="routine-guide-editor">
+            <RoutineDeskSetup
+              step={customSetup}
+              instrumentId={instrument}
+              tunerTransposition={getInstrumentProfile(instrument ?? '')?.tunerTransposition ?? tunerTransposition}
+              hapticFeedback={hapticFeedback}
+              onChange={patch => setCustomSetup(current => current ? { ...current, ...patch } : current)}
+            />
+          </div>}
+          {screen === 'custom-reference' && musicSetup && customSetup && (
+            <RoutineMusicSetup step={customSetup} onCreatePracticeItem={onCreatePracticeItem}
+              onChange={patch => setCustomSetup(current => current ? { ...current, ...patch } : current)} />
+          )}
+          {screen === 'custom-reference' && !musicSetup && (
+            <RoutineReferenceSetup instrumentId={instrument} title={setupTitle} value={customReference} onChange={setCustomReference}
+              videoId={customReferenceVideo} onVideoIdChange={setCustomReferenceVideo} />
+          )}
           {screen === 'library' && <>
             <button type="button" className="routine-guide-own routine-guide-own--hero" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items, order them, then choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
             <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>Choose what you want to work on</small></span><ArrowRight aria-hidden /></button>
-            <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); setDetailId(null); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
+            <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); clearItemSetup(); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
           </>}
         </motion.div>
       </AnimatePresence>
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
-    {(screen === 'detail' || screen === 'custom-settings') && <div ref={setItemFooterTarget} />}
     {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">
       {secondaryAction && <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-secondary" disabled={disabled} onClick={secondaryAction.run}>{secondaryAction.label}</Pressable>}
       <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable>

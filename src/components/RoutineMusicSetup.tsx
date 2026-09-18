@@ -1,10 +1,9 @@
-import { FileMusic, Music, Trash2, X } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { FileMusic, Trash2, Upload } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
   deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart,
 } from '../utils/practiceChartStorage'
-import type { DeskSnapshot } from '../utils/workspaceDesks'
 import type { RoutineStep } from '../utils/practiceRoutines'
 import { blankDesk } from '../utils/practiceRoutines'
 
@@ -16,13 +15,10 @@ interface RoutineMusicSetupProps {
 }
 
 /**
- * Pinning music to a routine step.
+ * Pinning a PDF or photo to a Music item.
  *
- * Music is pinned the same way a reference recording is, and to the same place:
- * the step's own practice item. The routine itself only remembers that this
- * step opens with the part up — the file never goes into the plan. That keeps a
- * shared `.btplan` small, keeps someone else's edition out of it, and lets a
- * student open a teacher's routine and simply add their own copy.
+ * The file lives on the step's practice folder, not in the shared plan. A
+ * student can open a teacher's routine and add their own copy of the part.
  */
 export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem }: RoutineMusicSetupProps) {
   const input = useRef<HTMLInputElement>(null)
@@ -42,10 +38,6 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
   const fileName = attached && step.projectId ? practiceChartName(step.projectId) : null
   const desk = step.desk ?? blankDesk('audio')
 
-  const patchDesk = useCallback((patch: Partial<DeskSnapshot>) => {
-    onChange({ desk: { ...desk, ...patch } })
-  }, [desk, onChange])
-
   const choose = async (file: File) => {
     setBusy(true)
     setError('')
@@ -54,7 +46,7 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
       // land in a folder, so the folder is made the moment the file is picked.
       const projectId = step.projectId ?? await onCreatePracticeItem(step.title)
       await savePracticeChart(projectId, file)
-      onChange({ projectId, desk: { ...desk, showMusic: true } })
+      onChange({ projectId, desk: { ...desk, mode: 'audio', showMusic: true } })
       setRevision(value => value + 1)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not save this music.')
@@ -69,7 +61,7 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
     setError('')
     try {
       await deletePracticeChart(step.projectId)
-      patchDesk({ showMusic: false })
+      onChange({ projectId: step.projectId })
       setRevision(value => value + 1)
     } catch {
       setError('Could not remove this music. Please try again.')
@@ -96,7 +88,7 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
           <FileMusic aria-hidden />
           <div>
             <strong>{fileName ?? 'Music'}</strong>
-            <small>{desk.showMusic ? 'Opens with this item' : 'Saved · the page stays down'}</small>
+            <small>Opens with this item</small>
           </div>
           <button type="button" disabled={busy} onClick={() => input.current?.click()}>Change</button>
           <button type="button" aria-label="Remove music" disabled={busy} onClick={() => void remove()}>
@@ -105,24 +97,12 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
         </div>
       ) : (
         <button type="button" className="routine-setup-action" disabled={busy} onClick={() => input.current?.click()}>
-          <Music aria-hidden />
+          <Upload aria-hidden />
           <span>
-            <strong>Add music</strong>
-            <small>A PDF or photo of the part · Optional</small>
+            <strong>Upload a PDF</strong>
+            <small>Or a photo of the part</small>
           </span>
         </button>
-      )}
-      {attached && (
-        <label className="routine-music-open">
-          <input
-            type="checkbox"
-            checked={desk.showMusic}
-            disabled={busy}
-            onChange={event => patchDesk({ showMusic: event.target.checked })}
-          />
-          <span>Open on the music when this item starts</span>
-          {!desk.showMusic && <X aria-hidden />}
-        </label>
       )}
       <p className="practice-menu-note">
         The file is saved in this item's practice folder, next to its takes. Sharing the routine

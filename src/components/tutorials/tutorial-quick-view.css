@@ -1,0 +1,102 @@
+/*
+ * A tutorial opened from Settings.
+ *
+ * It sits above the settings sheet it was opened from, so its z-index is above
+ * the app's sheet layer rather than merely above the page.
+ */
+
+.tutorial-quick-view {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.tutorial-quick-view__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: #0b111b66;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.tutorial-quick-view__card {
+  position: relative;
+  display: grid;
+  gap: 0.7rem;
+  width: min(23rem, 100%);
+  padding: 1rem 1rem 0.85rem;
+  border-radius: 1.1rem;
+  background: var(--audio-surface, #fff);
+  color: var(--audio-text-primary, #171a22);
+  border: 1px solid var(--audio-border, #dedfe3);
+  box-shadow: 0 24px 60px #10182833;
+  animation: tutorial-quick-view-in 220ms ease both;
+}
+
+html.app-dark-mode .tutorial-quick-view__card {
+  background: #141a24;
+  border-color: #ffffff1f;
+  color: #eef4ff;
+}
+
+.tutorial-quick-view__card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tutorial-quick-view__card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.tutorial-quick-view__card header button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--audio-surface-sunken, #eef1f6);
+  color: inherit;
+}
+
+html.app-dark-mode .tutorial-quick-view__card header button { background: #1d2634; }
+.tutorial-quick-view__card header button svg { width: 16px; height: 16px; }
+
+.tutorial-quick-view__summary {
+  margin: 0;
+  color: var(--audio-text-secondary, #5b6372);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+html.app-dark-mode .tutorial-quick-view__summary { color: #b9c6da; }
+
+.tutorial-quick-view__done {
+  min-height: 44px;
+  border: 0;
+  border-radius: 0.8rem;
+  background: var(--audio-accent, #3f8cff);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.tutorial-quick-view button:focus-visible { outline: 2px solid #69b5ff; outline-offset: 2px; }
+
+@keyframes tutorial-quick-view-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-quick-view__card { animation: none; }
+}

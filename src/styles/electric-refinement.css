@@ -65,7 +65,7 @@ html[data-refinement='depth-electric'] .pitch-widget-living .pitch-living-readou
 html[data-preview-tuner-colors='off'] .pitch-widget-living canvas { filter:none; }
 
 /* Carry the selected direction through routine setup and the active controller. */
-html[data-refinement='depth-electric'] :is(.routine-guide,.routine-program-setup,.routine-reference-setup) { --guide-bg:#edf5ff; --guide-panel:#fff; --guide-ink:#182b44; --guide-muted:#576a80; --guide-accent:#0066ff; --guide-line:#d8e6f6; --guide-selected:#e2eeff; font-family:-apple-system,system-ui,sans-serif; }
+html[data-refinement='depth-electric'] :is(.routine-guide,.routine-program-setup) { --guide-bg:#edf5ff; --guide-panel:#fff; --guide-ink:#182b44; --guide-muted:#576a80; --guide-accent:#0066ff; --guide-line:#d8e6f6; --guide-selected:#e2eeff; font-family:-apple-system,system-ui,sans-serif; }
 html[data-refinement='depth-electric'] .routine-guide :is(h2,h3,strong) { letter-spacing:-.025em; }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise,.practice-menu-section,.routine-guide-item,.routine-guide-summary) { border-radius:22px; background:#ffffffd9; border-color:#fff; box-shadow:0 5px 18px #0053aa08; }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise)[aria-pressed='true'] { background:#e2eeff; border-color:#0066ff; }

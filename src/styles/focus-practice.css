@@ -1084,10 +1084,6 @@ html.app-dark-mode .focus-node-marker::before {
 .routine-item-context span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .routine-item-context button { display: grid; place-items: center; min-width: 28px; min-height: 28px; background: none; border: 0; color: inherit; }
 .routine-item-context svg { width: 13px; height: 13px; }
-.routine-reference-shortcut { padding: 0 10px 6px; }
-.routine-reference-shortcut button { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--sm-blue, #1598ff) 30%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--sm-blue, #1598ff) 9%, transparent); color: inherit; font: inherit; font-size: 11px; }
-.routine-reference-shortcut span { flex: 1; text-align: left; }
-.routine-reference-shortcut svg { width: 15px; height: 15px; }
 
 /* Routine setup: a quiet summary, with configuration opened deliberately. */
 .routine-setup-summary { margin: 12px 0; padding: 18px; border: 1px solid var(--sm-blue-border, #1598ff55); border-radius: 20px; background: linear-gradient(135deg, var(--sm-blue-soft, #1598ff18), transparent); }
@@ -1102,21 +1098,9 @@ html.app-dark-mode .focus-node-marker::before {
 .routine-reference-legacy { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .routine-reference-legacy small { flex: 1; opacity: .65; }
 .routine-reference-legacy button { background: transparent; color: inherit; border: 0; min-height: 44px; }
-.routine-reference-dialog { box-sizing: border-box; width: min(640px, 100%); max-width: 100%; height: min(800px, 100dvh); max-height: 100dvh; padding: 24px; border: 1px solid var(--sm-blue-border, #1598ff55); border-radius: 24px; background: var(--sm-panel, #101722); color: var(--sm-text, #f1f5fb); overflow-y: auto; overscroll-behavior: contain; }
-.routine-reference-dialog::backdrop { background: #030710b8; backdrop-filter: blur(12px); }
-.routine-reference-dialog header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
-.routine-reference-dialog header h2 { margin: 0; font-size: 24px; letter-spacing: -.04em; }
-.routine-reference-dialog header p { margin: 6px 0; opacity: .65; }
-.routine-reference-dialog header button { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border: 1px solid #ffffff24; border-radius: 50%; background: transparent; color: inherit; }
-.routine-reference-dialog > p { font-size: 14px; line-height: 1.5; opacity: .75; }
-.routine-reference-dialog .routine-segment { margin: 16px 0; }
-.routine-reference-dialog .routine-segment button[aria-pressed="true"] { color: var(--sm-blue, #1598ff); background: var(--sm-blue-soft, #1598ff18); }
 .routine-reference-compact .routine-reference-pinned > div { min-width: 0; }
 .routine-reference-compact .routine-reference-pinned strong { overflow-wrap: anywhere; }
 .routine-reference-compact .routine-reference-pinned button { min-width: 44px; min-height: 44px; width: auto; font: inherit; font-size: 12px; }
-@media (max-width: 600px) {
-  .routine-reference-dialog { margin: 0; height: 100dvh; border-radius: 0; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); }
-}
 .focus-search-row { position: relative; }
 .focus-search-row .focus-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; opacity: .6; pointer-events: none; }
 .focus-search-row input[type="search"] { padding-left: 38px; }

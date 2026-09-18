@@ -282,42 +282,35 @@ html.app-dark-mode .practice-menu-card.practice-menu-card--routine-guide {
 .routine-guide-suggestion-strip button svg { width: 14px; height: 14px; color: var(--guide-accent); }
 .routine-guide-suggestion-strip button[aria-pressed='true'] { background: var(--guide-selected); border-color: var(--guide-accent); }
 .routine-guide-suggestion-strip button:disabled { opacity: .4; }
-.routine-reference-setup { padding: 22px; margin: 8px 0 18px; border: 1px solid var(--guide-accent, #1598ff); border-radius: 22px; background: linear-gradient(145deg, #1598ff16, transparent 75%), var(--practice-menu-group); box-shadow: 0 12px 40px #127cf012, inset 0 1px 0 #ffffff18; }
-.routine-reference-setup__heading { display: flex; align-items: center; gap: 12px; }
-.routine-reference-setup__heading > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: #1598ff20; color: var(--guide-accent, #1598ff); flex: none; }
-.routine-reference-setup__heading small { font-size: 9px; letter-spacing: .15em; color: var(--practice-menu-secondary); font-weight: 700; }
-.routine-reference-setup .routine-reference-setup__heading h3 { margin: 3px 0 0; font-size: 20px; font-weight: 700; letter-spacing: -.04em; line-height: 1.2; text-transform: none; color: var(--practice-menu-text); }
-.routine-reference-setup p { margin: 14px 0 18px; font-size: 13px; line-height: 1.65; color: var(--practice-menu-secondary); }
-.routine-reference-setup input { font-size: 16px; min-height: 50px; }
-.routine-reference-setup__suggestion { display: flex; align-items: center; gap: 8px; padding: 10px 0; min-height: 44px; text-align: left; color: var(--practice-menu-text); font-size: 12px; background: none; border: 0; overflow-wrap: anywhere; }
-.routine-reference-setup__suggestion svg { width: 15px; height: 15px; flex: none; color: var(--guide-accent, #1598ff); }
-.routine-reference-setup__steps { display: flex; flex-wrap: wrap; gap: 10px 16px; padding-top: 16px; border-top: 1px solid var(--practice-menu-divider); }
-.routine-reference-setup__steps span { display: flex; align-items: center; gap: 6px; color: var(--practice-menu-secondary); font-size: 10px; }
-.routine-reference-setup__steps svg { width: 13px; height: 13px; }
-.routine-reference-setup .routine-reference-setup__status { margin: 12px 0 0; font-size: 11px; }
-.routine-reference-setup .routine-reference-setup__error { margin: 8px 0 0; font-size: 11px; color: #d7263d; }
+.routine-guide .focus-reference-browser {
+  --focus-text: var(--guide-ink);
+  --focus-secondary: var(--guide-muted);
+  --focus-surface: var(--guide-panel);
+  --focus-field: var(--guide-panel);
+  --focus-divider: var(--guide-line);
+  --focus-edge: var(--guide-line);
+}
+.routine-guide .focus-reference-results { max-height: none; }
+.routine-guide .focus-suggested-search {
+  border-color: var(--guide-line);
+  border-radius: 16px;
+  color: var(--guide-ink);
+  background: var(--guide-panel);
+}
+.routine-guide .focus-search-row input,
+.routine-guide .focus-reference-name {
+  background: var(--guide-panel);
+  color: var(--guide-ink);
+  border-color: var(--guide-line);
+}
+.routine-guide .focus-reference-thumbnail svg { width: 1.25rem; height: 1.25rem; }
 /* A pinned recording is the headline state: show what will open, and let it go. */
 .routine-reference-pinned { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; padding: 12px; border: 1px solid var(--guide-accent, #1598ff); border-radius: 16px; background: #1598ff14; }
-.routine-reference-pinned__mark { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 11px; background: #1598ff22; color: var(--guide-accent, #1598ff); }
-.routine-reference-pinned__mark svg { width: 16px; height: 16px; }
 .routine-reference-pinned > div { min-width: 0; flex: 1; }
 .routine-reference-pinned strong { display: block; font-size: 13px; font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; color: var(--practice-menu-text); }
 .routine-reference-pinned small { display: block; margin-top: 2px; font-size: 11px; color: var(--practice-menu-secondary); overflow-wrap: anywhere; }
 .routine-reference-pinned > button { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border: 0; border-radius: 999px; background: none; color: var(--practice-menu-secondary); }
 .routine-reference-pinned > button svg { width: 16px; height: 16px; }
-.routine-reference-saved { display: grid; gap: 6px; margin-bottom: 16px; }
-.routine-reference-saved > small { font-size: 9px; letter-spacing: .15em; font-weight: 700; text-transform: uppercase; color: var(--practice-menu-secondary); }
-.routine-reference-saved__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 10px; text-align: left; border: 1px solid var(--practice-menu-divider); border-radius: 14px; background: var(--practice-menu-control); color: var(--practice-menu-text); }
-.routine-reference-saved__item > svg { width: 14px; height: 14px; flex: none; color: var(--guide-accent, #1598ff); }
-.routine-reference-saved__item span { min-width: 0; flex: 1; }
-.routine-reference-saved__item strong { display: block; font-size: 12px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.routine-reference-saved__item small { display: block; font-size: 10px; color: var(--practice-menu-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.routine-reference-saved__pin { width: 14px; height: 14px; flex: none; opacity: 0; }
-.routine-reference-link { display: flex; align-items: flex-end; gap: 8px; }
-.routine-reference-link .practice-menu-field { flex: 1; min-width: 0; }
-.routine-reference-link > button { display: flex; align-items: center; gap: 6px; min-height: 50px; padding: 0 14px; flex: none; border: 1px solid var(--guide-accent, #1598ff); border-radius: 12px; background: var(--guide-accent, #1598ff); color: #fff; font-size: 12px; font-weight: 650; }
-.routine-reference-link > button:disabled { opacity: .45; }
-.routine-reference-link > button svg { width: 14px; height: 14px; }
 @media (hover: hover) {
   .routine-guide :is(.routine-guide-choice, .routine-guide-exercise, .routine-guide-own):hover { border-color: var(--guide-accent); }
   .routine-guide-text:hover, .routine-guide-item:hover strong { color: var(--guide-accent); }
@@ -716,8 +709,4 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 .routine-guide:has(.routine-guide-ready-note) .routine-guide-lineup>li{min-height:0}.routine-guide:has(.routine-guide-ready-note) .routine-swipe-content{min-height:76px;padding:9px 12px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item{min-height:54px;padding:5px 0}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item strong{font-size:15px}.routine-guide:has(.routine-guide-ready-note) .routine-guide-item small{font-size:10px;margin-top:4px}.routine-guide-edit-exercise{width:14px!important;color:var(--guide-muted)}.routine-guide-lineup-actions{display:flex;justify-content:space-between;gap:8px}.routine-guide-lineup-actions .routine-guide-text{margin:4px 0 0;font-size:11px}
 
 /* Music pinned to a step: the file lives in the item's folder, the routine only
-   remembers that this step opens on it. Untick and the page stays down. */
-.routine-music-open { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, currentColor 5%, transparent); font-size: 12.5px; line-height: 1.3; }
-.routine-music-open input { width: 20px; height: 20px; flex: none; accent-color: var(--guide-accent, #1598ff); }
-.routine-music-open span { flex: 1; min-width: 0; }
-.routine-music-open svg { width: 14px; height: 14px; flex: none; opacity: .5; }
+   remembers that this step opens on it. */

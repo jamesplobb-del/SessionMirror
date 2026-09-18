@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { AudioLines, Columns2, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, X } from 'lucide-react'
+import { AudioLines, Columns2, Ear, LayoutGrid, Maximize2, Minimize2, Music2, Radio, Square, X } from 'lucide-react'
+import { useLongPress } from '../hooks/useLongPress'
+import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
   DEFAULT_CHART_VIEW, deletePracticeChart, isChartVisible, loadChartView, loadPracticeChart,
@@ -60,6 +62,28 @@ interface PracticeChartLayerProps {
   /** Seconds into the current take, for the rail's timer. */
   recordElapsed: number
   onToggleRecord: () => void
+  /*
+   * Hands-free, on the page.
+   *
+   * The gesture that arms it is a long press on Record — and in full screen the
+   * Record it lives on has been put away with the deck, which left the one mode
+   * built for a player holding an instrument unreachable from the one screen
+   * built for a player holding an instrument. The rail carries the same long
+   * press, and shows the same phase back.
+   */
+  handsFreeEnabled: boolean
+  handsFreePhase: HandsFreePhase | null
+  onToggleHandsFree: () => void
+}
+
+/** What the rail says while hands-free is running the sitting. */
+const HANDS_FREE_LABEL: Record<HandsFreePhase, string> = {
+  preparing: 'Getting ready',
+  listening: 'Listening',
+  recording: 'Recording',
+  playback: 'Playing back',
+  saving: 'Saving',
+  countdown: 'Next take',
 }
 
 function formatElapsed(seconds: number): string {
@@ -79,6 +103,7 @@ function formatElapsed(seconds: number): string {
 export default function PracticeChartLayer({
   projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
+  handsFreeEnabled, handsFreePhase, onToggleHandsFree,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -384,6 +409,18 @@ export default function PracticeChartLayer({
     }
   }, [projectId])
 
+  /*
+   * The same gesture the deck's Record has: tap to start or stop, hold to arm
+   * hands-free. Matching the deck's 900ms so the hold feels identical wherever
+   * a player learned it.
+   */
+  const railRecordHandlers = useLongPress({
+    onClick: onToggleRecord,
+    onLongPress: onToggleHandsFree,
+    delay: 900,
+    disabled: isStopping || (!recordReady && !isRecording),
+  })
+
   const gesture = useRef<{ id: number; x: number; y: number; at: number } | null>(null)
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, at: Date.now() }
@@ -519,12 +556,26 @@ export default function PracticeChartLayer({
               type="button"
               className="practice-chart-rail__record"
               data-recording={isRecording ? 'true' : undefined}
+              data-hands-free={handsFreeEnabled ? 'true' : undefined}
               disabled={isStopping || (!recordReady && !isRecording)}
-              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-              onClick={onToggleRecord}
+              aria-label={isRecording
+                ? 'Stop recording. Long press to turn hands-free practice off.'
+                : handsFreeEnabled
+                  ? 'Start recording. Long press to turn hands-free practice off.'
+                  : 'Start recording. Long press to turn hands-free practice on.'}
+              aria-pressed={handsFreeEnabled}
+              {...railRecordHandlers}
             >
               {isRecording ? <Square aria-hidden /> : <i aria-hidden />}
             </button>
+            {/* One line, and only when there is something to say: the phase
+                while hands-free is running it, the clock while a take is
+                actually being recorded, and nothing at all otherwise. */}
+            {handsFreeEnabled && handsFreePhase && !isRecording && (
+              <span className="practice-chart-rail__status" aria-live="polite">
+                <Ear aria-hidden />{HANDS_FREE_LABEL[handsFreePhase]}
+              </span>
+            )}
             {isRecording && (
               <span className="practice-chart-rail__elapsed" aria-live="polite">
                 {formatElapsed(recordElapsed)}

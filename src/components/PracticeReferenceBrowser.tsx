@@ -12,16 +12,14 @@ const decode = (text: string) => text.replace(/&amp;/g, '&').replace(/&#39;/g, "
  * row to load it. This used to be two tabs plus a separate paste form with its
  * own submit button, which meant four ways in and no obvious one.
  */
-export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, savedAsTab = false, useContextSuggestion = true }: {
+export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, useContextSuggestion = true }: {
   onSelect: (url: string) => void
   suggestedQuery?: string
   placeholder?: string
   selectionHelp?: string
-  savedAsTab?: boolean
   useContextSuggestion?: boolean
 }) {
   const searchId = useId()
-  const [view, setView] = useState<'search' | 'saved'>('search')
   const { query: initialQuery, projectId, autoSearch } = useContext(PracticeReferenceContext)
   const [query, setQuery] = useState(useContextSuggestion ? initialQuery : '')
   const [results, setResults] = useState<PracticeReference[]>([])
@@ -93,11 +91,6 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
     Number(b.projectIds.includes(projectId ?? '')) - Number(a.projectIds.includes(projectId ?? '')))
 
   return <section className="focus-reference-browser" aria-label="References">
-    {savedAsTab && <div className="routine-segment" role="group" aria-label="Reference source">
-      <button type="button" aria-pressed={view === 'search'} onClick={() => setView('search')}>Search or link</button>
-      <button type="button" aria-pressed={view === 'saved'} onClick={() => setView('saved')}>Saved · {saved.length}</button>
-    </div>}
-    {view === 'search' && <>
     <form onSubmit={event => { event.preventDefault(); if (!linkId) void search() }}>
       <label htmlFor={searchId}>Search YouTube, or paste a link</label>
       <div className="focus-search-row">
@@ -111,10 +104,9 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
       </div>
       <p className="focus-help">{selectionHelp || 'Tap any recording to load it into your take box.'}</p>
       {suggestedQuery && <button type="button" className="focus-suggested-search" onClick={() => {
-        setView('search'); setQuery(suggestedQuery); void search(suggestedQuery)
+        setQuery(suggestedQuery); void search(suggestedQuery)
       }}><Search aria-hidden /><span>Search YouTube for “{suggestedQuery}”</span></button>}
     </form>
-
 
     {linkId && <div className="focus-reference-group">
       <h4>From your link</h4>
@@ -135,13 +127,10 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
       <div className="focus-reference-results">{results.map(item => row(item))}</div>
     </div>}
 
-    </>}
     {error && <p className="focus-error" role="alert">{error}</p>}
-    {(!savedAsTab || view === 'saved') && <div className="focus-reference-group">
-      <h4>Saved{saved.length ? ` · ${saved.length}` : ''}</h4>
-      {sortedSaved.length
-        ? <div className="focus-reference-results">{sortedSaved.map(item => row(item, true))}</div>
-        : <p className="focus-help">Recordings you use are kept here, ready for next time.</p>}
+    {sortedSaved.length > 0 && <div className="focus-reference-group">
+      <h4>Saved · {saved.length}</h4>
+      <div className="focus-reference-results">{sortedSaved.map(item => row(item, true))}</div>
     </div>}
   </section>
 }

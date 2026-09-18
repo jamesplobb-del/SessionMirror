@@ -570,15 +570,18 @@ export function summarizeStep(step: RoutineStep, transposition: TunerTranspositi
     parts.push('Tuner')
   } else if (step.kind === 'metro') {
     parts.push('Metronome')
+  } else if (step.desk?.showMusic) {
+    parts.push('Music')
   } else if (step.kind === 'focus') {
     parts.push('Record & compare')
   }
   if (step.desk && step.kind !== 'game' && step.kind !== 'free') {
     const desk = summarizeDesk(step.desk, transposition)
-    // The surface word at the end is redundant for tool tabs.
-    const trimmed = step.kind === 'tune' || step.kind === 'metro'
+    // The surface word at the end is redundant for tool tabs and for Music.
+    let trimmed = step.kind === 'tune' || step.kind === 'metro' || step.desk.showMusic
       ? desk.replace(/(?:^| · )(Camera|Audio)$/, '')
       : desk
+    if (step.desk.showMusic) trimmed = trimmed.replace(/(?:^| · )Music\b/, '').replace(/^ · /, '')
     if (trimmed) parts.push(trimmed)
   }
   if (step.minutes > 0) parts.push(`${step.minutes} min`)

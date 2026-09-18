@@ -1,4 +1,6 @@
 import { readGuidancePreferences, resetFeatureGuides, setFeatureTipsEnabled, confirmFeatureAction, GUIDANCE_PREFERENCES_EVENT } from '../utils/featureGuidance'
+import TutorialQuickView from './tutorials/TutorialQuickView'
+import { TUTORIAL_DEMOS, TUTORIAL_ORDER, type TutorialId } from './tutorials/tutorialDemos'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   AudioLines,
@@ -577,6 +579,7 @@ function SettingsDrawer({
     }
   }
   const [featureTipsEnabled, setFeatureTipsPreference] = useState(() => readGuidancePreferences().enabled)
+  const [openTutorial, setOpenTutorial] = useState<TutorialId | null>(null)
   useEffect(() => {
     const sync = () => setFeatureTipsPreference(readGuidancePreferences().enabled)
     window.addEventListener(GUIDANCE_PREFERENCES_EVENT, sync)
@@ -1021,6 +1024,17 @@ function SettingsDrawer({
               </SettingsGroup>
             ))}
 
+            {/*
+              * The same demos the tips show, but looked up on purpose. A player
+              * who skipped a tip — or turned tips off — still needs somewhere to
+              * go and find out where a control is.
+              */}
+            <SettingsGroup title="Quick tutorials" footer="Short animated walkthroughs. Tap one to watch it." plain>
+              {TUTORIAL_ORDER.map(id => (
+                <TopicRow key={id} label={TUTORIAL_DEMOS[id].title} onClick={() => setOpenTutorial(id)} />
+              ))}
+            </SettingsGroup>
+
             <SettingsGroup footer="Short guides appear when you first use a feature. You can skip any guide.">
               <SwitchRow
                 icon={BookOpen}
@@ -1048,6 +1062,8 @@ function SettingsDrawer({
                 onClick={handleResetTutorials}
               />
             </SettingsGroup>
+
+            <TutorialQuickView id={openTutorial} onClose={() => setOpenTutorial(null)} />
 
             <SettingsGroup
               title="Storage"

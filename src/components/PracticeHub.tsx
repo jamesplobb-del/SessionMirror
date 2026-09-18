@@ -42,7 +42,6 @@ import {
   type RoutineDay,
 } from '../utils/practiceRoutines'
 import {
-  type BuilderView,
   type RoutineBuilderMode,
 } from './RoutineBuilder'
 import GuidedRoutineBuilder from './GuidedRoutineBuilder'
@@ -104,13 +103,6 @@ interface PracticeHubProps {
 
 type HubPage = 'home' | 'routine' | 'instrument' | 'today'
 
-const BUILDER_TITLE: Record<BuilderView, string> = {
-  presets: 'Start from a preset',
-  edit: 'Your routine',
-  add: 'Add a step',
-  step: 'Step',
-}
-
 export default function PracticeHub({
   isOpen,
   projects,
@@ -146,7 +138,6 @@ export default function PracticeHub({
   const [page, setPage] = useState<HubPage>('home')
   const pageRef = useRef<HubPage>(page)
   pageRef.current = page
-  const [builderView, setBuilderView] = useState<BuilderView>('edit')
   const [launchError, setLaunchError] = useState('')
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
@@ -333,7 +324,7 @@ export default function PracticeHub({
                     <span>BestTake</span>
                     <h2 id="practice-menu-title">
                       {activePage === 'routine'
-                          ? BUILDER_TITLE[builderView]
+                          ? 'Your routine'
                           : activePage === 'today' ? 'Today’s routine' : 'Instrument'}
                     </h2>
                   </>
@@ -341,7 +332,7 @@ export default function PracticeHub({
                 {activePage === 'instrument' && (
                   <p>Sets tuner, written pitch, and the gate</p>
                 )}
-                {activePage === 'routine' && builderView === 'edit' && (
+                {activePage === 'routine' && (
                   <p>Each step opens the right tool, already set.</p>
                 )}
               </div>
@@ -393,7 +384,6 @@ export default function PracticeHub({
                         setPage('home')
                       }}
                       onCancel={closeBuilder}
-                      onViewChange={setBuilderView}
                     />
                   </motion.div>
                 ) : activePage === 'instrument' ? (
