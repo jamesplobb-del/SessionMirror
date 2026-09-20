@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react'
+import { Grid2X2, Plus, Pause, Play, RotateCcw, SlidersHorizontal } from 'lucide-react'
 import { formatTime } from '../../hooks/useVideoPlayback'
 import Pressable from '../../components/ui/Pressable'
 
@@ -71,9 +71,9 @@ export default function MultitrackToolbar(props: {
         aria-label="Seek"
       />
       <div className="multitrack-toolbar__row2">
-        <Pressable type="button" intensity="soft" onClick={onAddPart} className="multitrack-toolbar__chip">Record next part</Pressable>
+        <Pressable type="button" intensity="soft" onClick={onAddPart} className="multitrack-toolbar__chip"><Plus className="h-4 w-4" />Add part</Pressable>
         <div className="multitrack-layout-strip">
-        {onOpenLayout && <Pressable type="button" intensity="soft" onClick={onOpenLayout} className="multitrack-toolbar__chip" aria-label="Layout settings">Layout</Pressable>}
+        {onOpenLayout && <Pressable type="button" intensity="soft" onClick={onOpenLayout} className="multitrack-toolbar__chip" aria-label="Layout settings"><Grid2X2 className="h-4 w-4" />Layout</Pressable>}
         </div>
         {onOpenAlign && (
           <Pressable type="button" intensity="soft" onClick={onOpenAlign} className="multitrack-toolbar__chip" aria-label="Editor">

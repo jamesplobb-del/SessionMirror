@@ -24,6 +24,7 @@ import type { HydratedLibraryItem } from '../utils/libraryBridge'
 
 interface TakeVaultDrawerProps {
   isOpen: boolean
+  simplified?: boolean
   onClose: () => void
   projects: Project[]
   activeProject: Project | null
@@ -79,6 +80,7 @@ function takeDayLabel(timestamp: number): string {
 
 export default function TakeVaultDrawer({
   isOpen,
+  simplified = false,
   onClose,
   projects,
   activeProject,
@@ -349,7 +351,7 @@ export default function TakeVaultDrawer({
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel="Take Vault"
-      maxHeightClass="h-[min(82vh,100dvh)]"
+      maxHeightClass={simplified ? "h-[min(92vh,100dvh)]" : "h-[min(82vh,100dvh)]"}
       sheetRef={drawerRef}
       motionPreset="premium"
       elevated
@@ -413,24 +415,26 @@ export default function TakeVaultDrawer({
               <Pressable
                 type="button"
                 intensity="soft"
-                disabled={!selectionMode || selectedCount === 0}
+                hidden={simplified && !selectionMode}
+                disabled={takes.length === 0}
+                onClick={handleClearAll}
+                haptic="light"
+                className="vault-header-action-btn vault-header-action-btn--danger"
+                aria-label="Delete all takes in current session"
+              >
+                <Trash2 aria-hidden className="h-4 w-4" /> Delete all
+              </Pressable>
+              <Pressable
+                type="button"
+                intensity="soft"
+                hidden={!selectionMode}
+                disabled={selectedCount === 0}
                 onClick={handleBulkDelete}
                 haptic="light"
                 className="vault-header-action-btn vault-header-action-btn--danger"
                 aria-label="Delete selected takes"
               >
                 Delete
-              </Pressable>
-              <Pressable
-                type="button"
-                intensity="soft"
-                disabled={takes.length === 0}
-                onClick={handleClearAll}
-                haptic="light"
-                className="vault-header-action-btn vault-header-action-btn--danger"
-                aria-label="Clear all takes"
-              >
-                Clear all
               </Pressable>
             </div>
           )}
@@ -459,14 +463,21 @@ export default function TakeVaultDrawer({
             libraryCount={libraryItems.length}
           />
           {vaultSection !== 'practice' && (
-          <ProjectSessionBar
+          simplified ? <details className="vault-folder-disclosure"><summary>Folder · {activeProject?.name ?? 'Current session'}</summary>          <ProjectSessionBar
             className="vault-session-bar"
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
             onSelectProject={onSelectProject}
             onCreateProject={onCreateProject}
             onDeleteProject={onDeleteProject}
-          />
+          /></details> : (          <ProjectSessionBar
+            className="vault-session-bar"
+            projects={projects}
+            activeProjectId={activeProject?.id ?? null}
+            onSelectProject={onSelectProject}
+            onCreateProject={onCreateProject}
+            onDeleteProject={onDeleteProject}
+          />)
           )}
           {vaultSection === 'practice' ? (
             <VaultPracticeOverview projects={projects} onOpenProject={id => { onSelectProject(id); setVaultSection('takes') }} />
@@ -491,6 +502,7 @@ export default function TakeVaultDrawer({
             </div>
           ) : (
             <>
+              <div className={simplified ? "vault-browse-controls" : undefined}>
               <VaultMediaSegment
                 value={vaultMediaTab}
                 onChange={setVaultMediaTab}
@@ -499,6 +511,8 @@ export default function TakeVaultDrawer({
                 audioCount={audioCount}
                 bestCount={bestCount}
               />
+              {simplified && <GallerySortStrip sortMode={sortMode} onSortChange={onSortChange} takeCount={filteredTakes.length}/>}
+              </div>
               {filteredTakes.length === 0 ? (
                 <div className="vault-empty-state flex min-h-44 flex-col items-center justify-center rounded-[1.75rem] border-dashed px-6 py-8 text-center">
                   <p className="text-base font-semibold text-stone-900">No takes here</p>
@@ -512,12 +526,12 @@ export default function TakeVaultDrawer({
                 </div>
               ) : (
                 <>
-                  <div className="vault-section-toolbar flex items-center justify-between gap-3">
-                    <GallerySortStrip
+                  {(!simplified || selectionMode) && <div className="vault-section-toolbar flex items-center justify-between gap-3">
+                    {!simplified && <GallerySortStrip
                       sortMode={sortMode}
                       onSortChange={onSortChange}
                       takeCount={filteredTakes.length}
-                    />
+                    />}
                     {selectionMode && (
                       <Pressable
                         type="button"
@@ -529,7 +543,7 @@ export default function TakeVaultDrawer({
                         {allFilteredSelected ? 'Deselect All' : 'Select All'}
                       </Pressable>
                     )}
-                  </div>
+                  </div>}
                   <div className="vault-take-list">
                     {filteredTakes.map((take, index) => {
                       const bestHistoryEntry = bestHistoryByTakeId.get(take.id)
@@ -561,6 +575,7 @@ export default function TakeVaultDrawer({
                           </div>
                         )}
                         <TakeCard
+                        simplified={simplified}
                         take={take}
                         takeIndex={takeIndexById.get(take.id) ?? 0}
                         isBenchmark={take.id === vaultBenchmarkTakeId}

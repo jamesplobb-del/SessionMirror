@@ -54,3 +54,8 @@ html.app-dark-mode .app-shell--audio-mode .widget-collapse::before { background:
 }
 
 .widget-ball .widget-ball__expand { width:12px; height:10px; opacity:.85; }
+.widget-ball-accessory { position:absolute; left:60px; top:10px; z-index:41; }
+.widget-ball-settings { width:36px; height:36px; display:grid; place-items:center; padding:0; border:1px solid #83b7ff66; border-radius:50%; color:#f1f6ff; background:#15243af5; box-shadow:0 5px 18px #0004, inset 0 0 0 3px #8fbaff12; touch-action:manipulation; }
+.widget-ball-settings svg { width:16px; height:16px; }
+.widget-ball-settings:active { transform:scale(.94); }
+.app-shell--audio-mode .widget-ball-settings { background:#f2f7fffa; color:#173d69; border-color:#4d8dd688; }

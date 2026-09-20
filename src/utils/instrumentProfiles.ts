@@ -287,7 +287,7 @@ export function getInstrumentSettings(id: string): InstrumentSettingsPatch | nul
   if (!profile) return null
   return {
     tunerInstrument: profile.tunerInstrument,
-    tunerTransposition: profile.tunerTransposition,
+    tunerTransposition: 'concert',
     soundVolumeThreshold: profile.soundVolumeThreshold,
   }
 }

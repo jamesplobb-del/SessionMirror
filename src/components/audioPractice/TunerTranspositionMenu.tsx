@@ -8,6 +8,7 @@ import {
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../../utils/pitchConfig'
 
 interface TunerTranspositionMenuProps {
+  concertOnly?: boolean
   value: TunerTranspositionId
   onChange: (value: TunerTranspositionId) => void
   onClose: () => void
@@ -17,6 +18,7 @@ interface TunerTranspositionMenuProps {
 }
 
 function TunerTranspositionMenu({
+  concertOnly = false,
   value,
   onChange,
   onClose,
@@ -34,7 +36,7 @@ function TunerTranspositionMenu({
       <header className="tuner-transposition-menu__header">
         <div>
           <h2><span className="electric-tuning-old">Tuner settings</span><span className="electric-tuning-new">Tuning</span></h2>
-          <span>Note names follow your part. Cents stay at concert pitch.</span>
+          <span>Notes and cents are shown at concert pitch.</span>
         </div>
         <button type="button" onClick={onClose} aria-label="Close tuner settings">
           <X aria-hidden />
@@ -62,7 +64,7 @@ function TunerTranspositionMenu({
         </div>
       ) : null}
 
-      <div className="tuner-transposition-menu__list" role="radiogroup" aria-label="Instrument">
+      {!concertOnly && <div className="tuner-transposition-menu__list" role="radiogroup" aria-label="Instrument">
         {TUNER_TRANSPOSITION_GROUPS.map((group) => (
           <div className="tuner-transposition-menu__group" key={group}>
             <p>{group}</p>
@@ -96,7 +98,7 @@ function TunerTranspositionMenu({
             </div>
           </div>
         ))}
-      </div>
+      </div>}
     </section>
   )
 }

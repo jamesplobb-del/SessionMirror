@@ -4,6 +4,7 @@
  */
 
 import {
+  buildNativeEnhancerParams,
   createAudioEnhancerChain,
   disposeAudioEnhancerChain,
   updateAudioEnhancerChain,
@@ -37,8 +38,33 @@ export interface TakeSpeakerNodes {
   lastMuted?: boolean
 }
 
+const enhancerStateListeners = new Set<() => void>()
+export function subscribeTakePlaybackEnhancer(listener: () => void): () => void {
+  enhancerStateListeners.add(listener)
+  return () => { enhancerStateListeners.delete(listener) }
+}
+
+let enhancerRevision = 0
+export function takePlaybackEnhancerRevision(): number { return enhancerRevision }
+const renderedSources = new Set<string>()
+export function registerRenderedEnhancementSource(src: string): void { renderedSources.add(playbackFileName(src)) }
+export function isProcessedEnhancementSource(src: string): boolean {
+  const name = playbackFileName(src)
+  return processedFileNames.has(name) || renderedSources.has(name)
+}
+export function enhancementParamsForSource(src: string): Record<string, number> | undefined {
+  return nativeTakePlaybackEnhancerParams(isProcessedEnhancementSource(src))
+}
+
 export function isTakePlaybackEnhancerEnabled(): boolean {
   return enhancerEnabled
+}
+
+/** Snapshot the same settings for native multitrack playback, which has no Web Audio bus. */
+export function nativeTakePlaybackEnhancerParams(alreadyProcessed = false): Record<string, number> | undefined {
+  return enhancerEnabled && enhancerSettings && (enhancerSettings.amount ?? 60) > 0 && !alreadyProcessed
+    ? buildNativeEnhancerParams(enhancerSettings)
+    : undefined
 }
 
 const speakerNodesByElement = new WeakMap<HTMLMediaElement, TakeSpeakerNodes>()
@@ -52,7 +78,7 @@ export function playbackFileName(src: string): string {
 }
 function shouldUseEnhancer(nodes: TakeSpeakerNodes): boolean {
   const element = nodes.source.mediaElement
-  const alreadyProcessed = processedFileNames.has(playbackFileName(element.src || element.currentSrc))
+  const alreadyProcessed = isProcessedEnhancementSource(element.src || element.currentSrc)
   return enhancerEnabled && Boolean(enhancerSettings) && !alreadyProcessed
 }
 
@@ -136,8 +162,13 @@ export function setTakePlaybackEnhancerState(
   processedSources: string[] = [],
 ): void {
   processedFileNames = new Set(processedSources.map(playbackFileName).filter(Boolean))
+  const previous = JSON.stringify([enhancerEnabled, enhancerSettings && buildNativeEnhancerParams(enhancerSettings)])
   enhancerEnabled = enabled
   enhancerSettings = settings ?? null
+  if (previous !== JSON.stringify([enhancerEnabled, enhancerSettings && buildNativeEnhancerParams(enhancerSettings)])) {
+    enhancerRevision += 1
+    enhancerStateListeners.forEach(listener => listener())
+  }
 
   for (const el of routedSpeakerElements) {
     const nodes = speakerNodesByElement.get(el)

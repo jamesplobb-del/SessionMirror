@@ -10,6 +10,9 @@ import {
   ChevronRight,
   Pencil,
   Play,
+  CircleDot,
+  ListMusic,
+  Settings,
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
@@ -69,6 +72,9 @@ interface PracticeHubProps {
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   onClose: () => void
+  onOpenSettings?: () => void
+  /** Optional inline routine summary, shared by the design review and a future approved Home. */
+  showHomeRoutineSummary?: boolean
   onOpenQuickPractice: () => void
   onOpenGames: () => void
   onDailyPractice: (plan: DailyChallengePlan) => void
@@ -116,6 +122,8 @@ export default function PracticeHub({
   onOpenTuner,
   onOpenMetronome,
   onOpenMusic,
+  onOpenSettings,
+  showHomeRoutineSummary = false,
   routine,
   routineDay,
   routineBuilderRequest,
@@ -341,26 +349,25 @@ export default function PracticeHub({
                   intensity="icon"
                   haptic="light"
                   hapticFeedback={hapticFeedback}
-                  onClick={onClose}
+                  onClick={activePage === 'home' && onOpenSettings ? onOpenSettings : onClose}
                   className="practice-menu-icon-button"
-                  aria-label="Close practice menu"
+                  aria-label={activePage === 'home' && onOpenSettings ? 'Open settings' : 'Close practice menu'}
                 >
-                  <X aria-hidden />
+                  {activePage === 'home' && onOpenSettings ? <Settings aria-hidden /> : <X aria-hidden />}
                 </Pressable>
               </div>
             </header>
 
             <div className="practice-menu-scroll">
               {launchError && <p className="focus-error" role="alert">{launchError}</p>}
-              <AnimatePresence mode="wait" initial={false}>
+              {/* Internal navigation replaces content immediately; keep sheet motion separate. */}
                 {activePage === 'routine' && routineBuilderRequest ? (
                   <motion.div
                     key="routine-builder"
                     className="practice-menu-page"
-                    initial={{ opacity: 0, x: reducedMotion ? 0 : 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: reducedMotion ? 0 : 8 }}
-                    transition={iosFade}
+                    initial={{ transform: `translateX(${reducedMotion ? 0 : 8}px)` }}
+                    animate={{ transform: 'translateX(0px)' }}
+                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
                   >
                     <GuidedRoutineBuilder
                       mode={routineBuilderRequest}
@@ -388,10 +395,9 @@ export default function PracticeHub({
                   <motion.div
                     key="instrument"
                     className="practice-menu-page"
-                    initial={{ opacity: 0, x: 12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 8 }}
-                    transition={iosFade}
+                    initial={{ transform: `translateX(${reducedMotion ? 0 : 8}px)` }}
+                    animate={{ transform: 'translateX(0px)' }}
+                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
                   >
                     <InstrumentSheet
                       selectedId={instrumentId}
@@ -414,10 +420,9 @@ export default function PracticeHub({
                   <motion.div
                     key="home"
                     className="practice-menu-page"
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -8 }}
-                    transition={iosFade}
+                    initial={{ transform: `translateX(${reducedMotion ? 0 : -8}px)` }}
+                    animate={{ transform: 'translateX(0px)' }}
+                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
                   >
                     <section className="practice-menu-focus-flow">
                       <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
@@ -433,20 +438,31 @@ export default function PracticeHub({
                       <span id="practice-home-instrument-description" className="practice-home-sr-only">{homeSubtitle}</span>
                       <div className="practice-home-launch-actions" aria-label="Start practicing">
                         <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-primary practice-home-record-launch" onClick={onOpenQuickPractice}>
-                          <span className="practice-home-launch-copy"><small>Your next great take</small><strong>Record & compare</strong><em>Play. Listen back. Keep your best.</em></span><ChevronRight aria-hidden />
+                          <span className="practice-home-launch-copy"><CircleDot className="open-lens-home-symbol" aria-hidden /><strong>Record & compare</strong><em>Audio or video</em></span><ChevronRight aria-hidden />
                           <svg className="practice-home-signal-detail" viewBox="0 0 180 55" fill="none" aria-hidden><path d="M0 28h20l5-7 6 14 7-25 8 36 8-29 7 20 6-9h23l5-12 6 25 8-34 8 43 8-27 6 12 5-7h39" stroke="currentColor" strokeWidth="1.6" /></svg>
                         </Pressable>
                         <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-quick practice-home-routine-launch" disabled={startingRoutineStepId !== null} onClick={() => {
                           if (!routine?.steps.length) onOpenRoutineBuilder('build')
                           else if (homeNext && !homeProgress?.complete) void startRoutineStep(homeNext.id)
                           else setPage('today')
-                        }}><span className="practice-home-launch-copy"><small>{routine?.name || 'A little structure, when you want it'}</small><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Start with a ready-to-play plan'}</em></span><ChevronRight aria-hidden /></Pressable>
+                        }}><span className="practice-home-launch-copy"><ListMusic className="open-lens-home-symbol" aria-hidden /><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Practice with a plan'}</em></span><ChevronRight aria-hidden /></Pressable>
                       </div>
                       <div className="practice-home-links">
                         <button className="practice-home-library" onClick={onOpenVault}><span>Take library<small>Recordings & best takes</small></span><ChevronRight aria-hidden /></button>
                         <button className="practice-home-library" onClick={() => onOpenRoutineBuilder('build')}><span>Your routines<small>Plans & exercises</small></span><ChevronRight aria-hidden /></button>
                       </div>
 
+                      {showHomeRoutineSummary && routine?.steps.length ? (
+                        <section className="practice-home-routine-summary" aria-label="Your routine">
+                          <header><span>{routine.name}</span><button type="button" onClick={() => setPage('today')}>View all <ChevronRight aria-hidden /></button></header>
+                          {routine.steps.slice(0, 3).map((step, index) => (
+                            <button type="button" key={step.id} disabled={startingRoutineStepId !== null} onClick={() => void startRoutineStep(step.id)}>
+                              <span className="practice-home-routine-summary__index">{String(index + 1).padStart(2, '0')}</span>
+                              <strong>{step.title}</strong><small>{step.minutes ? `${step.minutes} min` : 'Untimed'}</small><ChevronRight aria-hidden />
+                            </button>
+                          ))}
+                        </section>
+                      ) : null}
                       <DailyChallenges routine={routine} day={routineDay} instrumentId={instrumentId}
                         onPractice={onDailyPractice} onGame={onDailyGame} />
 
@@ -549,7 +565,6 @@ export default function PracticeHub({
                     </section>
                   </motion.div>
                 )}
-              </AnimatePresence>
             </div>
           </motion.section>
         </motion.div>

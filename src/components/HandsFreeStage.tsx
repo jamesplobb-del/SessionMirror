@@ -76,12 +76,28 @@ function HandsFreeStage({
   const ballDetail = phase === 'recording' ? formatElapsed(elapsed)
     : phase === 'countdown' ? `${replayCountdown ?? 0}s`
     : phase === 'playback' ? 'Listen' : phase === 'saving' ? 'Saving' : phase === 'preparing' ? 'Mic…' : 'Ready'
+  // Keep recovery controls reachable even while the widget is collapsed.
+  const settingsTappable = Boolean(phase && onTapForSettings)
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef: panel.panelRef,
     x, y, positionId: 'hands-free-tools', label: `hands-free${phase ? `, ${PHASE_COPY[phase].title}` : ''}`,
     icon: <Mic aria-hidden />, detail: ballDetail, active: phase === 'recording',
-    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase) })
+    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase),
+    ballAccessory: settingsTappable && (
+      <button
+        type="button"
+        className="widget-ball-settings"
+        aria-label="Hands-free settings"
+        title="Hands-free settings"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation()
+          onTapForSettings?.()
+        }}
+      >
+        <Settings2 aria-hidden />
+      </button>
+    ) })
   const copy = phase ? PHASE_COPY[phase] : null
-  const settingsTappable = (phase === 'listening' || phase === 'preparing') && Boolean(onTapForSettings)
 
   return (<>
     <div ref={boundaryRef} className="hands-free-ball-layer" aria-hidden={!phase}>
@@ -168,7 +184,10 @@ function HandsFreeStage({
             aria-label="Hands-free settings: quiet gap and start level"
           >
             {placement === 'chip' ? (
-              <Settings2 aria-hidden />
+              <>
+                <Settings2 aria-hidden />
+                <span>Tap for settings</span>
+              </>
             ) : (
               'Tap for settings'
             )}

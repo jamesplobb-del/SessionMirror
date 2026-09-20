@@ -22,11 +22,11 @@ import type { PluginListenerHandle } from '@capacitor/core'
 const POLL_INTERVAL_MS = 48
 const MIN_RECORDING_MS = 400
 const COOLDOWN_MS = 600
-const MONITOR_WARMUP_MS = 280
+const MONITOR_WARMUP_MS = 500
 // The native tap starts from an already-running pre-roll recorder. Keep enough
 // settling time to establish a quiet baseline without making normal speech feel
 // ignored when hands-free mode is first enabled.
-const NATIVE_MONITOR_WARMUP_MS = 180
+const NATIVE_MONITOR_WARMUP_MS = 500
 // Arming: a fresh monitor must see a few genuinely quiet frames before its
 // first trigger. AVAudioSession activation and the WebKit mic ramp both land
 // as a burst right at the start of the stream, and that burst used to read as
@@ -63,6 +63,7 @@ interface UseAutoSoundRecordingOptions {
   streamGeneration: number
   silenceMs: number
   volumeThreshold: number
+  instrumentFamily?: 'Brass' | 'Woodwind' | 'Strings' | 'Voice & keys'
   startRecording: () => void
   stopRecording: () => void
   warmRecorder: () => void
@@ -145,6 +146,7 @@ export function useAutoSoundRecording({
   streamGeneration,
   silenceMs,
   volumeThreshold,
+  instrumentFamily,
   startRecording,
   stopRecording,
   warmRecorder,
@@ -161,7 +163,7 @@ export function useAutoSoundRecording({
   useEffect(() => {
     healthRef.current.reset()
     setHandsFreeNotice(null)
-  }, [enabled, volumeThreshold])
+  }, [enabled, volumeThreshold, instrumentFamily])
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -206,7 +208,7 @@ export function useAutoSoundRecording({
   const restartAutoPreRollCaptureRef = useRef(restartAutoPreRollCapture)
   const isNativeAudioCaptureActiveRef = useRef(isNativeAudioCaptureActive)
   const pendingPerformanceGateRef = useRef(false)
-  const profileRef = useRef(getAutoRecordProfile(volumeThreshold))
+  const profileRef = useRef(getAutoRecordProfile(volumeThreshold, instrumentFamily))
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
   const appliedVolumeThresholdRef = useRef(volumeThreshold)
@@ -227,7 +229,7 @@ export function useAutoSoundRecording({
   getAutoPreRollAgeMsRef.current = getAutoPreRollAgeMs
   restartAutoPreRollCaptureRef.current = restartAutoPreRollCapture
   isNativeAudioCaptureActiveRef.current = isNativeAudioCaptureActive
-  profileRef.current = getAutoRecordProfile(volumeThreshold)
+  profileRef.current = getAutoRecordProfile(volumeThreshold, instrumentFamily)
   silenceMsRef.current = silenceMs
   effectiveGateRef.current = computeEffectiveGate(profileRef.current, quietRmsEmaRef.current)
 
@@ -824,15 +826,11 @@ export function useAutoSoundRecording({
         }
 
         if (now < monitorWarmUntilRef.current) {
-          // Capture only genuinely quiet startup samples. If the user begins
-          // playing immediately, those notes must not become the noise floor
-          // and raise the gate above the performance.
-          if (metrics.rms < profile.gate * 0.9) {
-            calibrationSamples.push(metrics.rms)
-            quietFramesSeen += 1
-          } else {
-            quietFramesSeen = 0
-          }
+          // Learn the room from every startup frame. The lower percentile
+          // keeps a note played during startup from becoming the noise floor,
+          // while still adapting when the room is louder than the saved gate.
+          calibrationSamples.push(metrics.rms)
+          quietFramesSeen = metrics.rms < profile.gate * 0.9 ? quietFramesSeen + 1 : 0
           loudSinceRef.current = null
           attackSinceRef.current = null
           return
@@ -840,7 +838,7 @@ export function useAutoSoundRecording({
 
         if (!calibrated && calibrationSamples.length > 0) {
           const sorted = [...calibrationSamples].sort((a, b) => a - b)
-          quietRmsEmaRef.current = percentile(sorted, 0.5)
+          quietRmsEmaRef.current = percentile(sorted, 0.2)
           effectiveGateRef.current = computeEffectiveGate(profile, quietRmsEmaRef.current)
           calibrationSamples.length = 0
           calibrated = true
@@ -1045,7 +1043,7 @@ export function useAutoSoundRecording({
     return () => {
       window.clearTimeout(timer)
     }
-  }, [volumeThreshold, shouldMonitor])
+  }, [volumeThreshold, instrumentFamily, shouldMonitor])
 
   useEffect(() => {
     if (!shouldMonitor) return
@@ -1116,6 +1114,10 @@ export function useAutoSoundRecording({
     ) {
       return
     }
+    // A restart is a real handoff, especially after Camera playback. Do not
+    // leave the old room's ready flag visible while the new native tap is
+    // still being acquired; that made Tools show “Your turn” while deaf.
+    setMonitorReady(false)
     setMonitorEpoch((epoch) => epoch + 1)
     void warmRecorderRef.current()
   }, [])

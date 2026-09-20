@@ -1,0 +1,571 @@
+/* Approved shared skin, used by production and the appearance review.
+   Every selector is opt-in; review and app will use this same file, not a recreation.
+   No pitch, audio, recording, or timing logic lives here. */
+html#lens-design-system.lens-system {
+  --ls-bg:#f8fbff; --ls-panel:#ffffff; --ls-soft:#eaf4ff; --ls-ink:#142b43;
+  --ls-muted:#526b83; --ls-blue:#087bce; --ls-line:#c3d8eb; --ls-radius:22px;
+  --ls-shadow:0 8px 24px #24577b06; --ls-glass:#ffffffed;
+  --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line);
+  --guide-panel:var(--ls-panel); color-scheme:light;
+}
+html#lens-design-system.lens-system.app-dark-mode {
+  --ls-bg:#101e2c; --ls-panel:#1b2d3e; --ls-soft:#21394d; --ls-ink:#edf5fc;
+  --ls-muted:#9fb4c8; --ls-blue:#83cdf8; --ls-line:#34516a; --ls-glass:#192c3de8;
+  --ls-shadow:0 8px 24px #030c141a; color-scheme:dark;
+}
+html#lens-design-system.lens-system[data-lens-finish='studio'] { --ls-bg:#ecf1f7; --ls-panel:#fafcfe; --ls-blue:#0769c6; --ls-line:#becedf; --ls-radius:16px; --ls-shadow:none; }
+html#lens-design-system.lens-system.app-dark-mode[data-lens-finish='studio'] { --ls-bg:#121c29; --ls-panel:#1e2c3f; --ls-blue:#7bb8ff; --ls-line:#3e526d; }
+html#lens-design-system.lens-system body { color:var(--ls-ink); background:var(--ls-bg); font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; }
+html#lens-design-system.lens-system button:focus-visible { outline:2px solid var(--ls-blue); outline-offset:3px; }
+html#lens-design-system.lens-system .open-lens-recording { --lens-bg:var(--ls-bg); --lens-panel:var(--ls-panel); --lens-ink:var(--ls-ink); --lens-muted:var(--ls-muted); --lens-line:var(--ls-line); --lens-blue:var(--ls-blue); }
+html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-mode { background:var(--ls-bg)!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .app-ui-overlay::before,html#lens-design-system.lens-system .app-ui-overlay::after { content:none!important; }
+html#lens-design-system.lens-system .open-lens-header { height:62px; padding:8px 20px; }
+html#lens-design-system.lens-system .open-lens-modes { padding:4px; background:var(--ls-soft); border:1px solid var(--ls-line); border-radius:28px; }
+html#lens-design-system.lens-system .open-lens-modes button { min-height:34px; min-width:80px; font-weight:500; }
+html#lens-design-system.lens-system .open-lens-modes button[aria-pressed=true] { color:var(--ls-blue); background:var(--ls-panel); box-shadow:0 2px 6px #1932490b; }
+html#lens-design-system.lens-system .open-lens-settings { color:var(--ls-ink); background:transparent; right:13px; }
+html#lens-design-system.lens-system .open-lens-settings svg { width:21px; height:21px; }
+html#lens-design-system.lens-system .open-lens-dock { max-width:480px; min-height:86px; gap:0; grid-template-columns:repeat(2,minmax(0,1fr)) 78px repeat(2,minmax(0,1fr)); }
+/* Keep the old carousel's wider drop target from shifting the central grid cell. */
+html#lens-design-system .open-lens-dock .control-deck__record-stack { width:78px; min-width:0; justify-self:center; }
+html#lens-design-system .open-lens-dock .record-delete-drop { width:72px; margin-inline:auto; }
+html#lens-design-system.lens-system .open-lens-deck { padding:0 12px!important; }
+html#lens-design-system.lens-system .open-lens-dock-action { font-size:10px; font-weight:500; letter-spacing:0; gap:7px; color:var(--ls-blue); text-shadow:none; }
+html#lens-design-system.lens-system .open-lens-dock-action span { color:var(--ls-muted); }
+html#lens-design-system.lens-system .open-lens-dock-action svg { stroke-width:1.6; width:24px; height:24px; }
+html#lens-design-system.lens-system .record-carousel-slot--active { box-shadow:none!important; }
+html#lens-design-system.lens-system .open-lens-dock .record-carousel-slot--active { background:var(--ls-panel)!important; border:1.5px solid var(--ls-line)!important; box-shadow:0 0 0 4px color-mix(in srgb,var(--ls-panel) 55%,transparent)!important; }
+html#lens-design-system.lens-system .open-lens-record-dot { background:#e95964; width:43px; height:43px; }
+html#lens-design-system.lens-system .open-lens-record-dot.is-recording { width:24px; height:24px; }
+
+/* Home retains the original arrangement and sizing, with the proposed finish. */
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge {
+  --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line); --guide-panel:var(--ls-panel);
+  background:var(--ls-bg)!important; color:var(--ls-ink); border:0; box-shadow:none;
+}
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header { justify-content:center; min-height:76px; padding:18px 22px 12px; }
+html#lens-design-system .practice-home-brand { color:var(--ls-ink); }
+html#lens-design-system .practice-menu-icon-button { color:var(--ls-muted)!important; background:transparent!important; box-shadow:none!important; border:0!important; }
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll { padding:10px 22px 24px; }
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-flow { gap:12px; min-height:0; flex:1 0 auto; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-instrument { min-height:70px; padding:13px 17px; margin-bottom:7px; border:1px solid var(--ls-line); border-radius:14px; background:var(--ls-soft)!important; }
+html#lens-design-system .practice-home-instrument-change { color:var(--ls-blue)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-columns:1fr; grid-template-rows:minmax(min-content,1.2fr) minmax(min-content,1fr); flex:1 0 auto; gap:12px; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button:is(.is-primary,.is-quick) { padding:23px; align-items:center; border-radius:var(--ls-radius); background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; box-shadow:var(--ls-shadow)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height:186px; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height:128px; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button > svg:not(.practice-home-signal-detail) { position:static; width:22px; height:22px; color:var(--ls-blue); }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-copy { width:auto; gap:10px; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:clamp(23px,6.3vw,29px); line-height:1.12; font-weight:600; color:var(--ls-ink)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-copy em { font-size:12px; color:var(--ls-muted)!important; }
+html#lens-design-system .open-lens-home-symbol { width:24px; height:24px; margin-bottom:0; color:var(--ls-blue); }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-links .practice-home-library { padding:14px 12px; min-height:70px; border:1px solid var(--ls-line); border-radius:var(--ls-radius); background:var(--ls-panel); }
+html#lens-design-system .practice-home-links .practice-home-library span { font-size:14px; color:var(--ls-ink); }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-links small { display:block; font-size:10px; color:var(--ls-muted); }
+html#lens-design-system .daily-challenges { background:transparent!important; border:0!important; box-shadow:none!important; padding:0!important; }
+html#lens-design-system .daily-challenges__disclosure strong { color:var(--ls-ink); }
+html#lens-design-system .daily-challenges__disclosure small { color:var(--ls-muted); }
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-tools { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:color-mix(in srgb,var(--home-tool-color,var(--ls-blue)) 7%,var(--ls-panel))!important; border:0!important; box-shadow:none!important; color:var(--ls-ink); }
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:var(--home-tool-color,var(--ls-blue))!important; stroke-width:1.6; }
+@media(max-height:760px){
+  html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header { min-height:64px; padding:10px 16px 8px; }
+  html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll { padding:8px 16px 12px; }
+  html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-flow { gap:8px; }
+  html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button:is(.is-primary,.is-quick) { min-height:96px; padding:16px; }
+  html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height:116px; }
+}
+
+/* Audio cards keep all real playback behavior; their visual hierarchy is shared with camera. */
+html#lens-design-system.lens-system .audio-mode-home--inplace { padding:0 20px 4px!important; }
+html#lens-design-system.lens-system .audio-compare-heading { min-height:54px!important; padding:0 2px 13px!important; display:flex; flex-direction:column; justify-content:center; }
+html#lens-design-system.lens-system .audio-compare-heading h1 { font-size:14px!important; font-weight:550; letter-spacing:-.15px; }
+html#lens-design-system.lens-system .audio-compare-heading p { display:none; }
+html#lens-design-system.lens-system .audio-mode-take-stack { gap:14px!important; }
+html#lens-design-system.lens-system .audio-mode-home--inplace .audio-mode-take-card { border-radius:var(--ls-radius)!important; padding:18px!important; background:var(--ls-panel)!important; box-shadow:var(--ls-shadow)!important; border:1px solid var(--ls-line)!important; }
+html#lens-design-system.lens-system .audio-mode-take-card__pill { font-size:12px; font-weight:550; letter-spacing:0; text-transform:none; padding:0; }
+html#lens-design-system.lens-system .audio-mode-take-card__mini-btn { background:transparent!important; border:0!important; color:var(--ls-muted)!important; }
+html#lens-design-system.lens-system .audio-mode-take-card__mini-btn--best { color:var(--ls-blue)!important; }
+html#lens-design-system.lens-system .audio-mode-take-card__name-line { color:var(--ls-ink); }
+html#lens-design-system.lens-system .audio-mode-take-card__play { width:43px; height:43px; background:var(--ls-soft)!important; color:var(--ls-blue)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .audio-mode-take-card__playback-column { color:var(--ls-muted); }
+html#lens-design-system.lens-system .audio-waveform { background:transparent!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .audio-wave-shape { color:var(--ls-blue); }
+html#lens-design-system.lens-system .audio-first-take { border:1px solid var(--ls-line); border-radius:var(--ls-radius); margin-top:54px; background:var(--ls-panel); }
+html#lens-design-system.lens-system .audio-first-take__brand { font-size:16px; }
+html#lens-design-system.lens-system .audio-first-take__brand img { width:45px; height:45px; }
+html#lens-design-system.lens-system .audio-first-take h1 { color:var(--ls-ink); font-size:26px; letter-spacing:-1px; }
+html#lens-design-system.lens-system .audio-first-take__record { background:var(--ls-soft); color:var(--ls-blue); box-shadow:none; border:1px solid var(--ls-line); }
+
+/* Full-size tools sit in the same shell. Color carries information on the stage. */
+/* Preserve the original icon-over-label sliding tabs; only the palette changes. */
+html#lens-design-system.lens-system .audio-practice-top-tabs { margin:10px auto 14px!important; width:min(calc(100% - 1.35rem),30rem); padding:5px!important; height:62px; min-height:62px; flex-shrink:0; gap:0; background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; border-radius:32px!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs::before { content:none!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs::after { inset-block:5px; left:5px; height:auto; border-radius:26px; background:var(--ls-blue)!important; box-shadow:0 2px 5px #1b385511!important; border:0; }
+html#lens-design-system.lens-system .audio-practice-top-tabs__btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:5px 2px!important; height:50px; min-height:50px; font-size:10px; font-weight:550; color:var(--ls-muted)!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs__btn--active { color:var(--ls-panel)!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs__beta { display:none; }
+html#lens-design-system.lens-system .pitch-audio-stage,html#lens-design-system.lens-system .pitch-living-canvas { background:transparent!important; box-shadow:none!important; border:0!important; }
+html#lens-design-system.lens-system .pitch-audio-stage::before,html#lens-design-system.lens-system .pitch-audio-stage::after,html#lens-design-system.lens-system .pitch-living-canvas::before,html#lens-design-system.lens-system .pitch-living-canvas::after { content:none!important; }
+html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner { --silk-bg:var(--ls-bg); --silk-ink:var(--ls-ink); --silk-muted:var(--ls-muted); --silk-accent:var(--ls-blue); background:var(--ls-bg)!important; }
+html#lens-design-system.lens-system .pitch-living-readout { top:22px!important; }
+html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note { font-size:100px; line-height:1.1; color:var(--ls-ink)!important; }
+html#lens-design-system.lens-system .pitch-living-readout__note small { font-size:33px; }
+html#lens-design-system.lens-system .pitch-living-canvas__direction { display:none; }
+html#lens-design-system.lens-system .pitch-living-readout__detail { margin-top:9px; font-size:12px; }
+html#lens-design-system.lens-system .pitch-living-tool-rail { inset-inline:0!important; margin-inline:auto; max-width:276px; bottom:12px!important; width:100%!important; border:0!important; background:transparent!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .pitch-living-tool-rail button { font-size:10px; font-weight:500; padding:6px 4px; }
+html#lens-design-system.lens-system .pitch-living-tool-rail svg { width:22px; height:22px; stroke-width:1.6; }
+html#lens-design-system.lens-system :is(.pitch-living-drone-panel,.pitch-living-transposition-panel) { border-radius:var(--ls-radius); background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; box-shadow:var(--ls-shadow)!important; color:var(--ls-ink); }
+html#lens-design-system.lens-system .metronome-audio-stage.audio-practice-metronome { background:transparent!important; box-shadow:none!important; border:0!important; padding:0 20px 6px!important; color:var(--ls-ink); }
+html#lens-design-system.lens-system .audio-practice-metronome__tempo-card { background:transparent!important; box-shadow:none!important; border:0!important; padding:8px 0 0!important; }
+html#lens-design-system.lens-system .audio-practice-metronome__tempo-strip { justify-content:space-between; }
+html#lens-design-system.lens-system .metronome-audio-stage__bpm-value { font-size:96px!important; line-height:1.08; font-weight:550!important; letter-spacing:-5px; color:var(--ls-ink)!important; text-shadow:none!important; }
+html#lens-design-system.lens-system .audio-practice-metronome__tempo-label { color:var(--ls-muted)!important; font-size:11px; }
+html#lens-design-system.lens-system .audio-practice-metronome__step-btn { background:var(--ls-panel)!important; color:var(--ls-blue)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; width:42px!important; height:42px!important; border-radius:50%!important; }
+html#lens-design-system.lens-system .metronome-live-stage { background:transparent!important; border:0!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .metronome-live-stage__glow { display:none; }
+html#lens-design-system.lens-system .metronome-columns { gap:12px; }
+html#lens-design-system.lens-system .metronome-columns__column { background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; border-radius:14px; box-shadow:none!important; }
+html#lens-design-system.lens-system .metronome-columns__column i { background:var(--ls-blue)!important; opacity:.25; }
+html#lens-design-system.lens-system .metronome-columns__column--downbeat i { background:#dfb45b!important; }
+html#lens-design-system.lens-system .metronome-columns__column--active i { opacity:1; }
+html#lens-design-system.lens-system .audio-practice-metronome__bottom-dock { gap:14px; background:transparent!important; }
+html#lens-design-system.lens-system .audio-practice-metronome__selectors { padding:12px 8px!important; background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:var(--ls-radius)!important; box-shadow:var(--ls-shadow)!important; }
+html#lens-design-system.lens-system .metronome-audio-select__label { color:var(--ls-muted)!important; font-size:10px; font-weight:500; letter-spacing:0; text-transform:none; }
+html#lens-design-system.lens-system .metronome-audio-select__control { color:var(--ls-ink)!important; background:transparent!important; border:0!important; box-shadow:none!important; border-radius:10px; }
+html#lens-design-system.lens-system .metronome-audio-select__menu { color:var(--ls-ink)!important; background:var(--ls-panel)!important; border-color:var(--ls-line)!important; box-shadow:0 8px 24px #172f4818; }
+html#lens-design-system.lens-system .metronome-audio-stage__btn { background:var(--ls-panel); color:var(--ls-blue); border:1px solid var(--ls-line); box-shadow:none!important; }
+
+/* Menus use the same surfaces and icon treatment as the screens behind them. */
+html#lens-design-system.lens-system .settings-branch-tray { background:var(--ls-glass)!important; border:1px solid var(--ls-line)!important; border-radius:24px!important; box-shadow:0 18px 50px #19324920!important; color:var(--ls-ink)!important; }
+html#lens-design-system.lens-system .settings-branch-tray::before,html#lens-design-system.lens-system .settings-branch-tray::after { content:none!important; }
+html#lens-design-system.lens-system .settings-branch-tray__title { color:var(--ls-ink)!important; font-size:19px; font-weight:550; letter-spacing:-.4px; }
+html#lens-design-system.lens-system .settings-branch-tray__item { border:1px solid var(--ls-line)!important; background:var(--ls-panel)!important; border-radius:15px!important; box-shadow:none!important; color:var(--ls-ink)!important; }
+html#lens-design-system.lens-system .settings-branch-tray__item--active { background:var(--ls-soft)!important; border-color:var(--ls-blue)!important; }
+html#lens-design-system.lens-system .settings-branch-tray__icon { color:var(--ls-blue)!important; }
+html#lens-design-system.lens-system .settings-branch-tray__label { color:var(--ls-ink)!important; font-size:11px; font-weight:500; }
+html#lens-design-system.lens-system .settings-branch-tray__save-trigger { color:var(--ls-blue)!important; }
+/* Settings keeps its original grouped lists, colored icons, and sliding section bar. */
+html#lens-design-system.lens-system .take-vault-sheet { background:var(--ls-bg)!important; color:var(--ls-ink); }
+html#lens-design-system.lens-system .native-bottom-sheet:not(:has(.settings-sheet)) .native-sheet-header { border-color:var(--ls-line)!important; background:transparent!important; }
+html#lens-design-system.lens-system .native-bottom-sheet:not(:has(.settings-sheet)) .native-sheet-title { color:var(--ls-ink)!important; font-weight:550; letter-spacing:-.7px; }
+html#lens-design-system.lens-system .native-bottom-sheet:not(:has(.settings-sheet)) :is(.native-sheet-kicker,.native-sheet-subtitle) { color:var(--ls-muted)!important; }
+html#lens-design-system.lens-system .native-bottom-sheet:not(:has(.settings-sheet)) .native-sheet-close { border:1px solid var(--ls-line)!important; background:var(--ls-panel)!important; color:var(--ls-muted)!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .routine-guide { --guide-panel:var(--ls-panel); --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line); }
+@media(max-height:700px){html#lens-design-system.lens-system .metronome-audio-stage__bpm-value{font-size:76px!important}}
+
+html#lens-design-system .audio-mode-take-card__media { position:relative; display:flex; align-items:center; gap:15px; }
+html#lens-design-system .audio-mode-take-card__play { order:2; flex-shrink:0; }
+html#lens-design-system .audio-mode-take-card__playback-column { order:1; display:flex; flex-direction:column-reverse; gap:18px; min-width:0; }
+html#lens-design-system .audio-mode-take-card__name-line { align-items:center; justify-content:space-between; gap:6px; }
+html#lens-design-system .audio-mode-take-card__name-line h3 { font-size:12px; font-weight:500; color:var(--ls-muted)!important; }
+html#lens-design-system .audio-wave-shape { height:80px; }
+html#lens-design-system .audio-wave-shape__future { fill:color-mix(in srgb,var(--ls-blue) 40%,var(--ls-panel))!important; }
+html#lens-design-system .audio-wave-shape__played { fill:var(--ls-blue)!important; }
+html#lens-design-system .audio-mode-take-card__duration { color:var(--ls-muted); font-size:10px; }
+html#lens-design-system .audio-mode-take-card__duration > span { display:none; }
+html#lens-design-system .audio-practice-metronome__body { display:flex; flex-direction:column; gap:12px; min-height:0; }
+html#lens-design-system .audio-practice-metronome__tempo-card { flex:0 0 auto; }
+html#lens-design-system .audio-practice-metronome__center-stack { display:flex; flex-direction:column; flex:1 1 0; min-height:0; }
+html#lens-design-system .metronome-audio-stage__beats { display:flex; flex:1 1 0; min-height:0; }
+html#lens-design-system .metronome-live-stage { display:flex; flex-direction:column; height:100%; min-height:0!important; max-height:none!important; flex:1 1 0; }
+html#lens-design-system .metronome-live-stage__canvas { flex:1 1 0; min-height:0; }
+html#lens-design-system .metronome-columns { height:100%; max-height:210px; padding:6px 0 12px; }
+html#lens-design-system .metronome-columns__column { width:40px; }
+html#lens-design-system .audio-practice-metronome__bottom-dock { padding-top:14px; }
+html#lens-design-system .audio-practice-metronome__play-btn { background:var(--ls-blue)!important; border:0!important; color:var(--ls-panel)!important; width:56px!important; height:56px!important; }
+html#lens-design-system .audio-practice-metronome__tap-btn,html#lens-design-system .audio-practice-metronome__program-btn { min-height:44px; height:44px; font-size:12px; font-weight:500; background:var(--ls-panel)!important; color:var(--ls-blue)!important; border:1px solid var(--ls-line)!important; }
+html#lens-design-system .pitch-living-tool-rail { display:flex!important; align-items:center; justify-content:space-around; gap:0!important; }
+html#lens-design-system .pitch-living-tool-rail > button { display:flex!important; flex-direction:column; align-items:center; gap:4px; flex:1!important; color:var(--ls-blue)!important; }
+html#lens-design-system .pitch-living-insights-trigger { order:2; }
+html#lens-design-system .pitch-living-drone-trigger:not(.pitch-living-insights-trigger):not(.pitch-living-transposition-trigger) { order:1; }
+html#lens-design-system .pitch-living-transposition-trigger { order:3; }
+html#lens-design-system .pitch-living-tool-rail { transform:none!important; }
+html#lens-design-system .pitch-living-tool-rail { height:44px!important; }
+html#lens-design-system .pitch-living-tool-rail > button { height:44px!important; min-height:44px!important; }
+html#lens-design-system .pitch-living-tool-rail > button svg { flex:0 0 17px!important; height:17px!important; width:17px!important; }
+html#lens-design-system .pitch-living-tool-rail > button small { display:none; }
+html#lens-design-system .audio-mode-take-card__media { display:grid!important; grid-template-columns:minmax(0,1fr) 44px!important; }
+html#lens-design-system .audio-mode-take-card__play { position:static!important; grid-column:2; grid-row:1; transform:none!important; }
+html#lens-design-system .audio-mode-take-card__playback-column { grid-column:1; grid-row:1; }
+html#lens-design-system .native-bottom-sheet:not(:has(.settings-sheet)) { background:var(--ls-bg)!important; border:1px solid var(--ls-line)!important; box-shadow:0 -12px 35px #10263816!important; }
+html#lens-design-system .audio-practice-top-tabs { display:grid!important; grid-template-columns:repeat(3,minmax(0,1fr))!important; }
+html#lens-design-system .audio-practice-top-tabs::after { width:calc((100% - 10px) / 3)!important; }
+
+/* Take identity stays gold / blue in every finish, including optional finishes. */
+html#lens-design-system { --take-best:#b97b0c; --take-best-soft:#f5d283; --take-current:#087bce; --take-current-soft:#8fd3ff; }
+html#lens-design-system.app-dark-mode { --take-best:#efc361; --take-best-soft:#a9843d; --take-current:#7dcbff; --take-current-soft:#4d91b9; }
+html#lens-design-system .audio-mode-take-card--best { --take-accent:var(--take-best); --take-accent-soft:var(--take-best-soft); border-color:color-mix(in srgb,var(--take-best) 33%,var(--ls-line))!important; }
+html#lens-design-system .audio-mode-take-card--current { --take-accent:var(--take-current); --take-accent-soft:var(--take-current-soft); border-color:color-mix(in srgb,var(--take-current) 33%,var(--ls-line))!important; }
+html#lens-design-system .audio-mode-home--inplace .audio-mode-take-card { box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--take-accent) 15%,transparent),var(--ls-shadow)!important; }
+html#lens-design-system .audio-mode-take-card__pill { color:var(--take-accent)!important; display:inline-flex; align-items:center; gap:7px; }
+html#lens-design-system .audio-mode-take-card__pill::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--take-accent); flex-shrink:0; }
+html#lens-design-system .audio-mode-take-card .audio-wave-shape__future { fill:var(--take-accent-soft)!important; }
+html#lens-design-system .audio-mode-take-card .audio-wave-shape__played { fill:var(--take-accent)!important; }
+html#lens-design-system .audio-mode-take-card .audio-mode-take-card__play { color:var(--take-accent)!important; background:color-mix(in srgb,var(--take-accent) 8%,var(--ls-panel))!important; border-color:color-mix(in srgb,var(--take-accent) 25%,var(--ls-line))!important; }
+html#lens-design-system .audio-mode-take-card__play svg { fill:currentColor!important; }
+html#lens-design-system .compact-take-slot--best { --take-accent:#f1ce80; }
+html#lens-design-system .compact-take-slot--current { --take-accent:#95d5ff; }
+html#lens-design-system .app-pip-row--compact > .compact-take-slot { background:linear-gradient(135deg,color-mix(in srgb,var(--take-accent) 10%,transparent),#17344830),#17344866!important; border:1px solid color-mix(in srgb,var(--take-accent) 58%,transparent)!important; box-shadow:inset 0 0 0 .5px color-mix(in srgb,var(--take-accent) 12%,transparent)!important; }
+html#lens-design-system .compact-take-slot .compact-take-caption__label { display:inline-flex; align-items:center; gap:6px; color:var(--take-accent)!important; font-weight:550; }
+html#lens-design-system .compact-take-caption__label::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--take-accent); }
+html#lens-design-system .native-bottom-sheet--vault { --vault-ink:var(--ls-ink); --vault-muted:var(--ls-muted); --vault-blue:var(--ls-blue); --vault-bg:var(--ls-bg); }
+html#lens-design-system .vault-section-tabs { background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; }
+html#lens-design-system .vault-section-tabs button { color:var(--ls-muted)!important; }
+html#lens-design-system .vault-section-tabs button[aria-selected=true] { background:var(--ls-panel)!important; color:var(--ls-blue)!important; box-shadow:none!important; }
+html#lens-design-system .vault-session-bar { background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:16px; box-shadow:none!important; }
+html#lens-design-system .vault-take-row { background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:16px!important; box-shadow:none!important; color:var(--ls-ink); }
+html#lens-design-system .vault-take-row--benchmark { border-color:color-mix(in srgb,var(--take-best) 25%,var(--ls-line))!important; }
+html#lens-design-system .vault-take-row--challenger { border-color:color-mix(in srgb,var(--take-current) 40%,var(--ls-line))!important; }
+html#lens-design-system .vault-header-icon-btn { color:var(--ls-blue); background:var(--ls-panel); box-shadow:none; }
+html#lens-design-system .vault-take-day-label { color:var(--ls-muted); }
+html#lens-design-system .routine-guide { color:var(--ls-ink)!important; background:var(--ls-bg)!important; }
+
+html#lens-design-system .pitch-living-tool-rail > button span { font-size:10px!important; font-weight:500; }
+
+/* Compact Library above a geometrically centered record control. */
+html#lens-design-system .open-lens-dock { padding-top:30px; min-height:116px; }
+html#lens-design-system .open-lens-dock .control-deck__record-stack { position:relative; }
+html#lens-design-system .open-lens-library-shortcut { position:absolute; left:50%; top:-34px; transform:translateX(-50%); display:grid; place-items:center; width:44px; height:32px; padding:0; border:1px solid var(--ls-line); border-radius:18px; background:var(--ls-panel); color:var(--ls-blue); box-shadow:none; }
+html#lens-design-system .open-lens-library-shortcut svg { width:17px; height:17px; stroke-width:1.7; }
+html#lens-design-system .lens-camera .open-lens-library-shortcut { color:#ecf7ff; border-color:#d6edff55; background:#17374966; }
+
+/* One quiet material for optional workspace widgets; camera remains translucent. */
+html#lens-design-system .lens-screen { --widget-surface:var(--ls-glass); --widget-border:var(--ls-line); --widget-ink:var(--ls-ink); --widget-muted:var(--ls-muted); --widget-accent:var(--ls-blue); --widget-control:var(--ls-soft); }
+html#lens-design-system .lens-camera { --widget-surface:#173449b0; --widget-border:#d6edff55; --widget-ink:#f1f8ff; --widget-muted:#bfd5e5; --widget-accent:#a9dbff; --widget-control:#ffffff12; }
+html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget,.reference-widget-panel,.music-widget__panel,.hands-free-stage__center) { border:1px solid var(--widget-border)!important; border-radius:20px!important; background:var(--widget-surface)!important; color:var(--widget-ink)!important; box-shadow:0 8px 26px #0e2d4518!important; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
+html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget,.reference-widget-panel,.music-widget__panel)::before,
+html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget)::after { content:none!important; }
+html#lens-design-system .drone-widget__glow { display:none; }
+html#lens-design-system :is(.metronome-widget__bpm,.metronome-widget__bpm-input,.drone-widget__pitch,.music-widget__file,.hands-free-stage__title) { color:var(--widget-ink)!important; text-shadow:none!important; }
+html#lens-design-system .metronome-widget__bpm-value { color:var(--widget-ink); font-size:38px; font-weight:550; }
+html#lens-design-system :is(.metronome-widget__btn,.drone-widget__play,.drone-widget__octave-btn,.music-widget__add) { background:var(--widget-control)!important; color:var(--widget-accent)!important; border:1px solid var(--widget-border)!important; box-shadow:none!important; }
+html#lens-design-system :is(.metronome-widget__bpm-label,.metronome-widget__bpm-equals,.drone-widget__octave-label,.music-widget__hint,.hands-free-stage__detail,.hands-free-stage__settings) { color:var(--widget-muted)!important; text-shadow:none!important; }
+html#lens-design-system .metronome-widget .metronome-audio-select__control { background:transparent!important; color:var(--widget-ink)!important; border-color:var(--widget-border)!important; box-shadow:none!important; }
+html#lens-design-system .metronome-widget .metronome-audio-select__label { color:var(--widget-muted)!important; }
+html#lens-design-system .metronome-widget .metronome-audio-select__menu { background:var(--ls-panel)!important; color:var(--ls-ink)!important; }
+html#lens-design-system .pitch-widget-living { background:transparent!important; }
+html#lens-design-system .pitch-widget-living .pitch-living-readout { top:18px!important; }
+html#lens-design-system .pitch-widget-living .pitch-living-readout__note { color:var(--widget-ink)!important; font-size:56px!important; text-shadow:none!important; }
+html#lens-design-system .pitch-widget-living .pitch-living-readout__detail { color:var(--widget-muted)!important; font-size:10px; }
+html#lens-design-system :is(.pitch-widget-close,.widget-collapse,.music-widget__close) { background:var(--widget-control)!important; border:0!important; color:var(--widget-muted)!important; box-shadow:none!important; }
+html#lens-design-system :is(.pitch-widget-close,.widget-collapse,.music-widget__close) svg { color:inherit!important; }
+html#lens-design-system .widget-ball { border:1px solid var(--widget-border); background:var(--widget-surface); color:var(--widget-ink); box-shadow:0 5px 15px #10263820; }
+html#lens-design-system .reference-widget-panel { overflow:hidden; }
+html#lens-design-system .reference-widget-panel header { min-height:43px; padding:5px 9px; border-bottom:1px solid var(--widget-border); }
+html#lens-design-system .reference-widget-panel header span { margin-right:auto; color:var(--widget-ink); }
+html#lens-design-system .reference-widget-panel header button { width:32px; height:32px; padding:5px; color:var(--widget-muted); }
+html#lens-design-system .reference-widget-media { height:150px; }
+html#lens-design-system .reference-widget-media .pip-empty-state { background:transparent!important; }
+html#lens-design-system .reference-widget-media .pip-empty-action { color:var(--widget-ink)!important; background:var(--widget-control); border-color:var(--widget-border); }
+html#lens-design-system .reference-widget-chip { color:var(--widget-ink)!important; background:var(--widget-surface)!important; border:1px solid var(--widget-border)!important; }
+html#lens-design-system .hands-free-stage__center { padding-top:35px!important; }
+html#lens-design-system .hands-free-stage__title { font-size:19px; font-weight:550; }
+
+/* Original Settings geometry and control styles, recolored to the new finish. */
+html#lens-design-system .settings-sheet { --set-surface:var(--ls-panel); --set-label:var(--ls-ink); --set-secondary:var(--ls-muted); --set-subhead:var(--ls-muted); --set-accent:var(--ls-blue); --set-fill:var(--ls-soft); --set-hairline:var(--ls-line); --set-separator:var(--ls-line); color:var(--ls-ink); background:var(--ls-bg); }
+html#lens-design-system .native-bottom-sheet:has(.settings-sheet) { background:var(--ls-bg)!important; border-color:var(--ls-line)!important; }
+html#lens-design-system .settings-sheet .native-sheet-header { background:var(--ls-soft)!important; border-color:var(--ls-line)!important; }
+html#lens-design-system .settings-sheet .native-sheet-title { color:var(--ls-ink)!important; }
+html#lens-design-system .settings-sheet :is(.native-sheet-kicker,.native-sheet-subtitle) { color:var(--ls-muted)!important; }
+html#lens-design-system .settings-sheet .native-sheet-close { background:var(--ls-panel)!important; color:var(--ls-muted)!important; }
+html#lens-design-system .settings-sheet .set-nav { background:var(--ls-bg); border-color:var(--ls-line); }
+html#lens-design-system .settings-sheet .set-nav__button[aria-current='page'] { background:var(--ls-blue)!important; color:var(--ls-panel)!important; box-shadow:none; }
+html#lens-design-system .settings-sheet .set-row__icon { background:color-mix(in srgb,var(--set-icon-bg,#8e8e93) 12%,var(--ls-panel))!important; color:var(--set-icon-bg,#8e8e93)!important; box-shadow:none; }
+html#lens-design-system.app-dark-mode .settings-sheet .set-row__icon { background:color-mix(in srgb,var(--set-icon-bg,#8e8e93) 20%,var(--ls-panel))!important; color:color-mix(in srgb,var(--set-icon-bg,#8e8e93) 65%,white)!important; }
+html#lens-design-system .settings-sheet .set-row__value { color:var(--ls-blue)!important; }
+
+/* Familiar recording / practice color cues, without the old glow. */
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { background:color-mix(in srgb,var(--ls-blue) 10%,var(--ls-panel))!important; border-color:color-mix(in srgb,var(--ls-blue) 28%,var(--ls-line))!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary .practice-home-launch-copy strong { color:var(--ls-ink)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary .practice-home-launch-copy em { color:var(--ls-muted)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary .open-lens-home-symbol,
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary > svg { color:var(--ls-blue)!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { background:color-mix(in srgb,var(--take-best) 7%,var(--ls-panel))!important; border-color:color-mix(in srgb,var(--take-best) 25%,var(--ls-line))!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick :is(.open-lens-home-symbol),
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick > svg { color:var(--take-best)!important; }
+html#lens-design-system .pitch-widget-living .pitch-living-readout__detail strong { color:var(--widget-accent)!important; }
+html#lens-design-system .settings-sheet [role='switch'][aria-checked='true'] { background-color:var(--ls-blue)!important; }
+html#lens-design-system .settings-sheet [role='switch'][aria-checked='false'] { background-color:var(--ls-line)!important; }
+html#lens-design-system .reference-widget-track-name { margin:12px 14px 0; font-size:12px; line-height:1.4; color:var(--widget-ink); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+html#lens-design-system .reference-widget-panel--named-audio .reference-widget-media { height:96px; }
+html#lens-design-system .reference-widget-media .take-audio-surface { background:transparent!important; box-shadow:none!important; }
+html#lens-design-system .reference-widget-media .take-audio-surface img { display:none; }
+html#lens-design-system .reference-widget-media .take-audio-controls-bar { transform:none!important; background:var(--widget-control); border-color:var(--widget-border); }
+html#lens-design-system .reference-widget-media :is(.mini-pip-controls__btn,.mini-pip-controls__icon) { color:var(--widget-ink); }
+html#lens-design-system .reference-widget-media .mini-pip-controls__slider { accent-color:var(--widget-accent); }
+
+/* Audio takes: remove the former left-side play-button reservation and size the
+   SVG to its actual scrub area, so neither waveform half gets clipped. */
+html#lens-design-system .audio-mode-take-card__media { display:grid!important; grid-template-columns:48px minmax(0,1fr)!important; grid-template-rows:auto 80px; align-content:center; align-items:center!important; gap:12px 14px; padding:0!important; overflow:visible; }
+html#lens-design-system .audio-mode-take-card__playback-column { display:contents!important; }
+html#lens-design-system .audio-mode-take-card__title-row { grid-column:1 / -1; grid-row:1; width:100%; }
+html#lens-design-system .audio-mode-take-card__play { grid-column:1; grid-row:2; justify-self:center; align-self:center; width:48px!important; min-width:48px!important; max-width:48px; height:48px!important; min-height:48px; padding:0; border-radius:50%; }
+html#lens-design-system .audio-mode-take-card :is(.audio-mode-waveform,.audio-mode-take-card__live) { grid-column:2; grid-row:2; width:100%; height:80px!important; min-height:80px!important; max-height:80px!important; margin:0; align-self:center; }
+html#lens-design-system .audio-mode-take-card .audio-wave-shape { width:100%; height:100%!important; }
+html#lens-design-system .audio-mode-take-card__play :is(.lucide-loader-circle,.lucide-rotate-cw) { fill:none!important; }
+html#lens-design-system .audio-mode-take-card--empty .audio-mode-take-card__media { grid-template-rows:auto; }
+html#lens-design-system .audio-mode-take-card--empty .audio-mode-take-card__live { grid-column:1 / -1; }
+/* Camera record: one fine white ring, with the camera showing through the gap. */
+html#lens-design-system .lens-camera .open-lens-dock .record-carousel-slot--active { border:1.5px solid #ffffffdf!important; background:#ffffff12!important; box-shadow:none!important; }
+html#lens-design-system .lens-camera .open-lens-dock .record-carousel-slot--active::before,
+html#lens-design-system .lens-camera .open-lens-dock .record-carousel-slot--active::after { content:none!important; }
+
+/* Small individual color cues on Home, with quiet card surfaces. */
+html#lens-design-system .practice-menu-shortcut:nth-child(1) { --home-tool-color:#8853cc; }
+html#lens-design-system .practice-menu-shortcut:nth-child(2) { --home-tool-color:#b7780e; }
+html#lens-design-system .practice-menu-shortcut:nth-child(3) { --home-tool-color:#008d79; }
+html#lens-design-system .practice-menu-shortcut:nth-child(4) { --home-tool-color:#087bce; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(1) { --home-tool-color:#bd9dea; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(2) { --home-tool-color:#e9bb70; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(3) { --home-tool-color:#70cebb; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(4) { --home-tool-color:#84c5ea; }
+
+/* Separate floating tools from full-screen recording views. */
+html#lens-design-system .settings-branch-tray__section-heading { grid-column:1 / -1; margin:9px 0 0; padding:0 2px; color:var(--ls-muted); font-size:11px; line-height:1.4; font-weight:600; text-align:left; letter-spacing:.3px; }
+html#lens-design-system .settings-branch-tray__section-heading:first-child { margin-top:0; }
+
+/* Vault: quiet library surfaces, compact take rows, and secondary editing tools. */
+html#lens-design-system .native-bottom-sheet--vault {
+  --audio-bg-base:var(--ls-bg); --audio-surface:var(--ls-panel); --audio-divider:var(--ls-line);
+  --audio-text-primary:var(--ls-ink); --audio-text-secondary:var(--ls-muted);
+  --audio-blue:var(--take-current); --audio-gold:var(--take-best);
+  --audio-blue-soft:color-mix(in srgb,var(--take-current) 9%,var(--ls-panel));
+  --audio-gold-soft:color-mix(in srgb,var(--take-best) 9%,var(--ls-panel));
+  --audio-radius-card:18px; --audio-shadow-card:none; --audio-shadow-fab:none;
+  color:var(--ls-ink)!important; background:var(--ls-bg)!important;
+}
+html#lens-design-system .native-bottom-sheet--vault :is(.native-sheet-handle,.vault-sheet-header,.vault-drawer-scroll) { background:var(--ls-bg)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-sheet-header { padding:8px 20px 12px!important; gap:8px; }
+html#lens-design-system .native-bottom-sheet--vault .native-sheet-title { color:var(--ls-ink)!important; font-size:25px; font-weight:600; letter-spacing:-.7px; }
+html#lens-design-system .native-bottom-sheet--vault .native-sheet-subtitle { color:var(--ls-muted)!important; font-size:12px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-header-command-row { justify-content:flex-end; gap:8px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-header-action-btn { min-height:36px; border:0!important; box-shadow:none!important; background:transparent!important; color:var(--ls-blue)!important; font-size:12px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-header-action-btn--danger { color:#c44e57!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-header-action-btn[hidden] { display:none!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-header-icon-btn { width:40px; height:40px; border:0!important; color:var(--ls-muted)!important; background:transparent!important; box-shadow:none!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-drawer-scroll { padding:14px 18px 28px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-section-tabs { border:0!important; padding:4px; border-radius:16px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-section-tabs button { min-height:40px; font-size:12px; border-radius:12px; }
+html#lens-design-system .vault-folder-disclosure { color:var(--ls-muted); font-size:12px; border-bottom:1px solid var(--ls-line); padding-bottom:10px; }
+html#lens-design-system .vault-folder-disclosure summary { min-height:36px; cursor:pointer; padding:9px 2px; }
+html#lens-design-system .vault-folder-disclosure .vault-session-bar { margin-top:10px; padding:12px; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-filter-pill,.vault-sort-trigger) { min-height:36px; font-size:11px; font-weight:500; color:var(--ls-muted)!important; border:0!important; background:transparent!important; box-shadow:none!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-filter-pill--active { background:var(--ls-soft)!important; color:var(--ls-blue)!important; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-filter-pill__count,.vault-sort-icons,.vault-take-day-label small) { display:none; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row { border:1px solid var(--ls-line)!important; border-radius:18px!important; box-shadow:none!important; background:var(--ls-panel)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row--benchmark { border-left:3px solid var(--take-best)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row--challenger { border-left:3px solid var(--take-current)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__main { padding:12px; gap:12px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__thumb { width:60px; min-width:60px; height:70px; border-radius:12px; box-shadow:none; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__take-tag { display:none; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__title { color:var(--ls-ink)!important; font-size:14px; line-height:1.35; font-weight:550; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-take-row__date,.vault-take-row__type,.vault-take-row__notes-hint) { color:var(--ls-muted)!important; font-size:10px; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__body { gap:7px; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-take-row__play-btn,.vault-take-row__icon-btn) { min-width:40px; width:40px; height:40px; border:0!important; color:var(--ls-blue)!important; background:var(--ls-soft)!important; box-shadow:none!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row--benchmark .vault-take-row__play-btn { color:var(--take-best)!important; background:var(--audio-gold-soft)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-take-row__detail { background:var(--ls-soft)!important; border-top:1px solid var(--ls-line); }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-take-row__notes-input,.vault-search-input,.vault-take-row__title-input,.vault-take-row__detail-btn,.vault-routine-group,.vault-practice-empty,.vault-empty-state,.vault-practice-folders button) { background:var(--ls-panel)!important; color:var(--ls-ink)!important; border-color:var(--ls-line)!important; box-shadow:none!important; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-practice-overview h3,.vault-practice-overview h4,.vault-routine-group strong) { color:var(--ls-ink)!important; }
+html#lens-design-system .native-bottom-sheet--vault :is(.vault-practice-overview p,.vault-practice-overview small,.vault-take-row__detail-label) { color:var(--ls-muted)!important; }
+html#lens-design-system .native-bottom-sheet--vault .vault-bulk-bar { background:var(--ls-bg)!important; border-color:var(--ls-line)!important; color:var(--ls-muted)!important; }
+
+html#lens-design-system .vault-sheet-header:has(.vault-header-action-btn[aria-pressed='false']) .vault-header-command-row { position:absolute; right:108px; top:12px; }
+html#lens-design-system .vault-browse-controls { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+html#lens-design-system .vault-browse-controls .vault-filter-pills { flex:1; gap:2px; margin:0; padding:0; min-width:0; }
+html#lens-design-system .vault-browse-controls .vault-filter-pill { padding-inline:9px; }
+html#lens-design-system .vault-browse-controls .vault-sort-row { width:auto; flex-shrink:0; margin:0; }
+html#lens-design-system .native-bottom-sheet--vault .vault-audio-thumbnail { display:grid; place-items:center; height:100%; width:100%; background:var(--ls-soft); color:var(--ls-blue); }
+html#lens-design-system .vault-audio-thumbnail svg { width:24px; height:24px; stroke-width:1.5; }
+html#lens-design-system .vault-take-row--benchmark .vault-audio-thumbnail { background:var(--audio-gold-soft); color:var(--take-best); }
+html#lens-design-system .vault-take-role { color:var(--take-current); margin:4px 0; font-size:10px; font-weight:600; }
+html#lens-design-system .vault-take-row--benchmark .vault-take-role { color:var(--take-best); }
+html#lens-design-system .native-bottom-sheet--vault .vault-filter-pills { background:transparent!important; border:0!important; box-shadow:none!important; }
+
+/* Live shell equivalents of the approved preview, with real device safe areas. */
+html#lens-design-system .practice-menu-layer { background:var(--ls-bg); }
+html#lens-design-system .practice-menu-card { height:100dvh!important; max-height:100dvh!important; width:100%!important; max-width:none!important; border-radius:0!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-menu-scroll { display:flex; flex:1; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-menu-page { display:flex; flex-direction:column; flex:1; }
+html#lens-design-system .lens-camera .open-lens-dock-action,
+html#lens-design-system .lens-camera .open-lens-dock-action span { color:#eff8ff!important; text-shadow:0 1px 4px #1c354177; }
+html#lens-design-system .lens-camera .open-lens-modes { background:#17374955!important; border-color:#ffffff40!important; color:#eff8ff!important; }
+html#lens-design-system .lens-camera .open-lens-modes button[aria-pressed=true] { background:#ffffffdf!important; color:#244b69!important; }
+html#lens-design-system .lens-camera .app-pip-row--compact { gap:12px; }
+html#lens-design-system .app-ui-overlay .app-pip-row-wrap--camera.app-pip-row-wrap--compact { bottom:calc(env(safe-area-inset-bottom,0px) + 144px); }
+
+/* Shared surfaces also reach sheets rendered outside the recording shell. */
+html#lens-design-system {
+  --widget-surface:var(--ls-glass); --widget-border:var(--ls-line);
+  --widget-ink:var(--ls-ink); --widget-muted:var(--ls-muted);
+  --widget-accent:var(--ls-blue); --widget-control:var(--ls-soft);
+}
+html#lens-design-system :is(.audio-mode-home,.audio-first-take) {
+  --audio-text-primary:var(--ls-ink); --audio-text-secondary:var(--ls-muted);
+  --audio-blue:var(--ls-blue); --audio-surface:var(--ls-panel);
+  color:var(--ls-ink);
+}
+html#lens-design-system .audio-first-take { background:transparent; }
+html#lens-design-system .audio-first-take h1 { color:var(--ls-ink); font-weight:550; }
+html#lens-design-system .audio-first-take__brand span { color:var(--ls-muted); font-size:18px; font-weight:500; }
+html#lens-design-system .audio-first-take__record { background:var(--ls-soft); color:var(--ls-blue); border:1px solid var(--ls-line); border-radius:18px; box-shadow:none; font-weight:550; }
+html#lens-design-system .audio-mode-take-card__mini-btn--best { color:var(--take-best)!important; background:color-mix(in srgb,var(--take-best) 10%,var(--ls-panel))!important; border-color:color-mix(in srgb,var(--take-best) 25%,var(--ls-line))!important; }
+
+/* Settings: one calm surface per group, lightweight section navigation. */
+html#lens-design-system .settings-sheet { --set-group-shadow:none; --set-press:var(--ls-soft); --set-tertiary:var(--ls-muted); }
+html#lens-design-system .settings-sheet .native-sheet-header { background:var(--ls-bg)!important; box-shadow:none; }
+html#lens-design-system .settings-sheet .native-sheet-title { font-size:26px; font-weight:600; letter-spacing:-.7px; }
+html#lens-design-system .settings-sheet .native-sheet-close { background:var(--ls-soft)!important; box-shadow:none!important; }
+html#lens-design-system .settings-sheet .set-list { border-color:color-mix(in srgb,var(--ls-line) 65%,transparent); border-radius:18px; box-shadow:none; }
+html#lens-design-system .settings-sheet .set-row { min-height:52px; }
+html#lens-design-system .settings-sheet .set-row__icon { background:transparent!important; border-radius:0; }
+html#lens-design-system .settings-sheet .set-row__icon svg { width:19px; height:19px; stroke-width:1.7; }
+html#lens-design-system .settings-sheet .set-section__title { font-weight:600; letter-spacing:.025em; }
+html#lens-design-system .settings-sheet .set-nav__track { background:var(--ls-soft); border-radius:16px; padding:4px; gap:2px; }
+html#lens-design-system .settings-sheet .set-nav__button { border:0; box-shadow:none; border-radius:12px; color:var(--ls-muted); font-weight:500; min-height:40px; }
+html#lens-design-system .settings-sheet .set-nav__button[aria-current='page'] { background:var(--ls-panel)!important; color:var(--ls-blue)!important; }
+
+/* Multitrack retains its composition geometry and all transport behavior. */
+html#lens-design-system body:has(.multitrack-quiet-workspace),
+html#lens-design-system .multitrack-quiet-workspace {
+  --mt-bg:var(--ls-bg); --mt-panel:var(--ls-panel); --mt-ink:var(--ls-ink);
+  --mt-muted:var(--ls-muted); --mt-line:var(--ls-line); --mt-soft:var(--ls-soft);
+  --mt-blue:var(--ls-blue); --mt-blue-soft:var(--ls-soft);
+}
+html#lens-design-system .multitrack-quiet-workspace .multitrack-camera-title h1 { font-weight:600; }
+html#lens-design-system :is(.multitrack-tool-expanded,.multitrack-toolbar) { background:var(--ls-glass); border-color:var(--ls-line); box-shadow:none; }
+html#lens-design-system .multitrack-tool-pin { background:transparent; border-color:transparent; color:var(--ls-muted); min-height:40px; border-radius:12px; }
+html#lens-design-system .multitrack-tool-pin[aria-expanded=true] { background:var(--ls-soft); color:var(--ls-blue); }
+html#lens-design-system :is(.multitrack-toolbar__btn--primary,.multitrack-editor-preview-button) { background:var(--ls-soft); color:var(--ls-blue); box-shadow:none; }
+html#lens-design-system .multitrack-toolbar__chip { border-color:var(--ls-line); box-shadow:none; font-weight:500; }
+
+/* Widget controls use their actual shared chrome; pitch/beat colors stay semantic. */
+html#lens-design-system :is(.drone-widget__note-name,.drone-widget__note-octave) { color:var(--widget-ink)!important; text-shadow:none!important; }
+html#lens-design-system :is(.drone-widget__note-caption,.metronome-widget__sync-lock) { color:var(--widget-muted)!important; }
+html#lens-design-system :is(.drone-widget__btn,.metronome-widget__play,.metronome-widget__tap,.metronome-widget__bpm-done) { background:var(--widget-control)!important; color:var(--widget-accent)!important; border:1px solid var(--widget-border)!important; box-shadow:none!important; }
+html#lens-design-system :is(.metronome-widget__btn--active,.drone-widget__play--on) { background:color-mix(in srgb,var(--widget-accent) 16%,var(--widget-surface))!important; color:var(--widget-accent)!important; }
+html#lens-design-system :is(.metronome-widget__drag-handle,.drone-widget__drag-handle) { color:var(--widget-muted); }
+
+/* Legacy consumers inherit the same palette, including empty states and sheets. */
+html#lens-design-system.lens-system,
+html#lens-design-system .app-ui-overlay--audio-mode,
+html#lens-design-system .native-bottom-sheet {
+  --audio-bg-top:var(--ls-bg); --audio-bg-mid:var(--ls-bg); --audio-bg-base:var(--ls-bg); --audio-bg-bottom:var(--ls-bg);
+  --audio-surface:var(--ls-panel); --audio-text-primary:var(--ls-ink); --audio-text-secondary:var(--ls-muted);
+  --audio-divider:var(--ls-line); --audio-blue:var(--ls-blue); --audio-blue-soft:var(--ls-soft);
+  --audio-blue-border:var(--ls-line); --audio-shadow-card:var(--ls-shadow);
+}
+html#lens-design-system .pitch-insights-screen {
+  --pi-bg:var(--ls-bg); --pi-surface:var(--ls-panel); --pi-border:var(--ls-line);
+  --pi-text-primary:var(--ls-ink); --pi-text-secondary:var(--ls-muted); --pi-text-tertiary:var(--ls-muted);
+  --pi-accent:var(--ls-blue); --pi-surface-soft:var(--ls-soft); --pi-surface-strong:var(--ls-soft);
+  --pi-accent-soft:var(--ls-soft); --pi-accent-border:var(--ls-line); --pi-border-strong:var(--ls-line); --pi-shadow-card:none;
+}
+html#lens-design-system :is(.practice-menu-card,.routine-guide) {
+  --practice-menu-bg:var(--ls-bg); --practice-menu-group:var(--ls-panel);
+  --practice-menu-text:var(--ls-ink); --practice-menu-secondary:var(--ls-muted); --practice-menu-divider:var(--ls-line);
+}
+html#lens-design-system.app-dark-mode .settings-sheet .set-row__icon { background:transparent!important; }
+html#lens-design-system .settings-sheet .set-slider { background:transparent!important; border:0!important; box-shadow:none!important; }
+html#lens-design-system .settings-sheet .set-slider::-webkit-slider-runnable-track { background:var(--ls-line); }
+html#lens-design-system .settings-sheet .set-slider::-moz-range-track { background:var(--ls-line); }
+
+/* Reserve the device inset inside Home, which occupies the full viewport. */
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header {
+  padding-top:calc(env(safe-area-inset-top,0px) + 14px);
+  min-height:calc(env(safe-area-inset-top,0px) + 72px);
+  flex-shrink:0;
+}
+/* Camera cards: explicit title, preview, and two-line caption tracks. */
+html#lens-design-system .open-lens-recording .app-ui-overlay .app-pip-row--compact > .compact-take-slot {
+  height:112px; padding:8px 10px!important; gap:4px;
+  grid-template-columns:minmax(0,1fr); grid-template-rows:16px minmax(0,1fr) 28px;
+}
+html#lens-design-system .app-ui-overlay .compact-take-slot > .compact-take-caption__label {
+  position:static!important; grid-column:1; grid-row:1; width:auto!important;
+  min-width:0; padding:0 24px 0 0; font-size:10px; font-weight:600; letter-spacing:.025em; line-height:16px; text-shadow:none;
+}
+html#lens-design-system .open-lens-recording .app-ui-overlay .compact-take-slot > .pip-video-container--compact {
+  height:100%!important; min-height:0!important; background:transparent!important; box-shadow:none!important;
+}
+html#lens-design-system .compact-take-slot .compact-take-card__empty {
+  background:transparent!important; box-shadow:none!important;
+}
+html#lens-design-system .compact-take-slot .compact-take-caption {
+  height:auto; min-height:0; gap:3px; justify-content:center; padding:0;
+}
+html#lens-design-system .compact-take-slot .compact-take-caption__name {
+  font-size:11px; font-weight:550; line-height:14px; color:#f1f8ff!important; text-shadow:0 1px 3px #122a3b80;
+}
+html#lens-design-system .compact-take-slot .compact-take-caption__detail {
+  font-size:10px; line-height:13px; color:#d6e6f2!important; text-shadow:0 1px 3px #122a3b80;
+}
+/* Audio title and duration stay together, separate from the waveform. */
+html#lens-design-system .audio-mode-take-card__title-row { position:relative; margin:0; padding:0; min-width:0; }
+html#lens-design-system .audio-mode-take-card__title-copy { width:100%; min-width:0; }
+html#lens-design-system .audio-mode-take-card__name-line { gap:12px; align-items:baseline; }
+html#lens-design-system .audio-mode-take-card__name-line h3 { margin:0; line-height:1.4; }
+html#lens-design-system .audio-mode-take-card__title-copy p { margin:4px 0 0; line-height:1.4; color:var(--ls-muted); }
+html#lens-design-system .audio-mode-take-card__media,
+html#lens-design-system .audio-mode-waveform { background:transparent!important; box-shadow:none!important; }
+html#lens-design-system .compact-take-slot .pip-video-container--compact:has(.compact-take-card__empty) > .ui-orient-spin > div {
+  background:transparent!important; border-color:transparent!important; box-shadow:none!important;
+}
+html#lens-design-system .compact-take-card__empty-placeholder { color:#d6e6f2; opacity:.7; }
+
+html#lens-design-system .compact-take-slot:has(.compact-take-card__empty) .compact-take-caption { align-items:center; text-align:center; }
+html#lens-design-system .compact-take-slot:has(.compact-take-card__empty) .compact-take-caption__name { font-size:10px; font-weight:450; color:#d6e6f2!important; }
+
+/* Multitrack sheets scroll as one column; grouped menus must not compress. */
+html#lens-design-system .multitrack-sheet { min-height:0; padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px)!important; }
+html#lens-design-system .multitrack-sheet > * { flex-shrink:0; }
+html#lens-design-system .multitrack-quiet-tools-sheet { gap:8px; }
+html#lens-design-system .multitrack-tools-sheet-header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+html#lens-design-system .multitrack-tools-sheet-header h2 { margin:0; font-size:21px; font-weight:600; color:var(--ls-ink); }
+html#lens-design-system .multitrack-tools-sheet-header button { min-height:44px; padding:8px 12px; color:var(--ls-blue); font-weight:600; }
+html#lens-design-system .multitrack-quiet-option-list > button[aria-pressed=true] { background:var(--ls-soft); }
+html#lens-design-system .multitrack-quiet-option-list > button > small { flex-shrink:0; color:var(--ls-blue); }
+html#lens-design-system .multitrack-quiet-option-list strong,
+html#lens-design-system .multitrack-quiet-option-list small { white-space:normal; overflow-wrap:anywhere; }
+/* Full-size metronome styles are scoped to its tab; Multitrack needs its own
+   complete field layout, including the value/chevron row and option list. */
+html#lens-design-system .multitrack-click-settings .metronome-audio-select { min-width:0; }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__control { width:100%; min-height:44px; padding:8px 10px; border:1px solid var(--ls-line); border-radius:12px; background:var(--ls-soft); color:var(--ls-ink); }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__selection { display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__value { min-width:0; text-align:left; }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__chevron { width:14px; height:14px; flex-shrink:0; }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__menu { position:relative; inset:auto; margin-top:6px; max-height:180px; overflow:auto; background:var(--ls-panel); border:1px solid var(--ls-line); border-radius:12px; }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__option { width:100%; min-height:44px; display:flex; align-items:center; justify-content:space-between; padding:10px; color:var(--ls-ink); }
+html#lens-design-system .multitrack-click-settings .metronome-audio-select__option--selected { color:var(--ls-blue); background:var(--ls-soft); }
+/* An empty Best slot needs one centered instruction, not a filename row. */
+html#lens-design-system .audio-mode-take-card--best.audio-mode-take-card--empty .audio-mode-take-card__media { grid-template-columns:minmax(0,1fr)!important; grid-template-rows:auto; align-content:center; }
+html#lens-design-system .audio-mode-take-card--best.audio-mode-take-card--empty .audio-mode-take-card__title-row { grid-column:1; width:100%; }
+html#lens-design-system .audio-mode-take-card--best.audio-mode-take-card--empty .audio-mode-take-card__title-copy p { margin:0; padding:12px; font-size:13px; font-weight:450; line-height:1.5; text-align:center; white-space:normal; }
+
+/* Home shortcuts clear the home indicator as well as the scroll padding. */
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-scroll {
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px);
+}
+/* Align each metronome caption and value to the center of its own field. */
+html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__label {
+  position:static; display:block; width:100%; max-width:none; transform:none;
+  margin:0 0 4px; padding:0; text-align:center; line-height:1.3;
+}
+html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__control {
+  position:relative; align-items:center; justify-content:center; min-height:38px;
+  padding:6px 16px; text-align:center;
+}
+html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__selection { width:100%; justify-content:center; }
+html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__selection::before { content:none; }
+html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__chevron { position:absolute; right:2px; top:50%; transform:translateY(-50%); }
+/* Neutral Multitrack surfaces; blue identifies actions rather than tinting the page. */
+html#lens-design-system:not(.app-dark-mode) body:has(.multitrack-quiet-workspace),
+html#lens-design-system:not(.app-dark-mode) .multitrack-quiet-workspace {
+  --mt-bg:#fafafa; --mt-panel:#ffffff; --mt-soft:#f0f1f3; --mt-line:#dcdfe3;
+  --mt-ink:#252b33; --mt-muted:#69717b; --mt-blue-soft:#eef3f8;
+}
+html#lens-design-system .multitrack-quiet-workspace :is(.multitrack-tool-expanded,.multitrack-toolbar) { background:var(--mt-panel); border-color:var(--mt-line); }
+html#lens-design-system .multitrack-quiet-workspace .multitrack-tool-pin[aria-expanded=true],
+html#lens-design-system .multitrack-quiet-workspace .multitrack-toolbar__btn--primary { background:var(--mt-soft); }

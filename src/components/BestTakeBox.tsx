@@ -1,8 +1,10 @@
+import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import {
   memo,
   useCallback,
   useEffect,
   useRef,
+  useId,
   useState,
   type ChangeEvent,
   type MouseEvent,
@@ -56,7 +58,6 @@ import { nativeDataFileExists } from '../utils/filesystemInit'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
-const NATIVE_TAKE_BOX_OWNER = 'best-take-box'
 
 const emptyActionClass =
   'pip-empty-action pip-empty-action--interactive pointer-events-auto flex flex-1 items-center justify-center gap-1.5'
@@ -87,6 +88,11 @@ function PipMediaPoster({
 }
 
 export interface BestTakeBoxProps {
+  playbackOwner?: string
+  allowReferenceSources?: boolean
+  displayLabel?: string
+  onBeforePlay?: () => void
+  uploadAccept?: string
   layout: 'pip' | 'fill'
   compact?: boolean
   take: Take | null
@@ -118,6 +124,11 @@ export interface BestTakeBoxProps {
 }
 
 function BestTakeBox({
+  playbackOwner: NATIVE_TAKE_BOX_OWNER = 'best-take-box',
+  allowReferenceSources = true,
+  displayLabel = 'Best Take',
+  onBeforePlay,
+  uploadAccept = 'video/*, audio/*, audio/mpeg, audio/mp4, .mp3, .m4a, .wav',
   layout,
   compact = false,
   take,
@@ -141,6 +152,7 @@ function BestTakeBox({
   dragSourceArming = false,
   dragSourceProps,
 }: BestTakeBoxProps) {
+  const uploadId = useId()
   const librarySrc = libraryPlayback?.playbackUrl ?? null
   const src = librarySrc || take?.videoUrl || null
   const playbackFilePath = libraryPlayback?.filePath || take?.filePath || ''
@@ -155,10 +167,12 @@ function BestTakeBox({
   const youtubeHostLocalRef = useRef<HTMLDivElement | null>(null)
   const lastYoutubeTapAtRef = useRef(0)
   const nativePlayInFlightRef = useRef(false)
+  const nativePlaybackGeneration = useRef(0)
   /** True only while this instance holds the shared stereo-playback route (native path). */
   const nativeRouteHeldRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayArmed, setIsPlayArmed] = useState(false)
+  const [nativePlaybackError, setNativePlaybackError] = useState(false)
   const [isYoutubePlaying, setIsYoutubePlaying] = useState(false)
   const [volume, setVolume] = useState(1)
   const [youtubeDialogOpen, setYoutubeDialogOpen] = useState(false)
@@ -166,8 +180,11 @@ function BestTakeBox({
 
   const hasLibraryPlayback = Boolean(librarySrc || libraryPlayback?.filePath)
   const hasTake = Boolean(hasLibraryPlayback || take?.videoUrl || take?.filePath)
+  const enhancerRevision = useTakePlaybackEnhancerRevision()
+  // Native previews use the same cached render as saved enhanced copies.
   const useNativeTakePlayback =
     isNativeInlineTakeBoxPlaybackAvailable() && Boolean(playbackFilePath)
+  useEffect(() => () => { nativePlaybackGeneration.current += 1 }, [useNativeTakePlayback, videoSourceKey, enhancerRevision])
   const mirrorPlayback = !hasLibraryPlayback && take?.mirrorPlayback === true
   const hasYoutube = Boolean(youtubeEmbedUrl)
   const hasReference = hasTake || hasYoutube
@@ -216,7 +233,7 @@ function BestTakeBox({
       nativeRouteHeldRef.current = false
       void releaseInlineTakeBoxPlaybackRoute()
     }
-  }, [videoSourceKey, suspendPlayback])
+  }, [videoSourceKey, suspendPlayback, useNativeTakePlayback, enhancerRevision])
 
   useEffect(() => {
     if (!hasYoutube || !youtubeIframeRef?.current) return
@@ -239,7 +256,7 @@ function BestTakeBox({
   }, [hasYoutube, suspendPlayback, youtubeEmbedUrl, youtubeIframeRef])
 
   useEffect(() => {
-    if (!hasYoutube || isFill) {
+    if (!hasYoutube) {
       setIsYoutubePlaying(false)
       return
     }
@@ -308,7 +325,7 @@ function BestTakeBox({
       }
       void teardownNativeInlineTakeBoxListener()
     }
-  }, [useNativeTakePlayback])
+  }, [useNativeTakePlayback, enhancerRevision])
 
   useEffect(() => {
     if (!useNativeTakePlayback || !isPlaying) return
@@ -336,8 +353,8 @@ function BestTakeBox({
   }, [isPlaying, useNativeTakePlayback, layout, splitViewActive])
 
   useEffect(() => {
-    onPlaybackChange?.(isPlaying)
-  }, [isPlaying, onPlaybackChange])
+    onPlaybackChange?.(isPlaying || isYoutubePlaying)
+  }, [isPlaying, isYoutubePlaying, onPlaybackChange])
 
   /*
    * Report "stopped" if this box is torn down while it is still playing.
@@ -348,8 +365,8 @@ function BestTakeBox({
    * silenced the click for the rest of the session. Refs keep this to a true
    * unmount, so it never fights the normal play/pause reporting.
    */
-  const playbackReportRef = useRef({ playing: isPlaying, notify: onPlaybackChange })
-  playbackReportRef.current = { playing: isPlaying, notify: onPlaybackChange }
+  const playbackReportRef = useRef({ playing: isPlaying || isYoutubePlaying, notify: onPlaybackChange })
+  playbackReportRef.current = { playing: isPlaying || isYoutubePlaying, notify: onPlaybackChange }
   useEffect(
     () => () => {
       const { playing, notify } = playbackReportRef.current
@@ -384,6 +401,7 @@ function BestTakeBox({
       event.stopPropagation()
       stopEventBubble(event)
       if (suspendPlayback || !hasTake) return
+      if (!isPlaying) onBeforePlay?.()
 
       void (async () => {
         if (Capacitor.isNativePlatform() && playbackFilePath) {
@@ -410,11 +428,18 @@ function BestTakeBox({
           const layout = measureInlineTakeBoxWindowRect(playbackStageRef.current)
           if (!layout) return
 
+          const generation = nativePlaybackGeneration.current
           setIsPlayArmed(true)
+          setNativePlaybackError(false)
           nativePlayInFlightRef.current = true
           try {
             await prepareInlineTakeBoxPlaybackRoute()
             nativeRouteHeldRef.current = true
+            if (generation !== nativePlaybackGeneration.current) {
+              nativeRouteHeldRef.current = false
+              await releaseInlineTakeBoxPlaybackRoute()
+              return
+            }
             const started = await startNativeInlineTakeBoxPlayback({
               filePath: playbackFilePath,
               layout,
@@ -422,11 +447,20 @@ function BestTakeBox({
               volume,
               ownerId: NATIVE_TAKE_BOX_OWNER,
             })
+            if (generation !== nativePlaybackGeneration.current) {
+              await stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: NATIVE_TAKE_BOX_OWNER })
+              if (nativeRouteHeldRef.current) {
+                nativeRouteHeldRef.current = false
+                await releaseInlineTakeBoxPlaybackRoute()
+              }
+              return
+            }
             if (!started) {
               nativeRouteHeldRef.current = false
               setIsPlayArmed(false)
               await releaseInlineTakeBoxPlaybackRoute()
             }
+            setNativePlaybackError(!started)
             setIsPlaying(started)
             if (!started) setIsPlayArmed(false)
           } finally {
@@ -480,6 +514,7 @@ function BestTakeBox({
       useNativeTakePlayback,
       videoRef,
       volume,
+      onBeforePlay,
     ],
   )
 
@@ -506,6 +541,7 @@ function BestTakeBox({
         setIsYoutubePlaying(false)
         return
       }
+      onBeforePlay?.()
 
       startYoutubeProxyPlayback(iframe, volume)
       setIsYoutubePlaying(true)
@@ -516,6 +552,7 @@ function BestTakeBox({
       isYoutubePlaying,
       notifyTutorial,
       resolveYoutubeIframe,
+      onBeforePlay,
       suspendPlayback,
       volume,
     ],
@@ -658,8 +695,8 @@ function BestTakeBox({
       {onUpload && (
         <input
           type="file"
-          accept="video/*, audio/*, audio/mpeg, audio/mp4, .mp3, .m4a, .wav"
-          id="benchmark-upload"
+          accept={uploadAccept}
+          id={uploadId}
           onChange={handleFileChange}
           className="sr-only"
           aria-hidden
@@ -669,14 +706,14 @@ function BestTakeBox({
 
       <div className={isFill ? 'relative h-full w-full' : 'ui-orient-spin relative h-full w-full'}>
         <div className={innerClass}>
-          {!compact && (
+          {!compact && displayLabel && (
             <span
               className={`pointer-events-none absolute z-10 max-w-[calc(100%-3rem)] truncate whitespace-nowrap rounded px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider bg-amber-400/90 text-white ${
                 isFill ? 'px-2 py-0.5 text-[10px]' : ''
               }`}
               style={{ top: isFill ? 8 : 4, left: isFill ? 8 : pillLeft }}
             >
-              Best Take
+              {displayLabel}
             </span>
           )}
 
@@ -726,6 +763,11 @@ function BestTakeBox({
             </>
           ) : hasTake ? (
             <div ref={playbackStageRef} className={nativePlaybackStageClass}>
+              {useNativeTakePlayback && ((isPlayArmed && !isPlaying) || nativePlaybackError) && (
+                <p role="status" className="absolute inset-x-1 top-1 z-20 rounded bg-black/80 px-2 py-1 text-center text-[10px] text-white">
+                  {isPlayArmed && !isPlaying ? 'Preparing audio…' : 'Could not prepare playback. Try again.'}
+                </p>
+              )}
               {!useNativeTakePlayback && (
                 <TakeVideoPlayer
                   filePath={playbackFilePath}
@@ -816,7 +858,7 @@ function BestTakeBox({
               <div className="compact-take-card__empty-actions">
                 {onUpload && (
                   <label
-                    htmlFor="benchmark-upload"
+                    htmlFor={uploadId}
                     className="compact-take-card__empty-action"
                     onPointerDown={stopEventBubble}
                     onTouchStart={stopEventBubble}
@@ -827,7 +869,7 @@ function BestTakeBox({
                     <Upload aria-hidden />
                   </label>
                 )}
-                <Pressable
+                {allowReferenceSources && <Pressable
                   type="button"
                   intensity="icon"
                   squish={false}
@@ -845,7 +887,7 @@ function BestTakeBox({
                   aria-label="Load a YouTube reference"
                 >
                   <Youtube aria-hidden />
-                </Pressable>
+                </Pressable>}
               </div>
             </div>
           ) : (
@@ -859,7 +901,7 @@ function BestTakeBox({
               <div className="pip-empty-state__actions flex shrink-0">
                 {onUpload && (
                   <label
-                    htmlFor="benchmark-upload"
+                    htmlFor={uploadId}
                     data-tutorial="best-take-youtube"
                     className={`${emptyActionClass} pip-empty-action--upload`}
                   >
@@ -867,7 +909,7 @@ function BestTakeBox({
                     Upload
                   </label>
                 )}
-                <Pressable
+                {allowReferenceSources && <Pressable
                   type="button"
                   intensity="soft"
                   haptic="light"
@@ -885,7 +927,7 @@ function BestTakeBox({
                 >
                   <Youtube className="h-3 w-3" aria-hidden />
                   YouTube
-                </Pressable>
+                </Pressable>}
               </div>
             </div>
           )}
@@ -895,7 +937,7 @@ function BestTakeBox({
 
           {showUploadBadge && (
             <label
-              htmlFor="benchmark-upload"
+              htmlFor={uploadId}
               data-tutorial="best-take-youtube"
               onPointerDown={stopEventBubble}
               onTouchStart={stopEventBubble}

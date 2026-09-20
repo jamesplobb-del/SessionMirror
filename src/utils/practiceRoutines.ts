@@ -1,3 +1,4 @@
+import { normalizeDeskMetronome } from './deskMetronome'
 import type { LabsRoute } from '../components/labs/LabsOverlay'
 import type { DeskSnapshot } from './workspaceDesks'
 import { summarizeDesk } from './workspaceDesks'
@@ -212,7 +213,6 @@ function parseDesk(value: unknown): DeskSnapshot | null {
   if (!value || typeof value !== 'object') return null
   const raw = value as Record<string, unknown>
   const mode = raw.mode === 'video' ? 'video' : 'audio'
-  const base = blankDesk(mode)
   const metronome = (raw.metronome ?? {}) as Record<string, unknown>
   const drone = (raw.drone ?? {}) as Record<string, unknown>
   const pitchClass = Number(drone.pitchClass)
@@ -225,13 +225,7 @@ function parseDesk(value: unknown): DeskSnapshot | null {
     showTakeCards: raw.showTakeCards === undefined ? true : Boolean(raw.showTakeCards),
     autoSoundRecording: Boolean(raw.autoSoundRecording),
     audioEnhancerEnabled: Boolean(raw.audioEnhancerEnabled),
-    metronome: {
-      bpm: Number.isFinite(Number(metronome.bpm)) ? Number(metronome.bpm) : base.metronome.bpm,
-      meter: (typeof metronome.meter === 'string' ? metronome.meter : '4/4') as DeskSnapshot['metronome']['meter'],
-      subdivision: (typeof metronome.subdivision === 'string'
-        ? metronome.subdivision
-        : 'off') as DeskSnapshot['metronome']['subdivision'],
-    },
+    metronome: normalizeDeskMetronome(metronome),
     drone: {
       pitchClass:
         drone.pitchClass !== null &&

@@ -951,7 +951,7 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="playback" title="Playback">
-            <SettingsGroup footer="Previews EQ, compression, and reverb during playback. New iPhone recordings also save an Enhanced copy in Vault; the original stays unchanged.">
+            <SettingsGroup footer="Automatic cleanup for musical recordings. Playback and Enhanced copies use the same processing. The first preview may take a moment to prepare; your original stays unchanged.">
               <div data-tutorial="settings-enhancer">
                 <SwitchRow
                   icon={Sparkles}

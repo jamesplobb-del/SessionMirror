@@ -1436,7 +1436,7 @@ export default function ReviewModeOverlay({
             <div className="review-sheet-handle-bar" />
           </div>
         )}
-        <div ref={reviewBoundsRef} className="relative min-h-0 w-full flex-1">
+        <div ref={reviewBoundsRef} className="relative flex min-h-0 w-full flex-1 flex-col">
         {trimApplying && <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/30 text-white" role="status">Saving trim…</div>}
       <AnimatePresence>
         {showPlayOverlay && (
@@ -1663,7 +1663,7 @@ export default function ReviewModeOverlay({
                 mediaKey={activePitchMediaKey}
                 takeName={activeName}
                 label="Pitch Analysis"
-                isAudioMode={activeIsAudio}
+                isAudioMode={false}
                 liveMicEnabled={false}
                 micStreamRef={micStreamRef}
                 tunerInstrument={tunerInstrument}

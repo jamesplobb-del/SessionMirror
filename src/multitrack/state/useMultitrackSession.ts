@@ -1,3 +1,4 @@
+import { DEFAULT_LAYOUT_STYLE } from '../layout/quietWorkspaceLayout'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { Take } from '../../types'
 import {
@@ -32,7 +33,7 @@ function createInitialSession(): MultitrackSession {
   const preset = getLayoutPreset('two')
   return {
     projectId: crypto.randomUUID(), name: 'My performance', aspectRatio: '9:16',
-    layoutId: preset.id,
+    layoutId: preset.id, layoutStyle: { ...DEFAULT_LAYOUT_STYLE },
     panels: createPanelsForLayout(preset),
     sheetMusic: { kind: 'sheet-music', id: 'music', asset: null },
     practice: { ...DEFAULT_PRACTICE },

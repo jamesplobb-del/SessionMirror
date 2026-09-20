@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "cap:sync": "npm run build && npx cap sync ios && node scripts/patch-ios-audio-plugin.mjs",
     "cap:sync:dev": "VITE_GAME_TEST_INPUT=1 npm run cap:sync",
-    "cap:icons": "node scripts/generate-app-icon.mjs && npx @capacitor/assets generate --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#ffffff\" --splashBackgroundColor \"#0c0a09\" --splashBackgroundColorDark \"#0c0a09\"",
+    "cap:icons": "node scripts/generate-app-icon.mjs && npx @capacitor/assets generate --iconBackgroundColor \"#ffffff\" --iconBackgroundColorDark \"#101e2c\" --splashBackgroundColor \"#f8fbff\" --splashBackgroundColorDark \"#f8fbff\"",
     "cap:open": "npx cap open ios",
     "ios:refresh": "npm run cap:icons && npm run build && npx cap sync ios && node scripts/patch-ios-audio-plugin.mjs"
   },

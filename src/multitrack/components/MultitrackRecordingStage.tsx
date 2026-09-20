@@ -3,7 +3,7 @@ import {
   AudioLines,
   Camera,
   Check,
-  Grid2X2,
+  FolderOpen,
   Headphones,
   Pause,
   Play,
@@ -15,9 +15,7 @@ import {
 } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { Take } from '../../types'
-import IOSSwitch from '../../components/ui/IOSSwitch'
 import { useActionSheet } from '../../context/ActionSheetContext'
-import { useHeadphoneOutput } from '../../hooks/useHeadphoneOutput'
 import Pressable from '../../components/ui/Pressable'
 import AnimatedBottomSheet from '../../components/ui/AnimatedBottomSheet'
 import MetronomeIcon from '../../components/icons/MetronomeIcon'
@@ -36,7 +34,7 @@ import {
 import { setNativeCameraFrameBridgeEnabled } from '../../utils/nativeCameraTest'
 import { APP_FOREGROUND_RECOVERY_EVENT } from '../../utils/appForeground'
 import type { MultitrackPracticeSettings, MultitrackRecordingPhase } from '../types'
-import MultitrackClickSettings from './MultitrackClickSettings'
+import MultitrackCountInControls from './MultitrackCountInControls'
 
 /** Above the stage (z-150). */
 const STAGE_SHEET_Z = { backdrop: 'z-[155]', sheet: 'z-[160]' }
@@ -64,6 +62,7 @@ interface MultitrackRecordingStageProps {
   reviewTake: Take | null
   /** Render camera/review inside the chosen grid tile; this component becomes the control dock. */
   inGrid?: boolean
+  dock?: boolean
   reviewMediaRef?: RefObject<HTMLMediaElement | null>
   /** "You'll hear" chips: other tiles + backing + click, all-on by default. */
   monitorSources: MultitrackMonitorSource[]
@@ -104,6 +103,7 @@ export default function MultitrackRecordingStage({
   elapsed,
   reviewTake,
   inGrid = false,
+  dock = false,
   reviewMediaRef: externalReviewMediaRef,
   monitorSources,
   onToggleMonitorSource,
@@ -120,7 +120,6 @@ export default function MultitrackRecordingStage({
   onClose,
 }: MultitrackRecordingStageProps) {
   const { showAlert } = useActionSheet()
-  const headphonesConnected = useHeadphoneOutput()
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const internalReviewVideoRef = useRef<HTMLMediaElement | null>(null)
@@ -280,8 +279,8 @@ export default function MultitrackRecordingStage({
   const anyMonitorAudible = monitorSources.some((source) => !source.muted)
 
   return (
-    <div ref={stageRef} className={`multitrack-recording-stage ${inGrid ? 'multitrack-recording-stage--in-grid' : ''}`}>
-      {inGrid ? <div className="multitrack-recording-stage__interaction-guard" aria-hidden /> : null}
+    <div ref={stageRef} className={`multitrack-recording-stage ${inGrid ? 'multitrack-recording-stage--in-grid' : ''} ${dock ? 'multitrack-recording-stage--dock' : ''}`}>
+      {inGrid && !dock ? <div className="multitrack-recording-stage__interaction-guard" aria-hidden /> : null}
       {!inGrid && showNativeBridgeCanvas && (
         <canvas
           ref={nativePreviewCanvasRef}
@@ -369,32 +368,38 @@ export default function MultitrackRecordingStage({
         </div>
       ) : null}
 
+      {!dock && <>
       <div className="multitrack-recording-stage__widgets">
         <Pressable
           type="button"
           intensity="soft"
           className={practice.showMetronome ? 'is-active' : ''}
+          aria-label="Metronome"
+          aria-pressed={practice.showMetronome}
           onClick={() => onPracticeChange({ showMetronome: !practice.showMetronome })}
         >
-          <MetronomeIcon className="h-4 w-4" />
+          <MetronomeIcon className="h-4 w-4" /><span>Metronome</span>
         </Pressable>
         <Pressable
           type="button"
           intensity="soft"
           className={practice.showPitch ? 'is-active' : ''}
+          aria-label="Tuner"
+          aria-pressed={practice.showPitch}
           onClick={() => onPracticeChange({ showPitch: !practice.showPitch })}
         >
-          <AudioLines className="h-4 w-4" strokeWidth={2.1} />
+          <AudioLines className="h-4 w-4" strokeWidth={2.1} /><span>Tuner</span>
         </Pressable>
       </div>
 
+      </>}
       <footer className="multitrack-recording-stage__controls">
         {phase === 'review' ? (
           <div className="multitrack-recording-stage__actions multitrack-recording-stage__actions--review">
             {savingTake && <span role="status">Saving recording…</span>}
             <Pressable type="button" intensity="soft" disabled={!reviewReady} onClick={onRetryTake} className="multitrack-recording-stage__retry">
               <RotateCcw className="h-4 w-4" />
-              Retry
+              Retake
             </Pressable>
             <Pressable
               type="button"
@@ -408,7 +413,7 @@ export default function MultitrackRecordingStage({
             </Pressable>
             <Pressable type="button" intensity="normal" haptic="medium" disabled={!reviewReady} onClick={onConfirmTake} className="multitrack-recording-stage__confirm">
               <Check className="h-5 w-5" />
-              Keep
+              Keep take
             </Pressable>
             <Pressable type="button" intensity="soft" disabled={!reviewReady} onClick={onDiscardTake} className="multitrack-recording-stage__retry">Discard take</Pressable>
             <span className="multitrack-review-note">Retry or close keeps this recording in your Take Vault.</span>
@@ -423,17 +428,17 @@ export default function MultitrackRecordingStage({
               className="multitrack-recording-stage__side-btn"
               aria-label="Choose from Take Vault"
             >
-              <Grid2X2 className="h-5 w-5" />
-              <span>Takes</span>
+              <FolderOpen className="h-5 w-5" />
+              <span>Take Vault</span>
             </Pressable>
             <Pressable
               type="button"
               intensity="normal"
               haptic="medium"
               className={`multitrack-recording-stage__record-big ${isRecording ? 'is-recording' : ''}`}
-              onClick={isRecording ? onStop : onRecord}
+              onClick={isRecording || phase === 'count-in' || phase === 'arming' ? onStop : onRecord}
               disabled={!isRecording && isStopping}
-              aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+              aria-label={isRecording ? 'Stop recording' : phase === 'count-in' || phase === 'arming' ? 'Cancel count-in' : 'Start recording'}
             >
               <span className="multitrack-recording-stage__record-glyph" />
             </Pressable>
@@ -446,7 +451,7 @@ export default function MultitrackRecordingStage({
               aria-label="Count-in settings"
             >
               <SlidersHorizontal className="h-5 w-5" />
-              <span>Count-in</span>
+              <span>Setup</span>
             </Pressable>
           </div>
         )}
@@ -477,62 +482,7 @@ export default function MultitrackRecordingStage({
       >
         <div className="multitrack-sheet multitrack-sheet--countin">
           <p className="multitrack-sheet__title">Click &amp; count-in</p>
-          <div className="multitrack-countin-sheet">
-            <label className="multitrack-countin-sheet__row">
-              <span>Click during recording</span>
-              <IOSSwitch
-                checked={practice.clickEnabled && headphonesConnected}
-                onChange={(clickEnabled) => {
-                  if (clickEnabled && !headphonesConnected) {
-                    void showAlert({
-                      title: 'Connect headphones for a click track',
-                      message:
-                        'On the speaker the click bleeds into your recording. Plug in or connect headphones (wired or Bluetooth) to run the click while you record. Your count-in still plays either way.',
-                    })
-                    return
-                  }
-                  onPracticeChange({ clickEnabled })
-                }}
-              />
-            </label>
-            <p className="multitrack-countin-sheet__hint">
-              {headphonesConnected
-                ? 'Headphones connected, so the click can run through the whole take without printing into your recording.'
-                : 'Needs headphones: through the speaker the microphone picks the click up and prints it into the take. Without them you still get the lead-in count-in below, then silence to play against.'}
-            </p>
-            {hasBacking && !practice.clickEnabled ? (
-              <p className="multitrack-countin-sheet__hint">
-                Off by default with a backing track — its tempo rarely matches the click. Turn it on
-                if your backing really is at {Math.round(practice.bpm)} BPM.
-              </p>
-            ) : null}
-            <label className="multitrack-countin-sheet__row">
-              <span>Count-in bars</span>
-              <div className="multitrack-recording-stage__stepper">
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  aria-label="Decrease count-in bars"
-                  onClick={() => onPracticeChange({ countInBars: Math.max(0, practice.countInBars - 1) })}
-                >
-                  -
-                </Pressable>
-                <strong>{practice.countInBars}</strong>
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  aria-label="Increase count-in bars"
-                  onClick={() => onPracticeChange({ countInBars: Math.min(8, practice.countInBars + 1) })}
-                >
-                  +
-                </Pressable>
-              </div>
-            </label>
-            <MultitrackClickSettings
-              practice={practice}
-              onChange={onPracticeChange}
-            />
-          </div>
+          <MultitrackCountInControls practice={practice} onChange={onPracticeChange} hasBacking={hasBacking} />
         </div>
       </AnimatedBottomSheet>
     </div>

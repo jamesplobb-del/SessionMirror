@@ -1,3 +1,4 @@
+import { normalizeLayoutStyle } from '../layout/quietWorkspaceLayout'
 import { sectionExportWindows } from './sectionExport'
 import { Capacitor } from '@capacitor/core'
 import type { Take } from '../../types'
@@ -255,7 +256,14 @@ export async function exportMultitrackSession(
       .map(([, rect]) => rect)
     const rendered = await BestTakeAudioPlugin.renderMultitrackVideo({
       exportId,
-      aspectRatio: session.aspectRatio ?? '9:16',
+      aspectRatio: '9:16',
+      cornerRadius: normalizeLayoutStyle(session.layoutStyle).cornerRadius,
+      cornerWindows: windows.map((window, index) => ({
+        startSec: index === 0 ? 0 : window.startSec + countOffSec,
+        endSec: window.endSec + countOffSec,
+        rects: session.panels.flatMap(panel => panel.kind === 'performance' && window.panelRects[panel.id] ? [{ rect: window.panelRects[panel.id], overlay: !!panel.overlay }] : [])
+          .sort((a, b) => Number(a.overlay) - Number(b.overlay)).map(item => item.rect),
+      })),
       durationSeconds: exportDurationSeconds,
       sources: [...sources].reverse().sort((a, b) => Number(!!session.panels.find(p => p.id === b.id && p.kind === 'performance' && p.overlay)) - Number(!!session.panels.find(p => p.id === a.id && p.kind === 'performance' && p.overlay))),
       gridRects: windows.length > 1 ? [] : baseGridRects,

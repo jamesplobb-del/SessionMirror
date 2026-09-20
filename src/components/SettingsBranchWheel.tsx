@@ -11,7 +11,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
@@ -60,6 +60,7 @@ interface SettingsBranchWheelProps {
   takeCardsToggleVisible?: boolean
   expandViewActive?: boolean
   workspaceActionsVisible?: boolean
+  workspaceSections?: boolean
   onPitchTrackerChange: (enabled: boolean) => void
   onShowTakeCardsChange: (show: boolean) => void
   onShowMetronomeChange: (show: boolean) => void
@@ -68,6 +69,7 @@ interface SettingsBranchWheelProps {
   onHandsFreeChange?: (enabled: boolean) => void
   onToggleExpandView?: () => void
   onOpenMultitrack?: () => void
+  onOpenReferences?: () => void
 }
 
 interface BranchItem {
@@ -167,6 +169,7 @@ export default function SettingsBranchWheel({
   takeCardsToggleVisible = true,
   expandViewActive = false,
   workspaceActionsVisible = false,
+  workspaceSections = false,
   onPitchTrackerChange,
   onShowTakeCardsChange,
   onShowMetronomeChange,
@@ -175,7 +178,9 @@ export default function SettingsBranchWheel({
   onHandsFreeChange,
   onToggleExpandView,
   onOpenMultitrack,
+  onOpenReferences,
 }: SettingsBranchWheelProps) {
+  const isView = (item: BranchItem) => item.id === 'expand-view' || item.id === 'multitrack'
   const notifyTutorial = useTutorialAction()
   const { showConfirm } = useActionSheet()
   const [savingDesk, setSavingDesk] = useState(false)
@@ -388,6 +393,7 @@ export default function SettingsBranchWheel({
       })
     }
 
+    if (onOpenReferences) items.push({ id: 'references', label: 'References', icon: 'music', kind: 'action', active: false, onSelect: onOpenReferences })
     return items
   }, [
     audioEnhancerEnabled,
@@ -406,6 +412,7 @@ export default function SettingsBranchWheel({
     onAudioEnhancerChange,
     onHandsFreeChange,
     onOpenMultitrack,
+    onOpenReferences,
     onPitchTrackerChange,
     onShowMetronomeChange,
     onShowTakeCardsChange,
@@ -559,7 +566,7 @@ export default function SettingsBranchWheel({
                 </form>
               ) : (
               <div className="settings-branch-tray__grid" data-guidance="workspace-tools">
-                {branchItems.map((item) => {
+                {(workspaceSections ? [...branchItems.filter(item=>!isView(item)), ...branchItems.filter(isView)] : branchItems).map((item, index, items) => {
                   const tutorialTarget =
                     item.id === 'pitch-analysis'
                       ? 'branch-pitch'
@@ -572,6 +579,8 @@ export default function SettingsBranchWheel({
                         : undefined
 
                   return (
+                    <Fragment key={item.id}>
+                    {workspaceSections && (index===0 || isView(item)!==isView(items[index-1])) && <h3 className="settings-branch-tray__section-heading">{isView(item)?'Views':'Widgets'}</h3>}
                     <Pressable
                       key={item.id}
                       type="button"
@@ -622,6 +631,7 @@ export default function SettingsBranchWheel({
                         <span className="settings-branch-tray__label">{item.label}{item.id === 'multitrack' && <span className="ml-1.5 inline-block rounded border border-current px-1 py-0.5 align-middle text-[9px] font-semibold leading-none opacity-75">Beta</span>}</span>
                       </span>
                     </Pressable>
+                    </Fragment>
                   )
                 })}
               </div>

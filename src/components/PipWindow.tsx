@@ -1,3 +1,4 @@
+import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
 import { Pause, Play, Pin, Upload, Video, X } from 'lucide-react'
 import TakeVideoPlayer from './TakeVideoPlayer'
@@ -132,17 +133,23 @@ function PipWindow({
   const autoPlaySessionRef = useRef(false)
   const playbackStageRef = useRef<HTMLDivElement>(null)
   const nativePlayInFlightRef = useRef(false)
+  const nativePlaybackGeneration = useRef(0)
   const nativeRouteHeldRef = useRef(false)
   const autoPlayViaNativeRef = useRef(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [playbackError, setPlaybackError] = useState(false)
   const [volume, setVolume] = useState(1)
 
   const hasMedia = Boolean(src || filePath)
   const nativeOwnerId = `pip-${variant}`
+  const enhancerRevision = useTakePlaybackEnhancerRevision()
+  // Native previews use the same processor as saved enhanced copies.
   const useNativePipPlayback =
     isNativeInlineTakeBoxPlaybackAvailable() &&
     Boolean(filePath) &&
     !isAudioMimeType(mimeType)
+  useEffect(() => () => { nativePlaybackGeneration.current += 1 }, [useNativePipPlayback, videoSourceKey, enhancerRevision])
   const isAudioMedia = isAudioMimeType(mimeType)
   const mediaSurfaceClass = isAudioMedia ? 'take-audio-surface' : 'take-media-surface'
   const showUploadBadge =
@@ -165,7 +172,7 @@ function PipWindow({
 
   useEffect(() => {
     setIsPlaying(false)
-  }, [videoSourceKey, suspendPlayback])
+  }, [videoSourceKey, suspendPlayback, useNativePipPlayback, enhancerRevision])
 
   useEffect(() => {
     if (!useNativePipPlayback) return
@@ -177,7 +184,7 @@ function PipWindow({
         void releaseInlineTakeBoxPlaybackRoute()
       }
     }
-  }, [useNativePipPlayback, videoSourceKey])
+  }, [useNativePipPlayback, videoSourceKey, enhancerRevision])
 
   useEffect(() => {
     if (!useNativePipPlayback) return
@@ -204,7 +211,7 @@ function PipWindow({
       }
       void teardownNativeInlineTakeBoxListener()
     }
-  }, [nativeOwnerId, onAutoPlayComplete, useNativePipPlayback])
+  }, [nativeOwnerId, onAutoPlayComplete, useNativePipPlayback, enhancerRevision])
 
   useEffect(() => {
     if (!useNativePipPlayback || !isPlaying) return
@@ -302,11 +309,19 @@ function PipWindow({
         const rect = measureInlineTakeBoxWindowRect(playbackStageRef.current)
         if (!rect) return
 
+        const generation = nativePlaybackGeneration.current
         void (async () => {
           nativePlayInFlightRef.current = true
+          setIsPreparing(true)
+          setPlaybackError(false)
           try {
             await prepareInlineTakeBoxPlaybackRoute()
             nativeRouteHeldRef.current = true
+            if (generation !== nativePlaybackGeneration.current) {
+              nativeRouteHeldRef.current = false
+              await releaseInlineTakeBoxPlaybackRoute()
+              return
+            }
             const started = await startNativeInlineTakeBoxPlayback({
               filePath,
               layout: rect,
@@ -314,13 +329,19 @@ function PipWindow({
               volume,
               ownerId: nativeOwnerId,
             })
+            if (generation !== nativePlaybackGeneration.current) {
+              stopNativePipPlayback()
+              return
+            }
             if (!started) {
               nativeRouteHeldRef.current = false
               await releaseInlineTakeBoxPlaybackRoute()
             }
+            setPlaybackError(!started)
             setIsPlaying(started)
           } finally {
             nativePlayInFlightRef.current = false
+            setIsPreparing(false)
           }
         })()
         return
@@ -388,6 +409,8 @@ function PipWindow({
           return
         }
         nativePlayInFlightRef.current = true
+          setIsPreparing(true)
+          setPlaybackError(false)
         try {
           await prepareInlineTakeBoxPlaybackRoute()
           nativeRouteHeldRef.current = true
@@ -413,6 +436,7 @@ function PipWindow({
           }
         } finally {
           nativePlayInFlightRef.current = false
+          setIsPreparing(false)
         }
       })()
 
@@ -470,6 +494,7 @@ function PipWindow({
     }
   }, [
     autoPlayRequestId,
+    enhancerRevision,
     filePath,
     mirror,
     nativeOwnerId,
@@ -637,6 +662,11 @@ function PipWindow({
               )
             )}
 
+            {(isPreparing || playbackError) && (
+              <p role="status" className="absolute inset-x-1 top-1 z-20 rounded bg-black/80 px-2 py-1 text-center text-[10px] text-white">
+                {isPreparing ? 'Preparing audio…' : 'Could not prepare playback. Try again.'}
+              </p>
+            )}
             <div className="absolute inset-0 z-[5] pointer-events-none">
               {!suspendPlayback && (
               <Pressable
@@ -650,6 +680,7 @@ function PipWindow({
                 onTouchEnd={stopEventBubble}
                 onClick={handlePlayPauseClick}
                 className={pipPlayButtonClass}
+                aria-busy={isPreparing}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >
                 <span className={pipTouchIconClass}>

@@ -1,11 +1,10 @@
-import { LayoutGlyph } from './MultitrackToolbar'
 import ProjectFileActions from './ProjectFileActions'
 import type { MultitrackSession, PerformancePanelState } from '../types'
 import type { MultitrackProjectSummary } from '../state/multitrackPersistence'
 import { compositionRects } from '../layout/composition'
-import { MULTITRACK_LAYOUT_PRESETS, getLayoutPreset } from '../layout/layoutPresets'
+import { getLayoutPreset } from '../layout/layoutPresets'
 
-export default function MultitrackProjectPanel({ session, projects, onProject, onUpdate, onPanel, onLayout, onReorder, onUndo, canUndo, onRecord, time, onShare, onImport, fileBusy }: {
+export default function MultitrackProjectPanel({ session, projects, onProject, onUpdate, onPanel, onReorder, onUndo, canUndo, onRecord, time, onShare, onImport, fileBusy }: {
   onShare: () => void; onImport: (file: File) => void; fileBusy: boolean
   session: MultitrackSession; projects: MultitrackProjectSummary[]
   onProject: (id?: string, duplicate?: boolean) => void
@@ -30,22 +29,6 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       {!projects.some(p => p.id === session.projectId) && <option value={session.projectId}>Current performance</option>}
       {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
     </select></label>
-    <div className="multitrack-settings-heading"><h2>Layout</h2>
-      <p>Choose a layout. New parts expand the grid automatically.</p></div>
-    <div className="multitrack-layout-options" role="group" aria-label="Base layout">
-      {MULTITRACK_LAYOUT_PRESETS.filter(p => ['two', 'four', 'six'].includes(p.id)).map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
-        <span className="multitrack-layout-card__preview" style={{ aspectRatio: (session.aspectRatio || '9:16').replace(':', '/'), height: session.aspectRatio === '16:9' ? 36 : 64 }}><LayoutGlyph {...p} /></span>
-        <span>{p.label}</span><span className="multitrack-layout-card__check" aria-hidden>{session.layoutId === p.id ? '✓' : ''}</span>
-      </button>)}
-    </div>
-    <details className="multitrack-advanced"><summary>More layouts · current: {getLayoutPreset(session.layoutId).label}</summary>
-    <div className="multitrack-layout-options" role="group" aria-label="More layouts">
-      {MULTITRACK_LAYOUT_PRESETS.filter(p => !['two', 'four', 'six'].includes(p.id)).map(p => <button key={p.id} className="multitrack-layout-card" aria-label={`${p.label} layout`} aria-pressed={session.layoutId === p.id} onClick={() => onLayout(p.id)}>
-        <span className="multitrack-layout-card__preview" style={{ aspectRatio: (session.aspectRatio || '9:16').replace(':', '/'), height: session.aspectRatio === '16:9' ? 36 : 64 }}><LayoutGlyph {...p} /></span>
-        <span>{p.label}</span><span className="multitrack-layout-card__check" aria-hidden>{session.layoutId === p.id ? '✓' : ''}</span>
-      </button>)}
-    </div>
-    </details>
     <div className="multitrack-settings-heading"><h2>Parts</h2></div>
     {session.panels.map((p, i) => p.kind !== 'performance' ? null : <details key={p.id} className="multitrack-part-settings"
       draggable onDragStart={e => e.dataTransfer.setData('text/plain', p.id)} onDragOver={e => e.preventDefault()}

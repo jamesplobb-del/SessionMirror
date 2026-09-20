@@ -5,6 +5,7 @@ import WebKit
 @objc(PortraitBridgeViewController)
 class PortraitBridgeViewController: CAPBridgeViewController {
     private let nativePreviewHostView = UIView()
+    private let shellBackground = UIColor(red: 248 / 255.0, green: 251 / 255.0, blue: 1, alpha: 1)
     private let hapticsHandler = ImmediateHapticsHandler()
     private weak var hapticsContentController: WKUserContentController?
 
@@ -53,7 +54,7 @@ class PortraitBridgeViewController: CAPBridgeViewController {
 
     override open func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black
+        view.backgroundColor = shellBackground
         view.isOpaque = true
         configureWebViewForNativePreview()
     }
@@ -83,13 +84,13 @@ class PortraitBridgeViewController: CAPBridgeViewController {
             view.bringSubviewToFront(webView)
         } else {
             webView.isOpaque = true
-            webView.backgroundColor = .black
-            webView.layer.backgroundColor = UIColor.black.cgColor
+            webView.backgroundColor = shellBackground
+            webView.layer.backgroundColor = shellBackground.cgColor
             webView.scrollView.isOpaque = true
-            webView.scrollView.backgroundColor = .black
-            webView.scrollView.layer.backgroundColor = UIColor.black.cgColor
+            webView.scrollView.backgroundColor = shellBackground
+            webView.scrollView.layer.backgroundColor = shellBackground.cgColor
             if #available(iOS 15.0, *) {
-                webView.underPageBackgroundColor = .black
+                webView.underPageBackgroundColor = shellBackground
             }
             nativePreviewHostView.isHidden = true
             view.bringSubviewToFront(webView)
@@ -133,10 +134,10 @@ class PortraitBridgeViewController: CAPBridgeViewController {
         webView.configuration.allowsInlineMediaPlayback = true
         webView.configuration.mediaTypesRequiringUserActionForPlayback = []
         webView.isOpaque = true
-        webView.backgroundColor = .black
-        webView.scrollView.backgroundColor = .black
+        webView.backgroundColor = shellBackground
+        webView.scrollView.backgroundColor = shellBackground
         if #available(iOS 15.0, *) {
-            webView.underPageBackgroundColor = .black
+            webView.underPageBackgroundColor = shellBackground
         }
         view.bringSubviewToFront(webView)
     }

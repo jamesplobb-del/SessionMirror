@@ -8,31 +8,38 @@ import Pressable from '../ui/Pressable'
  * and Practice is where you go *from* a tempo, not a peer of it.
  */
 const TABS: { id: AudioPracticeTab; label: string }[] = [
-  { id: 'audio', label: 'Record' },
   { id: 'tuner', label: 'Tuner' },
   { id: 'metronome', label: 'Metronome' },
   { id: 'games', label: 'Games' },
 ]
 
 interface AudioPracticeTopTabsProps {
+  /** Historical navigation for the isolated appearance comparison. */
+  includeRecording?: boolean
+  onBackToRecording?: () => void
   activeTab: AudioPracticeTab
   onTabChange: (tab: AudioPracticeTab) => void
 }
 
 export default function AudioPracticeTopTabs({
+  includeRecording = false,
+  onBackToRecording,
   activeTab,
   onTabChange,
 }: AudioPracticeTopTabsProps) {
   const [pending, startTabTransition] = useTransition()
   const [selectedTab, setSelectedTab] = useOptimistic(activeTab)
+  const tabs = includeRecording ? [{ id: 'audio' as const, label: 'Record' }, ...TABS] : TABS
   return (
+    <>
+    {onBackToRecording && <button className="tools-record-return" onClick={onBackToRecording}>‹ Recording</button>}
     <nav
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
       aria-busy={pending}
-      style={{ '--electric-tab-index': Math.max(0,TABS.findIndex(tab => tab.id === selectedTab)) } as CSSProperties}
+      style={{ '--electric-tab-index': Math.max(0,tabs.findIndex(tab => tab.id === selectedTab)) } as CSSProperties}
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = selectedTab === tab.id
         return (
           <Pressable
@@ -64,5 +71,6 @@ export default function AudioPracticeTopTabs({
         )
       })}
     </nav>
+    </>
   )
 }

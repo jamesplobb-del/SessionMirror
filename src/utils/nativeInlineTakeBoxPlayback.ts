@@ -1,3 +1,4 @@
+import { prepareNaturalTakePreview } from './naturalTakePreview'
 import { Capacitor } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
@@ -42,6 +43,14 @@ let endedListenerInstalled = false
 const endedHandlers = new Map<string, () => void>()
 let endedListenerHandle: PluginListenerHandle | null = null
 let activeOwnerId: string | null = null
+let playbackGeneration = 0
+let pendingOwnerId: string | null = null
+let nativeOperations: Promise<unknown> = Promise.resolve()
+function enqueueNativeOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const next = nativeOperations.catch(() => {}).then(operation)
+  nativeOperations = next
+  return next
+}
 
 /** Per-box ended handler — the native overlay is a singleton, so starting one
  * box preempts another and the preempted box gets its ended event. */
@@ -81,6 +90,8 @@ export async function startNativeInlineTakeBoxPlayback(options: {
 }): Promise<boolean> {
   if (!isNativeInlineTakeBoxPlaybackAvailable()) return false
 
+  const generation = ++playbackGeneration
+  pendingOwnerId = options.ownerId
   const fileURL = await resolveNativeFileUri(options.filePath)
   if (!fileURL) {
     console.warn('[InlineTakeBoxPlayback] could not resolve file URI', options.filePath)
@@ -90,8 +101,12 @@ export async function startNativeInlineTakeBoxPlayback(options: {
   await ensureEndedListener()
 
   try {
-    await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
-      url: fileURL,
+    const url = await prepareNaturalTakePreview(fileURL, /\.(m4a|mp3|wav|caf|aac)$/i.test(fileURL) ? 'audio' : 'video')
+    if (generation !== playbackGeneration) return false
+    return await enqueueNativeOperation(async () => {
+      if (generation !== playbackGeneration) return false
+      await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
+      url,
       x: options.layout.x,
       y: options.layout.y,
       width: options.layout.width,
@@ -101,11 +116,14 @@ export async function startNativeInlineTakeBoxPlayback(options: {
       volume: options.volume ?? 1,
       ownerId: options.ownerId,
     })
-    activeOwnerId = options.ownerId
-    return true
+      activeOwnerId = options.ownerId
+      return generation === playbackGeneration
+    })
   } catch (error) {
     console.warn('[InlineTakeBoxPlayback] failed to start', error)
     return false
+  } finally {
+    if (generation === playbackGeneration) pendingOwnerId = null
   }
 }
 
@@ -115,19 +133,18 @@ export async function stopNativeInlineTakeBoxPlayback(
   options: { notify?: boolean; ownerId?: string } = {},
 ): Promise<void> {
   if (!isNativeInlineTakeBoxPlaybackAvailable()) return
-  if (options.ownerId && activeOwnerId !== null && activeOwnerId !== options.ownerId) {
-    return
+  const owner = options.ownerId
+  if (!owner || pendingOwnerId === owner) {
+    playbackGeneration += 1
+    pendingOwnerId = null
   }
-  if (!options.ownerId || activeOwnerId === options.ownerId) {
-    activeOwnerId = null
-  }
-  try {
-    await BestTakeAudioPlugin.stopInlineTakeBoxPlayback({
-      notify: options.notify !== false,
-    })
-  } catch {
-    /* ignore */
-  }
+  await enqueueNativeOperation(async () => {
+    if (owner && activeOwnerId !== null && activeOwnerId !== owner) return
+    if (!owner || activeOwnerId === owner) activeOwnerId = null
+    try {
+      await BestTakeAudioPlugin.stopInlineTakeBoxPlayback({ notify: options.notify !== false })
+    } catch { /* ignore */ }
+  })
 }
 
 export async function updateNativeInlineTakeBoxLayout(

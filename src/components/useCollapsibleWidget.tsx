@@ -16,6 +16,7 @@ const ballPlacements = new Map<symbol, {
 /** Presentation only. The full widget stays mounted and retains its audio owner. */
 export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId, label,
   icon, detail, active = false, resetKey, onRestore, ballSlot = 0, visible = true,
+  ballAccessory,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
   widgetRef: RefObject<HTMLDivElement | null>
@@ -24,6 +25,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   onRestore?: (position: WidgetPosition) => void
   ballSlot?: number
   visible?: boolean
+  ballAccessory?: ReactNode
 }) {
   const [collapsed, setCollapsed] = useState(true)
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
@@ -158,7 +160,8 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     setCollapsed(false)
   }
 
-  const ball = collapsed && visible && present ? <motion.button
+  const ball = collapsed && visible && present ? <>
+    <motion.button
     ref={ballRef} type="button" className="widget-ball pointer-events-auto"
     aria-label={`Expand ${label}${detail ? `, ${detail}` : ''}`} aria-expanded={false}
     title={`Open ${label}`} data-active={active}
@@ -182,7 +185,9 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     transition={{ duration: reducedMotion ? 0 : 0.18 }}
   >
     {icon}<span>{detail ?? label}</span><ChevronsDown className="widget-ball__expand" aria-hidden /><i aria-hidden />
-  </motion.button> : null
+    </motion.button>
+    {ballAccessory && <motion.div className="widget-ball-accessory pointer-events-auto" style={{ x: ballX, y: ballY }}>{ballAccessory}</motion.div>}
+  </> : null
 
   return { collapsed, collapse, ball: ball && portalHost ? createPortal(ball, portalHost) : ball,
     panelAnimation: { opacity: collapsed ? 0 : 1, scale: collapsed && !reducedMotion ? 0.94 : 1 } }

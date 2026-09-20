@@ -140,8 +140,8 @@ function CompactTakeCaption({
 
   const content = (
     <>
-      <span className="compact-take-caption__name">{name}</span>
-      {detail && <span className="compact-take-caption__detail">{detail}</span>}
+      <span className="compact-take-caption__name">{hasMedia ? name : tone === 'best' ? 'Pin your best take' : 'Ready to record'}</span>
+      {hasMedia && detail && <span className="compact-take-caption__detail">{detail}</span>}
     </>
   )
 
@@ -784,7 +784,6 @@ export default memo(function PipCompareRow({
   onUnpinBenchmark,
   onClearLibraryReference,
   onUnpinChallenger,
-  onUploadBenchmark,
   onSubmitYoutube,
   onClearYoutube,
   onToggleSplitView,
@@ -1003,6 +1002,7 @@ export default memo(function PipCompareRow({
           {compact && <span className="compact-take-caption__label">Best Take</span>}
           <BestTakeBox
             layout="pip"
+            allowReferenceSources={false}
             compact={compact}
             take={benchmarkTake}
             libraryPlayback={libraryBenchmarkPlayback}
@@ -1014,7 +1014,6 @@ export default memo(function PipCompareRow({
             onClearLibraryReference={onClearLibraryReference}
             onClearYoutube={onClearYoutube}
             onSubmitYoutube={onSubmitYoutube}
-            onUpload={onUploadBenchmark}
             onToggleSplitView={onToggleSplitView}
             onExpand={
               libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake)

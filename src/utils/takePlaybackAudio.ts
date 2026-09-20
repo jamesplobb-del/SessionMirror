@@ -1,3 +1,4 @@
+import { prepareNaturalMediaPreview } from './naturalTakePreview'
 import { resumePitchGraphsForMedia } from '../hooks/useLivePitchTracker'
 import {
   prepareInlineMediaElement,
@@ -214,6 +215,7 @@ function wireTakePlaybackAfterStart(
 }
 
 async function prepareLoudPlaybackBeforeStart(media: HTMLMediaElement): Promise<void> {
+  await prepareNaturalMediaPreview(media)
   primeTakePlaybackForPreparedSession(media)
   await resumePlaybackAudioContext()
 }
@@ -369,8 +371,14 @@ export async function playTakeMediaAudible(
     }
   }
 
-  await prepareLoudPlaybackBeforeStart(media)
-  await waitForFirstMediaFrame(media)
+  try {
+    await prepareLoudPlaybackBeforeStart(media)
+    await waitForFirstMediaFrame(media)
+  } catch (error) {
+    options.onFailure?.(error)
+    if (options.restoreRouteOnFailure !== false) await completePlaybackRouteRestore()
+    return false
+  }
 
   const attachEnded = options.attachEndedRouteRestore !== false
 

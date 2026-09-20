@@ -1,9 +1,10 @@
+import { normalizeLayoutStyle, type MultitrackLayoutStyle } from '../layout/quietWorkspaceLayout'
 import { useEffect, useRef, useState, type RefObject, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Move, Pencil, Trash2 } from 'lucide-react'
 import PerformancePanel from '../performance/PerformancePanel'
 import SheetMusicPanel from '../sheetMusic/SheetMusicPanel'
 import { transformBox, type BoxGestureMode } from '../layout/boxGesture'
-import { compositionRects } from '../layout/composition'
+import { compositionRects, spacedLayoutRect } from '../layout/composition'
 import type { LayoutRectPercent } from '../layout/layoutRects'
 import { hasAnySheetImage } from '../sheetMusic/sheetMusicTimeline'
 import type { Take } from '../../types'
@@ -15,8 +16,9 @@ import type {
   SheetMusicPanelState,
 } from '../types'
 
-export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, currentTimeSec, aspectRatio = '9:16', bpm = 120, onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
+export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, currentTimeSec, aspectRatio = '9:16', layoutStyle, bpm = 120, onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
   aspectRatio?: string
+  layoutStyle?: MultitrackLayoutStyle
   bpm?: number
   editable?: boolean
   interactionDisabled?: boolean
@@ -38,7 +40,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [controlsHost, setControlsHost] = useState<HTMLDivElement | null>(null)
   const controlsPanelId = panels.some(p => p.kind === 'performance' && p.take && p.id === selectedId)
-    ? selectedId : panels.find(p => p.kind === 'performance' && p.take)?.id
+    ? selectedId : null
   const frameRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 1, height: 1 })
   useEffect(() => {
@@ -52,7 +54,8 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     return () => observer.disconnect()
   }, [])
   const [w, h] = aspectRatio.split(':').map(Number)
-  const { panelRects, musicRect } = compositionRects({ panels, sheetMusic: sheetMusicPanel, practice: { bpm } }, layout, currentTimeSec ?? 0)
+  const { panelRects, musicRect } = compositionRects({ panels, sheetMusic: sheetMusicPanel, practice: { bpm }, layoutStyle }, layout, currentTimeSec ?? 0)
+  const rawRects = compositionRects({ panels, sheetMusic: sheetMusicPanel, practice: { bpm } }, layout, currentTimeSec ?? 0).panelRects
   const rectStyle = (rect: LayoutRectPercent | null | undefined): CSSProperties => rect ? {
     position: 'absolute', left: `${rect.xPercent}%`, top: `${rect.yPercent}%`,
     width: `${rect.widthPercent}%`, height: `${rect.heightPercent}%`,
@@ -74,7 +77,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     setDraft(null)
   }, [interactionDisabled])
   const begin = (id: string, mode: BoxGestureMode, event: ReactPointerEvent<HTMLElement>, deferCapture = false) => {
-    const rect = panelRects[id]
+    const rect = rawRects[id]
     const bounds = canvasRef.current?.getBoundingClientRect()
     if (interactionDisabled || event.button !== 0 || drag.current || !rect || !bounds?.width || !bounds.height) return
     if (!deferCapture) {
@@ -119,7 +122,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
     if (current.captureTarget?.hasPointerCapture(event.pointerId)) current.captureTarget.releasePointerCapture(event.pointerId)
   }
   const nudge = (id: string, mode: BoxGestureMode, event: ReactKeyboardEvent<HTMLElement>) => {
-    const rect = panelRects[id]
+    const rect = rawRects[id]
     if (interactionDisabled || !rect || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
     event.preventDefault()
     const step = event.shiftKey ? 5 : 1
@@ -128,13 +131,12 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
       event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0))
   }
   const selectedPanel = panels.find(panel => panel.id === selectedId && panel.kind === 'performance')
-  const selectedRect = selectedId ? (draft?.id === selectedId ? draft.rect : panelRects[selectedId]) : null
+  const selectedRect = selectedId ? (draft?.id === selectedId ? spacedLayoutRect(draft.rect, layoutStyle) : panelRects[selectedId]) : null
   const showSelectionTools = !interactionDisabled && selectedPanel?.kind === 'performance' && (editable || !!selectedPanel.overlay) && selectedRect
   const showTakeControls = controlsPanelId && recordingPhase === 'idle'
-  const controlsHeight = (showTakeControls ? 62 : 0) + (showSelectionTools ? 62 : 0)
-  const width = Math.min(size.width, Math.max(1, size.height - controlsHeight) * w / h)
+  const width = Math.min(size.width, Math.max(1, size.height) * w / h)
   return (
-    <div className="multitrack-canvas-frame" ref={frameRef}>
+    <div className="multitrack-canvas-frame" ref={frameRef} inert={interactionDisabled}>
     {showTakeControls && <div ref={setControlsHost} className="multitrack-take-controls" role="toolbar" aria-label="Take controls" inert={interactionDisabled} aria-disabled={interactionDisabled} />}
     {showSelectionTools && selectedId ? <div className="multitrack-box-tools" role="toolbar" aria-label="Selected box">
       <button type="button" aria-label="Move selected box" onPointerDown={event => begin(selectedId, 'move', event)} onPointerMove={move}
@@ -143,7 +145,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
       <button type="button" aria-label="Edit selected box" onClick={() => onTapPerformance(selectedId)}><Pencil size={16} /></button>
       {selectedPanel?.kind === 'performance' && selectedPanel.overlay && onDeleteExtra ? <button type="button" className="multitrack-box-tools__delete" aria-label="Delete extra box" onClick={() => { onDeleteExtra(selectedId); setSelectedId(null) }}><Trash2 size={18} /><span>Delete</span></button> : null}
     </div> : null}
-    <div ref={canvasRef} className="multitrack-grid multitrack-social-canvas" style={{ width, height: width * h / w }}>
+    <div ref={canvasRef} className="multitrack-grid multitrack-social-canvas" style={{ width, height: width * h / w, '--multitrack-corner': `${normalizeLayoutStyle(layoutStyle).cornerRadius * width / 390}px` } as CSSProperties}>
       {hasMusic ? (
         <div style={rectStyle(musicRect)} className="multitrack-grid__cell">
           <SheetMusicPanel
@@ -182,7 +184,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
             }
             if (canEdit) setSelectedId(panel.id)
           }}
-          style={{ ...rectStyle(draft?.id === panel.id ? draft.rect : panelRects[panel.id]), zIndex: panel.kind === 'performance' && panel.overlay ? panels.indexOf(panel) + 2 : 1 }}
+          style={{ ...rectStyle(draft?.id === panel.id ? spacedLayoutRect(draft.rect, layoutStyle) : panelRects[panel.id]), zIndex: panel.kind === 'performance' && panel.overlay ? panels.indexOf(panel) + 2 : 1 }}
           className={`multitrack-grid__cell${panel.kind === 'performance' && panel.overlay ? ' is-extra' : ''}${canEdit ? ' is-editable' : ''}${canEdit && selectedId === panel.id ? ' is-selected' : ''}`}
         >
           {canEdit && selectedId === panel.id && onMoveOverlay && panelRects[panel.id] ? (

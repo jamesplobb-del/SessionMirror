@@ -1,0 +1,50 @@
+/* Device framing and sample-data UI only. Product styling lives in open-lens-system.css. */
+html,body,#root { margin:0; width:100%; height:100%; overflow:hidden; }
+.lens-screen { position:relative!important; display:flex!important; flex-direction:column!important; width:100%; height:100dvh!important; min-height:0!important; padding:0!important; background:var(--ls-bg)!important; }
+.lens-safe-top { height:26px; flex-shrink:0; }
+.lens-safe-bottom { height:22px; flex-shrink:0; display:grid; place-items:center; position:relative; z-index:2; }
+.lens-safe-bottom i { width:110px; height:4px; border-radius:4px; background:var(--ls-ink); opacity:.55; }
+.lens-content.app-ui-overlay { position:relative!important; inset:auto!important; display:flex!important; flex-direction:column!important; flex:1!important; min-height:0!important; width:100%!important; height:auto!important; padding:0!important; overflow:visible!important; pointer-events:auto!important; }
+.lens-stage { flex:1; display:flex; flex-direction:column; min-height:0; position:relative; }
+.lens-stage>.audio-mode-home { height:100%; flex:1; min-height:0; }
+.lens-dock-container { flex-shrink:0; position:relative; z-index:10; }
+.lens-dock-container>.control-deck { position:relative!important; inset:auto!important; }
+.lens-tools-header { display:flex; align-items:center; justify-content:space-between; height:49px; padding:0 19px; flex-shrink:0; }
+.lens-tools-header>span { font-size:12px; color:var(--ls-muted); font-weight:500; }
+.lens-tools-header button { min-height:44px; background:none; border:0; color:var(--ls-blue); font-size:12px; }
+.lens-tools-header svg { width:21px; height:21px; color:var(--ls-ink); }
+.lens-reference-entry { position:absolute; top:80px; left:22px; z-index:5; display:flex; align-items:center; gap:6px; min-height:34px; padding:7px 10px; border:1px solid var(--ls-line); border-radius:25px; background:var(--ls-soft); color:var(--ls-blue); font-size:10px; }
+.lens-reference-entry svg { width:14px; height:14px; }
+.lens-camera-backdrop { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:-1; }
+.lens-camera { background:#7d9898!important; isolation:isolate; }
+.lens-camera .open-lens-modes,.lens-camera .lens-reference-entry { background:#17374955!important; border-color:#ffffff40!important; color:#eff8ff!important; }
+.lens-camera .open-lens-settings,.lens-camera .open-lens-dock-action,.lens-camera .open-lens-dock-action span { color:#eff8ff!important; text-shadow:0 1px 4px #1c354177; }
+.lens-camera .lens-safe-bottom i { background:white; }
+.lens-camera .open-lens-modes button[aria-pressed=true] { background:#ffffffdf!important; color:#244b69!important; }
+html.lens-system .lens-camera .app-pip-row-wrap--camera.app-pip-row-wrap--compact { position:absolute!important; bottom:12px!important; top:auto!important; left:20px!important; right:20px!important; width:auto!important; padding:0!important; transform:none!important; }
+html.lens-system .lens-camera .app-pip-row--compact { gap:12px; }
+.lens-camera .compact-take-slot { backdrop-filter:none!important; }
+.lens-camera.open-lens-capturing .lens-reference-entry { visibility:hidden; }
+.lens-camera .pip-placeholder__icon { display:none; }
+html.lens-system .lens-camera .pip-video-container { background:linear-gradient(115deg,#7b9290,#a6b5a8)!important; }
+.lens-notice { position:fixed; bottom:122px; left:22px; right:22px; z-index:999999; padding:13px 16px; border:1px solid var(--ls-line); border-radius:16px; background:var(--ls-panel); color:var(--ls-ink); box-shadow:0 8px 25px #1232; font-size:12px; text-align:center; pointer-events:none; }
+.lens-demo-reference { position:fixed; top:140px; left:22px; z-index:9999; width:268px; border:1px solid var(--ls-line); border-radius:18px; background:var(--ls-glass); padding:12px; color:var(--ls-ink); box-shadow:0 12px 30px #1232; }
+.lens-demo-reference header { display:flex; gap:8px; align-items:center; font-size:12px; }.lens-demo-reference svg { width:17px; height:17px; }.lens-demo-reference button{margin-left:auto;background:none;border:0;color:var(--ls-muted);padding:5px;}.lens-demo-reference p{font-size:13px;margin:15px 0}.lens-demo-reference audio{width:100%;height:35px}
+html.lens-system .practice-menu-layer { background:var(--ls-bg); }
+html.lens-system .practice-menu-card { height:100dvh!important; max-height:100dvh!important; width:100%!important; max-width:none!important; border-radius:0!important; }
+html.lens-system .practice-menu-card--electric-edge .practice-menu-scroll { display:flex; flex:1; }
+html.lens-system .practice-menu-card--electric-edge .practice-menu-page { display:flex; flex-direction:column; flex:1; }
+/* Historical appearance uses the existing app styles, not the new design tokens. */
+html:not(.lens-system) .lens-screen { background:var(--audio-bg-base,#eef4ff)!important; }
+html.app-dark-mode:not(.lens-system) .lens-screen { background:#101b2b!important; }
+html:not(.lens-system) .lens-content.app-ui-overlay--audio-mode { background:var(--audio-bg-base)!important; }
+html:not(.lens-system) .lens-tools-header { color:var(--audio-text-primary,#1f3961); }
+html:not(.lens-system) .lens-tools-header>span { color:inherit; }
+html:not(.lens-system) .lens-tools-header button { color:inherit; }
+html:not(.lens-system) .lens-tools-header svg { color:inherit; }
+html:not(.lens-system) .lens-stage>.audio-mode-home { padding:0 16px; }
+html:not(.lens-system) .lens-stage>.audio-mode-home .audio-mode-take-stack { flex:1; min-height:0; }
+html:not(.lens-system) .lens-dock-container { min-height:88px; }
+.lens-widget-layer { position:absolute; inset:0; z-index:25; pointer-events:none; }
+.lens-widget-layer[hidden] { display:none; }
+.lens-widget-layer .reference-widget-live { pointer-events:auto; }

@@ -1,3 +1,4 @@
+import { normalizeLayoutStyle } from '../layout/quietWorkspaceLayout'
 import { persistAsset, restoreAsset } from './multitrackAssets'
 import type { Take } from '../../types'
 import { Capacitor } from '@capacitor/core'
@@ -31,6 +32,7 @@ interface PersistedMultitrackSession {
   projectId?: string
   name?: string
   aspectRatio?: MultitrackSession['aspectRatio']
+  layoutStyle?: MultitrackSession['layoutStyle']
   endSec?: number
   panelIds?: string[]
   panelDetails?: Array<Pick<import('../types').PerformancePanelState, 'label' | 'frame' | 'overlay' | 'hidden' | 'timelineOffsetMs' | 'sectionAudio' | 'mirrored'>>
@@ -60,6 +62,7 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
       projectId: session.projectId,
       name: session.name,
       aspectRatio: session.aspectRatio,
+      layoutStyle: normalizeLayoutStyle(session.layoutStyle),
       endSec: session.endSec,
       panelIds: performancePanels.map(p => p.id),
       panelDetails: performancePanels.map(p => ({ frame: p.frame, sectionAudio: p.sectionAudio, label: p.label, overlay: p.overlay, hidden: p.hidden, timelineOffsetMs: p.timelineOffsetMs, mirrored: p.mirrored })),
@@ -199,9 +202,10 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
 
     return {
       layoutId: preset.id,
+      layoutStyle: normalizeLayoutStyle(persisted.layoutStyle),
       projectId: persisted.projectId ?? crypto.randomUUID(),
       name: persisted.name ?? 'My performance',
-      aspectRatio: ['9:16', '16:9', '1:1'].includes(persisted.aspectRatio ?? '') ? persisted.aspectRatio : '9:16',
+      aspectRatio: '9:16',
       endSec: typeof persisted.endSec === 'number' ? bounded(persisted.endSec, 1, .1, 86400) : undefined,
       panels,
       sheetMusic,

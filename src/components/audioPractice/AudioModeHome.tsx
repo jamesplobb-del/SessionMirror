@@ -680,7 +680,7 @@ export function AudioModeTakeCard({
           <div className="audio-mode-take-card__title-row">
             <div className="audio-mode-take-card__title-copy">
               <div className="audio-mode-take-card__name-line">
-                <h3>{stage && isRecording ? 'Recording' : displayName}</h3>
+                {(hasMedia || tone !== 'best') && <h3>{stage && isRecording ? 'Recording' : displayName}</h3>}
                 {stage && isRecording ? (
                   <span className="audio-mode-take-card__duration">
                     <span aria-hidden />

@@ -1,5 +1,7 @@
+import { isIPhoneDevice } from './deviceFormFactor'
 import type { RecordingMode } from '../types'
-import type { MetronomeMeter, MetronomeSubdivision } from './metronomeConfig'
+import type { MetronomePrefs } from './metronomeConfig'
+import { normalizeDeskMetronome } from './deskMetronome'
 import { getWrittenPitchLabel, type TunerTranspositionId } from './tunerTransposition'
 
 /**
@@ -20,11 +22,7 @@ export interface WorkspaceDesk {
   showTakeCards: boolean
   autoSoundRecording: boolean
   audioEnhancerEnabled: boolean
-  metronome: {
-    bpm: number
-    meter: MetronomeMeter
-    subdivision: MetronomeSubdivision
-  }
+  metronome: Pick<MetronomePrefs, 'bpm' | 'meter' | 'subdivision'> & Partial<MetronomePrefs>
   drone: {
     pitchClass: number | null
     octave: number
@@ -65,13 +63,7 @@ function parseDesk(value: unknown): WorkspaceDesk | null {
     showTakeCards: raw.showTakeCards === undefined ? true : Boolean(raw.showTakeCards),
     autoSoundRecording: Boolean(raw.autoSoundRecording),
     audioEnhancerEnabled: Boolean(raw.audioEnhancerEnabled),
-    metronome: {
-      bpm: Number.isFinite(Number(metronome.bpm)) ? Number(metronome.bpm) : 120,
-      meter: (typeof metronome.meter === 'string' ? metronome.meter : '4/4') as MetronomeMeter,
-      subdivision: (typeof metronome.subdivision === 'string'
-        ? metronome.subdivision
-        : 'off') as MetronomeSubdivision,
-    },
+    metronome: normalizeDeskMetronome(metronome),
     drone: {
       pitchClass:
         drone.pitchClass !== null && drone.pitchClass !== undefined && Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null,
@@ -144,9 +136,7 @@ export function deskMatchesSnapshot(desk: WorkspaceDesk, live: DeskSnapshot): bo
     desk.autoSoundRecording === live.autoSoundRecording &&
     desk.audioEnhancerEnabled === live.audioEnhancerEnabled &&
     (!desk.showMetronome ||
-      (desk.metronome.bpm === live.metronome.bpm &&
-        desk.metronome.meter === live.metronome.meter &&
-        desk.metronome.subdivision === live.metronome.subdivision)) &&
+      JSON.stringify(normalizeDeskMetronome(desk.metronome)) === JSON.stringify(normalizeDeskMetronome(live.metronome))) &&
     (!desk.showDrone ||
       (desk.drone.pitchClass === live.drone.pitchClass &&
         desk.drone.octave === live.drone.octave)) &&
@@ -169,7 +159,7 @@ export function summarizeDesk(
     parts.push('Drone')
   }
   if (desk.pitchTrackerEnabled) parts.push('Pitch')
-  if (desk.showMusic) parts.push('Music')
+  if (desk.showMusic && !isIPhoneDevice()) parts.push('Music')
   if (desk.autoSoundRecording) parts.push(`Hands-free ${desk.soundSilenceSeconds}s`)
   if (desk.audioEnhancerEnabled) parts.push('Enhancer')
   if (desk.mode === 'video' && !desk.showTakeCards) parts.push('Cards off')

@@ -16,6 +16,7 @@ import { isNativeCaptureSessionActive, subscribeNativeCaptureSessionActive } fro
 import { ensureNativeCameraSessionHealthy } from '../../utils/nativeCameraTest'
 import {
   APP_INTERACTIVE_MEDIA_RECOVERY_EVENT,
+  APP_FOREGROUND_RECOVERY_EVENT,
   isAppInForeground,
   requestInteractiveMediaRecovery,
   subscribeAppForeground,
@@ -263,7 +264,7 @@ export default function AudioTunerTab({
     const recoverTunerMic = async (event: Event) => {
       if (!active || !isAppInForeground()) return
       const reason = (event as CustomEvent<{ reason?: string }>).detail?.reason
-      if (!reason?.startsWith('tuner-')) return
+      if (event.type !== APP_FOREGROUND_RECOVERY_EVENT && !reason?.startsWith('tuner-')) return
       if (reason !== 'tuner-auto-source-stalled') {
         automaticRecoveryAttemptsRef.current = 0
       }
@@ -284,9 +285,11 @@ export default function AudioTunerTab({
       }
     }
     window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
+    window.addEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverTunerMic)
     return () => {
       cancelled = true
       window.removeEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, recoverTunerMic)
+      window.removeEventListener(APP_FOREGROUND_RECOVERY_EVENT, recoverTunerMic)
     }
   }, [
     active,

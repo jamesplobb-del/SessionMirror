@@ -171,7 +171,7 @@ export default function HandsFreeSettingsCard({
               </div>
             </div>
 
-            <p className="hands-free-card__hint">Start playing to record. Pause to listen back. After playback, wait for “Your turn” and play again. Use Finish & listen to end a take yourself. Long-press Record to turn hands-free off.</p>
+            <p className="hands-free-card__hint">The trigger listens to the room for a moment when the app opens, then adjusts for your selected instrument. Start playing to record. Pause to listen back. After playback, wait for “Your turn” and play again. Use Finish & listen to end a take yourself. Long-press Record to turn hands-free off.</p>
           </motion.section>
         </motion.div>
       )}

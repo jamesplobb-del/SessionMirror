@@ -1,0 +1,107 @@
+/* Approved Open Lens recording surfaces. Full-size tools retain their own themes. */
+.open-lens-recording { --lens-bg:#f4f8fd; --lens-ink:#192f49; --lens-muted:#61778f; --lens-line:#d5e1ef; --lens-panel:#ffffffdb; --lens-blue:#237fbe; }
+html.app-dark-mode .open-lens-recording { --lens-bg:#142334; --lens-ink:#e8f2fc; --lens-muted:#a1b5c9; --lens-line:#314b64; --lens-panel:#1d3146; --lens-blue:#87c9f6; }
+html .open-lens-recording .app-ui-overlay--audio-mode { background:var(--lens-bg)!important; box-shadow:none!important; }
+.open-lens-header { display:flex; align-items:center; justify-content:center; position:relative; flex-shrink:0; height:62px; padding:8px 18px; pointer-events:auto; color:#edf6ff; }
+.open-lens-modes { display:flex; border:1px solid #d7eafa44; background:#19324960; border-radius:26px; padding:3px; }
+.open-lens-modes button { display:flex; align-items:center; justify-content:center; gap:6px; min-height:36px; min-width:78px; border:0; border-radius:22px; background:transparent; color:inherit; font-size:12px; }
+.open-lens-modes button[aria-pressed=true] { background:#f4f8fdeb; color:#245275; box-shadow:0 1px 4px #0001; }
+.open-lens-modes svg { width:16px; height:16px; stroke-width:1.7; }
+.open-lens-settings { display:grid; place-items:center; position:absolute; right:14px; width:44px; height:44px; border:0; border-radius:50%; background:#19324944; color:inherit; }
+.open-lens-settings svg { width:22px; height:22px; stroke-width:1.7; }
+.app-shell--audio-mode .open-lens-header { color:var(--lens-muted); }
+.app-shell--audio-mode .open-lens-modes { background:#e7f1fb; border-color:var(--lens-line); }
+.app-shell--audio-mode .open-lens-settings { background:transparent; }
+html.app-dark-mode .app-shell--audio-mode .open-lens-modes { background:#203951; }
+html.app-dark-mode .app-shell--audio-mode .open-lens-modes button[aria-pressed=true] { background:var(--lens-panel); color:var(--lens-blue); }
+html .open-lens-deck { padding:0 14px 8px; background:transparent!important; border:0!important; box-shadow:none!important; }
+.open-lens-dock { display:grid; grid-template-columns:1fr 1fr 76px 1fr 1fr; align-items:center; width:100%; max-width:470px; min-height:88px; gap:2px; }
+.open-lens-dock-action { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; min-height:54px; min-width:0; padding:4px 0; border:0; background:transparent; color:#e1f2ff; text-shadow:0 1px 4px #0006; font-size:10px; }
+.open-lens-dock-action svg { width:23px; height:23px; stroke-width:1.7; }
+.app-shell--audio-mode .open-lens-dock-action { color:var(--lens-blue); text-shadow:none; }
+.app-shell--audio-mode .open-lens-dock-action span { color:var(--lens-muted); }
+html .open-lens-dock .record-carousel-viewport { width:72px!important; min-width:0!important; }
+html .open-lens-dock .record-carousel-slot--inactive { display:none; }
+html .open-lens-dock .record-carousel-slot--active { box-shadow:0 0 0 3px #dae9f055!important; }
+.open-lens-record-dot { display:block; width:42px; height:42px; border-radius:50%; background:#ed515b; transition:border-radius .16s ease, width .16s ease, height .16s ease; }
+.open-lens-record-dot.is-recording { width:23px; height:23px; border-radius:6px; }
+html .open-lens-dock .record-carousel-slot--active { width:60px!important; height:60px!important; border:2px solid #d8e7ee!important; background:#19324922!important; }
+html .open-lens-recording .audio-mode-home--inplace { background:transparent!important; color:var(--lens-ink); padding-inline:16px; }
+html .open-lens-recording .audio-mode-take-stack { display:grid; grid-template-rows:minmax(0,1fr) minmax(0,1fr); gap:13px; flex:1; min-height:0; }
+html .open-lens-recording .audio-mode-home--inplace .audio-mode-take-card { background:var(--lens-panel)!important; border:1px solid var(--lens-line)!important; border-radius:20px!important; box-shadow:none!important; color:var(--lens-ink)!important; min-height:0; padding:16px; }
+html .open-lens-recording .audio-mode-take-card__pill { background:transparent!important; border:0!important; color:var(--lens-ink)!important; box-shadow:none!important; padding-left:0; font-size:12px; }
+html .open-lens-recording .audio-mode-take-card__play { background:var(--lens-bg)!important; color:var(--lens-blue)!important; border:1px solid var(--lens-line)!important; box-shadow:none!important; }
+html .open-lens-recording .audio-mode-take-card__mini-btn { box-shadow:none!important; }
+html .open-lens-recording .audio-compare-heading { padding:9px 8px 13px 112px; min-height:59px; }
+html .open-lens-recording .audio-compare-heading h1 { font-size:17px; color:var(--lens-ink); }
+html .open-lens-recording .audio-compare-heading p { font-size:10px; color:var(--lens-muted); }
+html .open-lens-recording .app-pip-row--compact > .compact-take-slot { background:#19324966!important; border:1px solid #d7eafa45!important; border-radius:16px!important; box-shadow:none!important; backdrop-filter:blur(8px); }
+html .open-lens-recording .compact-take-slot--best .compact-take-caption__name { color:#e4edf4!important; font-weight:500; }
+html .open-lens-recording .app-pip-row-wrap--camera { padding-bottom:12px; }
+html .open-lens-recording .app-ui-overlay .app-pip-row-wrap--camera.app-pip-row-wrap--compact { top:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 112px); }
+html .open-lens-recording .app-ui-overlay .app-pip-row--compact { max-width:520px; }
+html .open-lens-recording .app-ui-overlay .app-pip-row--compact > .compact-take-slot { height:140px; grid-template-columns:1fr; grid-template-rows:20px 64px 27px; gap:5px; padding:9px 10px; }
+html .open-lens-recording .compact-take-slot::before { content:none; }
+html .open-lens-recording .app-ui-overlay .compact-take-slot > .pip-video-container--compact { grid-column:1; grid-row:2; width:100%!important; min-width:0!important; height:64px!important; min-height:0!important; aspect-ratio:auto!important; }
+html .open-lens-recording .compact-take-caption { grid-column:1; grid-row:3; padding:0; min-height:0; }
+html .open-lens-recording .compact-take-caption__label { top:9px; left:10px; font-size:10px; color:#e4edf4!important; }
+html .open-lens-recording .compact-take-caption__name { font-size:10px; line-height:12px; }
+html .open-lens-recording .compact-take-caption__source { font-size:8px; }
+/* A clean live camera while recording; capture and Stop remain mounted. */
+.open-lens-capturing .open-lens-header,
+.open-lens-capturing .app-pip-row-wrap,
+.open-lens-capturing .open-lens-dock-action,
+.open-lens-capturing .reference-widget-live,
+.open-lens-capturing .metronome-display-layer,
+.open-lens-capturing .drone-display-layer,
+.open-lens-capturing .pitch-widget { visibility:hidden!important; pointer-events:none!important; }
+.open-lens-capturing :is(.pitch-widget-draggable,.pitch-widget-audio,.widget-ball) { visibility:hidden!important; pointer-events:none!important; }
+.reference-widget-live { position:absolute; top:0; left:0; z-index:45; pointer-events:auto; color:#edf6ff; max-width:calc(100% - 24px); }
+.reference-widget-chip { display:flex; align-items:center; gap:6px; min-height:36px; padding:7px 12px; border:1px solid #d7eafa44; border-radius:24px; background:#19324966; color:inherit; font-size:11px; }
+.reference-widget-chip svg { width:14px; height:14px; }
+.reference-widget-panel { width:250px; max-width:calc(100vw - 24px); border:1px solid #d7eafa55; background:#193249e8; border-radius:17px; overflow:hidden; box-shadow:0 8px 24px #00172820; }
+.reference-widget-panel[hidden] { display:none; }
+.reference-widget-panel header { display:flex; align-items:center; justify-content:space-between; padding:5px 9px; touch-action:none; cursor:grab; }
+.reference-widget-panel header span { display:flex; align-items:center; gap:7px; font-size:12px; }
+.reference-widget-panel header svg { width:17px; height:17px; }
+.reference-widget-panel header button { display:grid; place-items:center; width:36px; height:36px; background:transparent; border:0; color:inherit; }
+.reference-widget-media { height:150px; position:relative; }
+.reference-widget-media > .pip-video-container { width:100%!important; height:100%!important; max-width:none!important; aspect-ratio:auto!important; }
+.reference-widget-media .pip-empty-state { background:#1b3045; justify-content:center; padding:18px 12px; }
+.reference-widget-media .pip-empty-state > div:first-child { display:none; }
+.reference-widget-media .pip-empty-state__actions { gap:10px; padding:0; }
+.reference-widget-media .pip-empty-action { min-height:52px; border:1px solid #b7d2e844; border-radius:12px; color:#e9f4ff; font-size:12px; background:#ffffff08; }
+.app-shell--audio-mode .reference-widget-chip { background:#e7f1fb; color:var(--lens-blue); border-color:var(--lens-line); }
+html.app-dark-mode .app-shell--audio-mode .reference-widget-chip { background:#203951; }
+/* The existing tools screen has three tabs; Record is now its own surface. */
+html[data-refinement] .audio-practice-top-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
+html[data-refinement] .audio-practice-top-tabs::after { width:calc((100% - 10px)/3); }
+.tools-record-return { display:block; pointer-events:auto; background:transparent; border:0; color:var(--audio-text-primary,#327aae); padding:5px 18px; min-height:32px; text-align:left; font-size:12px; }
+/* Home keeps the current destinations and routine behavior. */
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge { --guide-ink:#192f49; --guide-muted:#61778f; --guide-line:#d5e1ef; --guide-panel:#ffffffdb; background:#f4f8fd!important; }
+html .practice-menu-card--electric-edge .practice-home-instrument { background:transparent!important; border:0; border-bottom:1px solid var(--guide-line); border-radius:0; padding:10px 2px 18px; }
+html .practice-menu-card--electric-edge .practice-home-launch-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:auto; flex:0 0 auto; gap:12px; }
+html .practice-menu-card--electric-edge .practice-home-launch-button:is(.is-primary,.is-quick) { min-height:175px; padding:17px; border:1px solid var(--guide-line)!important; border-radius:20px; background:var(--guide-panel)!important; color:var(--guide-ink)!important; box-shadow:0 4px 12px #244b7105!important; align-items:flex-start; }
+html .practice-menu-card--electric-edge .practice-home-launch-copy { gap:10px; }
+html .practice-menu-card--electric-edge .practice-home-launch-button > svg:not(.practice-home-signal-detail) { position:absolute; right:13px; bottom:13px; width:16px; height:16px; color:var(--guide-muted); }
+html .practice-menu-card--electric-edge .practice-home-launch-copy { width:100%; }
+html .practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:24px; line-height:1.13; font-weight:600; letter-spacing:-.7px; color:var(--guide-ink)!important; }
+html .practice-menu-card--electric-edge .practice-home-launch-copy :is(small,em) { color:var(--guide-muted)!important; font-size:11px; }
+html .practice-menu-card--electric-edge .practice-home-launch-copy small { display:none; }
+html .practice-menu-card--electric-edge .practice-home-signal-detail { display:none; }
+.open-lens-home-symbol { display:block; width:28px; height:28px; margin-bottom:9px; color:#358ecb; stroke-width:1.6; }
+html .practice-menu-card--electric-edge .practice-home-links .practice-home-library { background:transparent; border:0; padding:12px 2px; min-height:44px; }
+html .practice-menu-card--electric-edge .practice-home-links .practice-home-library span { font-size:12px; color:#237fbe; }
+html .practice-menu-card--electric-edge .practice-home-links small { display:none; }
+html .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:transparent!important; border:0!important; box-shadow:none!important; }
+html .practice-menu-card--electric-edge .practice-menu-shortcut svg,
+html .practice-menu-card--electric-edge .practice-menu-shortcut:first-child svg { color:#237fbe!important; }
+html.app-dark-mode .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge { --guide-ink:#e8f2fc; --guide-muted:#a1b5c9; --guide-line:#314b64; --guide-panel:#1d3146; background:#142334!important; }
+html.app-dark-mode .practice-menu-card--electric-edge .practice-home-links .practice-home-library span,
+html.app-dark-mode .practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#87c9f6!important; }
+@media(max-height:600px) { html .practice-menu-card--electric-edge .practice-home-launch-button:is(.is-primary,.is-quick) { min-height:130px; } .open-lens-header { height:52px; } html .open-lens-recording .audio-compare-heading { min-height:43px; padding-block:5px; } }
+@media(prefers-reduced-motion:reduce) { .open-lens-recording * { scroll-behavior:auto; } }
+html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-tools { grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
+html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:transparent!important; border:0!important; box-shadow:none!important; }
+html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#237fbe!important; }
+html.app-dark-mode[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#87c9f6!important; }

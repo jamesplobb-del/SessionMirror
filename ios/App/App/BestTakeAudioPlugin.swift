@@ -476,8 +476,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     /// (phone lock, Control Center camera takeover, mediaServicesWereReset, long
     /// background idle). No-op if nothing native is active.
     @objc func ensureNativeCameraSessionHealthy(_ call: CAPPluginCall) {
-        nativeCameraEngine.ensureSessionHealthy(reason: "js-request")
-        call.resolve(CameraSessionGuard.snapshot())
+        nativeCameraEngine.ensureSessionHealthy(reason: "js-request") {
+            DispatchQueue.main.async { call.resolve(CameraSessionGuard.snapshot()) }
+        }
     }
 
     @objc func setCameraSessionState(_ call: CAPPluginCall) {
@@ -1088,7 +1089,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     sourceOutSec: (raw["sourceOutSec"] as? NSNumber)?.doubleValue,
                     timelineDelaySec: max(0, (raw["timelineDelaySec"] as? NSNumber)?.doubleValue ?? 0),
                     volume: Float((raw["volume"] as? NSNumber)?.doubleValue ?? 1),
-                    muted: (raw["muted"] as? NSNumber)?.boolValue ?? false
+                    muted: (raw["muted"] as? NSNumber)?.boolValue ?? false,
+                    enhancerParams: (raw["enhancerParams"] as? [String: Any]).flatMap { AudioEnhancerParams.parse($0) }
                 )
             )
         }
@@ -1380,8 +1382,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let overlayFrames = (call.getArray("overlayRects", JSObject.self) ?? []).map {
             multitrackRectFrame($0 as [String: Any], renderSize: renderSize)
         }
+        let quietLayout = call.getDouble("cornerRadius") != nil
+        let cornerRadius = CGFloat(min(24, max(0, call.getDouble("cornerRadius") ?? 0))) * renderSize.width / 390
         let gridRects = call.getArray("gridRects", JSObject.self) ?? []
-        for rectAny in gridRects {
+        for rectAny in quietLayout ? [] : gridRects {
             addMultitrackBorder(
                 frame: multitrackRectFrame(rectAny as [String: Any], renderSize: renderSize),
                 to: decorationLayer,
@@ -1392,6 +1396,49 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         // Sheet cue windows are expressed against the finished composition, so
         // the real composition length is what their key times are scaled by.
         let sheetTimelineDuration = max(CMTimeGetSeconds(longestDuration), durationHint)
+
+        // Rounded video content sits on a black rectangular tile, matching the
+        // live canvas. Exclude all foreground tiles so a base corner never cuts
+        // across an extra box. Each set follows the same section windows as video.
+        if cornerRadius > 0, sheetTimelineDuration > 0 {
+            for window in call.getArray("cornerWindows", JSObject.self) ?? [] {
+                let frames = (window["rects"] as? [[String: Any]] ?? []).map {
+                    multitrackRectFrame($0, renderSize: renderSize)
+                }
+                let group = CALayer()
+                group.frame = parentLayer.bounds
+                for (index, frame) in frames.enumerated() {
+                    let layer = CAShapeLayer()
+                    layer.frame = frame
+                    let bounds = CGRect(origin: .zero, size: frame.size)
+                    let path = UIBezierPath(rect: bounds)
+                    path.append(UIBezierPath(roundedRect: bounds, cornerRadius: min(cornerRadius, min(frame.width, frame.height) / 2)))
+                    layer.path = path.cgPath
+                    layer.fillRule = .evenOdd
+                    layer.fillColor = UIColor.black.cgColor
+                    let maskPath = UIBezierPath()
+                    let occlusions = frames.dropFirst(index + 1).map { $0.offsetBy(dx: -frame.minX, dy: -frame.minY) }
+                    for region in rectsBySubtracting(occlusions, from: bounds) { maskPath.append(UIBezierPath(rect: region)) }
+                    let mask = CAShapeLayer()
+                    mask.path = maskPath.cgPath
+                    layer.mask = mask
+                    group.addSublayer(layer)
+                }
+                let start = min(1, max(0, (window["startSec"] as? NSNumber)?.doubleValue ?? 0) / sheetTimelineDuration)
+                let end = min(1, max(start, ((window["endSec"] as? NSNumber)?.doubleValue ?? sheetTimelineDuration) / sheetTimelineDuration))
+                let animation = CAKeyframeAnimation(keyPath: "opacity")
+                animation.values = [0, 1, 0, 0]
+                animation.keyTimes = [0, NSNumber(value: start), NSNumber(value: end), 1]
+                animation.calculationMode = .discrete
+                animation.beginTime = AVCoreAnimationBeginTimeAtZero
+                animation.duration = sheetTimelineDuration
+                animation.fillMode = .both
+                animation.isRemovedOnCompletion = false
+                group.opacity = start == 0 ? 1 : 0
+                group.add(animation, forKey: "cornerWindow")
+                decorationLayer.addSublayer(group)
+            }
+        }
 
         // One sheet layer builder, shared by the static image and by each timed
         // screenshot cue. Cues carry a window; the static case has none and
@@ -1416,7 +1463,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             sheetViewport.backgroundColor = fillsViewport ? UIColor.black.cgColor : UIColor.white.cgColor
             sheetViewport.masksToBounds = true
             sheetViewport.borderColor = UIColor.white.withAlphaComponent(0.65).cgColor
-            sheetViewport.borderWidth = 2
+            sheetViewport.borderWidth = quietLayout ? 0 : 2
+            sheetViewport.cornerRadius = cornerRadius
 
             let sheetLayer = CALayer()
             sheetLayer.frame = sheetViewport.bounds
@@ -2019,7 +2067,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         AudioEnhancerRenderer.enhanceCopy(
             fileURL: fileURL,
             isVideo: isVideo,
-            params: params
+            params: params,
+            preview: call.getBool("preview") ?? false
         ) { result in
             switch result {
             case .success(let payload):

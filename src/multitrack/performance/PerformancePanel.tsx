@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { RefObject } from 'react'
-import { Film, MoreHorizontal, Pause, Play, Video, X } from 'lucide-react'
+import { Plus, Film, MoreHorizontal, Pause, Play, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
@@ -78,8 +78,8 @@ export default function PerformancePanel({
     return (
       <Pressable type="button" intensity="soft" onClick={onTap} className="multitrack-panel multitrack-panel--empty" aria-label={`Add recording to ${displayName || 'box'}`}>
         <span className="multitrack-empty__name">{panel.missingTakeId ? 'Missing recording' : displayName || 'Box'}</span>
-        <Video className="multitrack-empty__camera h-8 w-8 text-stone-400" />
-        <span className="multitrack-empty__hint text-stone-500">{panel.missingTakeId ? 'Tap to replace' : 'Tap to add'}</span>
+        <Plus className="multitrack-empty__camera h-8 w-8 text-stone-400" />
+        <span className="multitrack-empty__hint text-stone-500">{panel.missingTakeId ? 'Tap to replace' : 'Add part'}</span>
         {isRecordingTarget && recordingPhase !== 'idle' && (
           <span className="mt-1 text-xs font-semibold text-red-500">
             {recordingPhase === 'arming'
@@ -183,6 +183,7 @@ export default function PerformancePanel({
         </div>
       </>, controlsHost)}
       <div className="multitrack-panel__overlay">
+        <button type="button" data-box-control className="multitrack-panel__options" onClick={onTap} aria-label={`${displayName || panel.take.name || 'Part'} options`}><MoreHorizontal size={18} /></button>
         <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.label || panel.take.name || 'Performance'}</span></div>
       </div>
     </div>

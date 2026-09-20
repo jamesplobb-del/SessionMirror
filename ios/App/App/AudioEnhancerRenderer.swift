@@ -2,66 +2,18 @@ import AVFoundation
 import AudioToolbox
 import Foundation
 
-/// Offline enhancement into a separate recording file.
-///
-/// Mirrors the WebAudio playback chain in src/utils/audioEnhancer.ts:
-///   input → 3-band EQ → compressor → { dry, reverb → wet gain } → sum → limiter → −1 dB ceiling
-/// Uses AVAudioEngine manual rendering (never touches AVAudioSession, so it is
-/// safe to run while the native camera session is live). The original is never replaced.
-struct AudioEnhancerParams {
-    let lowHz: Double
-    let lowGainDb: Float
-    let midHz: Double
-    let midQ: Float
-    let midGainDb: Float
-    let highHz: Double
-    let highGainDb: Float
+import Accelerate
 
-    let thresholdDb: Float
-    let ratio: Float
-    let attackSec: Float
-    let releaseSec: Float
-    let makeupDb: Float
-
-    /// Final wet-path gain (JS reverbSend.gain × wetGain.gain product), 0 disables reverb.
-    let reverbWetLevel: Float
-
+/// Versioned instrument-safe processing. Legacy colored presets are migrated
+/// at the settings boundary; malformed/unversioned native payloads are rejected.
+struct AudioEnhancerParams: Equatable {
+    let amount: Double
+    let matchOriginalLevel: Bool
     static func parse(_ dict: [String: Any]) -> AudioEnhancerParams? {
-        func number(_ key: String) -> Double? {
-            (dict[key] as? NSNumber)?.doubleValue
-        }
-        guard
-            let lowHz = number("lowHz"),
-            let lowGainDb = number("lowGainDb"),
-            let midHz = number("midHz"),
-            let midQ = number("midQ"),
-            let midGainDb = number("midGainDb"),
-            let highHz = number("highHz"),
-            let highGainDb = number("highGainDb"),
-            let thresholdDb = number("thresholdDb"),
-            let ratio = number("ratio"),
-            let attackSec = number("attackSec"),
-            let releaseSec = number("releaseSec"),
-            let makeupDb = number("makeupDb"),
-            let reverbWetLevel = number("reverbWetLevel")
-        else {
-            return nil
-        }
-        return AudioEnhancerParams(
-            lowHz: lowHz,
-            lowGainDb: Float(lowGainDb),
-            midHz: midHz,
-            midQ: Float(midQ),
-            midGainDb: Float(midGainDb),
-            highHz: highHz,
-            highGainDb: Float(highGainDb),
-            thresholdDb: Float(thresholdDb),
-            ratio: Float(ratio),
-            attackSec: Float(attackSec),
-            releaseSec: Float(releaseSec),
-            makeupDb: Float(makeupDb),
-            reverbWetLevel: Float(reverbWetLevel)
-        )
+        guard (dict["version"] as? NSNumber)?.intValue == 2,
+              let amount = (dict["amount"] as? NSNumber)?.doubleValue,
+              amount.isFinite, amount >= 0, amount <= 1 else { return nil }
+        return AudioEnhancerParams(amount: amount, matchOriginalLevel: (dict["matchOriginalLevel"] as? NSNumber)?.boolValue ?? false)
     }
 }
 
@@ -92,12 +44,13 @@ final class AudioEnhancerRenderer {
         fileURL: URL,
         isVideo: Bool,
         params: AudioEnhancerParams,
+        preview: Bool = false,
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
         workQueue.async {
             Task(priority: .utility) {
                 do {
-                    let result = try await performEnhance(fileURL: fileURL, isVideo: isVideo, params: params)
+                    let result = try await performEnhance(fileURL: fileURL, isVideo: isVideo, params: params, preview: preview)
                     DispatchQueue.main.async { completion(.success(result)) }
                 } catch {
                     DispatchQueue.main.async { completion(.failure(error)) }
@@ -106,12 +59,29 @@ final class AudioEnhancerRenderer {
         }
     }
 
+    private static let previewDirectoryLock = NSLock()
+    private static var previewDirectoryPrepared = false
+    private static func previewDirectory() throws -> URL {
+        previewDirectoryLock.lock()
+        defer { previewDirectoryLock.unlock() }
+        let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("BestTakeNaturalPreviews", isDirectory: true)
+        if !previewDirectoryPrepared {
+            // No previews from the previous process are held by a live player.
+            if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            previewDirectoryPrepared = true
+        }
+        return directory
+    }
+
     // MARK: - Pipeline
 
     private static func performEnhance(
         fileURL: URL,
         isVideo: Bool,
-        params: AudioEnhancerParams
+        params: AudioEnhancerParams,
+        preview: Bool
     ) async throws -> [String: Any] {
         let tempDir = FileManager.default.temporaryDirectory
         let sourceAudioURL = tempDir.appendingPathComponent("enhancer-src-\(UUID().uuidString).m4a")
@@ -136,9 +106,9 @@ final class AudioEnhancerRenderer {
 
         // Step B — offline render through the enhancer graph.
         // Video: render exactly the input length so A/V durations match.
-        // Audio-only: allow a reverb ring-out tail.
-        let tailSeconds: Double = (!isVideo && params.reverbWetLevel > 0.0005) ? 1.5 : 0
-        try renderEnhancedAudio(
+        // Preserve the original length; instrument decays are already in the recording.
+        let tailSeconds: Double = 0
+        let report = try renderEnhancedAudio(
             inputFile: inputFile,
             outputURL: renderedAudioURL,
             params: params,
@@ -146,7 +116,8 @@ final class AudioEnhancerRenderer {
         )
 
         // Publish a separate durable file. Readers of the original never see a replacement.
-        let outputURL = fileURL.deletingLastPathComponent().appendingPathComponent(
+        let outputDirectory = preview ? try previewDirectory() : fileURL.deletingLastPathComponent()
+        let outputURL = outputDirectory.appendingPathComponent(
             "enhanced-\(UUID().uuidString).\(isVideo ? "mp4" : "m4a")"
         )
         do {
@@ -159,7 +130,8 @@ final class AudioEnhancerRenderer {
             guard duration.isFinite && duration > 0 else {
                 throw AudioEnhancerRendererError.exportFailed("Invalid output duration")
             }
-            return ["enhanced": true, "duration": duration, "path": outputURL.absoluteString]
+            return ["enhanced": true, "duration": duration, "path": outputURL.absoluteString,
+                    "noiseProfileFound": report.noiseProfileFound, "gainDb": report.gainDb, "processingVersion": 2]
         } catch {
             try? FileManager.default.removeItem(at: outputURL)
             throw error
@@ -200,193 +172,16 @@ final class AudioEnhancerRenderer {
 
     // MARK: - Step B: offline render
 
-    private static func renderEnhancedAudio(
+    @discardableResult
+    static func renderEnhancedAudio(
         inputFile: AVAudioFile,
         outputURL: URL,
         params: AudioEnhancerParams,
-        tailSeconds: Double
-    ) throws {
-        let engine = AVAudioEngine()
-        let player = AVAudioPlayerNode()
-        let inputMixer = AVAudioMixerNode()
-        let eq = AVAudioUnitEQ(numberOfBands: 3)
-        let compressor = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
-            componentType: kAudioUnitType_Effect,
-            componentSubType: kAudioUnitSubType_DynamicsProcessor,
-            componentManufacturer: kAudioUnitManufacturer_Apple,
-            componentFlags: 0,
-            componentFlagsMask: 0
-        ))
-        let limiter = AVAudioUnitEffect(audioComponentDescription: AudioComponentDescription(
-            componentType: kAudioUnitType_Effect,
-            componentSubType: kAudioUnitSubType_PeakLimiter,
-            componentManufacturer: kAudioUnitManufacturer_Apple,
-            componentFlags: 0,
-            componentFlagsMask: 0
-        ))
-        let reverb = AVAudioUnitReverb()
-        let postCompressor = AVAudioMixerNode()
-        let wetGain = AVAudioMixerNode()
-        let sum = AVAudioMixerNode()
-
-        let sourceFormat = inputFile.processingFormat
-        guard let format = AVAudioFormat(
-            standardFormatWithSampleRate: sourceFormat.sampleRate,
-            channels: 2
-        ) else {
-            throw AudioEnhancerRendererError.renderFailed("Unsupported source format")
+        tailSeconds: Double = 0
+    ) throws -> NaturalEnhancementReport {
+        try autoreleasepool {
+            try NaturalInstrumentEnhancer.render(input: inputFile, outputURL: outputURL, params: params)
         }
-
-        // EQ bands (frequencies from the per-preset tuning table; gains are user dB).
-        let low = eq.bands[0]
-        low.filterType = .lowShelf
-        low.frequency = Float(params.lowHz)
-        low.gain = params.lowGainDb
-        low.bypass = false
-
-        let mid = eq.bands[1]
-        mid.filterType = .parametric
-        mid.frequency = Float(params.midHz)
-        // AudioUnit parametric bandwidth is in octaves, not Q.
-        mid.bandwidth = qToOctaveBandwidth(params.midQ)
-        mid.gain = params.midGainDb
-        mid.bypass = false
-
-        let high = eq.bands[2]
-        high.filterType = .highShelf
-        high.frequency = Float(params.highHz)
-        high.gain = params.highGainDb
-        high.bypass = false
-
-        let useReverb = params.reverbWetLevel > 0.0005
-        reverb.loadFactoryPreset(.mediumRoom)
-        reverb.wetDryMix = 100 // wet-only; dry path is the parallel branch
-        wetGain.outputVolume = params.reverbWetLevel
-        postCompressor.outputVolume = 1.0
-
-        engine.attach(player)
-        engine.attach(inputMixer)
-        engine.attach(eq)
-        engine.attach(compressor)
-        engine.attach(postCompressor)
-        engine.attach(sum)
-        engine.attach(limiter)
-        if useReverb {
-            engine.attach(reverb)
-            engine.attach(wetGain)
-        }
-
-        // Normalize mono recordings before effects that require a stereo bus.
-        engine.connect(player, to: inputMixer, format: sourceFormat)
-        engine.connect(inputMixer, to: eq, format: format)
-        engine.connect(eq, to: compressor, format: format)
-        if useReverb {
-            // Fan out: dry to the sum, wet through reverb → wet gain → sum.
-            engine.connect(postCompressor, to: [
-                AVAudioConnectionPoint(node: sum, bus: sum.nextAvailableInputBus),
-                AVAudioConnectionPoint(node: reverb, bus: 0),
-            ], fromBus: 0, format: format)
-            engine.connect(reverb, to: wetGain, format: format)
-            engine.connect(wetGain, to: sum, fromBus: 0, toBus: sum.nextAvailableInputBus, format: format)
-        } else {
-            engine.connect(postCompressor, to: sum, format: format)
-        }
-        engine.connect(compressor, to: postCompressor, format: format)
-        engine.connect(sum, to: limiter, format: format)
-        engine.connect(limiter, to: engine.mainMixerNode, format: format)
-        // −1 dB output ceiling (PeakLimiter itself ceilings at 0 dBFS).
-        engine.mainMixerNode.outputVolume = powf(10, -1.0 / 20.0)
-
-        // Compressor mapping from the WebAudio DynamicsCompressor semantics.
-        // Note: attack/release are already seconds on both sides. The AudioUnit
-        // has no ratio/knee params — ratio is approximated via HeadRoom.
-        let bypassCompression = params.ratio <= 1
-        compressor.bypass = bypassCompression
-        // The profile gain remains independent of the compression control.
-        postCompressor.outputVolume = bypassCompression ? powf(10, params.makeupDb / 20) : 1
-        let compUnit = compressor.audioUnit
-        setParam(compUnit, kDynamicsProcessorParam_Threshold, params.thresholdDb)
-        let headRoom = max(0.1, min(40, abs(params.thresholdDb) / max(1, params.ratio)))
-        setParam(compUnit, kDynamicsProcessorParam_HeadRoom, headRoom)
-        setParam(compUnit, kDynamicsProcessorParam_AttackTime, params.attackSec)
-        setParam(compUnit, kDynamicsProcessorParam_ReleaseTime, params.releaseSec)
-        setParam(compUnit, kDynamicsProcessorParam_OverallGain, params.makeupDb)
-
-        // Limiter: WebAudio used attack 0.001 / release 0.075; DecayTime max is 0.06.
-        let limiterUnit = limiter.audioUnit
-        setParam(limiterUnit, kLimiterParam_AttackTime, 0.001)
-        setParam(limiterUnit, kLimiterParam_DecayTime, 0.06)
-        setParam(limiterUnit, kLimiterParam_PreGain, 0)
-
-        try engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: 4096)
-        try engine.start()
-        player.scheduleFile(inputFile, at: nil)
-        player.play()
-
-        let outputSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: format.sampleRate,
-            AVNumberOfChannelsKey: Int(format.channelCount),
-            AVEncoderBitRateKey: 192_000,
-        ]
-        let outputFile = try AVAudioFile(
-            forWriting: outputURL,
-            settings: outputSettings,
-            commonFormat: .pcmFormatFloat32,
-            interleaved: false
-        )
-
-        guard let buffer = AVAudioPCMBuffer(
-            pcmFormat: engine.manualRenderingFormat,
-            frameCapacity: engine.manualRenderingMaximumFrameCount
-        ) else {
-            engine.stop()
-            throw AudioEnhancerRendererError.renderFailed("Cannot allocate render buffer")
-        }
-
-        let tailFrames = AVAudioFramePosition(tailSeconds * format.sampleRate)
-        let targetFrames = inputFile.length + tailFrames
-        var renderedFrames: AVAudioFramePosition = 0
-        var stallGuard = 0
-
-        while renderedFrames < targetFrames {
-            let framesToRender = AVAudioFrameCount(min(
-                AVAudioFramePosition(buffer.frameCapacity),
-                targetFrames - renderedFrames
-            ))
-            let status = try engine.renderOffline(framesToRender, to: buffer)
-            switch status {
-            case .success:
-                // A zero-frame success advances nothing; without this the loop
-                // would spin forever because only the other cases are guarded.
-                if buffer.frameLength == 0 {
-                    stallGuard += 1
-                    if stallGuard > 1000 {
-                        engine.stop()
-                        throw AudioEnhancerRendererError.renderFailed("Render stalled")
-                    }
-                } else {
-                    try outputFile.write(from: buffer)
-                    renderedFrames += AVAudioFramePosition(buffer.frameLength)
-                    stallGuard = 0
-                }
-            case .insufficientDataFromInputNode, .cannotDoInCurrentContext:
-                stallGuard += 1
-                if stallGuard > 1000 {
-                    engine.stop()
-                    throw AudioEnhancerRendererError.renderFailed("Render stalled")
-                }
-            case .error:
-                engine.stop()
-                throw AudioEnhancerRendererError.renderFailed("renderOffline returned error")
-            @unknown default:
-                engine.stop()
-                throw AudioEnhancerRendererError.renderFailed("Unknown render status")
-            }
-        }
-
-        player.stop()
-        engine.stop()
     }
 
     // MARK: - Step C: remux
@@ -493,13 +288,244 @@ final class AudioEnhancerRenderer {
         }
     }
 
-    /// WebAudio biquad Q → AudioUnit parametric bandwidth in octaves.
-    private static func qToOctaveBandwidth(_ q: Float) -> Float {
-        let safeQ = max(0.05, q)
-        return Float(2 * asinh(1 / (2 * Double(safeQ))) / log(2))
-    }
+}
 
-    private static func setParam(_ unit: AudioUnit, _ param: AudioUnitParameterID, _ value: Float) {
-        AudioUnitSetParameter(unit, param, kAudioUnitScope_Global, 0, value, 0)
+/// Conservative offline denoising for musical takes. Three bounded-memory passes:
+/// identify stationary noise, suppress only low-confidence spectral content,
+/// then set one gain for the entire take. No gate, moving loudness target,
+/// synthetic space, channel widening or automatic instrument EQ.
+struct NaturalEnhancementReport {
+    let noiseProfileFound: Bool
+    let gainDb: Double
+    let noiseFrames: Int
+}
+
+private final class InstrumentFFT {
+    let size = 2048
+    let logSize: vDSP_Length = 11
+    let setup: FFTSetup
+    let window: [Float]
+    init() throws {
+        guard let setup = vDSP_create_fftsetup(11, FFTRadix(kFFTRadix2)) else {
+            throw AudioEnhancerRendererError.renderFailed("Could not allocate audio analysis")
+        }
+        self.setup = setup
+        window = (0..<2048).map { sqrt(Float(0.5 - 0.5 * cos(2 * Double.pi * Double($0) / 2048))) }
+    }
+    deinit { vDSP_destroy_fftsetup(setup) }
+    func transform(_ real: inout [Float], _ imaginary: inout [Float], inverse: Bool = false) {
+        real.withUnsafeMutableBufferPointer { r in
+            imaginary.withUnsafeMutableBufferPointer { i in
+                var split = DSPSplitComplex(realp: r.baseAddress!, imagp: i.baseAddress!)
+                vDSP_fft_zip(setup, &split, 1, logSize, FFTDirection(inverse ? FFT_INVERSE : FFT_FORWARD))
+            }
+        }
+        if inverse { for i in real.indices { real[i] /= Float(size) } }
+    }
+}
+
+private enum NaturalInstrumentEnhancer {
+    static func render(input: AVAudioFile, outputURL: URL, params: AudioEnhancerParams) throws -> NaturalEnhancementReport {
+        let format = input.processingFormat
+        let channels = Int(format.channelCount)
+        guard channels > 0, channels <= 2, format.sampleRate >= 8000, format.sampleRate <= 192000,
+              input.length > 0 else {
+            throw AudioEnhancerRendererError.renderFailed("Unsupported or empty recording")
+        }
+        let fft = try InstrumentFFT()
+        let n = fft.size, bins = n / 2 + 1, hop = n / 4
+        guard let readBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(n)),
+              let writeBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(hop)) else {
+            throw AudioEnhancerRendererError.renderFailed("Could not allocate audio buffers")
+        }
+        var noise = [Float](repeating: .infinity, count: bins)
+        var candidate = [Float](repeating: 0, count: bins)
+        var candidateFrames = 0, acceptedFrames = 0
+        var candidateMinDb = Double.infinity, candidateMaxDb = -Double.infinity
+        var levelHistogram = [Int](repeating: 0, count: 161)
+        var real = [Float](repeating: 0, count: n)
+        var imaginary = [Float](repeating: 0, count: n)
+        var power = [Float](repeating: 0, count: bins)
+        let minimumNoiseFrames = max(3, Int(ceil(0.35 * format.sampleRate / Double(n))))
+        let firstNoiseBin = max(1, Int(80 * Double(n) / format.sampleRate))
+        input.framePosition = 0
+        // Linked-channel statistics avoid changing the stereo image. A tone in
+        // either channel protects that frequency in both channels.
+        while input.framePosition < input.length {
+            try input.read(into: readBuffer, frameCount: AVAudioFrameCount(n))
+            let count = Int(readBuffer.frameLength)
+            guard count > 0, let samples = readBuffer.floatChannelData else { break }
+            power = [Float](repeating: 0, count: bins)
+            var energy: Double = 0
+            for channel in 0..<channels {
+                for i in 0..<n {
+                    let value = i < count && samples[channel][i].isFinite ? samples[channel][i] : 0
+                    energy += Double(value * value)
+                    real[i] = value * fft.window[i]
+                    imaginary[i] = 0
+                }
+                fft.transform(&real, &imaginary)
+                for k in 0..<bins { power[k] = max(power[k], real[k] * real[k] + imaginary[k] * imaginary[k]) }
+            }
+            let rms = sqrt(energy / Double(max(1, count * channels)))
+            let db = 20 * log10(max(1e-8, rms))
+            levelHistogram[max(0, min(160, Int(db.rounded()) + 160))] += 1
+            let selected = power[firstNoiseBin..<(bins - 1)]
+            let sum = selected.reduce(0.0) { $0 + Double($1) }
+            let mean = sum / Double(selected.count)
+            let flatness = exp(selected.reduce(0.0) { $0 + log(max(1e-20, Double($1))) } / Double(selected.count)) / max(1e-20, mean)
+            let tonalShare = Double(selected.max() ?? 0) / max(1e-20, sum)
+            // A quiet passage is NOT a noise profile. Require broadband,
+            // low-level, stable ambience for >=350ms. Otherwise leave it alone.
+            let eligible = count == n && db > -100 && db < -42 && flatness > 0.42 && tonalShare < 0.08
+            if eligible {
+                candidateMinDb = min(candidateMinDb, db)
+                candidateMaxDb = max(candidateMaxDb, db)
+                if candidateMaxDb - candidateMinDb > 2 {
+                    candidateFrames = 0
+                    candidate = [Float](repeating: 0, count: bins)
+                    candidateMinDb = db; candidateMaxDb = db
+                }
+                candidateFrames += 1
+                for k in 0..<bins { candidate[k] += power[k] }
+                if candidateFrames >= minimumNoiseFrames {
+                    for k in 0..<bins { noise[k] = min(noise[k], candidate[k] / Float(candidateFrames)) }
+                    acceptedFrames += 1
+                }
+            } else {
+                candidateFrames = 0; candidateMinDb = .infinity; candidateMaxDb = -.infinity
+                candidate = [Float](repeating: 0, count: bins)
+            }
+        }
+        let hasNoise = acceptedFrames > 0 && params.amount > 0
+        // A percentile over active frames excludes long silences from gain
+        // decisions. Gain is constant for the take, preserving crescendos.
+        let activeStart = 105 // -55 dBFS
+        let activeCount = levelHistogram[activeStart...].reduce(0, +)
+        var cumulative = 0, activeDb = -24.0
+        if activeCount > 0 {
+            for index in activeStart...160 {
+                cumulative += levelHistogram[index]
+                if Double(cumulative) >= Double(activeCount) * 0.7 { activeDb = Double(index - 160); break }
+            }
+        }
+        let requestedGainDb = params.matchOriginalLevel || activeCount == 0 ? 0 : min(4 * params.amount, max(0, -24 - activeDb))
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("natural-pcm-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        var peak: Float = 0
+        do {
+            let temp = try AVAudioFile(forWriting: tempURL, settings: format.settings, commonFormat: .pcmFormatFloat32, interleaved: false)
+            var inputWindow = Array(repeating: [Float](repeating: 0, count: n), count: channels)
+            var overlap = inputWindow
+            var weights = [Float](repeating: 0, count: n)
+            var previousMask = [Float](repeating: 1, count: bins)
+            var spectraReal = inputWindow, spectraImaginary = inputWindow
+            var previousEnergy: Double = 0
+            var attackHold = 0
+            input.framePosition = 0
+            var start: AVAudioFramePosition = -AVAudioFramePosition(n - hop)
+            while start < input.length {
+                // Shift a rolling window; the source is read only sequentially.
+                for c in 0..<channels {
+                    for i in 0..<(n - hop) { inputWindow[c][i] = inputWindow[c][i + hop] }
+                    for i in (n - hop)..<n { inputWindow[c][i] = 0 }
+                }
+                if input.framePosition < input.length {
+                    try input.read(into: readBuffer, frameCount: AVAudioFrameCount(hop))
+                    if let samples = readBuffer.floatChannelData {
+                        for c in 0..<channels { for i in 0..<Int(readBuffer.frameLength) {
+                            inputWindow[c][n - hop + i] = samples[c][i].isFinite ? samples[c][i] : 0
+                        } }
+                    }
+                }
+                power = [Float](repeating: 0, count: bins)
+                var energy: Double = 0
+                for c in 0..<channels {
+                    for i in 0..<n {
+                        let value = inputWindow[c][i]
+                        spectraReal[c][i] = value * fft.window[i]
+                        spectraImaginary[c][i] = 0
+                        energy += Double(value * value)
+                    }
+                    fft.transform(&spectraReal[c], &spectraImaginary[c])
+                    for k in 0..<bins { power[k] = max(power[k], spectraReal[c][k] * spectraReal[c][k] + spectraImaginary[c][k] * spectraImaginary[c][k]) }
+                }
+                if energy > max(1e-10, previousEnergy * 2.5) { attackHold = 2 }
+                previousEnergy = energy
+                var mask = [Float](repeating: 1, count: bins)
+                var protected = [Bool](repeating: false, count: bins)
+                if hasNoise && attackHold == 0 {
+                    for k in 1..<(bins - 1) {
+                        // Never carve a clear harmonic, even a quiet sustained note.
+                        var neighbors: Float = 0; var neighborCount: Float = 0
+                        for offset in [-8, -6, -4, 4, 6, 8] {
+                            let j = k + offset
+                            if j > 0 && j < bins { neighbors += power[j]; neighborCount += 1 }
+                        }
+                        let tonal = power[k] > 5 * neighbors / max(1, neighborCount)
+                        protected[k] = tonal || power[k] > noise[k] * 6
+                        let hz = Double(k) * format.sampleRate / Double(n)
+                        let floor = Float(pow(10, -(hz < 120 ? 1 : 6) * params.amount / 20))
+                        if !protected[k] {
+                            mask[k] = sqrt(max(floor * floor, 1 - Float(params.amount * 1.2) * noise[k] / max(1e-20, power[k])))
+                        }
+                    }
+                    let unsmoothed = mask
+                    for k in 1..<(bins - 1) { mask[k] = protected[k] ? 1 : (unsmoothed[k - 1] + 2 * unsmoothed[k] + unsmoothed[k + 1]) / 4 }
+                }
+                for k in 0..<bins {
+                    // Open quickly for notes, close slowly for noise; no hard gate.
+                    let speed: Float = mask[k] > previousMask[k] ? 0.8 : 0.12
+                    previousMask[k] += speed * (mask[k] - previousMask[k])
+                    if attackHold > 0 || protected[k] { previousMask[k] = 1 }
+                    mask[k] = previousMask[k]
+                }
+                attackHold = max(0, attackHold - 1)
+                for c in 0..<channels {
+                    for k in 0..<n {
+                        let gain = mask[min(k, n - k)]
+                        spectraReal[c][k] *= gain; spectraImaginary[c][k] *= gain
+                    }
+                    fft.transform(&spectraReal[c], &spectraImaginary[c], inverse: true)
+                    for i in 0..<n { overlap[c][i] += spectraReal[c][i] * fft.window[i] }
+                }
+                for i in 0..<n { weights[i] += fft.window[i] * fft.window[i] }
+                if start >= 0 {
+                    let count = min(hop, Int(input.length - start))
+                    writeBuffer.frameLength = AVAudioFrameCount(count)
+                    for c in 0..<channels { for i in 0..<count {
+                        let value = overlap[c][i] / max(1e-8, weights[i])
+                        peak = max(peak, abs(value))
+                        writeBuffer.floatChannelData![c][i] = value
+                    } }
+                    try temp.write(from: writeBuffer)
+                }
+                for c in 0..<channels {
+                    for i in 0..<(n - hop) { overlap[c][i] = overlap[c][i + hop] }
+                    for i in (n - hop)..<n { overlap[c][i] = 0 }
+                }
+                for i in 0..<(n - hop) { weights[i] = weights[i + hop] }
+                for i in (n - hop)..<n { weights[i] = 0 }
+                start += AVAudioFramePosition(hop)
+            }
+        }
+        // Leave 1.5 dB sample headroom for encoding. No nonlinear limiter is
+        // needed: a measured, constant gain cannot flatten individual attacks.
+        let headroomGain = peak > 0 ? 0.841395 / Double(peak) : 1
+        let gain = params.amount == 0 ? 1 : min(pow(10, requestedGainDb / 20), headroomGain)
+        let pcmOutput = outputURL.pathExtension.lowercased() == "caf"
+        let outputSettings: [String: Any] = pcmOutput ? format.settings : [
+            AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: format.sampleRate,
+            AVNumberOfChannelsKey: channels, AVEncoderBitRateKey: channels == 1 ? 192000 : 256000,
+        ]
+        let cleaned = try AVAudioFile(forReading: tempURL)
+        let output = try AVAudioFile(forWriting: outputURL, settings: outputSettings, commonFormat: .pcmFormatFloat32, interleaved: false)
+        while cleaned.framePosition < cleaned.length {
+            try cleaned.read(into: readBuffer)
+            guard readBuffer.frameLength > 0 else { break }
+            for c in 0..<channels { for i in 0..<Int(readBuffer.frameLength) { readBuffer.floatChannelData![c][i] *= Float(gain) } }
+            try output.write(from: readBuffer)
+        }
+        return NaturalEnhancementReport(noiseProfileFound: hasNoise, gainDb: 20 * log10(max(1e-8, gain)), noiseFrames: acceptedFrames)
     }
 }

@@ -15,6 +15,7 @@ import { useTutorialAction } from '../context/TutorialContext'
 const SWIPE_THRESHOLD_PX = 36
 
 interface RecordingModeCarouselProps {
+  minimalRecord?: boolean
   value: RecordingMode
   onChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
@@ -39,6 +40,7 @@ function slotPosition(mode: RecordingMode, active: RecordingMode): SlotPosition 
 }
 
 interface ModeSlotProps {
+  minimalRecord?: boolean
   mode: RecordingMode
   position: SlotPosition
   isRecording: boolean
@@ -54,6 +56,7 @@ interface ModeSlotProps {
 }
 
 function ModeSlot({
+  minimalRecord = false,
   mode,
   position,
   isRecording,
@@ -133,6 +136,8 @@ function ModeSlot({
     >
       {isCenter && handsFreePhase === 'playback' ? (
         <Play className="record-carousel-slot-playback h-5 w-5" fill="currentColor" aria-hidden />
+      ) : isCenter && minimalRecord ? (
+        <span className={`open-lens-record-dot${isRecording ? ' is-recording' : ''}`} aria-hidden />
       ) : isCenter && isVideo ? (
         <RecordOrbitIcon recording={isRecording} />
       ) : isCenter && isRecording ? (
@@ -152,6 +157,7 @@ function ModeSlot({
 }
 
 function RecordingModeCarousel({
+  minimalRecord = false,
   value,
   onChange,
   onToggleRecord,
@@ -257,6 +263,7 @@ function RecordingModeCarousel({
       >
         <div className="record-carousel-track">
           <ModeSlot
+            minimalRecord={minimalRecord}
             mode="video"
             position="center"
             isRecording={isRecording}
@@ -288,6 +295,7 @@ function RecordingModeCarousel({
       >
         <div className="record-carousel-track">
           <ModeSlot
+            minimalRecord={minimalRecord}
             mode="audio"
             position="center"
             isRecording={isRecording}

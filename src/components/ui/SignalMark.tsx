@@ -5,8 +5,8 @@ export default function SignalMark() {
   const id = useId()
   return <svg className="signal-launch__mark" viewBox="0 0 200 200" width="110" height="110" aria-hidden="true">
     <defs>
-      <linearGradient id={`${id}-gold`} x2="0" y2="1"><stop stopColor="#ffd34c"/><stop offset="1" stopColor="#ff9a00"/></linearGradient>
-      <linearGradient id={`${id}-blue`} x2="0" y2="1"><stop stopColor="#31e5f5"/><stop offset="1" stopColor="#0876ff"/></linearGradient>
+      <linearGradient id={`${id}-gold`} x2="0" y2="1"><stop stopColor="#e8c779"/><stop offset="1" stopColor="#c38e36"/></linearGradient>
+      <linearGradient id={`${id}-blue`} x2="0" y2="1"><stop stopColor="#8ecde8"/><stop offset="1" stopColor="#2681bd"/></linearGradient>
     </defs>
     {[26, 52, 92, 140, 106, 66, 32].map((height, i) => <rect key={i}
       x={28 + i * 23} y={(200 - height) / 2} width="14" height={height} rx="7"

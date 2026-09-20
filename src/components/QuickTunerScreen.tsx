@@ -257,7 +257,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
     () => getTunerProfile(settings.tunerInstrument),
     [settings.tunerInstrument],
   )
-  const activeTransposition = getTunerTransposition(settings.tunerTransposition)
+  const activeTransposition = getTunerTransposition('concert')
   const showTuner = permissionChecked && permission === 'granted'
   // The header sat on "Live" while the stage still read "Checking microphone…",
   // and stayed there when the mic dropped and the retry prompt appeared.

@@ -27,6 +27,7 @@ assert.equal(instruments.describeHandsFreeGate(34), 'Loud gate')
 assert.equal(instruments.describeHandsFreeGate(16), 'Quiet gate')
 
 const routines = await load('src/utils/practiceRoutines.ts')
+const { normalizeDeskMetronome } = await load('src/utils/deskMetronome.ts')
 const presets = await load('src/utils/routinePresets.ts')
 
 const routine = presets.buildPresetRoutine(presets.getRoutinePresets('trumpet')[1], 'trumpet')
@@ -43,7 +44,7 @@ routines.saveRoutine(routine)
 const reloaded = routines.loadRoutine()
 assert.equal(reloaded?.id, routine.id)
 assert.equal(reloaded?.steps.length, routine.steps.length)
-assert.deepEqual(reloaded?.steps[0].desk?.metronome, routine.steps[0].desk?.metronome)
+assert.deepEqual(reloaded?.steps[0].desk?.metronome, normalizeDeskMetronome(routine.steps[0].desk?.metronome))
 
 const day = routines.loadRoutineDay(reloaded)
 assert.equal(day.date, routines.todayKey())
@@ -167,3 +168,15 @@ assert.equal(gate.busy, false, 'Failures release the navigation guard')
 await gate.run('retry', async () => { starts++ })
 assert.equal(starts, 2)
 console.log('Session flow checks passed: paused time, restart recovery, daily archive, plan isolation, skipped outcomes, storage errors, duplicate taps, competing navigation, and retry after failure.')
+
+localStorage.setItem = (key, value) => storage.set(key, value)
+const expandedDesk = { ...routines.blankDesk('audio'), metronome: normalizeDeskMetronome({ bpm: 137, meter: '7/8', soundId: 'woodblock' }) }
+expandedDesk.metronome.accentLevels[0] = 'silent'
+const expandedRoutine = routines.createRoutine('Expanded click', [routines.createStep({ title: 'Seven', kind: 'metro', desk: expandedDesk })], null)
+routines.saveRoutine(expandedRoutine)
+assert.deepEqual(routines.loadRoutine().steps[0].desk.metronome, expandedDesk.metronome, 'Full metronome settings survive save and reload')
+assert.equal(instruments.getInstrumentSettings('trumpet').tunerTransposition, 'concert')
+assert.equal(instruments.getInstrumentSettings('alto-sax')?.tunerTransposition ?? 'concert', 'concert')
+assert.equal(normalizeDeskMetronome({ meter: 'invalid', accentLevels: ['invalid'], bpm: -2 }).meter, '4/4')
+assert.equal(normalizeDeskMetronome({ accentLevels: ['invalid'] }).accentLevels[0], 'strong')
+console.log('PASS: expanded routine metronome roundtrip, migration, and concert instrument defaults')

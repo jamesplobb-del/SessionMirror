@@ -121,7 +121,7 @@ try {
   const layout={id:'one',panelCount:1,areas:['a'],columns:'1fr',rows:'1fr'}
   assert.equal((await exportMultitrackSession(project,layout,26)).ok,true)
   const payload=globalThis.exportCalls[0]
-  assert.equal(payload.aspectRatio,'1:1')
+  assert.equal(payload.aspectRatio,'9:16','export is portrait even for a legacy square project')
   assert.equal(payload.durationSeconds,28)
   assert.equal(payload.sources[0].id,'extra-1','floating layers render above base videos')
   assert.equal(payload.sources[0].insertAtSec,20,'extra is on screen for its count-off, not a pop-in')

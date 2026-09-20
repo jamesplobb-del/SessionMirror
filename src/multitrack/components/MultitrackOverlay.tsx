@@ -1,9 +1,10 @@
+import { nativeTakePlaybackEnhancerParams } from '../../utils/takePlaybackSpeaker'
 import { readMultitrackAsset } from '../state/readMultitrackAsset'
 import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { AudioLines, ChevronLeft, ChevronRight, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
+import { Activity, Timer, ChevronLeft, ChevronRight, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -67,7 +68,9 @@ import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
 import MultitrackAlignStage from './MultitrackAlignStage'
 import ProjectFileActions from './ProjectFileActions'
-import MultitrackPracticeOverlay from '../practiceWidgets/MultitrackPracticeOverlay'
+import MultitrackWorkspaceTools, { type MultitrackRoutine } from './MultitrackWorkspaceTools'
+import MultitrackLayoutSheet from './MultitrackLayoutSheet'
+import MultitrackCountInControls from './MultitrackCountInControls'
 
 /** Sheets portal to document.body; the overlay itself sits at z-135. */
 const MULTITRACK_SHEET_Z = { backdrop: 'z-[140]', sheet: 'z-[145]' }
@@ -81,6 +84,8 @@ const SHEET_FRAME_OPTIONS = [
 ] as const
 
 interface MultitrackOverlayProps {
+  routine?: MultitrackRoutine
+  onOpenRoutine?: () => void
   takesLoaded?: boolean
   isOpen: boolean
   takes: Take[]
@@ -175,7 +180,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take; mirrored: boolean } | null>(null)
   const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, export, visual or a tile's action sheet. */
-  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'project' | null>(null)
+  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'project' | 'tools' | 'layout' | 'click' | null>(null)
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
   const [layoutEditing, setLayoutEditing] = useState(false)
@@ -548,6 +553,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         label: panel.label || panel.take.name || `Box ${panelIndex + 1}`,
         path,
         sourceInSec,
+        enhancerParams: nativeTakePlaybackEnhancerParams(panel.take.enhancerBaked),
         sourceOutSec: window.sourceOutSec,
         ...(timelineDelaySec > 0 ? { timelineDelaySec } : null),
         volume: panel.volume ?? 1,
@@ -1313,7 +1319,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       headphoneNoticeShownForOpenRef.current = false
       return
     }
-    if (headphonesConnected || headphoneNoticeShownForOpenRef.current) return
+    if (!activePanel || isRestoring || !session.practice.clickEnabled || headphonesConnected || headphoneNoticeShownForOpenRef.current) return
     const timer = window.setTimeout(() => {
       if (!isOpen || isHeadphoneOutputActive() || headphoneNoticeShownForOpenRef.current) return
       headphoneNoticeShownForOpenRef.current = true
@@ -1325,24 +1331,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       })
     }, 400)
     return () => window.clearTimeout(timer)
-  }, [headphonesConnected, isOpen, showAlert])
-
-  /**
-   * A click track needs headphones. On the speaker it is picked up by the
-   * microphone and printed into the part, so the toggle explains that instead
-   * of silently recording a ruined take. The count-in is unaffected either way.
-   */
-  const requestClickToggle = useCallback(() => {
-    if (!session.practice.clickEnabled && !headphonesConnected) {
-      void showAlert({
-        title: 'Connect headphones for a click track',
-        message:
-          'On the speaker the click bleeds into your recording. Plug in or connect headphones (wired or Bluetooth) to run the click while you record. Your count-in still plays either way.',
-      })
-      return
-    }
-    updatePractice({ clickEnabled: !session.practice.clickEnabled })
-  }, [headphonesConnected, session.practice.clickEnabled, showAlert, updatePractice])
+  }, [activePanel, isRestoring, session.practice.clickEnabled, headphonesConnected, isOpen, showAlert])
 
   const handleSaveAlignChanges = useCallback(
     async (
@@ -1412,25 +1401,45 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     return sources
   }, [activePanelId, backingChipLabel, monitorMutes, session.backing.kind, session.backing.volume, session.panels, session.practice.clickEnabled])
 
+  const closeRecorder = () => {
+                if (isRecording && (recording.phase === 'idle' || recording.phase === 'review')) {
+                  discardNextRecordingRef.current = true
+                  onStopRecording()
+                }
+                if (pendingReview) {
+                  setPendingReview(null)
+                }
+                sync.setExcludePanelId(null)
+                sync.setReferencePanelIds(null)
+                sync.setMonitorMutedPanelIds([])
+                sync.pause()
+                pauseBacking()
+                recording.cancel()
+                recordStartSecRef.current = 0
+                setActivePanelId(null)
+                sync.seek(0)
+                playAllFromBeginningAfterRecordRef.current = true
+  }
+
   return createPortal(
     <>
       {projectFileBusy && <div className="multitrack-file-busy" role="alert" aria-live="polite"><strong>Preparing project file…</strong><span>Keeping your recordings and layout together.</span></div>}
       <AnimatePresence>
         {isOpen && (
-          <motion.div ref={shellRef} key="mt-overlay" className="multitrack-overlay multitrack-overlay--camera-mode" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={iosSpringSnappy} style={motionGpuLayer} role="dialog" aria-modal="true">
+          <motion.div ref={shellRef} key="mt-overlay" className="multitrack-overlay multitrack-overlay--camera-mode multitrack-quiet-workspace" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }} transition={iosSpringSnappy} style={motionGpuLayer} role="dialog" aria-modal="true">
             <header className="multitrack-overlay__header">
-              <Pressable type="button" intensity="soft" disabled={isExporting} onClick={onClose} aria-label="Return to Camera Mode" className="multitrack-camera-back">
+              <Pressable type="button" intensity="soft" disabled={isExporting || isRecording || isStopping || alignStageOpen} onClick={activePanel ? closeRecorder : onClose} aria-label={activePanel ? "Back to workspace" : "Return to Camera Mode"} className="multitrack-camera-back">
                 <ChevronLeft className="h-6 w-6" />
               </Pressable>
-              <button type="button" className="multitrack-camera-title multitrack-project-trigger" aria-label="Open project and parts" disabled={isRestoring || isExporting || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}>
-                <span><Video className="h-3 w-3" /> Camera Mode</span>
-                <h1 className="text-lg font-semibold">{session.name || 'Multitrack'} <FolderOpen className="h-4 w-4" /></h1>
+              <button type="button" className="multitrack-camera-title multitrack-project-trigger" aria-label="Open project and parts" disabled={isRestoring || isExporting || !!activePanel || alignStageOpen} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}>
+                <h1>{activePanel ? recording.phase === 'review' ? 'Review take' : 'Record a part' : 'Multitrack'}</h1>
+                <span>{session.name || 'My performance'}</span>
               </button>
               <Pressable
                 type="button"
                 intensity="normal"
                 onClick={() => { if (alignStageOpen) { void showAlert({ message: 'Tap Done in the editor to apply your timing changes before exporting.' }); return } pauseAllPlayback(); setActiveSourceSheet('export') }}
-                disabled={isRestoring || recording.phase !== 'idle'}
+                disabled={isRestoring || isExporting || !!activePanel || recording.phase !== 'idle'}
                 className="multitrack-share-btn"
               >
                 <Share2 className="h-4 w-4" />
@@ -1440,61 +1449,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             {isRestoring && !persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">Opening workspace…</p> : null}
             {persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">{persistenceNotice}</p> : null}
             <div inert={isRestoring || isExporting} className={`multitrack-overlay__body ${alignStageOpen ? 'multitrack-overlay__body--editing' : ''}`}>
-              <div className="multitrack-mix-strip" aria-label="Project audio sources" hidden={alignStageOpen}>
-                {/* Practice toggles lead the strip — they are tapped most and must
-                    stay reachable without scrolling past a long backing/file name. */}
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={requestClickToggle}
-                  className={`multitrack-source-chip ${session.practice.clickEnabled && headphonesConnected ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <span className="multitrack-source-chip__label">Click</span>
-                  <span className="multitrack-source-chip__state">
-                    {!session.practice.clickEnabled ? 'off' : headphonesConnected ? 'on' : 'count-in'}
-                  </span>
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={() => handlePracticeChange({
-                    showPitch: !session.practice.showPitch,
-                    practiceOverlayEnabled: true,
-                  })}
-                  className={`multitrack-source-chip ${session.practice.showPitch ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <AudioLines className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label">Pitch</span>
-                  <span className="multitrack-source-chip__state">
-                    {session.practice.showPitch ? 'on' : 'off'}
-                  </span>
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={() => setActiveSourceSheet('backing')}
-                  className={`multitrack-source-chip ${session.backing.kind !== 'none' ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <Music4 className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label multitrack-source-chip__label--truncate">{backingChipLabel}</span>
-                  {session.backing.kind !== 'none' ? <span className="multitrack-source-chip__dot" /> : null}
-                </Pressable>
-                <Pressable
-                  type="button"
-                  intensity="soft"
-                  onClick={() => {
-                    if (layoutSheetAsset) setActiveSourceSheet('visual')
-                    else sheetMusicInputRef.current?.click()
-                  }}
-                  className={`multitrack-source-chip ${layoutSheetAsset ? 'multitrack-source-chip--active' : ''}`}
-                >
-                  <FileMusic className="h-3.5 w-3.5" />
-                  <span className="multitrack-source-chip__label multitrack-source-chip__label--truncate">
-                    {layoutSheetAsset?.fileName ?? 'Music / photo / PDF'}
-                  </span>
-                  {layoutSheetAsset ? <span className="multitrack-source-chip__dot" /> : null}
-                </Pressable>
-              </div>
               {layoutEditing && <>
                 <div className="multitrack-studio-actions multitrack-arrange-actions">
                   <button disabled={!canUndo || isExporting} onClick={() => { pauseAllPlayback(); undo() }}>Undo</button>
@@ -1503,7 +1457,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 </div>
                 <p className="multitrack-arrange-hint">Select a box to move or resize it.</p>
               </>}
-              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio={session.aspectRatio} bpm={session.practice.bpm} editable={layoutEditing || alignStageOpen} interactionDisabled={isExporting || recording.phase !== 'idle' || sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
+              <MultitrackPanelGrid onDeleteExtra={id => updateProject({ panels: session.panels.filter(p => p.id !== id) })} aspectRatio="9:16" layoutStyle={session.layoutStyle} bpm={session.practice.bpm} editable={layoutEditing || alignStageOpen} interactionDisabled={isExporting || !!activePanel || recording.phase !== 'idle' || sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} onMoveOverlay={(id, rect) => { const panel = session.panels.find(p => p.id === id); updatePanel(id, panel?.kind === 'performance' && panel.overlay ? { overlay: rect } : { frame: rect }) }} layout={layout} panels={session.panels} sheetMusicPanel={session.sheetMusic} recordingTargetPanelId={activePanelId} recordingPhase={recording.phase}
                 streamRef={streamRef} streamGeneration={streamGeneration}
                 nativeLivePreviewActive={nativeLivePreviewActive} nativeCameraBridgeEnabled={nativeCameraBridgeEnabled}
                 countInRemaining={recording.countInRemaining} recordingElapsed={elapsed}
@@ -1517,89 +1471,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onEditSheetMusic={() => setActiveSourceSheet('visual')}
                 currentTimeSec={sync.state.currentTime}
                 onRegisterMedia={registerPanelMedia} />
+              {!alignStageOpen && <MultitrackWorkspaceTools practice={session.practice} onChange={handlePracticeChange} onOpenTools={() => setActiveSourceSheet('tools')}
+                streamRef={streamRef} mediaRef={masterMediaRef} tunerInstrument={tunerInstrument} busy={isRecording || isStopping || recording.phase !== 'idle'}
+                routine={props.routine} backingLabel={session.backing.kind !== 'none' ? backingChipLabel : undefined} onOpenBacking={() => setActiveSourceSheet('backing')}
+                musicLabel={layoutSheetAsset?.fileName} onOpenMusic={() => setActiveSourceSheet('visual')} />}
+
             </div>
             {/* The timeline editor docks under the live canvas rather than
                 covering it: the grid above IS the preview you are editing. */}
-            {alignStageOpen ? (
-              <MultitrackAlignStage
-                onPanelVolumeChange={setPanelVolume}
-                onPanelMuteToggle={setPanelMuted}
-                isOpen={alignStageOpen}
-                panels={session.panels.filter(
-                  (panel): panel is PerformancePanelState => panel.kind === 'performance',
-                )}
-                sheetMusic={session.sheetMusic}
-                bpm={session.practice.bpm}
-                sync={sync}
-                busy={isExporting || recording.phase !== 'idle'}
-                onClose={() => {
-                  pauseAllPlayback()
-                  setAlignStageOpen(false)
-                }}
-                onPreviewToggle={() => {
-                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
-                    pauseAllPlayback()
-                    return
-                  }
-                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
-                  playAllFromBeginningAfterRecordRef.current = false
-                  void playAllFromStart(startAt)
-                }}
-                onEditStart={pauseAllPlayback}
-                onAddBox={handleAddBoxAt}
-                onRecordBox={handleRecordBoxAt}
-                onAddImage={handleAddImageAt}
-                onAddPage={handleAddPageAt}
-                onMoveImage={moveSheetCue}
-                onRemoveImage={handleRemoveSheetImage}
-                onRestoreSheetMusic={sheetMusic => updateProject({ sheetMusic })}
-                onSectionChange={setPanelSection}
-                onDone={handleSaveAlignChanges}
-              />
-            ) : (
-              <>{sync.state.isPlaying && sync.state.preRollRemaining > 0 && <div className="multitrack-playback-count" role="status">Count in · {Math.min(4, Math.ceil(sync.state.preRollRemaining / (60 / session.practice.bpm)))}</div>}
-              <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
-                onAddPart={() => {
-                  pauseAllPlayback()
-                  const panelId = addPerformanceBox()
-                  if (!panelId) { void showAlert({ message: 'All twelve parts are filled. Tap a part to replace its recording.' }); return }
-                  openRecordingForPanel(panelId, 0)
-                }}
-                onOpenLayout={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}
-                onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
-                onTogglePlay={() => {
-                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
-                    pauseAllPlayback()
-                    return
-                  }
-                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
-                  playAllFromBeginningAfterRecordRef.current = false
-                  void playAllFromStart(startAt)
-                }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
-                  playAllFromBeginningAfterRecordRef.current = false
-                  if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
-                    pauseAllPlayback()
-                  }
-                  sync.seek(time)
-                }} /></>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {isOpen ? (
-        <MultitrackPracticeOverlay
-          className="multitrack-practice-overlay--screen"
-          boundaryRef={shellRef}
-          practice={session.practice}
-          isPlaying={sync.state.isPlaying || backingPlaying || isRecording || recording.phase === 'count-in' || recording.phase === 'arming'}
-          streamRef={streamRef}
-          tunerInstrument={tunerInstrument}
-          mediaRef={masterMediaRef}
-          mediaKey="multitrack-grid"
-          onHideMetronome={() => handlePracticeChange({ showMetronome: false })}
-          onHidePitch={() => handlePracticeChange({ showPitch: false })}
-        />
-      ) : null}
+            {activePanel ? (
       <AnimatePresence>
         {activePanel && isOpen && (
           <motion.div key="mt-recording-stage" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -1622,6 +1502,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                   : null
               }
               inGrid
+              dock
               reviewMediaRef={inGridReviewMediaRef}
               monitorSources={monitorSources}
               onToggleMonitorSource={toggleMonitorSource}
@@ -1683,26 +1564,74 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 handleRetryTake()
                 setActivePanelId(null)
               }}
-              onClose={() => {
-                if (isRecording && (recording.phase === 'idle' || recording.phase === 'review')) {
-                  discardNextRecordingRef.current = true
-                  onStopRecording()
-                }
-                if (pendingReview) {
-                  setPendingReview(null)
-                }
-                sync.setExcludePanelId(null)
-                sync.setReferencePanelIds(null)
-                sync.setMonitorMutedPanelIds([])
-                sync.pause()
-                pauseBacking()
-                recording.cancel()
-                recordStartSecRef.current = 0
-                setActivePanelId(null)
-                sync.seek(0)
-                playAllFromBeginningAfterRecordRef.current = true
-              }}
+              onClose={closeRecorder}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+            ) : alignStageOpen ? (
+              <MultitrackAlignStage
+                onPanelVolumeChange={setPanelVolume}
+                onPanelMuteToggle={setPanelMuted}
+                isOpen={alignStageOpen}
+                panels={session.panels.filter(
+                  (panel): panel is PerformancePanelState => panel.kind === 'performance',
+                )}
+                sheetMusic={session.sheetMusic}
+                bpm={session.practice.bpm}
+                sync={sync}
+                busy={isExporting || recording.phase !== 'idle'}
+                onClose={() => {
+                  pauseAllPlayback()
+                  setAlignStageOpen(false)
+                }}
+                onPreviewToggle={() => {
+                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+                    pauseAllPlayback()
+                    return
+                  }
+                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
+                  playAllFromBeginningAfterRecordRef.current = false
+                  void playAllFromStart(startAt)
+                }}
+                onEditStart={pauseAllPlayback}
+                onAddBox={handleAddBoxAt}
+                onRecordBox={handleRecordBoxAt}
+                onAddImage={handleAddImageAt}
+                onAddPage={handleAddPageAt}
+                onMoveImage={moveSheetCue}
+                onRemoveImage={handleRemoveSheetImage}
+                onRestoreSheetMusic={sheetMusic => updateProject({ sheetMusic })}
+                onSectionChange={setPanelSection}
+                onDone={handleSaveAlignChanges}
+              />
+            ) : (
+              <>{sync.state.isPlaying && sync.state.preRollRemaining > 0 && <div className="multitrack-playback-count" role="status">Count in · {Math.min(4, Math.ceil(sync.state.preRollRemaining / (60 / session.practice.bpm)))}</div>}
+              <MultitrackToolbar isPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing} currentTime={sync.state.currentTime} duration={sync.state.duration}
+                onAddPart={() => {
+                  pauseAllPlayback()
+                  const panelId = addPerformanceBox()
+                  if (!panelId) { void showAlert({ message: 'All twelve parts are filled. Tap a part to replace its recording.' }); return }
+                  setTileSheetPanelId(panelId)
+                }}
+                onOpenLayout={() => { pauseAllPlayback(); setActiveSourceSheet('layout') }}
+                onOpenAlign={() => { setLayoutEditing(false); setAlignStageOpen(true) }}
+                onTogglePlay={() => {
+                  if (sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing) {
+                    pauseAllPlayback()
+                    return
+                  }
+                  const startAt = playAllFromBeginningAfterRecordRef.current ? 0 : sync.state.currentTime
+                  playAllFromBeginningAfterRecordRef.current = false
+                  void playAllFromStart(startAt)
+                }} onRestart={() => void playAllFromStart()} onSeek={(time) => {
+                  playAllFromBeginningAfterRecordRef.current = false
+                  if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
+                    pauseAllPlayback()
+                  }
+                  sync.seek(time)
+                }} /></>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -2034,7 +1963,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       >
         <div className="multitrack-sheet">
           <p className="multitrack-sheet__title">
-            {tileSheetTake ? tileSheetTake.name || 'This tile' : 'What goes here?'}
+            {tileSheetTake ? tileSheetTake.name || 'Part options' : 'Add a part'}
           </p>
           <div className="multitrack-sheet__primary-row">
             <Pressable
@@ -2047,7 +1976,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               }}
             >
               <Video className="h-6 w-6" />
-              {tileSheetTake ? 'Record again' : 'Record'}
+              {tileSheetTake ? 'Record another take' : 'Record a new part'}
             </Pressable>
             <Pressable
               type="button"
@@ -2059,7 +1988,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               }}
             >
               <FolderOpen className="h-6 w-6" />
-              Take Vault
+              From Take Vault
             </Pressable>
           </div>
           {!tileSheetTake ? (
@@ -2138,6 +2067,27 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         </div>
       </AnimatedBottomSheet>
 
+
+      <AnimatedBottomSheet isOpen={activeSourceSheet === 'tools' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Workspace tools" elevated elevatedLight zClass={{ backdrop: 'z-[155]', sheet: 'z-[160]' }} maxHeightClass="max-h-[80vh]">
+        <div className="multitrack-sheet multitrack-quiet-tools-sheet"><header className="multitrack-tools-sheet-header"><h2>Workspace tools</h2><button onClick={() => setActiveSourceSheet(null)}>Done</button></header><p>Choose the widgets you want to keep open.</p>
+          <h3>Practice</h3><div className="multitrack-quiet-option-list">
+            <button aria-pressed={session.practice.showPitch} onClick={() => { handlePracticeChange({ showPitch: !session.practice.showPitch, practiceOverlayEnabled: true }) }}><Activity /><span><strong>Tuner</strong><small>Live pitch in your workspace</small></span><small>{session.practice.showPitch ? 'Remove' : 'Pin'}</small></button>
+            <button aria-pressed={session.practice.showMetronome} onClick={() => { handlePracticeChange({ showMetronome: !session.practice.showMetronome, practiceOverlayEnabled: true }) }}><Timer /><span><strong>Click & tempo</strong><small>{session.practice.bpm} BPM · {session.practice.meter ?? '4/4'}</small></span><small>{session.practice.showMetronome ? 'Remove' : 'Pin'}</small></button>
+          </div>
+          <h3>Media</h3><div className="multitrack-quiet-option-list">
+            <button disabled={!!activePanel} onClick={() => setActiveSourceSheet('backing')}><Music4 /><span><strong>Backing track</strong><small>{backingChipLabel}</small></span><ChevronRight /></button>
+            <button disabled={!!activePanel} onClick={() => { if (layoutSheetAsset) setActiveSourceSheet('visual'); else { setActiveSourceSheet(null); sheetMusicInputRef.current?.click() } }}><FileMusic /><span><strong>Music / photo / PDF</strong><small>{layoutSheetAsset?.fileName || 'Add a visual to your composition'}</small></span><ChevronRight /></button>
+          </div>
+          <h3>Setup</h3><div className="multitrack-quiet-option-list"><button disabled={isRecording || isStopping || recording.phase !== 'idle'} onClick={() => setActiveSourceSheet('click')}><SlidersHorizontal /><span><strong>Click & count-in</strong><small>Count-in bars, tempo, time, and sound</small></span><ChevronRight /></button></div>
+        </div>
+      </AnimatedBottomSheet>
+      <AnimatedBottomSheet isOpen={activeSourceSheet === 'click' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Click and count-in" elevated elevatedLight zClass={{ backdrop: 'z-[155]', sheet: 'z-[160]' }} maxHeightClass="max-h-[70vh]">
+        <div className="multitrack-sheet"><h2 className="multitrack-sheet__title">Click & count-in</h2><MultitrackCountInControls practice={session.practice} onChange={handlePracticeChange} hasBacking={session.backing.kind !== 'none'} /></div>
+      </AnimatedBottomSheet>
+      <AnimatedBottomSheet isOpen={activeSourceSheet === 'layout' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Layout" elevated elevatedLight zClass={MULTITRACK_SHEET_Z} maxHeightClass="max-h-[90vh]">
+        {activeSourceSheet === 'layout' && <MultitrackLayoutSheet key={session.projectId} session={session} onCancel={() => setActiveSourceSheet(null)} onApply={draft => { updateProject({ layoutId: draft.layoutId, panels: draft.panels, aspectRatio: '9:16', layoutStyle: draft.layoutStyle }); setActiveSourceSheet(null) }} />}
+      </AnimatedBottomSheet>
+
       {/* Backing source sheet. */}
       <AnimatedBottomSheet
         isOpen={activeSourceSheet === 'backing' && isOpen}
@@ -2197,9 +2147,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
             <p>Send your parts. Your friend adds theirs and sends the project back.</p>
           </div>
           <div className="multitrack-project-panel">
-            <label>Video format<select disabled={isExporting} value={session.aspectRatio ?? '9:16'} onChange={e => updateProject({ aspectRatio: e.target.value as '9:16' | '16:9' | '1:1' })}>
-              <option value="9:16">Portrait · Reels / Stories</option><option value="16:9">Landscape</option><option value="1:1">Square</option>
-            </select></label>
+            <p>Portrait video · 9:16</p>
             <label>End at (seconds)<input disabled={isExporting} type="number" min={.1} step={.1} placeholder={`Auto · ${sync.state.duration.toFixed(1)} seconds`} value={session.endSec ?? ''} onChange={e => updateProject({ endSec: e.target.value === '' ? undefined : Math.max(.1, Number(e.target.value)) })} /></label>
             <p>Leave the ending blank to include the longest part. Your practice click is not added to the exported mix.</p>
             {session.backing.kind === 'youtube' && <p>YouTube is a practice reference only. Import an audio file to include backing music in your export.</p>}

@@ -1,3 +1,4 @@
+import type { TunerInputAdvice } from '../utils/tunerInputAdvice'
 import { reportFeatureAction } from '../utils/featureGuidance'
 import { createTunerTrace, type TunerTrace } from '../utils/tunerTrace'
 import TunerHistory from './audioPractice/TunerHistory'
@@ -225,7 +226,7 @@ function StatusLabel({
   )
 }
 
-function LiveAudioTunerPane({
+export function LiveAudioTunerPane({
   readout,
   canvasRef,
   drone,
@@ -460,7 +461,7 @@ function LiveAudioTunerPane({
                   onClick={toggleTransposition}
                   aria-expanded={transpositionOpen}
                   aria-controls="pitch-living-transposition-panel"
-                  aria-label={`Open tuner settings. Written pitch ${transposition.shortLabel}`}
+                  aria-label={`Open tuner settings. Concert pitch`}
                   title={transpositionOpen ? 'Hide tuner settings' : `Tuner settings · ${transposition.shortLabel}`}
                 >
                   <Settings className="electric-tuning-old" aria-hidden /><SlidersHorizontal className="electric-tuning-new" aria-hidden />
@@ -519,6 +520,7 @@ function LiveAudioTunerPane({
                   transition={{ type: 'spring', stiffness: 390, damping: 36 }}
                 >
                   <TunerTranspositionMenu
+                    concertOnly
                     value={tunerTransposition}
                     onChange={selectTransposition}
                     onClose={toggleTransposition}
@@ -557,7 +559,7 @@ function LiveAudioTunerPane({
  * the same gauge, and the same tint easing along the line color. Only the tool
  * rail is left behind — the drone and transposition live in the tab.
  */
-function LivingPitchWidgetPane({
+export function LivingPitchWidgetPane({
   readout,
   canvasRef,
   inTuneGlow = 0,
@@ -613,7 +615,7 @@ function LivePitchTunerAudio({
   liveMicEnabled,
   micStreamRef,
   tunerInstrument = 'voice',
-  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  tunerTransposition: _requestedTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
   hapticsEnabled,
@@ -641,6 +643,9 @@ function LivePitchTunerAudio({
   audioToolsEnabled?: boolean
   nativePitchProcessing?: boolean
 }) {
+  const tunerTransposition = DEFAULT_TUNER_TRANSPOSITION
+  const [inputAdvice, setInputAdvice] = useState<TunerInputAdvice>(null)
+  useEffect(() => { setInputAdvice(null) }, [tunerInstrument, enabled])
   const pitchHistoryRef = useRef<TunerHistorySample[]>([])
   const visualTraceRef = useRef<TunerTrace>(createTunerTrace())
   useEffect(() => { pitchHistoryRef.current = []; visualTraceRef.current = createTunerTrace() }, [tunerInstrument, tunerTransposition])
@@ -732,7 +737,10 @@ function LivePitchTunerAudio({
       preferNativeAudioTap: true,
       retryNativeTapOnInteractiveRecovery: liveMicOnly,
       onSourceHealthChange: onLiveSourceHealthChange,
-      onInputAdvice: (advice: 'quiet' | 'loud') => reportFeatureAction(`tuner-input-${advice}`),
+      onInputAdvice: (advice: TunerInputAdvice) => {
+        setInputAdvice(advice)
+        if (advice) reportFeatureAction(`tuner-input-${advice}`)
+      },
       onAcceptedPitchFrame: liveMicOnly ? handleAcceptedPitchFrame : undefined,
     }),
     [
@@ -788,6 +796,12 @@ function LivePitchTunerAudio({
 
   return (
     <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col">
+      {enabled && inputAdvice === 'unpitched' && tunerInstrument === 'winds' && (
+        <div className="tuner-input-advice" role="status">
+          <span>Sound detected, but no steady pitch. Singing? Try Voice mode.</span>
+          {onTunerInstrumentChange && <button type="button" onClick={() => onTunerInstrumentChange('voice')}>Use Voice</button>}
+        </div>
+      )}
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={paneKey}
@@ -857,7 +871,7 @@ export default function LivePitchTuner({
   micStreamRef,
   persistWhenPaused = false,
   tunerInstrument = 'voice',
-  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  tunerTransposition: _requestedTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
   hapticsEnabled,
@@ -868,6 +882,7 @@ export default function LivePitchTuner({
   audioToolsEnabled = true,
   nativePitchProcessing = false,
 }: LivePitchTunerProps) {
+  const tunerTransposition = DEFAULT_TUNER_TRANSPOSITION
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
   const isAudio = variant === 'audio'

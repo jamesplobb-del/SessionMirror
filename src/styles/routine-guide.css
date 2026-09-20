@@ -710,3 +710,31 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 
 /* Music pinned to a step: the file lives in the item's folder, the routine only
    remembers that this step opens on it. */
+
+/* Every tool owns one complete row, including its hint and expanded controls. */
+.routine-guide-editor .routine-tools { gap: 0; }
+.routine-guide-editor .routine-tools > .routine-tool { padding: 14px 0; border: 0; border-bottom: 1px solid var(--guide-line); }
+.routine-guide-editor .routine-tools > .routine-tool:last-child { border-bottom: 0; }
+.routine-guide-editor .routine-tool .routine-tool__toggle { padding: 0; min-height: 44px; border: 0; font-family: inherit; }
+.routine-guide-editor .routine-tool__toggle strong { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.routine-guide-editor .routine-tool__hint { margin: 4px 0 0; font-size: 13px; }
+.routine-guide-editor .routine-metronome-controls { margin-top: 14px; }
+.routine-guide-editor .routine-tool .routine-stepper--wide { margin: 0 0 12px; }
+.routine-guide-editor .routine-metronome-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.routine-guide-editor .routine-metronome-fields label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--guide-muted); }
+.routine-guide-editor .routine-metronome-controls :is(select, input) { min-width: 0; width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--guide-line); border-radius: 12px; background: var(--guide-bg); color: var(--guide-ink); font: inherit; font-size: 14px; }
+.routine-guide-editor .routine-tempo-field { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--guide-muted); font-size: 11px; }
+.routine-guide-editor .routine-tempo-field input { width: 64px; text-align: center; }
+.routine-guide-editor .routine-metronome-accents { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.routine-guide-editor .routine-metronome-accents > span { width: 100%; color: var(--guide-muted); font-size: 12px; }
+.routine-guide-editor .routine-metronome-accents button { min-width: 44px; min-height: 48px; padding: 6px; border: 1px solid var(--guide-line); border-radius: 10px; background: var(--guide-bg); color: var(--guide-ink); }
+.routine-guide-editor .routine-metronome-accents small { display: block; font-size: 9px; }
+.routine-guide-editor .routine-metronome-accents [data-accent='strong'] { background: var(--guide-selected); border-color: var(--guide-accent); color: var(--guide-accent); }
+.routine-guide-editor .routine-tool .routine-stepper--wide { display: grid; grid-template-columns: 44px minmax(80px, 1fr) 44px minmax(68px, 1fr); width: 100%; gap: 6px; padding: 0; background: transparent; }
+.routine-guide-editor .routine-stepper button { width: 44px; height: 44px; border: 1px solid var(--guide-line); background: var(--guide-bg); color: var(--guide-ink); }
+.routine-guide-editor .routine-tempo-field { justify-content: center; }
+.routine-guide-editor .routine-tempo-field input { flex-shrink: 0; padding-inline: 4px; }
+@media (max-width: 480px) {
+  .routine-guide-editor .routine-tool .routine-stepper--wide { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .routine-guide-editor .routine-stepper--wide > select { grid-column: 1 / -1; }
+}

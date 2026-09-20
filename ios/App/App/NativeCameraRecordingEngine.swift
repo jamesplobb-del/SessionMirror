@@ -441,8 +441,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     /// invalidated by a media-services reset — rebuild and restart it. Cheap and
     /// idempotent when everything is already healthy, so callers can invoke it
     /// freely from any lifecycle hook.
-    func ensureSessionHealthy(reason: String) {
+    func ensureSessionHealthy(reason: String, completion: (() -> Void)? = nil) {
         sessionQueue.async { [weak self] in
+            defer { completion?() }
             guard let self = self else { return }
 
             // Hands-free in Tools owns the audio-only capture session without a
@@ -498,6 +499,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                self.session.isRunning,
                self.isSessionConfigured,
                !self.needsFullReconfigureAfterMediaReset,
+               !self.needsAudioPipelineRebuild,
                (!self.isBridgePreviewActive || CACurrentMediaTime() - self.lastBridgeFrameTime < 2.5),
                (!self.isTunerMonitorActive || (self.lastAudioTapSampleTime > 0 && CACurrentMediaTime() - self.lastAudioTapSampleTime < 2.5)) {
                 return
@@ -528,6 +530,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.session.isRunning &&
                 self.isSessionConfigured &&
                 !self.needsFullReconfigureAfterMediaReset &&
+                !self.needsAudioPipelineRebuild &&
                 (
                     !self.isTunerMonitorActive ||
                     (
@@ -552,20 +555,22 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             print("[NativeCameraRecovery][\(reason)] session unhealthy — running recovery attempt \(self.consecutiveRecoveryAttempts) (isRunning=\(self.session.isRunning) configured=\(self.isSessionConfigured) needsRebuild=\(self.needsFullReconfigureAfterMediaReset))")
 
             if self.isTunerMonitorActive &&
-                (self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured) {
+                (self.needsFullReconfigureAfterMediaReset || self.needsAudioPipelineRebuild || !self.isSessionConfigured) {
                 do {
                     try self.configureAudioOnlyCaptureSession()
+                    self.needsAudioPipelineRebuild = false
                     self.needsFullReconfigureAfterMediaReset = false
                 } catch {
                     print("[NativeTunerMonitor][\(reason)] rebuild failed: \(error.localizedDescription)")
                     return
                 }
-            } else if self.needsFullReconfigureAfterMediaReset || !self.isSessionConfigured {
+            } else if self.needsFullReconfigureAfterMediaReset || self.needsAudioPipelineRebuild || !self.isSessionConfigured {
                 print("[NativeCameraRecovery][\(reason)] rebuilding capture session from scratch")
                 do {
                     let configuredOutput = try self.configureCaptureSession(useFrontCamera: self.previewUsesFrontCamera)
                     self.movieOutput = configuredOutput
                     self.isSessionConfigured = true
+                    self.needsAudioPipelineRebuild = false
                     self.needsFullReconfigureAfterMediaReset = false
                 } catch {
                     print("[NativeCameraRecovery][\(reason)] rebuild failed: \(error.localizedDescription)")
@@ -1593,12 +1598,15 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             // is queued/no-op during preview), so honor it here with an
             // input-only setPreferredInput that never disturbs capture.
             activeAudioProfile = audioSessionProfile
+            let micPreferenceChanged = activeMicInputPreference != micInputPreference
             activeMicInputPreference = micInputPreference
             do {
-                _ = try AudioRouteConfigurator.applyMicInputPreferenceInputOnly(
-                    micInputPreference,
-                    caller: "startOnSessionQueue.previewActive"
-                )
+                if micPreferenceChanged {
+                    _ = try AudioRouteConfigurator.applyMicInputPreferenceInputOnly(
+                        micInputPreference,
+                        caller: "startOnSessionQueue.previewActive"
+                    )
+                }
             } catch {
                 print("[MicRouteProof] context=startOnSessionQueue.previewActive inputOnly apply failed: \(error.localizedDescription)")
             }
@@ -1610,8 +1618,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             needsAudioPipelineRebuild ||
             (!previewAlreadyActive && previewUsesFrontCamera != useFrontCamera)
         if needsCaptureReconfigure {
-            if previewAlreadyActive {
-                print("[NativeCameraTest] WARNING: capture reconfigure requested while preview is live — skipping to preserve movie audio connection")
+            // Rebuild a known stale audio pipeline before opening the movie.
+            // A live video preview alone does not prove the microphone is healthy.
+            if previewAlreadyActive && !needsAudioPipelineRebuild && movieOutput != nil {
+                print("[NativeCameraTest] preserving healthy preview capture session")
             } else {
                 let configuredOutput = try configureCaptureSession(useFrontCamera: useFrontCamera)
                 movieOutput = configuredOutput
@@ -1637,6 +1647,12 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         let timestamp = Int(Date().timeIntervalSince1970 * 1000)
         let filename = "native-camera-test-\(timestamp).mp4"
         let fileURL = takesDir.appendingPathComponent(filename)
+        guard let audioConnection = movieOutput?.connection(with: .audio) else {
+            throw NSError(domain: "NativeCameraTest", code: 14, userInfo: [
+                NSLocalizedDescriptionKey: "The microphone is unavailable. Reconnect your headphones and try again."
+            ])
+        }
+        audioConnection.isEnabled = true
         outputURL = fileURL
         beginAudioFallbackCapture(for: fileURL)
 

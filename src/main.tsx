@@ -27,6 +27,9 @@ import { installFakeMediaDevices } from './utils/fakeMediaDevices'
 
 document.documentElement.dataset.refinement = 'depth-electric'
 document.documentElement.dataset.arcadeStyle = 'arcade-pop'
+document.documentElement.id = 'lens-design-system'
+document.documentElement.classList.add('lens-system')
+document.documentElement.dataset.lensFinish = 'glass'
 
 async function bootstrap() {
   // Before anything can touch mediaDevices. No-op unless VITE_FAKE_MEDIA=1.
@@ -80,3 +83,10 @@ import './styles/signal-launch.css'
 import './styles/midnight-electric.css'
 
 import './styles/reactive-silk-tuner.css'
+import './styles/open-lens.css'
+// The approved multitrack workspace is scoped independently of Camera's controls.
+import './styles/multitrack-quiet.css'
+
+// Approved shared presentation; capture and playback remain in their existing components.
+import './styles/open-lens-system.css'
+import './styles/pocket-arcade.css'

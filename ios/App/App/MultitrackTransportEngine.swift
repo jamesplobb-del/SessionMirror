@@ -19,6 +19,7 @@ final class MultitrackTransportEngine {
         let timelineDelaySec: Double
         let volume: Float
         let muted: Bool
+        let enhancerParams: AudioEnhancerParams?
     }
 
     struct StartResult {
@@ -45,6 +46,14 @@ final class MultitrackTransportEngine {
         let sourceModificationDate: Date?
         let audioURL: URL
     }
+
+    private struct EnhancedAudioCacheEntry {
+        let sourceSize: Int
+        let sourceModificationDate: Date?
+        let params: AudioEnhancerParams
+        let audioURL: URL
+    }
+    private var enhancedAudioCache: [String: EnhancedAudioCacheEntry] = [:]
 
     private let engine = AVAudioEngine()
     private let clickNode = AVAudioPlayerNode()
@@ -396,11 +405,44 @@ final class MultitrackTransportEngine {
             let seconds = CMTimeGetSeconds($0.timeRange.start)
             return seconds.isFinite ? max(0, seconds) : 0
         } ?? 0
+        let original: AVAudioFile
         do {
-            return (try AVAudioFile(forReading: source.url), audioTrackStartSec)
+            original = try AVAudioFile(forReading: source.url)
         } catch {
-            let extractedURL = try extractedAudioURL(for: source)
-            return (try AVAudioFile(forReading: extractedURL), audioTrackStartSec)
+            original = try AVAudioFile(forReading: extractedAudioURL(for: source))
+        }
+        guard let params = source.enhancerParams else { return (original, audioTrackStartSec) }
+        let values = try source.url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
+        let key = source.url.standardizedFileURL.path
+        if let cached = enhancedAudioCache[key], cached.params == params,
+           cached.sourceSize == values.fileSize ?? 0,
+           cached.sourceModificationDate == values.contentModificationDate,
+           FileManager.default.fileExists(atPath: cached.audioURL.path) {
+            return (try AVAudioFile(forReading: cached.audioURL), audioTrackStartSec)
+        }
+        let output = try extractionDirectoryURL().appendingPathComponent("enhanced-\(UUID().uuidString).m4a")
+        do {
+            // Manual rendering leaves the live headphone/capture session alone.
+            // Preserve the exact source duration and its original timeline origin.
+            try AudioEnhancerRenderer.renderEnhancedAudio(
+                inputFile: original, outputURL: output, params: params, tailSeconds: 0
+            )
+            let file = try AVAudioFile(forReading: output)
+            if let old = enhancedAudioCache.removeValue(forKey: key) {
+                try? FileManager.default.removeItem(at: old.audioURL)
+            }
+            if enhancedAudioCache.count >= 24, let oldest = enhancedAudioCache.keys.sorted().first,
+               let removed = enhancedAudioCache.removeValue(forKey: oldest) {
+                try? FileManager.default.removeItem(at: removed.audioURL)
+            }
+            enhancedAudioCache[key] = EnhancedAudioCacheEntry(
+                sourceSize: values.fileSize ?? 0, sourceModificationDate: values.contentModificationDate,
+                params: params, audioURL: output
+            )
+            return (file, audioTrackStartSec)
+        } catch {
+            try? FileManager.default.removeItem(at: output)
+            throw error
         }
     }
 

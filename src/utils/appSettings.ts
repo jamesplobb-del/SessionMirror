@@ -280,7 +280,7 @@ export interface AutoRecordProfile {
 }
 
 /** Per-slider detection profile; start detection always requires sustained RMS. */
-export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
+function getBaseAutoRecordProfile(sliderValue: number): AutoRecordProfile {
   const baseGate = volumeThresholdToLevel(sliderValue)
   const t = clamp(sliderValue, 1, 100)
 
@@ -326,5 +326,26 @@ export function getAutoRecordProfile(sliderValue: number): AutoRecordProfile {
     attackPeakRatio: 1.75,
     gateCapMultiplier: 3,
     stopGateRatio: 0.42,
+  }
+}
+
+/** Tune the automatic gate for the selected instrument's acoustic output. */
+export function getAutoRecordProfile(
+  sliderValue: number,
+  instrumentFamily: 'Brass' | 'Woodwind' | 'Strings' | 'Voice & keys' | undefined = undefined,
+): AutoRecordProfile {
+  const profile = getBaseAutoRecordProfile(sliderValue)
+  if (!instrumentFamily) return profile
+
+  const noiseFactor =
+    instrumentFamily === 'Brass' ? 1.18
+      : instrumentFamily === 'Woodwind' ? 1.08
+        : instrumentFamily === 'Strings' ? 0.96
+          : 0.92
+  const holdFactor = instrumentFamily === 'Brass' ? 1.08 : instrumentFamily === 'Strings' ? 0.9 : 1
+  return {
+    ...profile,
+    noiseHeadroom: profile.noiseHeadroom * noiseFactor,
+    holdMs: Math.round(profile.holdMs * holdFactor),
   }
 }

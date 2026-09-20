@@ -365,7 +365,7 @@ export interface PitchTrackerOptions {
   retryNativeTapOnInteractiveRecovery?: boolean
   /** Reports source delivery health without treating musical silence as a failure. */
   onSourceHealthChange?: (health: PitchSourceHealth) => void
-  onInputAdvice?: (advice: 'quiet' | 'loud') => void
+  onInputAdvice?: (advice: TunerInputAdvice) => void
   /** Accepted detector frames for lightweight derived analytics such as Pitch Insights. */
   onAcceptedPitchFrame?: (frame: AcceptedPitchFrame | null) => void
 }
@@ -2897,9 +2897,12 @@ export function useLivePitchTracker(
         if (source === 'microphone' && inputAdviceCallbackRef.current) {
           const level = nativeTap?.nativePitchOnly
             ? nativeTap.estimate?.rmsDb ?? -160 : bufferRmsDb(graph.buffer)
-          const advice = tunerInputAdvice(level, rmsGate, rawPitch, clarity)
+          const advice = tunerInputAdvice(level, rmsGate, rawPitch, clarity, clarityMin)
           const previous = inputAdviceRef.current
-          if (advice !== previous.kind) inputAdviceRef.current = { kind: advice, since: now, sent: false }
+          if (advice !== previous.kind) {
+            inputAdviceRef.current = { kind: advice, since: now, sent: false }
+            inputAdviceCallbackRef.current(null)
+          }
           else if (advice && !previous.sent && now - previous.since >= 5000) {
             previous.sent = true
             inputAdviceCallbackRef.current(advice)

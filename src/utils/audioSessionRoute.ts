@@ -138,6 +138,8 @@ export interface NativeMultitrackRenderResult {
 }
 
 export interface NativeMultitrackMonitorSource {
+  /** Omitted for original playback and already-enhanced takes. */
+  enhancerParams?: Record<string, number>
   id: string
   /** Friendly name used when a source cannot be decoded. */
   label?: string
@@ -264,6 +266,9 @@ export interface BestTakeAudioPluginType {
   /** Composites N synced videos into one grid + optional sheet-music overlay + mixed audio. */
   cancelMultitrackExport(options: { exportId: string }): Promise<void>
   renderMultitrackVideo(options: {
+    /** Radius in a 390-point portrait canvas; ordered back to front. */
+    cornerRadius?: number
+    cornerWindows?: Array<{ startSec: number; endSec: number; rects: NativeRectPercent[] }>
     exportId?: string
     aspectRatio: string
     durationSeconds: number
@@ -379,6 +384,7 @@ export interface BestTakeAudioPluginType {
   /** Cheap, idempotent resync: rebuilds/restarts the native capture session if it should be active but AVFoundation left it stopped/invalid. */
   ensureNativeCameraSessionHealthy(): Promise<CameraSessionStateSnapshot>
   enhanceTakeAudio(options: {
+    preview?: boolean
     url: string
     mediaType: 'video' | 'audio'
     params: Record<string, number>

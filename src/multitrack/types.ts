@@ -114,6 +114,7 @@ export type MultitrackBackingTrack =
 export type MultitrackAspectRatio = '9:16' | '16:9' | '1:1'
 
 export interface MultitrackSession {
+  layoutStyle?: import('./layout/quietWorkspaceLayout').MultitrackLayoutStyle
   projectId?: string
   name?: string
   aspectRatio?: MultitrackAspectRatio

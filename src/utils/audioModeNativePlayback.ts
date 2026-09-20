@@ -1,3 +1,4 @@
+import { prepareNaturalTakePreview } from './naturalTakePreview'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import {
   prepareInlineTakeBoxPlaybackRoute,
@@ -33,6 +34,7 @@ export function shouldUseAudioModeNativePlayback(item: {
   return mime.startsWith('audio') || item.filePath.endsWith('.m4a')
 }
 
+let playbackGeneration = 0
 let endedHandler: (() => void) | null = null
 let endedListenerInstalled = false
 export function setAudioModeNativePlaybackEndedHandler(handler: (() => void) | null): void {
@@ -60,6 +62,7 @@ export async function startAudioModeNativePlayback(options: {
 }): Promise<{ duration: number } | null> {
   if (!shouldUseAudioModeNativePlayback({ filePath: options.filePath })) return null
 
+  const generation = ++playbackGeneration
   const fileURL = await resolveNativeFileUri(options.filePath)
   if (!fileURL) {
     console.warn('[AudioModeNativePlayback] could not resolve file URI', options.filePath)
@@ -80,8 +83,10 @@ export async function startAudioModeNativePlayback(options: {
       : 0
 
   try {
+    const url = await prepareNaturalTakePreview(fileURL, 'audio')
+    if (generation !== playbackGeneration) return null
     const result = await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
-      url: fileURL,
+      url,
       x: HEADLESS_INLINE_LAYOUT.x,
       y: HEADLESS_INLINE_LAYOUT.y,
       width: HEADLESS_INLINE_LAYOUT.width,
@@ -89,7 +94,7 @@ export async function startAudioModeNativePlayback(options: {
       cornerRadius: HEADLESS_INLINE_LAYOUT.cornerRadius,
       volume: 1,
       audioOnly: true,
-      loudnessGainDb: gainDb,
+      loudnessGainDb: url === fileURL ? gainDb : 0,
       ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
       startTime,
     })
@@ -116,6 +121,7 @@ export async function releaseAudioModeNativePlaybackRoute(): Promise<void> {
 }
 
 export async function stopAudioModeNativePlayback(): Promise<void> {
+  playbackGeneration += 1
   if (!isNativeInlineTakeBoxPlaybackAvailable()) return
   try {
     await stopNativeInlineTakeBoxPlayback({

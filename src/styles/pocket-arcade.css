@@ -1,0 +1,38 @@
+/* Shared Games presentation; Pocket Arcade is the approved app default. Existing gameplay and characters are unchanged. */
+html[data-game-concept] { --gc-bg:#edf6fc; --gc-panel:#ffffff; --gc-ink:#203750; --gc-muted:#708198; --gc-line:#d7e4ef; --gc-accent:#378dc6; --gc-lift:0 5px 15px #23405b0a; }
+html[data-game-concept='pocket'] { --gc-bg:#f8f3e9; --gc-panel:#fffdf8; --gc-ink:#283e48; --gc-muted:#7f8079; --gc-line:#d7d9ce; --gc-accent:#258b7d; --gc-lift:0 4px 0 #ccd8d3; }
+html[data-game-concept='night'] { --gc-bg:#152434; --gc-panel:#203447; --gc-ink:#e9f5ff; --gc-muted:#a5bacb; --gc-line:#3c546b; --gc-accent:#81d6d0; --gc-lift:0 8px 24px #07101a30; }
+html[data-game-concept] .balance-arcade { --ink:var(--gc-ink); --ink-soft:var(--gc-muted); --ink-faint:var(--gc-muted); background:var(--gc-bg)!important; color:var(--gc-ink)!important; font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; }
+html[data-game-concept] .balance-arcade__sky { opacity:.15; }
+html[data-game-concept='night'] .balance-arcade__sky { opacity:.04; }
+html[data-game-concept] :is(.balance-instrument-board,.balance-door,.balance-round-button,.balance-plaza__character,.balance-card) { background:var(--gc-panel)!important; border:1px solid var(--gc-line)!important; box-shadow:var(--gc-lift)!important; border-radius:22px!important; color:var(--gc-ink)!important; }
+html[data-game-concept] :is(.balance-instrument-board strong,.balance-door__name strong,.balance-arcade__bar-title,.balance-hall__roster strong,.balance-display) { color:var(--gc-ink)!important; text-shadow:none!important; letter-spacing:-.5px; }
+html[data-game-concept] .balance-instrument-board strong { font-size:18px; font-weight:600; }
+html[data-game-concept] :is(.balance-instrument-board small,.balance-door__name small,.balance-hall__roster small,.balance-subdisplay) { color:var(--gc-muted)!important; }
+html[data-game-concept] :is(.balance-instrument-board b,.balance-instrument-board em,.balance-instrument-board>svg) { color:var(--gc-accent)!important; }
+html[data-game-concept] .balance-instrument-board { padding:13px 15px; }
+html[data-game-concept] .balance-arcade__notice { background:transparent!important; border:0!important; box-shadow:none!important; color:var(--gc-muted)!important; font-size:10px; line-height:1.45; padding:0 20px 12px; }
+html[data-game-concept] .balance-arcade__notice strong { color:var(--gc-muted)!important; }
+html[data-game-concept] .balance-door__name { border:0!important; background:var(--gc-panel)!important; padding:15px 5px!important; }
+html[data-game-concept] .balance-door__name strong { font-size:18px; line-height:1.15; font-weight:650; }
+html[data-game-concept] .balance-door__name small { font-size:10px; }
+html[data-game-concept] .balance-door:nth-child(1) { --door-color:#6aaed5; }
+html[data-game-concept] .balance-door:nth-child(2) { --door-color:#e5bc62; }
+html[data-game-concept] .balance-door:nth-child(3) { --door-color:#a692d3; }
+html[data-game-concept] .balance-door { border-top:4px solid var(--door-color)!important; overflow:hidden; }
+html[data-game-concept] .balance-door.is-open { outline:2px solid var(--door-color); outline-offset:2px; }
+html[data-game-concept] .balance-door__continue { background:#f2d58c!important; color:#594624!important; box-shadow:none!important; font-size:8px; letter-spacing:.5px; }
+html[data-game-concept] .balance-hall__floor { background:color-mix(in srgb,var(--gc-accent) 12%,var(--gc-panel))!important; border:1px solid var(--gc-line)!important; box-shadow:none!important; border-radius:20px!important; }
+html[data-game-concept] .balance-hall__roster-pick { background:transparent!important; border:1px solid transparent!important; box-shadow:none!important; border-radius:15px; }
+html[data-game-concept] .balance-hall__roster-pick.is-selected { background:var(--gc-panel)!important; border-color:var(--gc-line)!important; }
+html[data-game-concept] .balance-trophy-cost { background:color-mix(in srgb,var(--gc-accent) 12%,var(--gc-panel))!important; color:var(--gc-muted)!important; border:0!important; }
+/* More tactile, colorful game cabinets with softly squared corners. */
+html[data-game-concept='pocket'] :is(.balance-door,.balance-instrument-board) { border:1.5px solid #465c60!important; border-radius:16px!important; }
+html[data-game-concept='pocket'] .balance-door__name { background:color-mix(in srgb,var(--door-color) 27%,var(--gc-panel))!important; border-top:1.5px solid #465c60!important; }
+html[data-game-concept='pocket'] .balance-door.is-open { outline-color:#e0b956; }
+html[data-game-concept='pocket'] .balance-hall__floor { background:#edcb7a!important; border:1.5px solid #465c60!important; border-radius:12px!important; box-shadow:0 3px 0 #ccd8d3!important; }
+/* Light notation remains legible inside a dark arcade cabinet. */
+html[data-game-concept='night'] .balance-door { box-shadow:0 5px 20px #050e1b44,inset 0 0 0 1px #ffffff04!important; }
+html[data-game-concept='night'] .balance-door__name { background:linear-gradient(180deg,color-mix(in srgb,var(--door-color) 16%,var(--gc-panel)),var(--gc-panel))!important; }
+html[data-game-concept='night'] .balance-hall__floor { background:linear-gradient(180deg,#274c58,#203447)!important; border-top:2px solid #72bdb4!important; }
+html[data-game-concept] .lens-screen { background:var(--gc-bg)!important; }

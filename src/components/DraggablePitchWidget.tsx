@@ -2,7 +2,7 @@ import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useMotionValue } from 'framer-motion'
 import { Gauge } from 'lucide-react'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject, type ReactNode } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
 import { clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
@@ -14,6 +14,8 @@ type TunerProps = Omit<
 >
 
 interface DraggablePitchWidgetProps extends TunerProps {
+  /** Optional display content inside the same draggable / resizable shell. */
+  children?: ReactNode
   boundaryRef: RefObject<HTMLElement | null>
   onClose?: () => void
   collapseResetKey?: string
@@ -76,6 +78,7 @@ export default function DraggablePitchWidget({
   tunerInstrument = 'voice',
   pitchSource = 'media',
   liveMicOnly = false,
+  children,
   ...tunerProps
 }: DraggablePitchWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -194,7 +197,7 @@ export default function DraggablePitchWidget({
     positionId: resolvedPositionId, label: 'tuner', icon: <Gauge aria-hidden />, detail: 'Tuner',
     active: tunerProps.enabled !== false, resetKey: collapseResetKey, ballSlot: 2, visible })
 
-  const tuner = (
+  const tuner = children ?? (
     <LivePitchTuner
       variant={isAudioMode ? 'audio' : 'widget'}
       mediaKey={mediaKey}

@@ -1129,3 +1129,7 @@ html.app-dark-mode .native-bottom-sheet--vault .vault-take-row__detail-btn--conf
     transform: scale(1);
   }
 }
+
+.native-bottom-sheet--vault .vault-header-command-row { flex-wrap: wrap; overflow: visible; }
+.native-bottom-sheet--vault .vault-header-action-btn[hidden] { display: none; }
+.native-bottom-sheet--vault .vault-header-action-btn[aria-label="Delete all takes in current session"] { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding-inline: 14px; border-color: #c6282840; background: #c6282810; font-weight: 650; }

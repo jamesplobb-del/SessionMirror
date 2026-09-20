@@ -1,7 +1,8 @@
+import { isIPhoneDevice } from '../utils/deviceFormFactor'
 import SwipeRoutineItem from './SwipeRoutineItem'
 import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { kindNeedsDesk, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
@@ -36,7 +37,7 @@ const GAMES: Array<{ route: LabsRoute; label: string; hint: string }> = [
 ]
 
 function toolKeyForStep(step: RoutineStep): string {
-  if (step.desk?.showMusic) return 'music'
+  if (step.desk?.showMusic && !isIPhoneDevice()) return 'music'
   if (step.kind === 'record' || step.kind === 'focus') return step.desk?.mode === 'video' ? 'camera' : 'audio'
   if (step.kind === 'tune') return 'tuner'
   if (step.kind === 'metro') return 'metronome'
@@ -361,10 +362,11 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       {[0, 1, 2].map(index => <i key={index} className={index <= (screen === 'instrument' ? 0 : screen === 'library' || screen === 'choose' || screen.startsWith('custom') ? 1 : 2) ? 'is-on' : ''} />)}
     </div>}
     <div className="routine-guide-scroll" ref={scrollRef}>
-      <AnimatePresence mode="wait" initial={false} custom={direction}>
         <motion.div key={`${screen}-${screen === 'custom-tool' ? `${customIndex}-${editingStepId ?? ''}` : 0}`} custom={direction}
-          variants={{ enter: (d: number) => ({ opacity: 0, x: reducedMotion ? 0 : d * 32 }), center: { opacity: 1, x: 0 }, leave: (d: number) => ({ opacity: 0, x: reducedMotion ? 0 : d * -20 }) }}
-          initial="enter" animate="center" exit="leave" onAnimationComplete={definition => { if (definition === 'center') titleRef.current?.focus({ preventScroll: true }) }} transition={{ duration: reducedMotion ? .08 : .3, ease: [.22, 1, .36, 1] }}>
+          // Replace the previous step immediately. A full transform lets the
+          // compositor handle the short entrance without a blank fade between pages.
+          variants={{ enter: (d: number) => ({ transform: `translateX(${reducedMotion ? 0 : d * 10}px)` }), center: { transform: 'translateX(0px)' } }}
+          initial="enter" animate="center" onAnimationComplete={definition => { if (definition === 'center') titleRef.current?.focus({ preventScroll: true }) }} transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}>
           <header className="routine-guide-heading">
             <div className="routine-guide-motif" aria-hidden="true">{[0, 1, 2, 3, 4, 5, 6].map(index => <i key={index} />)}</div>
             {screen !== 'instrument' && screen !== 'routines' && <button className="routine-guide-instrument" type="button" onClick={() => { setInstrumentReturn(screen); setChangingInstrument(true); move('instrument', true) }}>{instrumentName}<ChevronRight aria-hidden /></button>}
@@ -493,7 +495,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           </div>}
           {screen === 'custom-tool' && <>
             {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}
-            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
+            <div className="routine-guide-tool-list">{toolChoices.filter(choice => choice.key !== 'music' || !isIPhoneDevice()).map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
             {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
             {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
           </>}
@@ -520,7 +522,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); clearItemSetup(); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
           </>}
         </motion.div>
-      </AnimatePresence>
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
     {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">

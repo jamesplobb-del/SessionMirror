@@ -8,6 +8,9 @@ import {
   Mic,
   Settings,
   Trash2,
+  Grid2X2,
+  Library,
+  Wrench,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type RefObject, type ReactNode, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
@@ -29,6 +32,15 @@ interface ControlDeckProps {
   onRecordingModeChange: (mode: RecordingMode) => void
   onToggleRecord: () => void
   onOpenHome: () => void
+  openLens?: boolean
+  /** Show the return to recording action while viewing full-size tools. */
+  toolsActive?: boolean
+  /** Alternate reviewed dock: Library above Record, Settings in the last slot. */
+  workspaceSections?: boolean
+  libraryAboveRecord?: boolean
+  onOpenTools?: () => void
+  onOpenAudioRecorder?: () => void
+  onOpenReferences?: () => void
   vaultRevision?: number
   onOpenVault?: () => void
   onOpenSettings: () => void
@@ -112,6 +124,13 @@ function ControlDeck({
   onRecordingModeChange,
   onToggleRecord,
   onOpenHome,
+  openLens = false,
+  toolsActive = false,
+  libraryAboveRecord = false,
+  workspaceSections = false,
+  onOpenTools,
+  onOpenAudioRecorder,
+  onOpenReferences,
   onOpenVault,
   vaultRevision,
   onOpenSettings,
@@ -251,6 +270,9 @@ function ControlDeck({
           : 'audio-control-deck__record-stack'
       }`}
     >
+      {openLens && libraryAboveRecord && onOpenVault && !isRecording && !isStopping && (
+        <Pressable className="open-lens-library-shortcut" onClick={() => { reportFeatureAction('take-library-opened'); onOpenVault() }} hapticFeedback={hapticFeedback} aria-label="Open Take library" title="Library"><Library aria-hidden /></Pressable>
+      )}
       <div
         ref={recordDropRef}
         className={`record-delete-drop ${
@@ -290,6 +312,7 @@ function ControlDeck({
           </div>
         ) : (
           <RecordingModeCarousel
+            minimalRecord={openLens}
             value={recordingMode}
             onChange={onRecordingModeChange}
             onToggleRecord={onToggleRecord}
@@ -327,7 +350,7 @@ function ControlDeck({
 
   return (
     <div
-      className={`control-deck pointer-events-auto flex w-full flex-col items-center px-4 ${
+      className={`control-deck ${openLens ? 'open-lens-deck' : ''} pointer-events-auto flex w-full flex-col items-center px-4 ${
         collapsible ? 'control-deck--collapsible' : ''
       } ${isCameraPresentation ? 'control-deck--camera' : ''} ${
         // Reserves the strip the elapsed timer now sits in, below the record
@@ -335,7 +358,7 @@ function ControlDeck({
         isRecording && !handsFreeRecording ? 'control-deck--timer-below' : ''
       }`}
     >
-      {onOpenVault && !isRecording && !isStopping && (
+      {onOpenVault && !openLens && !isRecording && !isStopping && (
         <VaultHandle onOpen={onOpenVault} revision={vaultRevision} concealed={branchActive} />
       )}
       <SettingsBranchWheel
@@ -372,9 +395,11 @@ function ControlDeck({
         pitchToggleVisible={pitchToggleVisible}
         takeCardsToggleVisible={recordingMode !== 'audio'}
         expandViewActive={expandViewActive}
-        workspaceActionsVisible={isCameraPresentation && !isRecording && !isStopping}
+        workspaceSections={workspaceSections}
+        workspaceActionsVisible={(workspaceSections || isCameraPresentation) && !isRecording && !isStopping}
         onToggleExpandView={onToggleExpandView}
         onOpenMultitrack={onOpenMultitrack}
+        onOpenReferences={onOpenReferences}
         onPitchTrackerChange={(enabled) => onPitchTrackerChange?.(enabled)}
         onShowTakeCardsChange={(show) => onShowTakeCardsChange?.(show)}
         onShowMetronomeChange={(show) => onShowMetronomeChange?.(show)}
@@ -383,7 +408,15 @@ function ControlDeck({
       />
 
       {referenceControls}
-      {isCameraPresentation ? (
+      {openLens ? (
+        <div className="open-lens-dock">
+          <Pressable className="open-lens-dock-action" onClick={onOpenHome} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="home-button" aria-label="Open Practice Home"><House aria-hidden /><span>Home</span></Pressable>
+          <Pressable ref={overlaysButtonRef} className="open-lens-dock-action" onClick={() => branchActive ? closeBranch() : openBranch()} disabled={settingsBranchDisabled || isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="overlays-button" aria-label={branchActive ? 'Close workspace' : 'Open workspace'} aria-expanded={branchActive}><Grid2X2 aria-hidden /><span>Workspace</span></Pressable>
+          {recordStage}
+          <Pressable className="open-lens-dock-action" onClick={toolsActive ? onOpenAudioRecorder : onOpenTools} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="practice-button" aria-label={toolsActive ? 'Open recording' : 'Open Tools'}>{toolsActive ? <Mic aria-hidden /> : <Wrench aria-hidden />}<span>{toolsActive ? 'Record' : 'Tools'}</span></Pressable>
+          {libraryAboveRecord ? <Pressable className="open-lens-dock-action" onClick={onOpenSettings} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} aria-label="Open settings"><Settings aria-hidden /><span>Settings</span></Pressable> : <Pressable className="open-lens-dock-action" onClick={() => { reportFeatureAction('take-library-opened'); onOpenVault?.() }} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-guidance="take-library" aria-label="Open Take library"><Library aria-hidden /><span>Library</span></Pressable>}
+        </div>
+      ) : isCameraPresentation ? (
         <div className="camera-control-deck__main-row">
           <div className="camera-control-pill">
             <Pressable
@@ -544,13 +577,14 @@ function ControlDeck({
               className="audio-camera-button pointer-events-auto"
               disabled={isRecording || isStopping}
               onClick={() => {
-                onRecordingModeChange('video')
+                if (onOpenAudioRecorder) onOpenAudioRecorder()
+                else onRecordingModeChange('video')
               }}
-              aria-label="Open Camera"
+              aria-label={onOpenAudioRecorder ? 'Open audio recorder' : 'Open Camera'}
             >
               <span className="ui-orient-spin audio-camera-button__content">
-                <span className="electric-original-icon"><Camera aria-hidden strokeWidth={1.75} /></span><ElectricControlIcon kind="camera" />
-                <span>Camera</span>
+                {onOpenAudioRecorder ? <Mic aria-hidden strokeWidth={1.75} /> : <><span className="electric-original-icon"><Camera aria-hidden strokeWidth={1.75} /></span><ElectricControlIcon kind="camera" /></>}
+                <span>{onOpenAudioRecorder ? 'Record' : 'Camera'}</span>
               </span>
             </Pressable>
 

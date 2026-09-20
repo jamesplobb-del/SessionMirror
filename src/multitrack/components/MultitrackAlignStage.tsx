@@ -4,7 +4,7 @@ import Pressable from '../../components/ui/Pressable'
 import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
-import { waveformRasterSize, visibleRulerSeconds } from '../synchronization/editorGeometry'
+import { waveformRasterSize, visibleRulerSeconds, trimWaveformEdge } from '../synchronization/editorGeometry'
 import { panelOffsetMs } from '../synchronization/projectTiming'
 import { hasSectionWindow } from '../layout/sectionVisibility'
 import { sheetCueWindows } from '../sheetMusic/sheetMusicTimeline'
@@ -120,7 +120,7 @@ function ClipWaveform({
       const barH = Math.max(2, amp * h * 0.78)
       const x = i * gap
       const y = (h - barH) / 2
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.fillStyle = '#5089c7'
       ctx.beginPath()
       ctx.roundRect(x, y, barW, barH, 1)
       ctx.fill()
@@ -199,13 +199,14 @@ function ClipTrack({
    */
   const beginDrag = (mode: 'move' | 'trim-start' | 'trim-end') => (event: ReactPointerEvent) => {
     if (disabled || event.button !== 0) return
-    if (!selected) {
+    if (!selected && mode === 'move') {
       // First touch selects; it never moves anything. The gesture is left
       // uncaptured so this same swipe can still scroll the timeline.
       onSelect()
       return
     }
     event.stopPropagation()
+    onSelect()
     dragRef.current = {
       mode,
       startX: event.clientX,
@@ -247,21 +248,16 @@ function ClipTrack({
       return
     }
 
-    if (drag.mode === 'trim-start') {
-      const maxStart = drag.startTrimEnd - MIN_CLIP_SEC
-      const nextStart = Math.max(0, Math.min(maxStart, drag.startTrimStart + deltaSec))
-      const actualDelta = nextStart - drag.startTrimStart
-      queueChange({
-        trimStart: Math.round(nextStart * 1000) / 1000,
-        offsetMs: Math.round(drag.startOffsetMs - actualDelta * 1000),
-      })
-      return
-    }
+    queueChange(trimWaveformEdge({ trimStart: drag.startTrimStart, trimEnd: drag.startTrimEnd,
+      offsetMs: drag.startOffsetMs, duration }, drag.mode === 'trim-start' ? 'start' : 'end', deltaSec))
+  }
 
-    // trim-end
-    const minEnd = drag.startTrimStart + MIN_CLIP_SEC
-    const nextEnd = Math.max(minEnd, Math.min(duration, drag.startTrimEnd + deltaSec))
-    queueChange({ trimEnd: nextEnd >= duration - 0.02 ? undefined : Math.round(nextEnd * 1000) / 1000 })
+  const onTrimKey = (edge: 'start' | 'end') => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return
+    event.preventDefault()
+    event.stopPropagation()
+    onEditStart()
+    onChange(trimWaveformEdge({ ...clip, duration }, edge, (event.key === 'ArrowLeft' ? -1 : 1) * (event.shiftKey ? .5 : .05)))
   }
 
   const endDrag = (event: ReactPointerEvent) => {
@@ -310,14 +306,20 @@ function ClipTrack({
           carries two thin targets that swallow a scroll. */}
       {selected ? (
         <>
-          <div
+          <button
+            type="button"
+            aria-label={`Trim ${clip.label} start`}
+            onKeyDown={onTrimKey('start')}
             className="multitrack-align-stage__handle multitrack-align-stage__handle--left"
             onPointerDown={beginDrag('trim-start')}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={cancelDrag}
           />
-          <div
+          <button
+            type="button"
+            aria-label={`Trim ${clip.label} end`}
+            onKeyDown={onTrimKey('end')}
             className="multitrack-align-stage__handle multitrack-align-stage__handle--right"
             onPointerDown={beginDrag('trim-end')}
             onPointerMove={onPointerMove}
@@ -364,6 +366,8 @@ export default function MultitrackAlignStage({
     clipsRef.current = next
     setClips(next)
   }, [])
+  const [editorTab, setEditorTab] = useState<'timing' | 'mix'>('timing')
+  const initialMixRef = useRef(panels.map(p => ({ id: p.id, volume: p.volume ?? 1, muted: p.muted === true })))
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -391,7 +395,7 @@ export default function MultitrackAlignStage({
     observer.observe(el)
     el.addEventListener('scroll', schedule, { passive: true })
     return () => { observer.disconnect(); el.removeEventListener('scroll', schedule); if (frame !== null) cancelAnimationFrame(frame) }
-  }, [isOpen])
+  }, [isOpen, editorTab])
 
   const secToPx = useCallback((sec: number) => TIMELINE_ORIGIN_PX + sec * pxPerSec, [pxPerSec])
 
@@ -583,6 +587,7 @@ export default function MultitrackAlignStage({
     for (const [panelId, [startSec, endSec]] of Object.entries(initialSectionsRef.current)) {
       onSectionChange(panelId, startSec, endSec)
     }
+    for (const p of initialMixRef.current) { onPanelVolumeChange(p.id, p.volume); onPanelMuteToggle(p.id, p.muted) }
     onRestoreSheetMusic(initialSheetMusicRef.current)
     onClose()
   }
@@ -812,26 +817,7 @@ export default function MultitrackAlignStage({
             {formatClock(playheadSec)} / {formatClock(maxDurationSec)}
           </span>
         </div>
-        <div className="multitrack-align-stage__zoom" aria-label="Zoom">
-          <Pressable
-            type="button"
-            intensity="icon"
-            onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}
-            disabled={zoomIndex === 0}
-            aria-label="Zoom out"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="icon"
-            onClick={() => setZoomIndex((index) => Math.min(ZOOM_STEPS.length - 1, index + 1))}
-            disabled={zoomIndex === ZOOM_STEPS.length - 1}
-            aria-label="Zoom in"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Pressable>
-        </div>
+        <button type="button" className="multitrack-editor-preview-button" onClick={onPreviewToggle} aria-label={sync.state.isPlaying ? 'Pause preview' : 'Play preview'}>{sync.state.isPlaying ? <Pause size={15} /> : <Play size={15} />}<span>Preview</span></button>
         <Pressable
           type="button"
           intensity="normal"
@@ -844,6 +830,9 @@ export default function MultitrackAlignStage({
         </Pressable>
       </header>
 
+      <div className="multitrack-editor-tabs" role="tablist" aria-label="Editor tools"><button type="button" role="tab" aria-selected={editorTab === 'timing'} onClick={() => setEditorTab('timing')}>Timing</button><button type="button" role="tab" aria-selected={editorTab === 'mix'} onClick={() => setEditorTab('mix')}>Mix</button></div>
+      {editorTab === 'mix' ? <div className="multitrack-editor-mix" role="tabpanel" aria-label="Mix">{panels.filter(p => p.take).map((p, i) => <div key={p.id}><header><span>{p.label || `Part ${i + 1}`}</span><button type="button" aria-label={`Mute ${p.label || `Part ${i + 1}`}`} aria-pressed={p.muted === true} onClick={() => onPanelMuteToggle(p.id, !p.muted)}>{p.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}Mute</button></header><label><input type="range" aria-label={`${p.label || `Part ${i + 1}`} volume`} min={0} max={1} step={.01} value={p.volume ?? 1} onChange={e => onPanelVolumeChange(p.id, Number(e.target.value))} /><output>{Math.round((p.volume ?? 1) * 100)}%</output></label></div>)}</div> : <>
+      <p className="multitrack-waveform-help">Select a waveform. Drag its edges to trim, or its middle to move.</p>
       <div className="multitrack-align-stage__actions">
         <Pressable
           type="button"
@@ -883,15 +872,27 @@ export default function MultitrackAlignStage({
             Page {nextPage.pageIndex + 1}
           </Pressable>
         ) : null}
-        <Pressable
-          type="button"
-          intensity="soft"
-          className="multitrack-align-stage__action multitrack-align-stage__action--play"
-          onClick={onPreviewToggle}
-        >
-          {sync.state.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          {sync.state.isPlaying ? 'Pause' : 'Preview'}
-        </Pressable>
+        <div className="multitrack-align-stage__zoom" aria-label="Zoom">
+          <Pressable
+            type="button"
+            intensity="icon"
+            onClick={() => setZoomIndex((index) => Math.max(0, index - 1))}
+            disabled={zoomIndex === 0}
+            aria-label="Zoom out"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Pressable>
+          <Pressable
+            type="button"
+            intensity="icon"
+            onClick={() => setZoomIndex((index) => Math.min(ZOOM_STEPS.length - 1, index + 1))}
+            disabled={zoomIndex === ZOOM_STEPS.length - 1}
+            aria-label="Zoom in"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Pressable>
+        </div>
+
       </div>
 
       {selectedClip ? (
@@ -1037,31 +1038,6 @@ export default function MultitrackAlignStage({
                         {clip.windowed ? 'Only here' : 'All song'}
                       </Pressable>
                     ) : null}
-                    {clip ? (
-                      <div className="multitrack-align-stage__track-audio">
-                        <Pressable
-                          type="button"
-                          intensity="icon"
-                          className={`multitrack-align-stage__track-mute ${panel.muted ? 'is-muted' : ''}`}
-                          aria-label={`${panel.muted ? 'Unmute' : 'Mute'} ${label}`}
-                          aria-pressed={panel.muted === true}
-                          onClick={() => onPanelMuteToggle(panel.id, !panel.muted)}
-                        >
-                          {panel.muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                        </Pressable>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          aria-label={`${label} volume`}
-                          value={panel.volume ?? 1}
-                          data-muted={panel.muted === true ? 'true' : 'false'}
-                          onChange={(event) => onPanelVolumeChange(panel.id, Number(event.target.value))}
-                          className="multitrack-align-stage__track-volume"
-                        />
-                      </div>
-                    ) : null}
                   </div>
                   <div
                     className="multitrack-align-stage__track-lane"
@@ -1111,10 +1087,10 @@ export default function MultitrackAlignStage({
           Reset all
         </Pressable>
         <p className="multitrack-align-stage__hint">
-          Drag clips to move them, edges to trim. Reset puts a clip back on its own recorded spot,
-          wherever that is in the song.
+          Drag the handle above to give your tracks more room.
         </p>
       </footer>
+      </>}
       </div>
     </section>
   )

@@ -10,3 +10,17 @@ export function visibleRulerSeconds(duration: number, pxPerSec: number, left: nu
   const end = Math.min(Math.ceil(duration) + 1, Math.ceil((left + width - origin) / pxPerSec) + 2)
   return Array.from({ length: Math.max(0, end - start + 1) }, (_, i) => start + i)
 }
+
+/** Trim a source edge while leaving every retained sample at its original song time. */
+export function trimWaveformEdge(clip: { trimStart: number; trimEnd?: number; duration: number; offsetMs: number }, edge: 'start' | 'end', deltaSec: number) {
+  const duration = Math.max(0, clip.duration)
+  const end = Math.min(duration, clip.trimEnd ?? duration)
+  const minimum = Math.min(.2, duration)
+  if (!Number.isFinite(deltaSec)) return {}
+  if (edge === 'start') {
+    const trimStart = Math.round(Math.max(0, Math.min(end - minimum, clip.trimStart + deltaSec)) * 1000) / 1000
+    return { trimStart, offsetMs: Math.round(clip.offsetMs - (trimStart - clip.trimStart) * 1000) }
+  }
+  const next = Math.max(clip.trimStart + minimum, Math.min(duration, end + deltaSec))
+  return { trimEnd: next >= duration - .02 ? undefined : Math.round(next * 1000) / 1000 }
+}

@@ -1,3 +1,5 @@
+import { normalizeDeskMetronome } from './utils/deskMetronome'
+import { isIPhoneDevice } from './utils/deviceFormFactor'
 import FeatureGuidance from './components/FeatureGuidance'
 import { confirmFeatureAction, reportFeatureAction } from './utils/featureGuidance'
 import { queueAudioEnhancement } from './utils/enhancementQueue'
@@ -27,6 +29,8 @@ import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
 import type { PipDragUiState } from './hooks/useDragToPin'
 import ControlDeck from './components/ControlDeck'
+import RecordingHeader from './components/RecordingHeader'
+import ReferenceWidget from './components/ReferenceWidget'
 import HandsFreeStage from './components/HandsFreeStage'
 import { resolveHandsFreePhase } from './utils/handsFreePhase'
 import type { LabsRoute } from './components/labs/LabsOverlay'
@@ -120,7 +124,7 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
-import { getInstrumentSettings } from './utils/instrumentProfiles'
+import { getInstrumentProfile, getInstrumentSettings } from './utils/instrumentProfiles'
 import { ActionSheetProvider, showAlertOutsideTree } from './context/ActionSheetContext'
 import { MetronomeProvider } from './context/MetronomeContext'
 import { TutorialProvider } from './context/TutorialContext'
@@ -549,6 +553,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
   const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
+  const [referenceExpanded, setReferenceExpanded] = useState(false)
+  const [referenceVisible, setReferenceVisible] = useState(false)
+  const [referencePlaying, setReferencePlaying] = useState(false)
+  const [referenceAudioId, setReferenceAudioId] = useState<string | null>(null)
   const [benchmarkBinding, setBenchmarkBinding] = useState<BenchmarkBinding | null>(
     bootSnapshot.benchmarkBinding
   )
@@ -689,8 +697,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     activeTab: audioPracticeTab,
     setActiveTab: setAudioPracticeTab,
   } = useAudioPracticeTab(bootSurface.tab)
+  const lastFullToolTab = useRef<'tuner' | 'metronome'>(bootSurface.tab === 'metronome' ? 'metronome' : 'tuner')
   const handleAudioPracticeTabChange = useCallback(
     (tab: AudioPracticeTab) => {
+      if (tab === 'tuner' || tab === 'metronome') lastFullToolTab.current = tab
       if (tab === 'tuner' && audioPracticeTab !== 'tuner') {
         setShowTunerTakePills(false)
         // Start native capture in this tap. Waiting for the tab effect left
@@ -1012,7 +1022,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
-  const finishAutoPlayback = useCallback(() => {
+  const finishAutoPlayback = useCallback((): Promise<void> => {
     // Clear the replay UI and invalidate any in-flight native start
     // immediately. Route/mic cleanup can take a bridge round trip and must not
     // leave the interface stuck in "Playing your take back…" while it settles.
@@ -1021,7 +1031,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setAutoRecordStartSuppressed(true)
     stopAutoPlaybackAudio()
     const completedGeneration = autoPlaybackGenerationRef.current
-    void finalizeTakePlaybackCleanup().finally(() => {
+    return finalizeTakePlaybackCleanup().finally(() => {
       if (autoPlaybackGenerationRef.current !== completedGeneration) return
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
       if (recordingModeRef.current === 'audio') {
@@ -1031,6 +1041,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             restartHandsFreeMonitorRef.current({ force: true })
           } else {
             void refreshCameraSessionRef.current()
+          }
+        })
+      } else if (autoSoundRecordingEnabledRef.current) {
+        // Camera playback tears down and rebuilds the native capture session.
+        // Re-arm the monitor after that route restore too; otherwise the HUD
+        // can remain on “Getting ready” after the first camera take.
+        window.requestAnimationFrame(() => {
+          if (recordingModeRef.current === 'video' && autoSoundRecordingEnabledRef.current) {
+            restartHandsFreeMonitorRef.current({ force: true })
           }
         })
       }
@@ -2559,6 +2578,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !isReviewOpen &&
     !isExperimentalOpen
 
+  // The instrument picker is loaded independently from the hands-free monitor.
+  // Keep a family fallback so a fresh launch still gets the right acoustic
+  // bias while the preferred instrument id is being restored.
+  const selectedHandsFreeInstrumentFamily =
+    (preferredInstrumentId ? getInstrumentProfile(preferredInstrumentId)?.family : undefined) ??
+    (settings.tunerInstrument === 'strings'
+      ? 'Strings'
+      : settings.tunerInstrument === 'winds'
+        ? 'Woodwind'
+        : 'Voice & keys')
+
   const { handsFreeRecording, handsFreeListeningReady, restartHandsFreeMonitor, replayCountdown, finishHandsFreeTake, handsFreeNotice } =
     useAutoSoundRecording({
       enabled: settings.autoSoundRecording,
@@ -2566,6 +2596,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       suppressStart: autoRecordStartSuppressed,
       isNativeAudioCaptureActive,
       monitoringPaused:
+        referencePlaying ||
         handsFreePlaybackPending ||
         autoPlaybackPlaying ||
         audioModeTakePlaying ||
@@ -2578,6 +2609,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       streamGeneration,
       silenceMs: settings.soundSilenceSeconds * 1000,
       volumeThreshold: settings.soundVolumeThreshold,
+      instrumentFamily: selectedHandsFreeInstrumentFamily,
       startRecording: startAutoRecording,
       stopRecording,
       warmRecorder: () => {
@@ -2946,9 +2978,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const modeChanged = mode !== recordingModeRef.current
       if (modeChanged) {
         if (isRecording) return
+        // Do not let Tools claim the microphone while Camera playback still
+        // owns the native route. Finish the replay first, then repeat the
+        // mode change against a clean capture session.
+        if (
+          mode === 'audio' &&
+          (handsFreePlaybackBusyRef.current || autoPlaybackTakeId !== null)
+        ) {
+          void finishAutoPlayback().finally(() => {
+            if (recordingModeRef.current !== mode) {
+              handleRecordingModeChangeRef.current(mode)
+            }
+          })
+          return
+        }
         // Cancel the old surface's replay before its player unmounts and
         // before the destination starts claiming the microphone.
-        if (handsFreePlaybackBusyRef.current || autoPlaybackTakeId !== null) finishAutoPlayback()
         // Tokens for Tools (`--audio-bg-base`) live on `html.app-audio-mode`.
         // Apply them before React paints the new overlay so the first frame is
         // already cream, not a black hole that then lerps.
@@ -2997,12 +3042,19 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         scheduleAfterPaint(() => {
           if (recordingModeRef.current !== 'audio') return
           if (autoSoundRecordingEnabledRef.current) {
+            // Playback route restoration and camera teardown must finish
+            // before native Hands-Free claims the microphone in Tools.
             void warmAutoRecording().finally(() => {
-              if (
-                autoSoundRecordingEnabledRef.current &&
-                recordingModeRef.current === 'audio'
-              ) {
-                restartHandsFreeMonitorRef.current({ force: true })
+              restartHandsFreeMonitorRef.current({ force: true })
+              // iOS can finish releasing the camera route a tick after the
+              // first native tap request. Retry the handoff briefly so a
+              // successful warm cannot leave Tools visually ready but deaf.
+              for (const delay of [350, 900, 1800]) {
+                window.setTimeout(() => {
+                  if (recordingModeRef.current === 'audio' && !isRecording) {
+                    restartHandsFreeMonitorRef.current({ force: true })
+                  }
+                }, delay)
               }
             })
             return
@@ -3121,12 +3173,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     ]
   )
 
+  // Hands-Free is opt-in for each app entry. A saved-on preference should not
+  // unexpectedly seize the microphone during launch or Quick Play.
+  useEffect(() => {
+    autoSoundRecordingEnabledRef.current = false
+    updateSettings({ autoSoundRecording: false })
+    void disarmAutoRecording()
+  }, [disarmAutoRecording, updateSettings])
+
   /* ---- Desks: the whole room as one tap ---------------------------------- */
   const metronomeDeskState = useSyncExternalStore(
     sharedMetronomeEngine.subscribe,
     () => {
       const snapshot = sharedMetronomeEngine.getSnapshot()
-      return `${snapshot.bpm}|${snapshot.meter}|${snapshot.subdivision}`
+      return JSON.stringify(normalizeDeskMetronome(snapshot))
     },
     () => '',
   )
@@ -3143,11 +3203,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       showTakeCards: settings.showTakeCards,
       autoSoundRecording: settings.autoSoundRecording,
       audioEnhancerEnabled: settings.audioEnhancerEnabled,
-      metronome: {
-        bpm: Math.round(metronome.bpm),
-        meter: metronome.meter,
-        subdivision: metronome.subdivision,
-      },
+      metronome: normalizeDeskMetronome(metronome),
       drone: {
         pitchClass: droneDeskState.activeNotes[0] ?? droneDeskState.lastPitchClass,
         octave: droneDeskState.octave,
@@ -3186,9 +3242,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (desk.autoSoundRecording !== autoSoundRecordingEnabledRef.current) {
         handleAutoSoundRecordingChange(desk.autoSoundRecording)
       }
-      sharedMetronomeEngine.setMeter(desk.metronome.meter)
-      sharedMetronomeEngine.setSubdivision(desk.metronome.subdivision)
-      sharedMetronomeEngine.setBpm(desk.metronome.bpm)
+      const metronome = normalizeDeskMetronome(desk.metronome)
+      sharedMetronomeEngine.setMeter(metronome.meter)
+      if (metronome.pulseModeId) sharedMetronomeEngine.setPulseMode(metronome.pulseModeId)
+      if (metronome.feelId) sharedMetronomeEngine.setFeel(metronome.feelId)
+      sharedMetronomeEngine.setSubdivision(metronome.subdivision)
+      sharedMetronomeEngine.setAccentLevels(metronome.accentLevels)
+      sharedMetronomeEngine.setSoundId(metronome.soundId)
+      sharedMetronomeEngine.setBpm(metronome.bpm)
       if (desk.showDrone) {
         applyDroneFromDesk(desk.drone.pitchClass, desk.drone.octave)
       } else {
@@ -3335,6 +3396,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleOpenQuickPractice = useCallback(() => {
     if (practiceTransition.current.busy || captureBusyRef.current) return
     triggerLightHaptic(settings.hapticFeedback)
+    handleAutoSoundRecordingChange(false)
     exitRoutineProgram()
     const sessionId = focusedPracticeSessionIdRef.current
     if (sessionId) void endPracticeSession(sessionId).catch(() => setTakeDeleteError('Could not close this sitting. Your takes are still saved.'))
@@ -3345,8 +3407,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setFocusedReferenceTakeId(null)
     setFocusedPracticeSessionId(null)
     focusedPreviousChallengerRef.current = null
+    setMusicPageVisible(false)
+    setLabsRoute(null)
+    handleAudioPracticeTabChange('audio')
     dismissPracticeHub()
-  }, [dismissPracticeHub, settings.hapticFeedback])
+  }, [dismissPracticeHub, handleAutoSoundRecordingChange, handleAudioPracticeTabChange, settings.hapticFeedback])
 
   /**
    * Closing the sheet resumes whatever context is already live — it never
@@ -3587,6 +3652,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [deferHudMediaPause, settings.hapticFeedback])
 
   const handleOpenMultitrack = useCallback(() => {
+    setQuickSettingsOpen(false)
     triggerLightHaptic(settings.hapticFeedback)
     markOverlayClosed()
     setIsSettingsOpen(false)
@@ -3754,9 +3820,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleCloseLabs = useCallback(() => {
     triggerLightHaptic(settings.hapticFeedback)
     setLabsRoute(null)
-    if (audioPracticeTab === 'games') setAudioPracticeTab('audio')
+    if (audioPracticeTab === 'games') handleAudioPracticeTabChange(lastFullToolTab.current)
     recoverCameraAfterSurfaceDismiss('labs-close')
-  }, [audioPracticeTab, recoverCameraAfterSurfaceDismiss, setAudioPracticeTab, settings.hapticFeedback])
+  }, [audioPracticeTab, recoverCameraAfterSurfaceDismiss, handleAudioPracticeTabChange, settings.hapticFeedback])
 
   const handleLabsNavigate = useCallback((route: LabsRoute) => {
     setLabsRoute(route)
@@ -4239,6 +4305,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     musicPageVisible ? 'center' : recordingMode === 'audio' && audioPracticeTab !== 'tuner' ? 'chip' : 'center'
 
   const takePlaybackActive =
+    referencePlaying ||
     autoPlaybackPlaying ||
     audioModeTakePlaying ||
     benchmarkPipPlaying ||
@@ -4252,6 +4319,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Only hands-free and full review playback need exclusive preview ownership.
     (autoPlaybackPlaying || handsFreePlaybackPending || isReviewOpen || reviewPlaybackPlaying)
   const nativeSessionPlaybackActive =
+    referencePlaying ||
     autoPlaybackPlaying ||
     (recordingMode === 'video' && takePlaybackActive) ||
     (recordingMode === 'audio' && audioModeTakePlaying)
@@ -4378,6 +4446,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
   const isAudioPracticeGamesTab = recordingMode === 'audio' && audioPracticeTab === 'games'
+  useLayoutEffect(() => {
+    if (isLabsOpen || isAudioPracticeGamesTab) document.documentElement.dataset.gameConcept = 'pocket'
+    else delete document.documentElement.dataset.gameConcept
+    return () => { delete document.documentElement.dataset.gameConcept }
+  }, [isLabsOpen, isAudioPracticeGamesTab])
 
   useEffect(() => {
     if (!isAudioPracticeTimelineTab) {
@@ -4629,11 +4702,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       stopAutoPlaybackAudio()
       releaseAutoRecordSuppress(0)
       pausePipVideos()
-      setYoutubeUrl(null)
-      if (activeProjectIdRef.current) {
-        try { selectPracticeReference(activeProjectIdRef.current, null) }
-        catch { setTakeDeleteError('Your reference selection could not be remembered.') }
-      }
       setBenchmarkBinding({ source: 'take', refId: id })
       setBenchmarkId((prevBenchmark) => {
         setChallengerId((current) => {
@@ -4745,7 +4813,30 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (item) {
       setLibraryItems((current) => [item, ...current])
     }
+    return item
   }, [])
+
+  useEffect(() => {
+    try { setReferenceAudioId(activeProjectId ? localStorage.getItem(`besttake.reference-audio.${activeProjectId}`) : null) }
+    catch { setReferenceAudioId(null) }
+    setReferenceExpanded(false)
+  }, [activeProjectId])
+
+  const selectReferenceAudio = useCallback((id: string | null) => {
+    setReferenceAudioId(id)
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    try {
+      if (id) localStorage.setItem(`besttake.reference-audio.${projectId}`, id)
+      else localStorage.removeItem(`besttake.reference-audio.${projectId}`)
+    } catch { setTakeDeleteError('Reference selection could not be remembered on this device.') }
+  }, [])
+  const referenceAudio = libraryItems.find(item => item.id === referenceAudioId && item.projectId === activeProjectId) ?? null
+  const handleReferenceBeforePlay = useCallback(() => {
+      stopAutoPlaybackAudio()
+      audioModePlaybackControlsRef.pause?.()
+      pausePipVideos()
+  }, [stopAutoPlaybackAudio, pausePipVideos])
 
   const handleRenameLibraryItem = useCallback((itemId: string, name: string) => {
     void updateLibraryItemName(itemId, name)
@@ -5219,14 +5310,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
     }
     pausePipVideos()
-    prepareNewYoutubeReference({ autoplay: !focusedPracticeRef.current })
-    setYoutubeAutoPlayOnLoad(!focusedPracticeRef.current)
+    prepareNewYoutubeReference({ autoplay: false })
+    setYoutubeAutoPlayOnLoad(false)
     setYoutubeUrl(embedUrl)
     setYoutubeReferenceEnabled(true)
     setYoutubeHeadphonesTipNonce((current) => current + 1)
     setShowYoutubeHeadphonesTip(!focusedPracticeRef.current)
     setYoutubeExpandTipNonce((current) => current + 1)
-    setShowYoutubeExpandTip(!focusedPracticeRef.current)
+    setShowYoutubeExpandTip(false)
   }, [handleAudioPracticeTabChange, pausePipVideos, updateSettings])
 
   const handleClearYoutube = useCallback(() => {
@@ -5378,6 +5469,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
     const surfaceBefore = recordingModeRef.current
+    if (isIPhoneDevice()) updateSettings({ showMusic: false })
     setIsSplitView(false)
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
@@ -5397,7 +5489,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // acquire each other's recordings or references through a name-only match.
     let itemProjectId = step.projectId
     let sessionId: string | null = null
-    const desk = day.desksByStep[step.id] ?? step.desk
+    const savedDesk = day.desksByStep[step.id] ?? step.desk
+    const desk = savedDesk && isIPhoneDevice() ? { ...savedDesk, showMusic: false } : savedDesk
     if (step.kind !== 'game' && step.kind !== 'free') {
       const existing = await findRoutinePracticeProject(target.id, step.id, itemProjectId)
       const project = existing ?? await createProject(step.title)
@@ -5693,6 +5786,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
 
   const handleToggleSplitView = useCallback(() => {
+    setQuickSettingsOpen(false)
+    // Expanded takes must remain available even when their floating cards are hidden.
+    if (!isSplitView) {
+      updateSettings({ showTakeCards: true })
+      if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
+    }
     setIsSplitView((current) => {
       const next = !current
       if (next && youtubeUrlRef.current) {
@@ -5713,7 +5812,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       return next
     })
-  }, [acquireNativeVideoBridge, isNativeCameraPlatform, recoverCameraAfterSurfaceDismiss])
+  }, [acquireNativeVideoBridge, isNativeCameraPlatform, recoverCameraAfterSurfaceDismiss, isSplitView, updateSettings, handleAudioPracticeTabChange])
 
   const handleExitSplitView = useCallback(() => {
     setIsSplitView(false)
@@ -5797,7 +5896,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           >
             <div
               ref={appShellRef}
-              className={`app-shell${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
+              className={`app-shell lens-screen${recordingMode === 'video' ? ' lens-camera' : ''}${!musicPageVisible && !isLabsOpen && !multitrackOpen ? ' open-lens-recording' : ''}${recordingMode === 'video' && isRecording ? ' open-lens-capturing' : ''}${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
                 isSplitView ? ' app-shell--split-open' : ''
               }${musicPageVisible ? ' app-shell--music-page' : ''}${
                 musicChromeHidden ? ' app-shell--music-chrome-hidden' : ''
@@ -5815,6 +5914,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {focusPanel === 'references'  && <YoutubeUrlDialog open onClose={() => setFocusPanel(null)} onSubmit={handleSubmitYoutube} />}
               <PracticeHub
+                onOpenSettings={() => { setIsPracticeHubOpen(false); handleOpenSettings() }}
                 isOpen={isPracticeHubOpen}
                 projects={projects}
                 takes={takes}
@@ -5847,6 +5947,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {routine &&
                 routineActiveStep &&
+                !multitrackOpen &&
                 !isPracticeHubOpen &&
                 !isReviewOpen &&
                 !isVaultOpen &&
@@ -6265,7 +6366,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               )}
 
-              {!metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
+              {!onRecordSurface && !metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
                 <PracticeToolStrip
                   reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
                   referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
@@ -6294,6 +6395,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onTapForSettings={() => {
                   reportFeatureAction('hands-free-settings-opened')
                   setHandsFreeCardOpen(true)
+                  // Opening settings is also an explicit recovery gesture for
+                  // a monitor that is still preparing after playback.
+                  restartHandsFreeMonitorRef.current({ force: true })
                 }}
                 onClose={handleCloseHandsFree}
               />
@@ -6311,6 +6415,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onClose={() => setHandsFreeCardOpen(false)}
               />
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
+                {onRecordSurface && !isSplitView && !musicPageVisible && !isLabsOpen && !multitrackOpen && (
+                  <ReferenceWidget showTrackName visible={referenceVisible} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded}
+                    youtubeUrl={youtubeUrl} libraryPlayback={referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null}
+                    suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || !referenceExpanded || autoPlaybackPlaying}
+                    onSubmitYoutube={(url) => { selectReferenceAudio(null); handleSubmitYoutube(url); setYoutubeAutoPlayOnLoad(false); setShowYoutubeExpandTip(false); setReferenceExpanded(true) }}
+                    onUpload={(file) => {
+                      if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(file.name)) { setTakeDeleteError('Choose an audio file for References.'); return }
+                      const projectId = activeProjectIdRef.current
+                      void handleImportLibraryAudio(file).then(item => {
+                        if (!item) throw new Error('No reference imported')
+                        if (activeProjectIdRef.current !== projectId) return
+                        handleClearYoutube(); selectReferenceAudio(item.id); setReferenceExpanded(true)
+                      }).catch(() => setTakeDeleteError('Could not import reference audio. Please try another file.'))
+                    }}
+                    onClearAudio={() => selectReferenceAudio(null)} onClearYoutube={handleClearYoutube}
+                    onYoutubeHostChange={handleYoutubeHostChange} youtubeIframeRef={youtubeIframeRef}
+                    onBeforePlay={handleReferenceBeforePlay} onPlaybackChange={setReferencePlaying} />
+                )}
                 {showMainPitchWidget && mainVideoPitchSource && (
                   <Suspense fallback={null}>
                     <AnimatePresence>
@@ -6396,7 +6518,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                 >
 
-                  {recordingMode === 'audio' && !practiceSessionActive && !isSplitView && !musicPageVisible && (
+                  {onRecordSurface && !isSplitView && !musicPageVisible && (
+                    <RecordingHeader mode={recordingMode} disabled={isRecording || isStopping || practiceTransitionBusy}
+                      onModeChange={(mode) => { handleAudioPracticeTabChange('audio'); handleRecordingModeChange(mode) }}
+                      hapticFeedback={settings.hapticFeedback} />
+                  )}
+                  {recordingMode === 'audio' && audioPracticeTab !== 'audio' && !isLabsOpen && !isAudioPracticeGamesTab && !practiceSessionActive && !isSplitView && !musicPageVisible && (
                     <div data-tutorial="audio-mode-tabs">
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
@@ -6633,7 +6760,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
                             challengerTake={challengerTake}
-                            youtubeEmbedUrl={youtubeUrl}
+                            youtubeEmbedUrl={null}
                             suspendPipPlayback={suspendPipPlayback}
                             benchmarkPipVideoRef={benchmarkPipVideoRef}
                             challengerPipVideoRef={challengerPipVideoRef}
@@ -6671,7 +6798,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         </motion.div>
                       )}
 
-                    {!isAudioPracticeMetronomeTab &&
+                    {!isAudioPracticeMetronomeTab && !isLabsOpen && !isAudioPracticeGamesTab &&
                       !musicChromeHidden &&
                       !(
                         isAudioPracticeTimelineTab &&
@@ -6679,6 +6806,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         !quickSettingsOpen
                       ) && (
                       <ControlDeck
+                        onOpenReferences={onRecordSurface && !isSplitView ? () => { setQuickSettingsOpen(false); setReferenceVisible(true); setReferenceExpanded(true) } : undefined}
+                        openLens={!musicPageVisible}
+                        libraryAboveRecord={!musicPageVisible}
+                        workspaceSections
+                        toolsActive={isAudioPracticeToolTab}
+                        onOpenTools={() => handleOpenFullPracticeTool(lastFullToolTab.current)}
+                        onOpenAudioRecorder={() => { setMusicPageVisible(false); handleAudioPracticeTabChange('audio') }}
                         vaultRevision={takes.length}
                         isRecording={isRecording}
                         isStopping={isStopping}
@@ -6688,7 +6822,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         onRecordingModeChange={handleRecordingModeChange}
                         onToggleRecord={handleToggleRecord}
                         onOpenHome={handleOpenPracticeHome}
-                        onOpenVault={isAudioPracticeTunerTab ? undefined : handleOpenVaultFromPracticeHub}
+                        onOpenVault={handleOpenVaultFromPracticeHub}
                         onOpenSettings={handleOpenSettings}
                         expandViewActive={isSplitView}
                         onToggleExpandView={handleToggleSplitView}
@@ -6717,7 +6851,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         droneToggleVisible={onRecordSurface}
                         onShowDroneChange={handleShowDroneSettingChange}
                         showMusic={hudQuickSettings.showMusic}
-                        musicToggleVisible={Boolean(activeProjectId)}
+                        musicToggleVisible={Boolean(activeProjectId) && !/iPhone/i.test(navigator.userAgent)}
                         onShowMusicChange={handleShowMusicSettingChange}
                         againPulse={againPulse}
                         audioEnhancerToggleVisible={!musicRoomActive}
@@ -6834,6 +6968,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                 <Suspense fallback={null}>
                   <TakeVaultDrawer
+                    simplified
                     isOpen={isVaultOpen}
                     onClose={handleCloseVault}
                     projects={projects}
@@ -6909,6 +7044,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   />
 
                   <MultitrackOverlay
+                    routine={routine && routineActiveStep ? {
+                      name: routine.name,
+                      step: routineActiveStep.title,
+                      progress: `${routine.steps.findIndex(step => step.id === routineActiveStep.id) + 1}/${routine.steps.length}`,
+                      onNext: () => handleCompleteRoutineStep(routineActiveStep.id),
+                      onOpen: () => { handleCloseMultitrack(); handleOpenRoutineToday() },
+                    } : undefined}
+                    onOpenRoutine={() => { handleCloseMultitrack(); handleOpenRoutineToday() }}
                     takesLoaded={takesLoaded}
                     isOpen={multitrackOpen}
                     takes={sortedTakes}

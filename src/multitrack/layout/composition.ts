@@ -1,3 +1,4 @@
+import { normalizeLayoutStyle, type MultitrackLayoutStyle } from './quietWorkspaceLayout'
 import type { MultitrackLayoutPreset, MultitrackSession } from '../types'
 import { computeMultitrackLayoutRects, type LayoutRectPercent } from './layoutRects'
 import { isPanelActiveAt } from './sectionVisibility'
@@ -7,7 +8,7 @@ import { sheetLayoutAsset } from '../sheetMusic/sheetMusicTimeline'
 /** Identical rectangles for the live canvas and the exported movie. Floating
  * harmonies never resize the base videos or the scrolling music panel. */
 export function compositionRects(
-  session: Pick<MultitrackSession, 'panels' | 'sheetMusic'> & { practice?: { bpm?: number } },
+  session: Pick<MultitrackSession, 'panels' | 'sheetMusic'> & { practice?: { bpm?: number }; layoutStyle?: MultitrackLayoutStyle },
   layout: MultitrackLayoutPreset, time: number) {
   const bpm = session.practice?.bpm ?? 120
   const base = session.panels.filter(p => p.kind === 'performance' && !p.hidden && !p.overlay)
@@ -25,5 +26,15 @@ export function compositionRects(
       model.panelRects[panel.id] = panel.overlay
     }
   }
+  for (const id of Object.keys(model.panelRects)) model.panelRects[id] = spacedLayoutRect(model.panelRects[id], session.layoutStyle)
+  if (model.musicRect) model.musicRect = spacedLayoutRect(model.musicRect, session.layoutStyle)
   return model
+}
+
+/** Display/export inset only. Editing always operates on the unpadded box. */
+export function spacedLayoutRect(rect: LayoutRectPercent, style?: MultitrackLayoutStyle): LayoutRectPercent {
+  const gap = normalizeLayoutStyle(style).gap
+  const x = Math.min(gap / 390 * 50, rect.widthPercent / 4)
+  const y = Math.min(gap / (390 * 16 / 9) * 50, rect.heightPercent / 4)
+  return { xPercent: rect.xPercent + x, yPercent: rect.yPercent + y, widthPercent: rect.widthPercent - 2 * x, heightPercent: rect.heightPercent - 2 * y }
 }

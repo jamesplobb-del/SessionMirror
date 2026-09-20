@@ -35,6 +35,7 @@ function TakeCardThumbnailPlaceholder() {
 interface TakeCardProps {
   take: Take
   takeIndex: number
+  simplified?: boolean
   isBenchmark: boolean
   isChallenger: boolean
   /** Present when this take has held Best Take at some point in the project. */
@@ -57,6 +58,7 @@ interface TakeCardProps {
 function TakeCard({
   take,
   takeIndex,
+  simplified = false,
   isBenchmark,
   isChallenger,
   bestHistoryEntry = null,
@@ -266,7 +268,7 @@ function TakeCard({
         <div
           className="vault-take-row__thumb cursor-pointer"
         >
-          {showThumbnailImage ? (
+          {simplified && mediaType === 'audio' ? <div className="vault-audio-thumbnail"><Mic2 aria-hidden /></div> : showThumbnailImage ? (
             <img
               src={
                 thumbnailRevision > 0
@@ -341,6 +343,7 @@ function TakeCard({
                 </Pressable>
               )}
             </div>
+            {simplified && (isBenchmark || isChallenger) && <p className="vault-take-role">{isBenchmark ? 'Best Take' : 'Current Take'}</p>}
             <p className="vault-take-row__date">{formattedDate}</p>
             {(bestHistoryEntry || focusArea) && (
               <div className="vault-take-row__practice-chips">
@@ -563,6 +566,7 @@ function TakeCard({
 export default memo(TakeCard, (previous, next) =>
   previous.take.id === next.take.id &&
   previous.takeIndex === next.takeIndex &&
+  previous.simplified === next.simplified &&
   previous.take.thumbnailUrl === next.take.thumbnailUrl &&
   previous.take.name === next.take.name &&
   previous.take.notes === next.take.notes &&

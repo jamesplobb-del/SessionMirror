@@ -30,8 +30,8 @@ export interface NativeAudioPitchChunk {
 let tapRefCount = 0
 let tapActive = false
 let tapOperation: Promise<void> = Promise.resolve()
+let deferredTapDisableTimer: number | null = null
 let tunerMonitorRefCount = 0
-let tunerMonitorActive = false
 let tunerMonitorOperation: Promise<void> = Promise.resolve()
 let tunerRecovery: { preference: MicInputPreference | undefined; result: Promise<boolean> } | null = null
 
@@ -63,12 +63,10 @@ async function startTunerMonitor(
       micInputPreference,
     })
     const active = result.active === true
-    tunerMonitorActive = active
     setNativeAudioCaptureActive(active)
     if (!active) releaseNativeTunerMicrophone(false)
     return active
   } catch (error) {
-    tunerMonitorActive = false
     releaseNativeTunerMicrophone(false)
     if (!isNativeCaptureSessionActive()) {
       setNativeAudioCaptureActive(false)
@@ -85,7 +83,6 @@ async function stopTunerMonitor(): Promise<void> {
   } catch (error) {
     console.warn('[PitchTap] native tuner monitor stop failed', error)
   } finally {
-    tunerMonitorActive = false
     releaseNativeTunerMicrophone()
   }
 }
@@ -97,7 +94,8 @@ export async function acquireNativeTunerMonitor(
   tunerMonitorRefCount += 1
   return enqueueTunerMonitorOperation(async () => {
     if (tunerMonitorRefCount === 0) return false
-    if (tunerMonitorActive) return true
+    // A routine or interruption may have replaced native capture since the
+    // last lease. Revalidate with native on every screen activation.
     const active = await startTunerMonitor(micInputPreference)
     if (active && tunerMonitorRefCount === 0) {
       // releaseNativeTunerMonitor already queued the stop behind this start.
@@ -142,6 +140,10 @@ export async function releaseNativeTunerMonitor(): Promise<void> {
 
 export async function acquireNativeAudioTap(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
+  if (deferredTapDisableTimer !== null) {
+    window.clearTimeout(deferredTapDisableTimer)
+    deferredTapDisableTimer = null
+  }
   tapRefCount += 1
   await enqueueTapOperation(async () => {
     if (tapRefCount === 0 || tapActive) return
@@ -160,6 +162,20 @@ export async function acquireNativeAudioTap(): Promise<void> {
 export async function releaseNativeAudioTap(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
   tapRefCount = Math.max(0, tapRefCount - 1)
+  // A monitor cleanup can race native hands-free startup. Native capture is
+  // already delivering the PCM frames the next monitor needs; disabling the
+  // shared tap here leaves the UI permanently on “Getting ready”. Defer the
+  // final disable until the native session is idle, giving the replacement
+  // monitor time to claim its lease.
+  if (tapRefCount === 0 && isNativeCaptureSessionActive()) {
+    if (deferredTapDisableTimer === null) {
+      deferredTapDisableTimer = window.setTimeout(() => {
+        deferredTapDisableTimer = null
+        void releaseNativeAudioTap()
+      }, 750)
+    }
+    return
+  }
   await enqueueTapOperation(async () => {
     if (tapRefCount > 0 || !tapActive) return
     try {
