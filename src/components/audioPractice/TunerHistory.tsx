@@ -36,7 +36,7 @@ export default function TunerHistory({ samples, trace, transposition }: { sample
       ctx.setTransform(dpr,0,0,dpr,0,0)
       ctx.clearRect(0,0,width,height)
       const points = tunerTracePoints(snapshot.trace,cursor,width,height)
-      drawSilkTuner(ctx,width,height,points,true,document.documentElement.classList.contains('app-dark-mode'))
+      drawSilkTuner(ctx,width,height,points,true,document.documentElement.classList.contains('app-dark-mode'), document.documentElement.id === 'lens-design-system')
     }
     draw()
     const observer = new ResizeObserver(draw)

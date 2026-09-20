@@ -1,0 +1,8 @@
+/* Review-only palettes. Production does not import this file. */
+html#lens-design-system[data-colorway='coral'] { --ls-bg:#fffdfc; --ls-panel:#fff; --ls-soft:#edf3ff; --ls-ink:#192d4c; --ls-muted:#566783; --ls-blue:#2863e8; --ls-line:#dce3f0; --take-best:#c15342; --take-best-soft:#ffb4a4; --take-current:#2863e8; --take-current-soft:#a6c6ff; --cw-one:#2863e8; --cw-two:#c15342; --cw-three:#148b82; --cw-four:#7863c6; }
+html#lens-design-system[data-colorway='teal'] { --ls-bg:#fcfefc; --ls-panel:#fff; --ls-soft:#e9f8f4; --ls-ink:#163c39; --ls-muted:#506e68; --ls-blue:#008776; --ls-line:#d4e8e1; --take-best:#b96a21; --take-best-soft:#ffcf9c; --take-current:#008776; --take-current-soft:#80d9c8; --cw-one:#008776; --cw-two:#b96a21; --cw-three:#397cac; --cw-four:#9a647c; }
+html#lens-design-system[data-colorway='indigo'] { --ls-bg:#fdfcff; --ls-panel:#fff; --ls-soft:#f0efff; --ls-ink:#292848; --ls-muted:#68627f; --ls-blue:#5a50db; --ls-line:#e2dff1; --take-best:#9660b2; --take-best-soft:#deb5ed; --take-current:#5a50db; --take-current-soft:#bdb7ff; --cw-one:#5a50db; --cw-two:#9660b2; --cw-three:#208b92; --cw-four:#b17436; }
+html#lens-design-system[data-colorway] .practice-menu-shortcut:nth-child(1) { --home-tool-color:var(--cw-one); }
+html#lens-design-system[data-colorway] .practice-menu-shortcut:nth-child(2) { --home-tool-color:var(--cw-two); }
+html#lens-design-system[data-colorway] .practice-menu-shortcut:nth-child(3) { --home-tool-color:var(--cw-three); }
+html#lens-design-system[data-colorway] .practice-menu-shortcut:nth-child(4) { --home-tool-color:var(--cw-four); }

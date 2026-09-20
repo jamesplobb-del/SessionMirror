@@ -12,9 +12,10 @@ import {
   type RefObject,
 } from 'react'
 import { motion, useDragControls, useMotionValue, useReducedMotion } from 'framer-motion'
-import { ArrowLeftRight, Pin, RotateCcw, Share, X } from 'lucide-react'
+import { ArrowLeftRight, MoveDiagonal2, Pin, RotateCcw, Share, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import BestTakeBox from './BestTakeBox'
+import { clampTakeCardScale, loadTakeCardScale, saveTakeCardScale } from '../utils/takeCardSize'
 import { isYoutubeDialogOpen } from '../utils/youtubeDialogState'
 import PipWindow from './PipWindow'
 import Pressable from './ui/Pressable'
@@ -230,6 +231,8 @@ function MovableTakeSlot({
   const slotNodeRef = useRef<HTMLDivElement | null>(null)
   const reduceMotion = useReducedMotion()
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
+  const [cardScale, setCardScale] = useState(() => loadTakeCardScale(positionId))
+  const resizeRef = useRef<{ x: number; y: number; scale: number; width: number; height: number } | null>(null)
   const layoutReady = useRef(false)
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
   const dragY = useMotionValue(savedPosition.current?.y ?? 0)
@@ -268,10 +271,10 @@ function MovableTakeSlot({
 
     const centerX = (rect.left + rect.right) / 2 - currentX
     const centerY = (rect.top + rect.bottom) / 2 - currentY
-    const baseLeft = centerX - node.offsetWidth / 2
-    const baseRight = centerX + node.offsetWidth / 2
-    const baseTop = centerY - node.offsetHeight / 2
-    const baseBottom = centerY + node.offsetHeight / 2
+    const baseLeft = centerX - node.offsetWidth * cardScale / 2
+    const baseRight = centerX + node.offsetWidth * cardScale / 2
+    const baseTop = centerY - node.offsetHeight * cardScale / 2
+    const baseBottom = centerY + node.offsetHeight * cardScale / 2
     const minX = bounds.left + TAKE_CARD_BOUNDARY_INSET - baseLeft
     const maxX = bounds.right - TAKE_CARD_BOUNDARY_INSET - baseRight
     const minY = bounds.top + TAKE_CARD_BOUNDARY_INSET - baseTop
@@ -289,7 +292,7 @@ function MovableTakeSlot({
     dragX.set(nextX)
     dragY.set(nextY)
     // Viewport correction is temporary; only a deliberate drag is persisted.
-  }, [boundaryRef, dragX, dragY, editing, movable, positionId])
+  }, [boundaryRef, cardScale, dragX, dragY, editing, movable, positionId])
 
   useLayoutEffect(() => {
     clampPositionToBoundary()
@@ -335,6 +338,9 @@ function MovableTakeSlot({
     handledResetNonceRef.current = resetNonce
     dragX.set(0)
     dragY.set(0)
+    savedPosition.current = null
+    setCardScale(1)
+    saveTakeCardScale(positionId, 1)
     savePersistentWidgetPosition(positionId, 0, 0)
   }, [dragX, dragY, positionId, resetNonce])
 
@@ -538,18 +544,19 @@ function MovableTakeSlot({
       animate={
         editing && !dragging
           ? {
-              scale: 1.018,
+              scale: cardScale,
               rotate:
                 wiggleDirection < 0
                   ? [-0.38, 0.38, -0.38]
                   : [0.38, -0.38, 0.38],
             }
-          : { scale: armed || dragging ? 1.04 : 1, rotate: 0 }
+          : { scale: movable ? cardScale : 1, rotate: 0 }
       }
       transition={
         editing && !dragging
           ? {
               ...iosDragRelease,
+              scale: { duration: 0 },
               rotate: { duration: 0.24, repeat: Infinity, ease: 'linear' },
             }
           : reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 30, mass: 0.9 }
@@ -557,6 +564,50 @@ function MovableTakeSlot({
       style={movable ? { x: dragX, y: dragY, transformOrigin: 'center center' } : undefined}
     >
       {children}
+      {movable && editing && <button
+        type="button" className="take-card-resize-handle" data-card-move-ignore
+        aria-label="Resize take card. Drag to resize or use arrow keys."
+        onClick={event => { event.preventDefault(); event.stopPropagation() }}
+        onPointerDown={event => {
+          event.preventDefault(); event.stopPropagation()
+          const node = slotNodeRef.current
+          if (!node) return
+          suppressClickRef.current = true
+          resizeRef.current = { x:event.clientX, y:event.clientY, scale:cardScale, width:node.offsetWidth, height:node.offsetHeight }
+          event.currentTarget.setPointerCapture(event.pointerId)
+        }}
+        onPointerMove={event => {
+          const start = resizeRef.current
+          const node = slotNodeRef.current
+          const boundary = boundaryRef.current
+          if (!start || !node || !boundary) return
+          event.stopPropagation()
+          const rect = node.getBoundingClientRect(), bounds = boundary.getBoundingClientRect()
+          const cx = (rect.left + rect.right)/2, cy = (rect.top + rect.bottom)/2
+          const max = Math.min(2, 2*Math.min(cx-bounds.left-12,bounds.right-cx-12)/start.width, 2*Math.min(cy-bounds.top-12,bounds.bottom-cy-12)/start.height)
+          const delta = ((event.clientX-start.x)*start.width + (event.clientY-start.y)*start.height)*2/(start.width**2+start.height**2)
+          setCardScale(clampTakeCardScale(start.scale + delta, max))
+        }}
+        onPointerUp={event => {
+          if (!resizeRef.current) return
+          event.stopPropagation(); resizeRef.current = null
+          saveTakeCardScale(positionId, cardScale)
+          savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
+          savedPosition.current = {x:dragX.get(),y:dragY.get()}
+          onLayoutDragCompleted(); releaseClickSuppressionSoon()
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }}
+        onPointerCancel={() => {
+          if (resizeRef.current) setCardScale(resizeRef.current.scale)
+          resizeRef.current = null; releaseClickSuppressionSoon()
+        }}
+        onKeyDown={event => {
+          if (!['ArrowUp','ArrowRight','ArrowDown','ArrowLeft'].includes(event.key)) return
+          event.preventDefault(); event.stopPropagation()
+          const next = clampTakeCardScale(cardScale + (['ArrowUp','ArrowRight'].includes(event.key) ? .1 : -.1))
+          setCardScale(next); saveTakeCardScale(positionId,next)
+        }}
+      ><MoveDiagonal2 aria-hidden /></button>}
     </motion.div>
   )
 }
@@ -675,7 +726,7 @@ function TakeCardLayoutToolbar({
     >
       <span className="take-card-layout-toolbar__copy">
         <strong>Arrange Take Cards</strong>
-        <small>Layout only · tap outside to finish</small>
+        <small>Drag to move · corner to resize</small>
       </span>
       <Pressable
         type="button"
@@ -686,7 +737,7 @@ function TakeCardLayoutToolbar({
         className="take-card-layout-toolbar__reset"
         data-card-move-ignore
         onClick={onReset}
-        aria-label="Reset take cards to their default positions"
+        aria-label="Reset take cards to their default sizes and positions"
       >
         <RotateCcw aria-hidden />
         <span>Reset</span>

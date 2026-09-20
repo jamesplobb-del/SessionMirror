@@ -1,0 +1,24 @@
+/* Home design studies only — composed from the production Home screen. */
+html#lens-design-system[data-home-design]:not([data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-instrument { background:var(--ls-panel)!important; border-radius:18px; min-height:74px; }
+html#lens-design-system[data-home-design]:not([data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:25px; }
+html#lens-design-system[data-home-design]:not([data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy em { line-height:1.5; font-size:12px; }
+html#lens-design-system[data-home-design]:not([data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-links .practice-home-library { border-radius:16px; }
+/* Classic Pair — two equal entry points, compact supporting rows. */
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-columns:1fr 1fr; grid-template-rows:1fr; flex:0 0 auto; gap:12px; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button { min-height:226px; padding:20px 16px; align-items:flex-start; flex-direction:column; justify-content:space-between; border-radius:24px; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button > svg:not(.practice-home-signal-detail) { align-self:flex-end; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy { gap:16px; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-links { grid-template-columns:1fr; gap:0; border:1px solid var(--ls-line); border-radius:20px; overflow:hidden; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-library { border:0; border-radius:0; min-height:64px; padding:12px 18px; }
+html#lens-design-system[data-home-design='pair'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-library + .practice-home-library { border-top:1px solid var(--ls-line); }
+/* Focus — a confident recording hero with a quiet routine row. */
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-rows:1fr auto; flex:1 0 auto; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height:215px; background:linear-gradient(135deg,#007ee5,#0063be)!important; border:0!important; padding:26px; border-radius:28px; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button.is-primary :is(strong,em,svg) { color:white!important; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-primary .practice-home-launch-copy strong { font-size:34px; max-width:230px; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-primary .open-lens-home-symbol { width:34px; height:34px; margin-bottom:12px; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height:102px; padding:18px; background:#fffbf1!important; border-radius:20px; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-quick .practice-home-launch-copy { display:grid; grid-template-columns:30px 1fr; gap:5px 10px; align-items:center; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-quick .practice-home-launch-copy svg { grid-row:span 2; color:var(--take-best); }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-quick .practice-home-launch-copy strong { font-size:20px; }
+html#lens-design-system[data-home-design='focus'] .practice-menu-card.practice-menu-card--electric-edge .is-quick .practice-home-launch-copy em { grid-column:2; }

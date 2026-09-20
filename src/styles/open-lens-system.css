@@ -2,9 +2,9 @@
    Every selector is opt-in; review and app will use this same file, not a recreation.
    No pitch, audio, recording, or timing logic lives here. */
 html#lens-design-system.lens-system {
-  --ls-bg:#f8fbff; --ls-panel:#ffffff; --ls-soft:#eaf4ff; --ls-ink:#142b43;
-  --ls-muted:#526b83; --ls-blue:#087bce; --ls-line:#c3d8eb; --ls-radius:22px;
-  --ls-shadow:0 8px 24px #24577b06; --ls-glass:#ffffffed;
+  --ls-bg:#ffffff; --ls-panel:#ffffff; --ls-soft:#f2f8ff; --ls-ink:#142b43;
+  --ls-muted:#49647d; --ls-blue:#007ee5; --ls-line:#d8e6f2; --ls-radius:22px;
+  --ls-shadow:0 4px 18px #24577b05; --ls-glass:#fffffff5;
   --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line);
   --guide-panel:var(--ls-panel); color-scheme:light;
 }
@@ -563,9 +563,108 @@ html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-se
 /* Neutral Multitrack surfaces; blue identifies actions rather than tinting the page. */
 html#lens-design-system:not(.app-dark-mode) body:has(.multitrack-quiet-workspace),
 html#lens-design-system:not(.app-dark-mode) .multitrack-quiet-workspace {
-  --mt-bg:#fafafa; --mt-panel:#ffffff; --mt-soft:#f0f1f3; --mt-line:#dcdfe3;
+  --mt-bg:#ffffff; --mt-panel:#ffffff; --mt-soft:#f6f7f8; --mt-line:#e3e6e9;
   --mt-ink:#252b33; --mt-muted:#69717b; --mt-blue-soft:#eef3f8;
 }
 html#lens-design-system .multitrack-quiet-workspace :is(.multitrack-tool-expanded,.multitrack-toolbar) { background:var(--mt-panel); border-color:var(--mt-line); }
 html#lens-design-system .multitrack-quiet-workspace .multitrack-tool-pin[aria-expanded=true],
 html#lens-design-system .multitrack-quiet-workspace .multitrack-toolbar__btn--primary { background:var(--mt-soft); }
+
+/* Pitch Insights: the same quiet surfaces and typography as Open Lens. */
+html#lens-design-system .pitch-insights-screen {
+  background:var(--ls-bg); color:var(--ls-ink);
+  --pi-accent-strong:var(--ls-blue); --pi-grid-line:var(--ls-line);
+}
+html#lens-design-system .pitch-insights-screen__topbar {
+  padding:8px 20px 12px; background:var(--ls-bg); border-bottom:1px solid var(--ls-line);
+}
+html#lens-design-system .pitch-insights-screen__title-wrap h2 { font-size:22px; font-weight:600; letter-spacing:-.035em; }
+html#lens-design-system .pitch-insights-screen__close { width:44px; height:44px; background:var(--ls-soft); color:var(--ls-muted); }
+html#lens-design-system .pitch-insights-screen__scroll { padding-top:16px; }
+html#lens-design-system :is(.pitch-insights-hero,.pitch-insights-detail__hero,.pitch-insights-list,.pitch-insights-days,.pitch-insights-sessions,.pitch-insights-all-time,.pitch-insights-detail__trend-card,.pitch-insights-state--empty) {
+  padding:18px; border:1px solid var(--ls-line); border-radius:var(--ls-radius);
+  background:var(--ls-panel); box-shadow:var(--ls-shadow);
+}
+html#lens-design-system .pitch-insights-hero { gap:10px; }
+html#lens-design-system .pitch-insights-hero__status { font-size:28px; font-weight:600; letter-spacing:-.04em; }
+html#lens-design-system .pitch-insights-screen :is(p,button,strong,span) { text-shadow:none; }
+html#lens-design-system .pitch-insights-screen :is(.pitch-insights-row__note,.pitch-insights-row__cents,.pitch-insights-row__copy strong,.pitch-insights-list > header span,.pitch-insights-detail__hero-row strong) { font-weight:600; }
+html#lens-design-system .pitch-insights-row { min-height:64px; gap:10px; padding:12px 0; }
+html#lens-design-system .pitch-insights-row__copy span { font-size:12px; white-space:normal; line-height:1.4; }
+html#lens-design-system .pitch-insights-row__note { font-size:17px; }
+html#lens-design-system .pitch-insights-day-strip { gap:6px; padding-bottom:4px; }
+html#lens-design-system :is(.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill) {
+  position:relative; transform:none; box-sizing:border-box; min-height:44px; height:auto;
+  border:1px solid transparent; background:transparent; color:var(--ls-muted); font-weight:500;
+}
+html#lens-design-system .pitch-insights-day-strip__cell { padding:10px 12px; border-radius:14px; gap:5px; }
+html#lens-design-system .pitch-insights-instrument-filter__pill { display:inline-flex; align-items:center; justify-content:center; padding:9px 14px; }
+html#lens-design-system :is(.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill).is-active {
+  background:var(--ls-soft); color:var(--ls-blue); border-color:var(--ls-line); box-shadow:none;
+}
+html#lens-design-system .pitch-insights-day-strip__cell.is-active :is(small,strong,span) { color:var(--ls-blue); }
+html#lens-design-system :is(.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill)::before,
+html#lens-design-system :is(.pitch-insights-day-strip__cell,.pitch-insights-instrument-filter__pill)::after { content:none; }
+html#lens-design-system .pitch-insights-rail__track { border:0; background:var(--ls-soft); }
+html#lens-design-system .pitch-insights-rail__dot { box-shadow:0 2px 6px #142b4320; }
+html#lens-design-system .pitch-insights-footer { border-top:0; padding:0; gap:12px; }
+html#lens-design-system .pitch-insights-footer button { min-height:44px; padding:10px 14px; border:1px solid var(--ls-line); border-radius:14px; background:var(--ls-panel); font-weight:500; }
+html#lens-design-system .pitch-insights-back { min-height:44px; margin-bottom:8px; font-weight:500; }
+html#lens-design-system .pitch-insights-instrument-picker { box-shadow:none; border-radius:18px; }
+html#lens-design-system .pitch-insights-instrument-picker > div button { min-height:44px; }
+html#lens-design-system .pitch-insights-reset-zone { border-radius:18px; flex-wrap:wrap; }
+html#lens-design-system .pitch-insights-state--empty { min-height:190px; justify-content:center; gap:12px; }
+@media (max-width:360px) {
+  html#lens-design-system .pitch-insights-list { padding:14px; }
+  html#lens-design-system .pitch-insights-row { gap:6px; grid-template-columns:2.2rem minmax(0,1fr) auto auto; }
+  html#lens-design-system .pitch-insights-rail--mini { width:2.5rem; }
+}
+
+/* Air — spacious white cards, identity carried by icons and a fine edge. */
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-actions { grid-template-columns:1fr 1fr; grid-template-rows:1fr; flex:1 0 auto; gap:12px; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button { min-height:250px; padding:22px 16px; background:var(--ls-panel)!important; border-radius:26px; align-items:flex-start; flex-direction:column; justify-content:space-between; box-shadow:0 6px 20px #16375d08!important; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button.is-primary { border-top:3px solid #59caff!important; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button.is-quick { border-top:3px solid #ffd55a!important; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .open-lens-home-symbol { width:48px; height:48px; padding:12px; border-radius:15px; background:var(--ls-soft); margin-bottom:15px; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .is-quick .open-lens-home-symbol { background:color-mix(in srgb,var(--take-best) 10%,var(--ls-panel)); color:var(--take-best); }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button > svg:not(.practice-home-signal-detail) { align-self:flex-end; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-instrument { border:0; border-bottom:1px solid var(--ls-line); border-radius:0; padding-inline:4px; }
+
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:25px; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy em { font-size:12px; line-height:1.5; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-links .practice-home-library { border-radius:16px; }
+html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-instrument { min-height:74px; background:var(--ls-panel)!important; }
+@media(max-width:360px), (max-height:740px) {
+  html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button { min-height:190px; padding:18px 12px; }
+  html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:22px; }
+  html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .open-lens-home-symbol { margin-bottom:8px; }
+}
+/* A corner grip appears only while the take-card layout is being edited. */
+.take-card-resize-handle { position:absolute; right:-8px; bottom:-8px; width:44px; height:44px; display:grid; place-items:center; border:1px solid #ffffff90; border-radius:50%; background:#16324bd9; color:white; z-index:30; touch-action:none; cursor:nwse-resize; }
+.take-card-resize-handle svg { width:20px; height:20px; }
+.compact-take-slot--layout-editing { overflow:visible!important; }
+/* Program title uses the current finish instead of the old Prism gradient. */
+html#lens-design-system :is(.practice-timeline__hero,.practice-timeline-editor__header) { background:var(--ls-panel); border:1px solid var(--ls-line); border-radius:20px; box-shadow:none; color:var(--ls-ink); }
+html#lens-design-system :is(.practice-timeline__hero-title,.practice-timeline-editor__title) { color:var(--ls-ink); font-weight:600; letter-spacing:-.035em; background:none; -webkit-text-fill-color:var(--ls-ink); }
+html#lens-design-system .practice-timeline__hero-sub { color:var(--ls-muted); }
+html#lens-design-system .practice-timeline__hero-name svg { color:var(--ls-blue); }
+html#lens-design-system .practice-timeline__section-count { color:var(--ls-blue); background:var(--ls-soft); }
+html#lens-design-system .practice-timeline__hero-rename { color:var(--ls-ink); background:var(--ls-soft); border-color:var(--ls-line); }
+/* Original Air tuner. --silk-wash remains non-inheriting: the registered
+   property is consumed ONLY on the overlay, never on its descendants. */
+html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
+  background:color-mix(in srgb,var(--silk-wash) 27%,var(--ls-bg))!important;
+}
+html#lens-design-system.lens-system.app-dark-mode .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
+  background:color-mix(in srgb,var(--silk-wash) 16%,var(--ls-bg))!important;
+}
+html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout { top:20px!important; display:flex; flex-direction:column; align-items:center; }
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note,
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note span {
+  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important; font-size:72px; font-weight:500!important; letter-spacing:-3px!important; line-height:1.1; text-shadow:none!important;
+}
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note small { font-size:30px; color:var(--ls-ink)!important; }
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__coach { order:-1; margin:0 0 14px; padding:0; border:0!important; background:transparent!important; font-size:11px; line-height:1.5; color:var(--ls-muted)!important; }
+html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail { margin-top:6px; font-size:11px; }
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button,
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button svg { color:var(--ls-ink)!important; }

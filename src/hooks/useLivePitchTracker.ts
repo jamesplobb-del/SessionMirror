@@ -1657,7 +1657,7 @@ function drawPitchCanvas(
     const now = Date.now()
     if (visualTrace) appendTunerTrace(visualTrace, now, centsHistory.at(-1) ?? PITCH_SILENCE_FLOOR_CENTS)
     const displayedPoints = visualTrace ? tunerTracePoints(visualTrace.samples, now, width, height) : tracePoints
-    const color = drawSilkTuner(ctx, width, height, displayedPoints, visualTrace ? true : active, document.documentElement.classList.contains('app-dark-mode'))
+    const color = drawSilkTuner(ctx, width, height, displayedPoints, visualTrace ? true : active, document.documentElement.classList.contains('app-dark-mode'), document.documentElement.id === 'lens-design-system')
     if (now - (silkColorUpdates.get(silkOverlay) ?? -Infinity) >= 100 && silkOverlay.style.getPropertyValue('--silk-live') !== color) {
       silkColorUpdates.set(silkOverlay, now)
       silkOverlay.style.setProperty('--silk-live', color)

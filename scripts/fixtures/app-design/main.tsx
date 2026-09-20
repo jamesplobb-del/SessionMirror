@@ -16,6 +16,7 @@ import AudioPracticeMetronomeView from '../../../src/components/audioPractice/Au
 import { LiveAudioTunerPane, LivingPitchWidgetPane } from '../../../src/components/LivePitchTuner'
 import LabsMenu from '../../../src/components/labs/LabsMenu'
 import SettingsDrawer from '../../../src/components/SettingsDrawer'
+import PitchInsightsScreen from '../../../src/components/audioPractice/PitchInsightsScreen'
 import TakeVaultDrawer from '../../../src/components/TakeVaultDrawer'
 import SettingsBranchWheel from '../../../src/components/SettingsBranchWheel'
 import DraggablePitchWidget from '../../../src/components/DraggablePitchWidget'
@@ -63,7 +64,15 @@ import '../../../src/styles/open-lens-system.css'
 import './fixture.css'
 import '../../../src/styles/pocket-arcade.css'
 
+import '../colorways/palettes.css'
+import '../home-layouts/concepts.css'
 const params = new URLSearchParams(location.search)
+const homeDesign = params.get('homeDesign')
+if (homeDesign && ['pair','focus','air'].includes(homeDesign)) document.documentElement.dataset.homeDesign = homeDesign
+else delete document.documentElement.dataset.homeDesign
+const colorway = params.get('colorway')
+if (colorway && ['coral','teal','indigo'].includes(colorway)) document.documentElement.dataset.colorway = colorway
+else delete document.documentElement.dataset.colorway
 // Vite review server uses 5195. Refuse to run storage-owning components on 5194.
 if (location.port !== '5195') location.replace(`http://127.0.0.1:5195${location.pathname}${location.search}`)
 const widgetDemo = params.get('screen') === 'widgets'
@@ -144,6 +153,10 @@ function TunerPreview({widget=false}:{widget?:boolean}){
   const [readout,setReadout]=useState({noteName:'A4',midi:69,frequencyHz:440,cents:2})
   const [notes,setNotes]=useState<number[]>([]), [octave,setOctave]=useState(4)
   useEffect(()=>{
+    const soak=params.get('soak')==='1', started=performance.now()
+    let frames=0,lastReport=0,lastWash=0
+    const report=document.createElement('output')
+    if(soak){report.id='tuner-soak-report';report.style.cssText='position:fixed;top:0;left:0;z-index:99999;background:white;color:black;font:10px monospace;pointer-events:none';document.body.append(report)}
     const paint=()=>{
       const c=canvas.current;if(!c)return
       const now=performance.now(), cents=2+8*Math.sin(now/2100)+3*Math.sin(now/560)
@@ -155,11 +168,18 @@ function TunerPreview({widget=false}:{widget?:boolean}){
       if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
       const ctx=c.getContext('2d');if(!ctx)return
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h)
-      drawSilkTuner(ctx,w,h,tunerTracePoints(trace.current.samples,now,w,h),true,dark)
+      const color=drawSilkTuner(ctx,w,h,tunerTracePoints(trace.current.samples,now,w,h),true,dark,!originalElectric && !widget)
+      const overlay=c.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
+      if(overlay && now-lastWash>=100){overlay.style.setProperty('--silk-wash',color);lastWash=now}
+      if(soak){frames++;if(now-lastReport>=1000){
+        const heap=(performance as Performance & {memory?:{usedJSHeapSize:number}}).memory?.usedJSHeapSize
+        report.textContent=JSON.stringify({elapsedSeconds:Math.round((now-started)/1000),frames,traceSamples:trace.current.samples.length,historySamples:history.current.length,canvas:[c.width,c.height],heapMiB:heap?Math.round(heap/1048576):null})
+        lastReport=now
+      }}
     }
     // Simulated readings, with the production renderer, no pitch engine or microphone.
-    const timer=window.setInterval(()=>{if(!document.hidden)paint()},50);paint()
-    return()=>clearInterval(timer)
+    const timer=window.setInterval(()=>{if(!document.hidden)paint()},soak?1000/60:50);paint()
+    return()=>{clearInterval(timer);report.remove()}
   },[])
   if(widget)return <div className="pitch-tuner pitch-tuner--widget flex h-full min-h-0 w-full flex-col"><div className="pitch-glass-panel pitch-glass-panel--compact pitch-glass-panel--widget pitch-glass-panel--elevated relative flex h-full min-h-0 w-full flex-col overflow-hidden"><LivingPitchWidgetPane readout={readout} canvasRef={canvas} tunerTransposition="concert"/></div></div>
   return <LiveAudioTunerPane readout={readout} canvasRef={canvas} tunerInstrument="winds" tunerTransposition="concert" onTunerTranspositionChange={noop} onTunerInstrumentChange={noop} hapticsEnabled={false} insightsEnabled pitchHistory={history} visualTrace={trace} drone={{activeNotes:notes,octave,onToggleNote:n=>setNotes(v=>v.includes(n)?v.filter(x=>x!==n):[...v,n]),onGlissNote:(n,o)=>{setNotes([n]);setOctave(o)},onSetNotes:setNotes,onIncrementOctave:()=>setOctave(v=>v+1),onDecrementOctave:()=>setOctave(v=>v-1),hapticsEnabled:false}}/>
@@ -214,6 +234,7 @@ function Preview(){
       <div className="lens-safe-bottom"><i/></div>
     </div>
     <PracticeHub isOpen={screen==='home'||screen==='routines'} projects={[]} takes={takes} tunerTransposition="concert" hapticFeedback={false} onClose={()=>go('audio')} onOpenSettings={()=>go('settings')} onOpenQuickPractice={()=>go('audio')} onOpenGames={()=>go('games')} onDailyPractice={()=>{setRoutine(sampleRoutine);openRoutine()}} onDailyGame={()=>go('games')} onOpenVault={()=>go('library')} onOpenTuner={()=>go('tuner')} onOpenMetronome={()=>go('metronome')} onOpenMusic={()=>note('Music library · existing page retained')} routine={routine} routineDay={null} routineBuilderRequest={builder} instrumentId={instrument} liveDeskSnapshot={desk} onSelectInstrument={setInstrument} onStartRoutineStep={async()=>go('tuner')} onToggleRoutineStep={noop} onOpenRoutineBuilder={m=>{setBuilder(m);go('routines')}} onCloseRoutineBuilder={()=>{setBuilder(null);go('home')}} onSaveRoutine={r=>{setRoutine(r);setBuilder(null);go('home')}} onSaveAndStartRoutine={async r=>{setRoutine(r);setBuilder(null);go('tuner')}} onCreatePracticeItem={async()=> 'demo-project'} onDeleteRoutine={()=>setRoutine(null)}/>
+    <PitchInsightsScreen isOpen={screen==='insights'} onClose={()=>go('tuner')} hapticFeedback={false}/>
     <SettingsDrawer isOpen={screen==='settings'} onClose={()=>go('audio')} settings={settings} hudQuickSettings={pickHudQuickSettings(settings)} onUpdate={patch=>setSettings(s=>({...s,...patch}))} onAudioEnhancerChange={noop} onReset={()=>setSettings(DEFAULT_APP_SETTINGS)} onOpenLabs={()=>go('games')} onOpenQuickTuner={()=>go('tuner')} onOpenQuickMetronome={()=>go('metronome')}/>
     <TakeVaultDrawer simplified={!originalSurface} isOpen={screen==='library'} onClose={()=>go('audio')} projects={[]} activeProject={null} onSelectProject={noop} onCreateProject={noop} takes={takes} bestTakeHistory={[]} sortedTakes={takes} sortMode="newest" onSortChange={noop} benchmarkId={takes[0]?.id??null} benchmarkBinding={null} challengerId={takes[1]?.id??null} libraryItems={[]} onImportLibraryAudio={noop} onRenameLibraryItem={noop} onDeleteLibraryItem={noop} onSetLibraryReference={noop} onPinBenchmark={noop} onPinChallenger={noop} onUpdateTake={noop} onDeleteTake={id=>setTakes(v=>v.filter(t=>t.id!==id))} onDeleteTakes={ids=>setTakes(v=>v.filter(t=>!ids.includes(t.id)))} onClearAllTakes={()=>setTakes([])} onOpenTake={()=>note('Sample take · review data only')}/>
     <SettingsBranchWheel workspaceSections={!originalSurface} workspaceActionsVisible={!originalSurface} onToggleExpandView={()=>note('Expanded view · opens the existing comparison screen in the app')} onOpenMultitrack={()=>note('Multitrack · opens the existing studio in the app')} open={screen==='workspace'} showDrone={widgets.drone} droneToggleVisible onShowDroneChange={v=>setWidgets(w=>({...w,drone:v}))} handsFreeEnabled={widgets.hands} handsFreeToggleVisible onHandsFreeChange={v=>setWidgets(w=>({...w,hands:v}))} showMusic={widgets.music} musicToggleVisible onShowMusicChange={v=>setWidgets(w=>({...w,music:v}))} onClose={()=>go('audio')} anchorRef={anchor} pitchTrackerEnabled={widgets.pitch} showTakeCards={widgets.cards} showMetronome={widgets.met} audioEnhancerEnabled={widgets.enhance} pitchToggleVisible onPitchTrackerChange={v=>setWidgets(w=>({...w,pitch:v}))} onShowTakeCardsChange={v=>setWidgets(w=>({...w,cards:v}))} onShowMetronomeChange={v=>setWidgets(w=>({...w,met:v}))} onAudioEnhancerChange={v=>setWidgets(w=>({...w,enhance:v}))} onOpenReferences={()=>{go('audio');openReferences()}} hapticFeedback={false}/>

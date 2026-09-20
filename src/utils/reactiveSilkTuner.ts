@@ -38,11 +38,12 @@ export const SILK_TRACE_WINDOW_MS = Math.round((110 / 60) * 1000)
 type SilkPoint = { x: number; y: number; cents: number; time?: number }
 type IndexedSilkPoint = { point: SilkPoint; index: number }
 
-function colorWithAlpha(color: string, alpha: number): string {
+function colorWithAlpha(color: string, alpha: number, contrast = false): string {
   const red = Number.parseInt(color.slice(1, 3), 16)
   const green = Number.parseInt(color.slice(3, 5), 16)
   const blue = Number.parseInt(color.slice(5, 7), 16)
-  return `rgba(${red},${green},${blue},${Math.max(0, Math.min(1, alpha))})`
+  const strength = contrast ? .7 : 1
+  return `rgba(${Math.round(red*strength)},${Math.round(green*strength)},${Math.round(blue*strength)},${Math.max(0, Math.min(1, alpha))})`
 }
 
 function silkGradient(
@@ -51,6 +52,7 @@ function silkGradient(
   totalPoints: number,
   startAlpha: number,
   endAlpha: number,
+  contrast = false,
 ) {
   const firstX = run[0].point.x
   const lastX = Math.max(firstX + 1, run[run.length - 1].point.x)
@@ -63,17 +65,18 @@ function silkGradient(
     const age = totalPoints <= 1 ? 1 : entry.index / (totalPoints - 1)
     gradient.addColorStop(
       Math.max(0, Math.min(1, (entry.point.x - firstX) / (lastX - firstX))),
-      colorWithAlpha(silkPitchColor(entry.point.cents), startAlpha + (endAlpha - startAlpha) * age),
+      colorWithAlpha(silkPitchColor(entry.point.cents), startAlpha + (endAlpha - startAlpha) * age, contrast),
     )
   }
   const last = run[run.length - 1]
   const lastAge = totalPoints <= 1 ? 1 : last.index / (totalPoints - 1)
-  gradient.addColorStop(1, colorWithAlpha(silkPitchColor(last.point.cents), startAlpha + (endAlpha - startAlpha) * lastAge))
+  gradient.addColorStop(1, colorWithAlpha(silkPitchColor(last.point.cents), startAlpha + (endAlpha - startAlpha) * lastAge, contrast))
   return gradient
 }
 
-function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], totalPoints: number) {
+function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], totalPoints: number, air = false, dark = false) {
   if (run.length < 2) return
+  if (!air) {
   ctx.fillStyle = silkGradient(ctx, run, totalPoints, .02, .13)
   ctx.beginPath()
   ctx.moveTo(run[0].point.x, run[0].point.y)
@@ -85,9 +88,10 @@ function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], tot
   }
   ctx.closePath()
   ctx.fill()
+  }
 
-  ctx.strokeStyle = silkGradient(ctx, run, totalPoints, .15, 1)
-  ctx.lineWidth = 5
+  ctx.strokeStyle = silkGradient(ctx, run, totalPoints, air ? .65 : .15, 1, air && !dark)
+  ctx.lineWidth = air ? 2.8 : 5
   ctx.beginPath()
   ctx.moveTo(run[0].point.x, run[0].point.y)
   for (let index = 1; index < run.length; index += 1) {
@@ -99,20 +103,28 @@ function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], tot
 /** Paint measured history only. No simulated movement or changes to pitch detection. */
 export function drawSilkTuner(
   ctx: CanvasRenderingContext2D, width: number, height: number,
-  points: SilkPoint[], active: boolean, dark: boolean,
+  points: SilkPoint[], active: boolean, dark: boolean, air = false,
 ): string {
   const g = silkTunerGeometry(width, height)
   ctx.save()
-  ctx.fillStyle = '#20ed782e'
-  ctx.fillRect(10, g.centsToY(5), width - 20, g.bandBottom - g.centsToY(5))
+  ctx.fillStyle = air ? '#20ed7817' : '#20ed782e'
+  ctx.fillRect(air ? 48 : 10, g.centsToY(5), width - (air ? 58 : 20), g.bandBottom - g.centsToY(5))
   ctx.strokeStyle = '#00d85a59'; ctx.lineWidth = 1
-  for (const y of [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
+  for (const y of air ? [] : [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
   ctx.strokeStyle = dark ? '#adcfcf44' : '#567b8333'
-  ctx.beginPath();ctx.moveTo(14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
+  ctx.beginPath();ctx.moveTo(air ? 48 : 14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
   // No Sharp / Flat / TARGET captions. The green band already says where in
   // tune is, and up/down needs no caption once the trace is moving. Geometry
   // keeps targetY and flatY: they still reserve the space the labels used to
   // occupy, so the trace and its endpoint dot stay clear of the bottom edge.
+  if (air) {
+    ctx.font = '500 9px -apple-system, system-ui, sans-serif'
+    ctx.fillStyle = dark ? '#c0d1d6' : '#405c66'
+    ctx.fillText('SHARP', 8, g.centsToY(30))
+    ctx.fillText('TARGET', 8, g.center + 3)
+    ctx.fillText('FLAT', 8, g.centsToY(-30))
+    ctx.save(); ctx.beginPath(); ctx.rect(48, 0, Math.max(0,width-48), height); ctx.clip()
+  }
   ctx.lineCap='round';ctx.lineJoin='round'
   let run: IndexedSilkPoint[] = []
   let gap = 0
@@ -135,7 +147,7 @@ export function drawSilkTuner(
       // stored silence in that path is a real gap and must stay a gap.
       gap += 1
       if (point.time != null || gap > MAX_BRIDGED_GAP_SAMPLES) {
-        drawSilkRun(ctx, run, points.length)
+        drawSilkRun(ctx, run, points.length, air, dark)
         run = []
       }
     } else {
@@ -143,17 +155,20 @@ export function drawSilkTuner(
       run.push({ point, index })
     }
   }
-  drawSilkRun(ctx, run, points.length)
+  drawSilkRun(ctx, run, points.length, air, dark)
   const last=points.at(-1)
   const color=active&&last&&!isSilenceFloorSample(last.cents)?silkPitchColor(last.cents):'transparent'
   if(color!=='transparent'&&last) {
+    if (!air) {
     const halo=ctx.createRadialGradient(last.x,last.y,0,last.x,last.y,33)
     halo.addColorStop(0,color+'b3');halo.addColorStop(.38,color+'57');halo.addColorStop(1,color+'00')
     ctx.fillStyle=halo;ctx.beginPath();ctx.arc(last.x,last.y,33,0,Math.PI*2);ctx.fill()
-    ctx.fillStyle=color;ctx.beginPath();ctx.arc(last.x,last.y,8,0,Math.PI*2);ctx.fill()
+    }
+    ctx.fillStyle=air && !dark ? colorWithAlpha(color,1,true) : color;ctx.beginPath();ctx.arc(last.x,last.y,air ? 4.5 : 8,0,Math.PI*2);ctx.fill()
     ctx.strokeStyle='#ffffffd9';ctx.lineWidth=1.7;ctx.stroke()
-    ctx.fillStyle='white';ctx.beginPath();ctx.arc(last.x,last.y,2.4,0,Math.PI*2);ctx.fill()
+    if (!air) {ctx.fillStyle='white';ctx.beginPath();ctx.arc(last.x,last.y,2.4,0,Math.PI*2);ctx.fill()}
   }
+  if (air) ctx.restore()
   ctx.restore()
   return color
 }
