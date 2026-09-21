@@ -102,7 +102,7 @@ final class InlineTakeBoxPlaybackController {
             queue: .main
         ) { [weak self, weak player] _ in
             guard let self = self, let player = player, self.player === player else { return }
-            self.stop(notify: true)
+            self.stop(notify: true, completed: true)
         }
 
         let safeStartTime = max(0, startTime)
@@ -161,7 +161,7 @@ final class InlineTakeBoxPlaybackController {
         audioPlayer?.pause()
     }
 
-    func stop(notify: Bool = true) {
+    func stop(notify: Bool = true, completed: Bool = false) {
         assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
         let hadPlayer = player != nil || audioPlayer != nil
         let endedOwnerId = ownerId
@@ -188,7 +188,7 @@ final class InlineTakeBoxPlaybackController {
         cornerRadius = 0
 
         if notify && hadPlayer {
-            plugin?.notifyListeners("inlineTakeBoxPlaybackEnded", data: ["ownerId": endedOwnerId])
+            plugin?.notifyListeners("inlineTakeBoxPlaybackEnded", data: ["ownerId": endedOwnerId, "completed": completed])
         }
     }
 
@@ -293,7 +293,7 @@ final class InlineTakeBoxPlaybackController {
                 guard let self = self, let audioPlayer = audioPlayer,
                       self.audioPlayer === audioPlayer else { return }
                 print("[InlineTakeBoxPlayback] native audio engine completed")
-                self.stop(notify: true)
+                self.stop(notify: true, completed: true)
             }
         }
         audioPlayer.play()

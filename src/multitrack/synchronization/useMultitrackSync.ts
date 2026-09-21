@@ -63,6 +63,7 @@ export function useMultitrackSync() {
   const visualStartTimersRef = useRef<number[]>([])
   const visualPlaybackGenerationRef = useRef(0)
   const visualOnlyModeRef = useRef(false)
+  const previewPanelIdRef = useRef<string | null>(null)
   /**
    * performance.now() until which playback is in its lead-in: the mix is already
    * sounding a little before the downbeat so the first note's attack is audible,
@@ -99,6 +100,15 @@ export function useMultitrackSync() {
   const transportLockedRef = useRef(false)
 
   const applyMixState = useCallback((panelId: string, element: HTMLMediaElement) => {
+    // A box preview auditions the original take independently of the project
+    // playhead, section boundaries and recording-monitor mutes. Readiness events
+    // re-register this same element, so ownership must survive those events.
+    if (previewPanelIdRef.current === panelId) {
+      element.muted = false
+      element.volume = 1
+      if (hasTakePlaybackSpeakerRoute(element)) updateTakePlaybackSpeakerGain(element, 1, false)
+      return
+    }
     const volume = panelVolumeRef.current.get(panelId) ?? 1
     const section = projectRulesRef.current.sections.get(panelId)
     const time = multitrackTransport.position()
@@ -310,6 +320,7 @@ export function useMultitrackSync() {
     } else {
       existing?.removeEventListener('loadedmetadata', refreshDuration)
       existing?.removeEventListener('durationchange', refreshDuration)
+      if (previewPanelIdRef.current === panelId) previewPanelIdRef.current = null
       mediaMapRef.current.delete(panelId)
       pendingStartRef.current.delete(panelId)
     }
@@ -350,6 +361,7 @@ export function useMultitrackSync() {
   }, [clipWindowFor])
 
   const playElements = useCallback(async (entries: Array<[string, HTMLMediaElement]>, startTime: number) => {
+    previewPanelIdRef.current = null
     const elements = entries.map(([, el]) => el)
     if (elements.length === 0) return false
 
@@ -472,6 +484,7 @@ export function useMultitrackSync() {
   }, [applyMixStateToAll, clipWindowFor])
 
   const prepareAtStart = useCallback(async (startTime = 0) => {
+    previewPanelIdRef.current = null
     preparedStartRef.current = startTime
     multitrackTransport.arm(startTime)
     transportLockedRef.current = false
@@ -536,6 +549,7 @@ export function useMultitrackSync() {
    * any WebKit audio or introducing a second audible clock.
    */
   const prepareVisualAtStart = useCallback(async (startTime = 0) => {
+    previewPanelIdRef.current = null
     const generation = visualPlaybackGenerationRef.current
     visualOnlyModeRef.current = true
     preparedStartRef.current = startTime
@@ -809,6 +823,7 @@ export function useMultitrackSync() {
   }, [clipWindowFor, getEntries, playElements])
 
   const pause = useCallback(() => {
+    previewPanelIdRef.current = null
     recordingVisualRef.current = false
     chaseModeRef.current = false
     visualOnlyModeRef.current = false
@@ -822,6 +837,20 @@ export function useMultitrackSync() {
     multitrackTransport.pause()
     setIsPlaying(false)
   }, [])
+
+  const beginPanelPreview = useCallback((panelId: string) => {
+    pause()
+    previewPanelIdRef.current = panelId
+    const element = mediaMapRef.current.get(panelId)
+    if (element) applyMixState(panelId, element)
+  }, [pause, applyMixState])
+
+  const endPanelPreview = useCallback((panelId: string) => {
+    if (previewPanelIdRef.current !== panelId) return
+    previewPanelIdRef.current = null
+    const element = mediaMapRef.current.get(panelId)
+    if (element) applyMixState(panelId, element)
+  }, [applyMixState])
 
   const restart = useCallback(async () => {
     referencePanelIdsRef.current = null
@@ -1052,6 +1081,8 @@ export function useMultitrackSync() {
 
   return {
     registerMedia,
+    beginPanelPreview,
+    endPanelPreview,
     setExcludePanelId,
     setReferencePanelIds,
     setProjectRules,

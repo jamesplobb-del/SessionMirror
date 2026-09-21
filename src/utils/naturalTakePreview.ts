@@ -7,6 +7,23 @@ import { queueAudioEnhancement } from './enhancementQueue'
 // Store resolved promises too: replay and comparisons reuse exactly the same
 // rendered file. Native previews live in Caches, cleared on the next cold run.
 const previews = new Map<string, Promise<string>>()
+const readyPreviews = new Map<string, string>()
+
+/** Playback must never enqueue or wait for a whole-file enhancement render. */
+export async function readyNaturalTakePreview(source: string, mediaType: 'audio' | 'video'): Promise<string> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return source
+  const revision = takePlaybackEnhancerRevision()
+  const params = enhancementParamsForSource(source)
+  if (!params) return source
+  let nativePath = source
+  const marker = '/_capacitor_file_/'
+  if (source.includes(marker)) nativePath = 'file:///' + decodeURIComponent(source.split(marker)[1].split(/[?#]/)[0])
+  if (/^(https?:|blob:|data:|capacitor:)/.test(nativePath)) return source
+  const url = await resolveNativeFileUri(nativePath)
+  if (!url || revision !== takePlaybackEnhancerRevision()) return source
+  return readyPreviews.get(JSON.stringify([url, mediaType, params])) ?? source
+}
+
 export async function prepareNaturalTakePreview(source: string, mediaType: 'audio' | 'video'): Promise<string> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') return source
   const revision = takePlaybackEnhancerRevision()
@@ -30,6 +47,7 @@ export async function prepareNaturalTakePreview(source: string, mediaType: 'audi
             throw new Error('Audio enhancement could not be prepared.')
           }
           registerRenderedEnhancementSource(result.path)
+          readyPreviews.set(key, result.path)
           resolve(result.path)
         } catch (error) { reject(error) }
       })
@@ -50,7 +68,7 @@ export async function prepareNaturalMediaPreview(media: HTMLMediaElement): Promi
   if (!current) return
   const previous = mediaSources.get(media)
   const original = previous && current === previous.rendered ? previous.original : current
-  const renderedPath = await prepareNaturalTakePreview(original, media instanceof HTMLVideoElement ? 'video' : 'audio')
+  const renderedPath = await readyNaturalTakePreview(original, media instanceof HTMLVideoElement ? 'video' : 'audio')
   const rendered = renderedPath.startsWith('file://') ? Capacitor.convertFileSrc(renderedPath) : renderedPath
   // Source may have been replaced by another take during the render.
   if ((media.getAttribute('src') || media.currentSrc) !== current || (wasConnected && !media.isConnected) || revision !== takePlaybackEnhancerRevision()) {

@@ -3222,19 +3222,21 @@ export function useCameraSession({
       cancelAutoPreRollCapture()
     }
     releaseAllLiveMicPitchGraphs()
-    void disarmAutoRecording()
+    const disarmed = disarmAutoRecording()
     resetCameraPreviewZoom()
     releaseLiveStream()
     setNativeLivePreviewActive(false)
     setNativeLivePreviewSeedUrl(null)
+    let stoppedBridge: Promise<void> = Promise.resolve()
     if (nativePreviewActiveRef.current) {
       nativePreviewActiveRef.current = false
-      void stopNativeCameraBridge()
+      stoppedBridge = stopNativeCameraBridge()
     }
-    void syncNativeCameraSessionState({
+    const synced = syncNativeCameraSessionState({
       previewActive: false,
       recordingActive: false,
     })
+    return Promise.allSettled([disarmed, stoppedBridge, synced]).then(() => undefined)
   }, [
     cancelAutoPreRollCapture,
     cancelScheduledRelease,

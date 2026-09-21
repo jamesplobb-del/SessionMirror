@@ -4,7 +4,7 @@ import { hasSectionWindow } from '../layout/sectionVisibility'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { Activity, Timer, ChevronLeft, ChevronRight, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Trash2, Video, VolumeX } from 'lucide-react'
+import { Activity, Timer, ChevronLeft, ChevronRight, Crosshair, FileMusic, FolderOpen, Music4, RefreshCw, RotateCcw, Save, Share2, SlidersHorizontal, Sparkles, Trash2, Video, VolumeX } from 'lucide-react'
 import type { Take } from '../../types'
 import type { PerformancePanelState } from '../types'
 import type { TunerInstrument } from '../../utils/pitchConfig'
@@ -118,6 +118,8 @@ interface MultitrackOverlayProps {
     path: string
     durationSeconds: number
   }) => Promise<void>
+  audioEnhancerEnabled: boolean
+  onAudioEnhancerChange: (enabled: boolean) => void
 }
 
 function describeMultitrackExportFailure(reason: MultitrackExportFailureReason): string {
@@ -1477,7 +1479,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onRemoveSheetCue={handleRemoveSheetImage}
                 onEditSheetMusic={() => setActiveSourceSheet('visual')}
                 currentTimeSec={sync.state.currentTime}
-                onRegisterMedia={registerPanelMedia} />
+                onRegisterMedia={registerPanelMedia} onBeginPanelPreview={sync.beginPanelPreview} onEndPanelPreview={sync.endPanelPreview} />
               {!alignStageOpen && <MultitrackWorkspaceTools practice={session.practice} onChange={handlePracticeChange} onOpenTools={() => setActiveSourceSheet('tools')}
                 streamRef={streamRef} mediaRef={masterMediaRef} tunerInstrument={tunerInstrument} busy={isRecording || isStopping || recording.phase !== 'idle'}
                 routine={props.routine} backingLabel={session.backing.kind !== 'none' ? backingChipLabel : undefined} onOpenBacking={() => setActiveSourceSheet('backing')}
@@ -2091,6 +2093,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           <h3>Practice</h3><div className="multitrack-quiet-option-list">
             <button aria-pressed={session.practice.showPitch} onClick={() => { handlePracticeChange({ showPitch: !session.practice.showPitch, practiceOverlayEnabled: true }) }}><Activity /><span><strong>Tuner</strong><small>Live pitch in your workspace</small></span><small>{session.practice.showPitch ? 'Remove' : 'Pin'}</small></button>
             <button aria-pressed={session.practice.showMetronome} onClick={() => { handlePracticeChange({ showMetronome: !session.practice.showMetronome, practiceOverlayEnabled: true }) }}><Timer /><span><strong>Click & tempo</strong><small>{session.practice.bpm} BPM · {session.practice.meter ?? '4/4'}</small></span><small>{session.practice.showMetronome ? 'Remove' : 'Pin'}</small></button>
+          </div>
+          <h3>Playback</h3><div className="multitrack-quiet-option-list">
+            <button aria-pressed={props.audioEnhancerEnabled} onClick={() => props.onAudioEnhancerChange(!props.audioEnhancerEnabled)}><Sparkles /><span><strong>Audio Enhance</strong><small>Clean up take playback and multitrack monitor audio</small></span><small>{props.audioEnhancerEnabled ? 'On' : 'Off'}</small></button>
           </div>
           <h3>Media</h3><div className="multitrack-quiet-option-list">
             <button disabled={isRestoring || isExporting || isRecording || isStopping || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('backing') }}><Music4 /><span><strong>Backing track</strong><small>{backingChipLabel}</small></span><ChevronRight /></button>

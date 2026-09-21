@@ -27,6 +27,8 @@ export default function PerformancePanel({
   onRegisterMedia,
   controlsHost,
   onSelect,
+  onBeginPreview,
+  onEndPreview,
 }: {
   panel: PerformancePanelState
   displayName?: string
@@ -45,6 +47,8 @@ export default function PerformancePanel({
   onRegisterMedia: (panelId: string, element: HTMLMediaElement | null) => void
   controlsHost?: HTMLElement | null
   onSelect?: () => void
+  onBeginPreview?: (id: string) => void
+  onEndPreview?: (id: string) => void
 }) {
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const [quickPlaying, setQuickPlaying] = useState(false)
@@ -100,9 +104,11 @@ export default function PerformancePanel({
     if (!media) return
     if (quickPlaying) {
       media.pause()
+      onEndPreview?.(panel.id)
       setQuickPlaying(false)
       return
     }
+    onBeginPreview?.(panel.id)
     try {
       media.style.opacity = '1'
       media.currentTime = 0
@@ -111,7 +117,7 @@ export default function PerformancePanel({
     }
     void playTakeMediaFromUserGesture(media, {
       onPlaying: () => setQuickPlaying(true),
-      onFailure: () => setQuickPlaying(false),
+      onFailure: () => { setQuickPlaying(false); onEndPreview?.(panel.id) },
     })
   }
 
@@ -136,7 +142,8 @@ export default function PerformancePanel({
         poster={panel.take.thumbnailUrl || undefined}
         onLoadedMetadata={(event) => onRegisterMedia(panel.id, event.currentTarget)}
         onCanPlay={(event) => onRegisterMedia(panel.id, event.currentTarget)}
-        onEnded={() => setQuickPlaying(false)}
+        onPause={() => setQuickPlaying(false)}
+        onEnded={() => { setQuickPlaying(false); onEndPreview?.(panel.id) }}
       />
       {controlsHost && createPortal(<>
       <span className="multitrack-take-controls__name">{displayName || panel.take.name}</span>

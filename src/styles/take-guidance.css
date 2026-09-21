@@ -1,0 +1,9 @@
+/* Cues live inside movable take boxes; they never intercept playback or drag. */
+.audio-mode-take-card{position:relative}
+.take-guidance-label{display:block;pointer-events:none;font-size:11px;line-height:1.35;font-weight:500;color:var(--ls-blue,#0075dc)}
+.audio-mode-take-card>.take-guidance-label{position:absolute;bottom:7px;left:0;right:0;text-align:center}
+.audio-mode-take-card--best>.take-guidance-label{color:var(--ls-muted,#986e25)}
+.compact-take-caption .take-guidance-label{font-size:9px;line-height:1.4;color:inherit}
+.take-guidance-emphasis{outline:2px solid var(--ls-blue,#0075dc)!important;outline-offset:3px;box-shadow:0 0 0 5px color-mix(in srgb,var(--ls-blue,#0075dc) 12%,transparent)!important}
+.audio-mode-take-card--best .take-guidance-emphasis,.compact-take-slot--best .take-guidance-emphasis{outline-color:#c49a48!important}
+@media(prefers-reduced-motion:reduce){.take-guidance-emphasis{animation:none!important;transition:none!important}}

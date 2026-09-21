@@ -1,3 +1,4 @@
+import { TakeGuidanceLabel, useTakeGuidance } from '../../context/TakeGuidanceContext'
 import {
   memo,
   useCallback,
@@ -435,6 +436,7 @@ export function AudioModeTakeCard({
   micReady = false,
   liveWaveform,
 }: AudioModeTakeCardProps) {
+  const cue = useTakeGuidance(tone, !isRecording && Boolean(take || libraryPlayback) && (!readiness || readiness.status === 'ready'))
   const {
     playbackItem,
     hasMedia,
@@ -654,7 +656,7 @@ export function AudioModeTakeCard({
           onPointerUp={handlePlayPointerEnd}
           onPointerCancel={handlePlayPointerEnd}
           onPointerLeave={handlePlayPointerEnd}
-          className="audio-mode-take-card__play"
+          className={`audio-mode-take-card__play${cue.emphasis ? ' take-guidance-emphasis' : ''}`}
           aria-label={
             isPreparing
               ? 'Preparing take playback'
@@ -719,6 +721,7 @@ export function AudioModeTakeCard({
           )}
         </div>
       </div>
+      <TakeGuidanceLabel tone={tone} ready={playable && !isRecording} />
       {ghost ? createPortal(
         <div className="audio-take-drag-ghost" aria-hidden="true"
           style={{ left: ghost.x, top: ghost.y }}>

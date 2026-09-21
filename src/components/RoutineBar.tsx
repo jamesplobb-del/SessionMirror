@@ -23,7 +23,6 @@ import {
   ChevronUp,
   GripHorizontal,
   House,
-  MoveDiagonal2,
   Pause,
   Pencil,
   Play,
@@ -113,8 +112,6 @@ const BALL_SIZE = 64
 const COLLAPSE_HEADROOM = 36
 /** First run sits just above the control deck, where the bar used to be pinned. */
 const DEFAULT_BOTTOM_GAP = 124
-/** Ignore small pointer movements when resizing. */
-const RESIZE_SLOP = 6
 const KEY_STEP = 16
 const ARROWS: Record<string, readonly [number, number]> = {
   ArrowLeft: [-1, 0],
@@ -245,7 +242,6 @@ export default function RoutineBar({
   const draggingRef = useRef(false)
   /** Set by a drag so the click that ends it does not also toggle anything. */
   const draggedRef = useRef(false)
-  const resizeRef = useRef<{ id: number; startX: number; startY: number; startWidth: number; moved: boolean } | null>(null)
   const [width, setWidth] = useState(() => clampWidth(loadWidgetSize(POSITION_ID)?.width ?? DEFAULT_WIDTH))
   const [folded, setFolded] = useState(loadFolded)
   const foldedRef = useRef(folded)
@@ -352,7 +348,7 @@ export default function RoutineBar({
 
   const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
     draggedRef.current = false
-    if (event.button !== 0 || !event.isPrimary || resizeRef.current) return
+    if (event.button !== 0 || !event.isPrimary) return
     if ((event.target as HTMLElement).closest('[data-no-drag]')) return
     dragControls.start(event)
   }
@@ -457,43 +453,11 @@ export default function RoutineBar({
     saveFolded(false)
   }
 
-  /** Width only; the height is whatever the layout for that width needs. */
-  const startResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || !event.isPrimary) return
-    event.stopPropagation()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    resizeRef.current = {
-      id: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: nodeRef.current?.offsetWidth ?? width,
-      moved: false,
-    }
-  }
-
-  const moveResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const gesture = resizeRef.current
-    if (!gesture || gesture.id !== event.pointerId) return
-    const dx = event.clientX - gesture.startX
-    if (!gesture.moved && Math.hypot(dx, event.clientY - gesture.startY) < RESIZE_SLOP) return
-    gesture.moved = true
-    setWidth(clampWidth(gesture.startWidth + dx))
-  }
-
-  const endResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    const gesture = resizeRef.current
-    if (!gesture || gesture.id !== event.pointerId) return
-    resizeRef.current = null
-    if (!gesture.moved) return
-    saveWidgetSize(POSITION_ID, width, nodeRef.current?.offsetHeight ?? 0)
-    rememberSpot()
-  }
-
-  const resizeWithKeys = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    const arrow = ARROWS[event.key]
-    if (!arrow || arrow[0] === 0) return
-    event.preventDefault()
-    const next = clampWidth(width + arrow[0] * KEY_STEP)
+  const expandedWidth = clampWidth(400)
+  const widthExpanded = width >= expandedWidth - 1
+  const toggleWidth = () => {
+    triggerLightHaptic(hapticFeedback)
+    const next = widthExpanded ? clampWidth(MIN_WIDTH) : expandedWidth
     setWidth(next)
     saveWidgetSize(POSITION_ID, next, nodeRef.current?.offsetHeight ?? 0)
   }
@@ -659,15 +623,22 @@ export default function RoutineBar({
         >
           <ChevronUp aria-hidden />
         </button>
-        <button
-          type="button"
-          className="routine-bar__grip"
-          aria-label="Move the routine bar. Use the arrow keys."
-          onPointerDown={startDrag}
-          onKeyDown={moveWithKeys}
-        >
-          <GripHorizontal aria-hidden />
-        </button>
+        <div className="routine-bar__toolbar">
+          <button
+            type="button"
+            className="routine-bar__grip"
+            aria-label="Move the routine bar. Use the arrow keys."
+            onPointerDown={startDrag}
+            onKeyDown={moveWithKeys}
+          >
+            <GripHorizontal aria-hidden />
+          </button>
+          <button type="button" className="routine-bar__size" data-no-drag
+            aria-label={widthExpanded ? 'Compact routine widget' : 'Expand routine widget'}
+            aria-pressed={widthExpanded} onClick={toggleWidth}>
+            {widthExpanded ? 'Compact' : 'Expand'}
+          </button>
+        </div>
 
         <div className="routine-bar__head" onPointerDown={startDrag}>
           <button
@@ -717,23 +688,6 @@ export default function RoutineBar({
         {step.programId && step.kind !== 'game' && step.kind !== 'free' && (
           <RoutineProgramControls key={step.id} programId={step.programId} disabled={Boolean(busy || paused)} />
         )}
-
-        {/* One element in both layouts: a drag that narrows the bar into a
-            single row must not lose the handle it started on. */}
-        <button
-          type="button"
-          className="routine-bar__resize"
-          data-no-drag
-          aria-label="Resize routine bar. Drag, or use the left and right arrow keys."
-          onPointerDown={startResize}
-          onPointerMove={moveResize}
-          onPointerUp={endResize}
-          onPointerCancel={endResize}
-          onLostPointerCapture={endResize}
-          onKeyDown={resizeWithKeys}
-        >
-          <MoveDiagonal2 aria-hidden />
-        </button>
 
         <AnimatePresence initial={false}>
           {open && (

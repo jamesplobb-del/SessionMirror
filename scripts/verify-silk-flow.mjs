@@ -3,10 +3,10 @@ import { build } from 'esbuild'
 import { readFile } from 'node:fs/promises'
 const result = await build({ stdin: { contents: `export * from './src/utils/reactiveSilkTuner'; export { PITCH_SILENCE_FLOOR_CENTS } from './src/utils/pitchConfig';`, resolveDir: process.cwd() }, bundle: true, write: false, format: 'esm', platform: 'node' })
 const { drawSilkTuner, silkFlowColor, PITCH_SILENCE_FLOOR_CENTS: silence } = await import('data:text/javascript;base64,' + Buffer.from(result.outputFiles[0].text).toString('base64'))
-assert.equal(silkFlowColor(0), '#039c70', 'Use the approved green rather than the old darkened neon')
-assert.equal(silkFlowColor(11), '#df951c')
-assert.equal(silkFlowColor(30), '#ef5c78')
-assert.equal(silkFlowColor(0, true), '#59e7b5')
+assert.equal(silkFlowColor(0), '#00dc7d', 'Use the vibrant green palette')
+assert.equal(silkFlowColor(11), '#ffb900')
+assert.equal(silkFlowColor(30), '#ff424c')
+assert.equal(silkFlowColor(0, true), '#2df5a8')
 for (const boundary of [3, 10, 12, 22]) {
   const rgb = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16))
   const before = rgb(silkFlowColor(boundary - .01)), after = rgb(silkFlowColor(boundary + .01))
@@ -53,7 +53,7 @@ for (const dark of [false, true]) {
   assert.equal(render([], dark).dots.length, 0)
 }
 const styles = await readFile('src/styles/open-lens-system.css', 'utf8')
-assert.match(styles, /var\(--silk-wash\) 32%,transparent/, 'Screen color follows the live wash')
+assert.match(styles, /var\(--silk-wash\) 72%,transparent/, 'Screen color follows the live wash')
 assert.match(styles, /\),var\(--ls-bg\)!important/, 'Silence retains an opaque background')
 const wash = await readFile('src/styles/reactive-silk-tuner.css', 'utf8')
 assert.match(wash, /@property --silk-wash\s*\{[^}]*inherits:\s*false/, 'Preserve the WebKit memory fix')

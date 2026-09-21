@@ -1,4 +1,4 @@
-import { prepareNaturalTakePreview } from './naturalTakePreview'
+import { readyNaturalTakePreview } from './naturalTakePreview'
 import BestTakeAudioPlugin from './audioSessionRoute'
 import {
   prepareInlineTakeBoxPlaybackRoute,
@@ -83,7 +83,7 @@ export async function startAudioModeNativePlayback(options: {
       : 0
 
   try {
-    const url = await prepareNaturalTakePreview(fileURL, 'audio')
+    const url = await readyNaturalTakePreview(fileURL, 'audio')
     if (generation !== playbackGeneration) return null
     const result = await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
       url,

@@ -1,3 +1,4 @@
+import { TakeGuidanceProvider } from './context/TakeGuidanceContext'
 import { normalizeDeskMetronome } from './utils/deskMetronome'
 import { isIPhoneDevice } from './utils/deviceFormFactor'
 import FeatureGuidance from './components/FeatureGuidance'
@@ -551,6 +552,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     bootSnapshot.activeProjectId
   )
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
+  const [guidedTakeId, setGuidedTakeId] = useState<string | null>(null)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
   const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
   const [referenceExpanded, setReferenceExpanded] = useState(false)
@@ -1774,6 +1776,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         challengerUserDismissedRef.current = false
         pendingChallengerIdRef.current = takeId
         setChallengerId(takeId)
+        if (!shouldAutoPlay && !multitrackRecordingActiveRef.current) setGuidedTakeId(takeId)
       }
 
       setTakes((prev) => {
@@ -2480,7 +2483,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     })
     registerPlaybackCameraHandlers({
       suspend: () => {
-        suspendCameraForBackground()
+        return suspendCameraForBackground()
       },
       resume: () => {
         void refreshCameraSession()
@@ -4335,6 +4338,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // While it owns AVAudioSession, React must not reconfigure that session.
   const nativeHandsFreeSessionCaptureActive = isNativeAudioCaptureActive()
   const shouldDeferNativeExperimentalAudioMode =
+    (recordingMode === 'video' && (handsFreePlaybackPending || autoPlaybackTakeId !== null)) ||
     handsFreeBackgroundPlaybackActive ||
     handsFreeAudioBackgroundPlaybackActive ||
     nativeHandsFreeSessionCaptureActive ||
@@ -5906,6 +5910,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             onBeforePlay={handleAudioModeBeforePlaybackStart}
             onPlaybackActiveChange={handleAudioModePlaybackActiveChange}
           >
+            <TakeGuidanceProvider takeId={guidedTakeId} currentId={challengerId}
+              enabled={!isRecording && !isStopping && !suspendPipPlayback && !isSplitView && !multitrackOpen && !settings.autoSoundRecording && settings.showTakeCards}
+              hasReference={Boolean((benchmarkTake && benchmarkTake.id !== challengerId) || libraryBenchmarkPlayback)}
+              importedReference={Boolean(libraryBenchmarkPlayback)} videoPlaying={benchmarkPipPlaying || challengerPipPlaying}
+              currentVideo={challengerPipVideoRef} bestVideo={benchmarkPipVideoRef}>
             <div
               ref={appShellRef}
               className={`app-shell lens-screen${recordingMode === 'video' ? ' lens-camera' : ''}${!isLabsOpen && !multitrackOpen ? ' open-lens-recording' : ''}${recordingMode === 'video' && isRecording ? ' open-lens-capturing' : ''}${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
@@ -7079,6 +7088,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onOpenRecordingStage={handleMultitrackOpenRecordingStage}
                     onWakeCamera={handleMultitrackWakeCamera}
                     onSaveRenderedTakeToVault={handleSaveRenderedMultitrackToVault}
+                    audioEnhancerEnabled={settings.audioEnhancerEnabled}
+                    onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                   />
                 </Suspense>
 
@@ -7107,6 +7118,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               </div>
             </div>
+            </TakeGuidanceProvider>
           </AudioModePlaybackProvider>
         </MetronomeProvider>
       </ActionSheetProvider>

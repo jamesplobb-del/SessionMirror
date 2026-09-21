@@ -74,7 +74,7 @@ final class DroneEngine {
     private let stateLock = NSLock()
 
     private let fadeDuration: TimeInterval = 0.035
-    private let oscillatorHeadroom: Float = 0.82
+    private let oscillatorHeadroom: Float = 0.96
     private let speakerBusGain: Float = 1
 
     private init() {
@@ -359,7 +359,7 @@ final class DroneEngine {
     private static func outputVolume(for requestedVolume: Float) -> Float {
         let clamped = max(0, min(1, requestedVolume))
         if clamped <= 0 { return 0 }
-        return min(1, 0.08 + pow(clamped, 0.7) * 0.92)
+        return min(1, 0.08 + pow(clamped, 0.5) * 0.92)
     }
 
     private func fadeVoice(pitchClass: Int, to target: Float) {

@@ -529,3 +529,26 @@ html#lens-design-system .quick-tuner-instrument-picker button[aria-pressed='true
 }
 .quick-tool-error p { margin: 8px 0 16px; color: var(--audio-text-secondary, #49647d); }
 .quick-tool-error .quick-tuner-return { max-width: 24rem; }
+
+.quick-tools-screen {
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr);
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(12px,env(safe-area-inset-left,0px));
+  background:var(--ls-bg,#fff);
+  color:var(--ls-ink,#142b43);
+}
+.quick-tools-content { position:relative; min-height:0; overflow:hidden; }
+.quick-tools-screen .quick-tool-panel.app-ui-overlay {
+  position:relative;
+  inset:auto;
+  width:100%;
+  height:100%;
+  padding:0;
+  z-index:auto;
+}
+.quick-tools-screen .quick-tuner-screen { grid-template-rows:auto minmax(0,1fr) auto; }
+.quick-tools-screen .quick-metronome-screen { grid-template-rows:minmax(0,1fr); }
+.quick-tools-screen .quick-metronome-stage { margin-top:0; }

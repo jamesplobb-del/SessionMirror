@@ -362,125 +362,108 @@ function LiveCameraBackground({
 
     handsFreePlaybackSessionRef.current = true
     let cancelled = false
+    let finished = false
     let stopTailSkip: (() => void) | null = null
+    const media = handsFreePlaybackVideoRef.current
+    let startupTimer: number | null = null
+    let progressTimer: number | null = null
+    const isCurrent = () => !cancelled && !finished && handsFreePlaybackSessionRef.current
+    const clearTimers = () => {
+      if (startupTimer !== null) window.clearTimeout(startupTimer)
+      if (progressTimer !== null) window.clearInterval(progressTimer)
+      startupTimer = null
+      progressTimer = null
+    }
+    const stopRecovery = () => {
+      stopTailSkip?.()
+      stopTailSkip = null
+      handsFreeStallRecoveryRef.current?.()
+      handsFreeStallRecoveryRef.current = null
+    }
+    const finish = () => {
+      if (!isCurrent()) return
+      finished = true
+      handsFreePlaybackSessionRef.current = false
+      clearTimers()
+      stopRecovery()
+      media?.pause()
+      setHandsFreePlaybackReady(false)
+      onHandsFreePlaybackPlayingChange?.(false)
+      onHandsFreePlaybackComplete?.()
+    }
+    const fail = () => {
+      console.warn('[HandsFree] camera replay could not advance', { takeId: handsFreePlaybackTakeId })
+      finish()
+    }
+    startupTimer = window.setTimeout(fail, 8000)
+    media?.addEventListener('ended', finish)
+    media?.addEventListener('error', fail)
 
     void (async () => {
-      const media = handsFreePlaybackVideoRef.current
-      if (!media) {
-        onHandsFreePlaybackComplete?.()
-        return
-      }
+      if (!media) { finish(); return }
 
+      // Finish capture teardown before asking WebKit for a playback decoder.
+      // Stopping AVCapture after loading the first frame can invalidate that
+      // decoder on the first record/replay transition.
+      await preparePlaybackRoute({ suspendCamera: true })
+      if (!isCurrent()) return
       resetVideoPlayback(media)
       media.removeAttribute('src')
-      media.load()
       assignMediaPlaybackSrc(media, withWebKitThumbnailHint(handsFreePlaybackSrc!))
       media.load()
-
-      // Preflight while the preview is still visible. This is the critical
-      // difference from the old path: a file that is not ready cannot replace
-      // the camera with an empty black video element.
       const ready = await waitForMediaReadyWithRetry(media)
-      if (cancelled || !handsFreePlaybackSessionRef.current) {
-        return
-      }
-
-      if (!ready) {
-        console.warn('Hands-free background playback media not ready', {
-          takeId: handsFreePlaybackTakeId,
-          readyState: media.readyState,
-        })
-        onHandsFreePlaybackComplete?.()
-        return
-      }
-
-      try {
-        await preparePlaybackRoute({ suspendCamera: true })
-      } catch (error) {
-        if (cancelled) return
-        console.warn('[HandsFree] playback route prep failed', error)
-        onHandsFreePlaybackComplete?.()
-        return
-      }
-      if (cancelled || !handsFreePlaybackSessionRef.current) {
-        await completePlaybackRouteRestore()
-        return
-      }
-
-      setHandsFreePlaybackReady(true)
-
+      if (!isCurrent()) return
+      if (!ready) { fail(); return }
       await applyAutoPlaybackLeadIn(media, undefined, handsFreePlaybackPerformanceStartSeconds)
-      if (cancelled || !handsFreePlaybackSessionRef.current) return
+      if (!isCurrent()) return
 
-      const stopStallRecovery = () => {
-        handsFreeStallRecoveryRef.current?.()
-        handsFreeStallRecoveryRef.current = null
-      }
-
-      const onEnded = () => {
-        if (cancelled || !handsFreePlaybackSessionRef.current) return
-        handsFreePlaybackSessionRef.current = false
-        media.removeEventListener('ended', onEnded)
-        stopTailSkip?.()
-        stopTailSkip = null
-        stopStallRecovery()
-        onHandsFreePlaybackPlayingChange?.(false)
-        onHandsFreePlaybackComplete?.()
-      }
-
-      media.addEventListener('ended', onEnded, { once: true })
-      stopTailSkip = attachAutoPlaybackTailSkip(
-        media,
-        handsFreePlaybackTailSkipSeconds,
-        onEnded,
-      )
-
-      stopStallRecovery()
+      stopTailSkip = attachAutoPlaybackTailSkip(media, handsFreePlaybackTailSkipSeconds, finish)
       handsFreeStallRecoveryRef.current = attachVideoDecoderStallRecovery(media, {
-        hasSource: () => Boolean(handsFreePlaybackSrc),
+        hasSource: () => isCurrent() && Boolean(handsFreePlaybackSrc),
         debugLabel: 'HandsFree',
       })
-
       const started = await playTakeMediaAudible(media, {
         skipRoutePrep: true,
         suspendCameraForRoute: false,
-        onFailure: () => { if (!cancelled) onHandsFreePlaybackPlayingChange?.(false) },
+        // This session owns its end/error cleanup, including tail skipping.
+        attachEndedRouteRestore: false,
       })
-      if (cancelled || !handsFreePlaybackSessionRef.current) {
-        media.pause()
-        media.removeEventListener('ended', onEnded)
-        stopTailSkip?.()
-        stopTailSkip = null
-        stopStallRecovery()
+      if (!isCurrent()) {
+        // A late play promise must not touch a newer session's media element.
+        if (!cancelled || handsFreePlaybackVideoRef.current !== media || !handsFreePlaybackSessionRef.current) media.pause()
         return
       }
-
-      if (started) {
-        onHandsFreePlaybackPlayingChange?.(true)
-      } else {
-        media.removeEventListener('ended', onEnded)
-        stopTailSkip?.()
-        stopTailSkip = null
-        handsFreePlaybackSessionRef.current = false
-        setHandsFreePlaybackReady(false)
-        onHandsFreePlaybackComplete?.()
-      }
+      if (!started) { fail(); return }
+      if (startupTimer !== null) window.clearTimeout(startupTimer)
+      startupTimer = null
+      setHandsFreePlaybackReady(true)
+      onHandsFreePlaybackPlayingChange?.(true)
+      let lastTime = media.currentTime
+      let lastProgressAt = performance.now()
+      progressTimer = window.setInterval(() => {
+        if (!isCurrent()) return
+        if (Math.abs(media.currentTime - lastTime) > 0.01) {
+          lastTime = media.currentTime
+          lastProgressAt = performance.now()
+        } else if (performance.now() - lastProgressAt > 8000) {
+          fail()
+        }
+      }, 1000)
     })().catch((error) => {
-      if (cancelled) return
+      if (!isCurrent()) return
       console.warn('[HandsFree] background replay failed', error)
-      onHandsFreePlaybackComplete?.()
+      finish()
     })
 
     return () => {
       cancelled = true
       handsFreePlaybackSessionRef.current = false
+      clearTimers()
+      stopRecovery()
       setHandsFreePlaybackReady(false)
-      stopTailSkip?.()
-      stopTailSkip = null
-      handsFreeStallRecoveryRef.current?.()
-      handsFreeStallRecoveryRef.current = null
-      const media = handsFreePlaybackVideoRef.current
       if (media) {
+        media.removeEventListener('ended', finish)
+        media.removeEventListener('error', fail)
         resetVideoPlayback(media)
         media.removeAttribute('src')
         media.load()

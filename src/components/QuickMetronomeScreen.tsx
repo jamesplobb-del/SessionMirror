@@ -12,13 +12,16 @@ import AudioMetronomeTab from './audioPractice/AudioMetronomeTab'
 interface QuickMetronomeScreenProps {
   request: QuickFunctionLaunchRequest
   onExit: () => void
+  embedded?: boolean
 }
 
 function QuickMetronomeContent({
   hapticFeedback,
   onExit,
+  embedded,
 }: {
   hapticFeedback: boolean
+  embedded: boolean
   onExit: () => void
 }) {
   const { playing, stop } = useMetronome()
@@ -32,8 +35,8 @@ function QuickMetronomeContent({
   }, [hapticFeedback, onExit, stop])
 
   return (
-    <main className="quick-metronome-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-metronome">
-      <header className="quick-tuner-header">
+    <main className={`quick-metronome-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-metronome${embedded ? ' quick-tool-panel' : ''}`}>
+      {!embedded && <header className="quick-tuner-header">
         <button
           type="button"
           className="quick-tuner-icon-button"
@@ -50,17 +53,17 @@ function QuickMetronomeContent({
           <span aria-hidden />
           {playing ? 'Playing' : 'Ready'}
         </span>
-      </header>
+      </header>}
 
       <section className="quick-metronome-stage" aria-label="Quick Metronome">
         <AudioMetronomeTab />
       </section>
 
-      <footer className="quick-metronome-footer">
+      {!embedded && <footer className="quick-metronome-footer">
         <button type="button" className="quick-tuner-return" onClick={handleExit}>
           Return to BestTake
         </button>
-      </footer>
+      </footer>}
     </main>
   )
 }
@@ -68,10 +71,12 @@ function QuickMetronomeContent({
 export default function QuickMetronomeScreen({
   request,
   onExit,
+  embedded = false,
 }: QuickMetronomeScreenProps) {
   const [settings] = useState(loadAppSettings)
 
   useEffect(() => {
+    if (embedded) return
     const root = document.documentElement
     root.classList.add('app-audio-mode')
     root.classList.toggle('app-dark-mode', settings.darkMode)
@@ -80,7 +85,7 @@ export default function QuickMetronomeScreen({
       root.classList.remove('app-audio-mode', 'app-dark-mode')
       root.style.removeProperty('color-scheme')
     }
-  }, [settings.darkMode])
+  }, [settings.darkMode, embedded])
 
   useEffect(() => {
     console.info('[QuickAccess] lightweight metronome shell mounted', {
@@ -99,6 +104,7 @@ export default function QuickMetronomeScreen({
   return (
     <MetronomeProvider muteDuringPlayback={false}>
       <QuickMetronomeContent
+        embedded={embedded}
         hapticFeedback={settings.hapticFeedback}
         onExit={onExit}
       />

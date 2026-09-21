@@ -10,6 +10,11 @@ export const WEBKIT_MEDIA_RENDER_OVERHEAD_MS = 240
 
 /**
  * AVAudioSession outputLatency ignores most Bluetooth A2DP codec delay.
+ *
+ * This additive form applies to WebKit media starts only. The native multitrack
+ * capture anchor uses a floor instead — see
+ * `AudioRouteConfigurator.bluetoothMinimumOutputLatencySec` — because adding to
+ * an already-honest reading would pull recorded takes ahead of the click.
  */
 export const BLUETOOTH_A2DP_EXTRA_LATENCY_MS = 200
 

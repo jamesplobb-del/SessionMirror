@@ -16,7 +16,7 @@ import type {
   SheetMusicPanelState,
 } from '../types'
 
-export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, currentTimeSec, aspectRatio = '9:16', layoutStyle, bpm = 120, onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
+export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, recordingTargetPanelId, recordingPhase, streamRef, streamGeneration, nativeLivePreviewActive, nativeCameraBridgeEnabled, countInRemaining, recordingElapsed, reviewTake, reviewMediaRef, onTapPerformance, onRemoveTake, onSheetMusicChange, onSheetCueAssetChange, onRemoveSheetCue, onEditSheetMusic, onRegisterMedia, onBeginPanelPreview, onEndPanelPreview, currentTimeSec, aspectRatio = '9:16', layoutStyle, bpm = 120, onMoveOverlay, onDeleteExtra, editable = false, interactionDisabled = false }: {
   aspectRatio?: string
   layoutStyle?: MultitrackLayoutStyle
   bpm?: number
@@ -31,6 +31,8 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
   onSheetCueAssetChange?: (cueId: string, asset: SheetMusicAsset) => void
   onRemoveSheetCue?: (cueId: string) => void
   onEditSheetMusic?: () => void
+  onBeginPanelPreview?: (id: string) => void
+  onEndPanelPreview?: (id: string) => void
   onRegisterMedia: (id: string, el: HTMLMediaElement | null) => void
   /** Timeline position — drives which section-scoped boxes hold a slot, and
       which screenshot the music panel is showing. */
@@ -217,6 +219,8 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
               onTap={() => onTapPerformance(panel.id)}
               onRemoveTake={() => onRemoveTake(panel.id)}
               onRegisterMedia={onRegisterMedia}
+              onBeginPreview={onBeginPanelPreview}
+              onEndPreview={onEndPanelPreview}
             />
           ) : (
             <SheetMusicPanel

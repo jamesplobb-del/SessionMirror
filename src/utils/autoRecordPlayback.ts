@@ -180,12 +180,10 @@ export async function applyAutoPlaybackLeadIn(
       ? Math.max(0, performanceStartSeconds - leadInSeconds)
       : 0
 
-  let start = metadataStart
-  if (metadataStart <= 0.01) {
-    const waveformStart = await findAutoPlaybackLeadInStartSeconds(media, leadInSeconds)
-    // Waveform onset can be late on native takes that start loud; never skip the file head.
-    start = Math.min(metadataStart, waveformStart)
-  }
+  // Saved onset metadata already determines the earliest safe start. Scanning
+  // the whole recording when metadataStart is zero cannot improve it:
+  // min(0, waveformStart) is always zero, but decoding blocks camera replay.
+  const start = metadataStart
 
   if (start <= 0.01) return
 

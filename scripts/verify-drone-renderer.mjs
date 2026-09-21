@@ -29,7 +29,7 @@ extension DroneEngine {
             for channel in 0..<2 {
                 for frame in 0..<Int(frames) {
                     let sample = buffer.floatChannelData![channel][frame]
-                    precondition(sample.isFinite && abs(sample) <= 0.83, "Invalid/clipped audio")
+                    precondition(sample.isFinite && abs(sample) <= 0.97, "Invalid/clipped audio")
                     peak = max(peak, abs(sample))
                 }
             }
@@ -47,7 +47,7 @@ extension DroneEngine {
         }
         notes([9])
         for _ in 0..<30 { _ = render() }
-        precondition(render() > 0.1, "Drone must produce audio")
+        precondition(render() > 0.83, "Default drone volume should be clearly audible")
         // Simulate a control thread held up while the audio deadline arrives.
         // A blocking render lock deadlocks here; the executable has a timeout.
         drone.stateLock.lock()

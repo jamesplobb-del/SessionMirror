@@ -12,11 +12,11 @@ export function silkPitchColor(cents: number): string {
   const blend = t * t * (3 - 2 * t)
   return '#' + from.map((value, i) => Math.round(value + (to[i] - value) * blend).toString(16).padStart(2, '0')).join('')
 }
-/** Approved Flow palette, shared by the pitch line and full-screen tint. */
+/** Vibrant Flow palette, shared by the pitch line and full-screen tint. */
 export function silkFlowColor(cents: number, dark = false): string {
-  const green = dark ? [89, 231, 181] : [3, 156, 112]
-  const amber = dark ? [255, 210, 115] : [223, 149, 28]
-  const red = dark ? [255, 139, 158] : [239, 92, 120]
+  const green = dark ? [45, 245, 168] : [0, 220, 125]
+  const amber = dark ? [255, 204, 36] : [255, 185, 0]
+  const red = dark ? [255, 88, 119] : [255, 66, 76]
   const distance = Math.abs(cents)
   const lower = distance < 10
   const from = lower ? green : amber, to = lower ? amber : red

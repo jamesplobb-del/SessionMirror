@@ -40,7 +40,7 @@ export function presetFamilyFor(instrumentId: string | null): PresetFamily {
   }
 }
 
-/** Concert pitch class the instrument most often tunes or plays long tones on. */
+/** Editable starting concert reference; choose the drone for the exercise or key. */
 export function homePitchClass(instrumentId: string | null): number | null {
   switch (instrumentId) {
     case 'french-horn':
@@ -75,7 +75,7 @@ function homeOctave(instrumentId: string | null): number {
     case 'bassoon':
     case 'tenor-sax':
     case 'guitar':
-    // Concert B♭3 is written middle C on a B♭ instrument.
+    // Starting sounding register; these values never transpose the tuner.
     case 'trumpet':
     case 'clarinet':
     case 'alto-sax':
@@ -171,8 +171,8 @@ const common = {
     topic: 'cooldown',
     kind: 'tune',
     minutes: 2,
-    hint: 'Soft and low against the drone.',
-    desk: (id) => deskFor(id, { drone: true }),
+    hint: 'Easy notes in a comfortable register against the drone.',
+    desk: (id) => deskFor(id, { drone: true, pitch: true }),
   }),
   free: (): StepTemplate => ({
     id: 'free',
@@ -191,10 +191,10 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       id: 'buzzing',
       title: 'Buzzing & breathing',
       topic: 'warmup',
-      kind: 'metro',
+      kind: 'tune',
       minutes: 3,
-      hint: 'Slow click for breath counts and sirens.',
-      desk: (id) => deskFor(id, { bpm: 60 }),
+      hint: 'Relaxed breaths, then match easy buzzes to the drone.',
+      desk: (id) => deskFor(id, { drone: true, pitch: true }),
     },
     {
       id: 'long-tones',
@@ -202,8 +202,8 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'long-tones',
       kind: 'tune',
       minutes: 5,
-      hint: 'Tuner open, drone on your home note.',
-      desk: (id) => deskFor(id, { drone: true, pitch: true }),
+      hint: 'Choose a drone for the exercise; use the slow click for notes and rests.',
+      desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
     },
     {
       id: 'flow',
@@ -260,11 +260,11 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
   woodwind: [
     {
       id: 'breathing',
-      title: 'Breathing & harmonics',
+      title: 'Breathing & first notes',
       topic: 'warmup',
       kind: 'tune',
       minutes: 3,
-      hint: 'Tuner open. Overtones or slow register slurs.',
+      hint: 'Relaxed air, then easy notes in a comfortable register.',
       desk: (id) => deskFor(id, { pitch: true }),
     },
     {
@@ -273,8 +273,8 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'long-tones',
       kind: 'tune',
       minutes: 5,
-      hint: 'Drone on your home note, tuner watching.',
-      desk: (id) => deskFor(id, { drone: true, pitch: true }),
+      hint: 'Choose a drone for the exercise; sustain comfortably with notes and rests.',
+      desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
     },
     {
       id: 'scales',
@@ -391,8 +391,8 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'long-tones',
       kind: 'tune',
       minutes: 4,
-      hint: 'Drone under a single vowel, tuner watching.',
-      desk: (id) => deskFor(id, { drone: true, pitch: true }),
+      hint: 'Comfortable vowel, drone, and slow click; breathe and rest between notes.',
+      desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
     },
     {
       id: 'vocalises',
@@ -438,7 +438,7 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'scales',
       kind: 'metro',
       minutes: 6,
-      hint: 'Hands together, four octaves, click on.',
+      hint: 'Start hands separately in a comfortable range, then combine at a steady click.',
       desk: (id) => deskFor(id, { bpm: 72 }),
     },
     {
@@ -483,8 +483,8 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'long-tones',
       kind: 'tune',
       minutes: 5,
-      hint: 'Tuner open, drone on.',
-      desk: (id) => deskFor(id, { drone: true, pitch: true }),
+      hint: 'Tuner, drone, and slow click for sustained notes and rests.',
+      desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
     },
     {
       id: 'scales',
@@ -532,110 +532,117 @@ const seen = (id: string, title: string, topic: RoutineTopic, hint: string): Ste
 /**
  * The first cards are instrument-specific. The family list still supplies
  * universal work such as repertoire, etudes, and sight-reading below them.
- * Sources for these distinctions are recorded in FOCUSED_PRACTICE.md.
+ * Sources and tool-selection rationale are recorded in ROUTINE_PRESET_AUDIT.md.
  */
 const SPECIALTIES: Record<string, StepTemplate[]> = {
+  recorder: [
+    tuned('breathing', 'Air & first notes', 'warmup', 'Use gentle, steady air; listen to easy notes before changing fingers.'),
+    tuned('long-tones', 'Long tones & breath control', 'long-tones', 'Choose a comfortable drone; keep pitch steady and rest between notes.', true, 60),
+    clicked('scales', 'Scales & finger coordination', 'scales', 'Choose a familiar key and comfortable range; keep fingers close.', 60),
+    clicked('technique', 'Thumb & finger coordination', 'technique', 'Coordinate the thumb opening and fingers slowly across registers.', 60),
+    clicked('articulation', 'Tonguing & slurs', 'articulation', 'Keep the air steady while alternating tongued and slurred patterns.', 72),
+  ],
   trumpet: [
-    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Breath patterns, easy buzzes, then transfer the sound to the horn.', true, 60),
-    tuned('long-tones', 'Long tones', 'long-tones', 'Begin in the middle register; keep air and sound steady.', true),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Breath patterns, easy buzzes, then transfer the sound to the horn.', true),
+    tuned('long-tones', 'Long tones', 'long-tones', 'Begin in the middle register; keep air and sound steady.', true, 60),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Easy harmonic patterns with uninterrupted air.', 68),
     clicked('technique', 'Valve coordination', 'technique', 'Clarke-style finger patterns, clean and even.', 80),
     clicked('articulation', 'Single & multiple tonguing', 'articulation', 'Match every attack without closing the air.', 84),
   ],
   'french-horn': [
-    heard('buzzing', 'Breathing & mouthpiece', 'warmup', 'Hear the pitch first, then place clean, centered entrances.'),
-    tuned('long-tones', 'Long tones & entrances', 'long-tones', 'Note, rest, note: center each entrance against a drone.', true),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Relaxed breaths, then hear the drone and match easy buzzes.', true),
+    tuned('long-tones', 'Long tones & entrances', 'long-tones', 'Note, rest, note: center each entrance against a drone.', true, 60),
     clicked('slurs', 'Lip slurs & trills', 'flexibility', 'Connect overtones cleanly with energized air.', 64),
     tuned('stopped-horn', 'Stopped horn', 'technique', 'Check pitch, resistance, and a steady stopped sound.', true),
     clicked('transposition', 'Transposition', 'sight-reading', 'Short lines in a different horn key each day.', 60),
   ],
   trombone: [
-    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Free air, easy buzz, then connect it to the slide.', true, 60),
-    tuned('long-tones', 'Remington long tones', 'long-tones', 'Sustain a centered sound through every register.', true),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Free air, easy buzz, then connect it to the slide.', true),
+    tuned('long-tones', 'Remington long tones', 'long-tones', 'Sustain a centered sound through every register.', true, 60),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Move through the harmonic series without excess motion.', 66),
     clicked('technique', 'Slide coordination', 'technique', 'Move early and match tongue, air, and slide.', 72),
     heard('legato', 'Legato tonguing', 'articulation', 'Record smooth connections without glissandi.', 68),
   ],
   euphonium: [
-    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Full relaxed breaths and an easy, resonant buzz.', true, 60),
-    tuned('long-tones', 'Long tones', 'long-tones', 'Match a drone through the middle and low register.', true),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Full relaxed breaths and an easy, resonant buzz.', true),
+    tuned('long-tones', 'Long tones', 'long-tones', 'Match a drone through the middle and low register.', true, 60),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Even harmonic patterns with relaxed airflow.', 66),
     heard('lyrical', 'Lyrical studies', 'etude', 'Record a Bordogni-style phrase and listen for line.'),
     clicked('articulation', 'Articulation', 'articulation', 'Keep single and multiple tonguing resonant.', 80),
   ],
   tuba: [
-    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Large relaxed breaths, buzzes, and easy first notes.', true, 56),
-    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Start notes cleanly and sustain a resonant core.', true),
+    tuned('buzzing', 'Breathing & mouthpiece', 'warmup', 'Large relaxed breaths, buzzes, and easy first notes.', true),
+    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Start notes cleanly and sustain a resonant core.', true, 60),
     clicked('slurs', 'Lip slurs', 'flexibility', 'Slow harmonic patterns without forcing.', 60),
     clicked('technique', 'Valve & scale patterns', 'technique', 'Coordinate air and valves across the full range.', 68),
     clicked('articulation', 'Low-register articulation', 'articulation', 'Make each low attack speak without heaviness.', 68),
   ],
   flute: [
     tuned('breathing', 'Headjoint & tone', 'warmup', 'Find the center of the air stream before adding fingers.'),
-    tuned('long-tones', 'Long tones', 'long-tones', 'Shape dynamics and color without losing the core.', true),
+    tuned('long-tones', 'Long tones', 'long-tones', 'Shape dynamics and color without losing the core.', true, 60),
     tuned('harmonics', 'Harmonics', 'flexibility', 'Overblow low notes and keep the embouchure free.'),
     clicked('technique', 'Finger patterns', 'technique', 'Even fingers through awkward combinations.', 76),
     clicked('articulation', 'Single & multiple tonguing', 'articulation', 'Vary slurs and tongue patterns while the pulse stays steady.', 80),
   ],
   piccolo: [
     tuned('breathing', 'Tone preparation', 'warmup', 'Begin in a comfortable register with a small, supported air stream.'),
-    tuned('long-tones', 'Soft dynamics & intonation', 'long-tones', 'Hold pitch through soft entrances and releases.', true),
+    tuned('long-tones', 'Soft dynamics & intonation', 'long-tones', 'Hold pitch through soft entrances and releases.', true, 60),
     tuned('register', 'Upper-register control', 'flexibility', 'Connect octaves cleanly without pinching.'),
     clicked('technique', 'Finger patterns', 'technique', 'Light fingers and compact motion.', 72),
     clicked('articulation', 'Light articulation', 'articulation', 'Short attacks that keep the sound alive.', 80),
   ],
   clarinet: [
     tuned('breathing', 'Mouthpiece & barrel tone', 'warmup', 'Set air and voicing before assembling the full instrument.'),
-    tuned('long-tones', 'Long tones & voicing', 'long-tones', 'Keep a resonant core in chalumeau and clarion.', true),
+    tuned('long-tones', 'Long tones & voicing', 'long-tones', 'Keep a resonant core in chalumeau and clarion.', true, 60),
     tuned('register-slurs', 'Register slurs', 'flexibility', 'Match twelfths without biting or changing the air.'),
     clicked('technique', 'Crossing the break', 'technique', 'Coordinate thumb, index finger, and right hand inside a slur.', 66),
     clicked('articulation', 'Tongue & fingers', 'articulation', 'Keep the reed response and fingers together.', 76),
   ],
   'bass-clarinet': [
     tuned('breathing', 'Low-register response', 'warmup', 'Start low notes with focused air and relaxed voicing.'),
-    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Build the low-note concept against a drone.', true),
+    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Build the low-note concept against a drone.', true, 60),
     tuned('register-slurs', 'Register slurs & voicing', 'flexibility', 'Connect registers without an undertone.'),
     clicked('technique', 'Breaks & little-finger patterns', 'technique', 'Practice register changes and alternate little fingers.', 66),
     clicked('articulation', 'Articulation through registers', 'articulation', 'Match response from low to clarion.', 72),
   ],
   'soprano-sax': [
     tuned('breathing', 'Mouthpiece pitch & voicing', 'warmup', 'Stabilize the embouchure and hear the pitch center.'),
-    tuned('long-tones', 'Long tones & intonation', 'long-tones', 'Balance pitch and tone across the horn.', true),
+    tuned('long-tones', 'Long tones & intonation', 'long-tones', 'Balance pitch and tone across the horn.', true, 60),
     tuned('overtones', 'Overtones', 'flexibility', 'Match overtones to fingered notes without biting.'),
     clicked('technique', 'Palm-key coordination', 'technique', 'Keep upper-register fingers close and even.', 72),
     heard('articulation', 'Articulation & vibrato', 'articulation', 'Record attacks, releases, and an even vibrato.', 76),
   ],
   'alto-sax': [
     tuned('breathing', 'Mouthpiece pitch & voicing', 'warmup', 'Set a consistent embouchure and air stream.'),
-    tuned('long-tones', 'Long tones & dynamics', 'long-tones', 'Crescendo and diminuendo without moving the pitch.', true),
+    tuned('long-tones', 'Long tones & dynamics', 'long-tones', 'Crescendo and diminuendo without moving the pitch.', true, 60),
     tuned('overtones', 'Overtones & voicing', 'flexibility', 'Match overtone tone quality to fingered notes.'),
     clicked('technique', 'Finger technique', 'technique', 'Even side-key and palm-key connections.', 76),
     heard('articulation', 'Articulation & time', 'articulation', 'Record accents, legato tongue, and clean releases.', 80),
   ],
   'tenor-sax': [
     tuned('breathing', 'Mouthpiece pitch & voicing', 'warmup', 'Start with supported air and a free, resonant setup.'),
-    tuned('long-tones', 'Full-range long tones', 'long-tones', 'Connect the low register to palm keys evenly.', true),
+    tuned('long-tones', 'Full-range long tones', 'long-tones', 'Connect the low register to palm keys evenly.', true, 60),
     tuned('overtones', 'Overtones & voicing', 'flexibility', 'Build register control from low fundamentals.'),
     clicked('technique', 'Finger technique', 'technique', 'Coordinate octave-key and side-key patterns.', 74),
     heard('articulation', 'Articulation & subtone', 'articulation', 'Compare attack, release, and low-register color.', 76),
   ],
   'bari-sax': [
     tuned('breathing', 'Low-note response', 'warmup', 'Move enough air for a clean, immediate low register.'),
-    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Keep low notes resonant and in tune.', true),
+    tuned('long-tones', 'Low-register long tones', 'long-tones', 'Keep low notes resonant and in tune.', true, 60),
     tuned('overtones', 'Overtones & voicing', 'flexibility', 'Use low fundamentals to stabilize the upper register.'),
     clicked('technique', 'Low-key coordination', 'technique', 'Keep the large keywork light and synchronized.', 68),
     heard('articulation', 'Articulation & groove', 'articulation', 'Record attacks against the beat and check placement.', 76),
   ],
   oboe: [
     tuned('breathing', 'Reed response & air', 'warmup', 'Check the reed, then connect air, embouchure, and first attack.'),
-    tuned('long-tones', 'Long tones & dynamics', 'long-tones', 'Shape a full dynamic arc while keeping pitch stable.', true),
+    tuned('long-tones', 'Long tones & dynamics', 'long-tones', 'Shape a full dynamic arc while keeping pitch stable.', true, 60),
     heard('response', 'Attack & release', 'articulation', 'Record clean starts and resonant releases.'),
     clicked('technique', 'Finger coordination', 'technique', 'Work forked, side, and half-hole connections slowly.', 68),
     clicked('scales', 'Scales in patterns', 'scales', 'Stepwise, thirds, and fourths across the range.', 72),
   ],
   bassoon: [
-    tuned('breathing', 'Reed response & long tones', 'warmup', 'Connect air, embouchure, and a stable first sound.', true),
-    tuned('tenor-register', 'Tenor-register stability', 'long-tones', 'Tune and stabilize the tenor register against a drone.', true),
+    tuned('breathing', 'Reed response & first notes', 'warmup', 'Check the reed, then assemble the instrument for easy first notes.'),
+    tuned('tenor-register', 'Tenor-register stability', 'long-tones', 'Tune and stabilize the tenor register against a drone.', true, 60),
     clicked('flicking', 'Flicking & venting', 'technique', 'Coordinate speaker keys on clean register entrances.', 60),
     clicked('technique', 'Finger patterns & half-hole', 'technique', 'Slow patterns for half-hole and thumb coordination.', 66),
     heard('articulation', 'Articulation', 'articulation', 'Record single and double tongue for consistent response.', 72),
@@ -645,14 +652,14 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
     tuned('intonation', 'Scales & intonation', 'scales', 'Hear ringing intervals and tune against a drone.', true),
     heard('shifting', 'Shifting & left hand', 'technique', 'Listen for relaxed, accurate arrivals.', 60),
     seen('bowing', 'Bow strokes & crossings', 'articulation', 'Check contact point, level changes, and bow distribution.'),
-    tuned('double-stops', 'Double stops', 'technique', 'Tune intervals slowly from the lower voice upward.', true),
+    tuned('double-stops', 'Double stops', 'technique', 'Check each note separately with the tuner, then listen to the interval together.', true),
   ],
   viola: [
     seen('bow-warmup', 'Open strings & whole bows', 'warmup', 'Use camera to check weight, contact point, and a free shoulder.'),
     tuned('intonation', 'Scales & intonation', 'scales', 'Build a ringing C-string-to-A-string frame.', true),
     heard('shifting', 'Shifting & left hand', 'technique', 'Record position changes and listen for clean arrivals.', 58),
     seen('bowing', 'Bow strokes & string crossings', 'articulation', 'Check bow levels and sustained weight.'),
-    tuned('double-stops', 'Double stops', 'technique', 'Tune intervals without squeezing the left hand.', true),
+    tuned('double-stops', 'Double stops', 'technique', 'Check single notes first; listen to both together without squeezing.', true),
   ],
   cello: [
     seen('bow-warmup', 'Open strings & bow path', 'warmup', 'Check contact point, weight, and level changes.'),
@@ -692,13 +699,13 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   voice: [
     seen('body', 'Body & breath', 'warmup', 'Use camera to check easy alignment and unforced breathing.'),
     tuned('sirens', 'SOVT, lip trills & sirens', 'warmup', 'Glide easily through the range without pushing.'),
-    tuned('sustained', 'Sustained vowels & resonance', 'long-tones', 'Keep pitch and vowel stable on an easy note.', true),
+    tuned('sustained', 'Sustained vowels & resonance', 'long-tones', 'Choose a comfortable drone and vowel; use the click for notes and rests.', true, 60),
     heard('registers', 'Register blend', 'flexibility', 'Record smooth transitions through the passaggio.'),
     heard('agility', 'Agility & diction', 'articulation', 'Check consonant clarity without interrupting the phrase.', 72),
   ],
   piano: [
     seen('warmup', 'Five-finger patterns & alignment', 'warmup', 'Use camera to check relaxed wrists and economical motion.'),
-    clicked('scales', 'Scales', 'scales', 'Even tone, reliable fingering, and a steady pulse.', 72),
+    clicked('scales', 'Scales', 'scales', 'Start hands separately; combine when tone and fingering are even at the click.', 72),
     clicked('arpeggios', 'Arpeggios', 'scales', 'Connect thumb crossings without accents.', 66),
     heard('chords', 'Chords, cadences & voicing', 'technique', 'Record balance and harmonic direction.', 60),
     heard('independence', 'Hand independence', 'technique', 'Listen for separate layers and even coordination.', 60),
@@ -846,7 +853,7 @@ const INSTRUMENT_PRESETS: Record<string, RoutinePreset[]> = {
   'tenor-sax': tailoredPresets(['breathing', 'long-tones', 'overtones', 'piece'], ['breathing', 'long-tones', 'overtones', 'scales', 'technique', 'articulation', 'etude', 'piece'], 'Air, full-range tone, voicing.', 'Registers, fingers, color, and repertoire.'),
   'bari-sax': tailoredPresets(['breathing', 'long-tones', 'overtones', 'piece'], ['breathing', 'long-tones', 'overtones', 'scales', 'technique', 'articulation', 'etude', 'piece'], 'Low response, tone, voicing.', 'Low register, keywork, groove, and repertoire.'),
   oboe: tailoredPresets(['breathing', 'long-tones', 'response', 'piece'], ['breathing', 'long-tones', 'response', 'scales', 'technique', 'articulation', 'etude', 'piece'], 'Air, reed response, stable sound.', 'Air, face, tongue, fingers, and repertoire.'),
-  bassoon: tailoredPresets(['breathing', 'tenor-register', 'flicking', 'piece'], ['breathing', 'tenor-register', 'flicking', 'scales', 'technique', 'articulation', 'etude', 'piece'], 'Response, tenor register, flicking.', 'Tone, registers, fingerings, tongue, and repertoire.'),
+  bassoon: tailoredPresets(['breathing', 'long-tones', 'flicking', 'piece'], ['breathing', 'long-tones', 'tenor-register', 'flicking', 'scales', 'technique', 'articulation', 'etude', 'piece'], 'Response, sustained tone, flicking.', 'Tone, registers, fingerings, tongue, and repertoire.'),
   violin: tailoredPresets(['bow-warmup', 'intonation', 'shifting', 'piece'], ['bow-warmup', 'intonation', 'shifting', 'bowing', 'double-stops', 'etude', 'piece'], 'Bow, intonation, shifting, music.', 'Sound, pitch, left hand, bowing, and repertoire.'),
   viola: tailoredPresets(['bow-warmup', 'intonation', 'shifting', 'piece'], ['bow-warmup', 'intonation', 'shifting', 'bowing', 'double-stops', 'etude', 'piece'], 'Bow weight, intonation, shifting.', 'C-string sound, pitch, bowing, and repertoire.'),
   cello: tailoredPresets(['bow-warmup', 'intonation', 'shifting', 'piece'], ['bow-warmup', 'intonation', 'shifting', 'bowing', 'thumb-position', 'etude', 'piece'], 'Bow path, intonation, shifting.', 'Sound, extensions, thumb position, and repertoire.'),

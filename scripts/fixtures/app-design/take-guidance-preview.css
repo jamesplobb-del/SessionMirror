@@ -1,0 +1,9 @@
+/* Guidance stays attached to the existing card and never intercepts a tap. */
+.take-cue-owner{position:relative}
+.take-inline-cue{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:11px;line-height:1.3;font-weight:500;color:var(--ls-blue);pointer-events:none}
+.audio-mode-take-card--best .take-inline-cue{color:#986e25}
+.take-cue-caption{font-size:0!important}
+.take-cue-caption .take-inline-cue{position:static;display:block;font-size:9px;color:inherit;text-align:left;line-height:1.4}
+.take-cue-emphasis{outline:2px solid var(--ls-blue)!important;outline-offset:3px;box-shadow:0 0 0 5px color-mix(in srgb,var(--ls-blue) 12%,transparent)!important;transition:box-shadow .3s,outline-color .3s}
+.audio-mode-take-card--best .take-cue-emphasis,.compact-take-slot--best.take-cue-emphasis,.compact-take-slot--best .take-cue-emphasis{outline-color:#c49a48!important;box-shadow:0 0 0 5px #c49a481c!important}
+@media(prefers-reduced-motion:reduce){.take-cue-emphasis{transition:none}}

@@ -16,6 +16,7 @@ const TABS: { id: AudioPracticeTab; label: string }[] = [
 interface AudioPracticeTopTabsProps {
   /** Historical navigation for the isolated appearance comparison. */
   includeRecording?: boolean
+  includeGames?: boolean
   onBackToRecording?: () => void
   activeTab: AudioPracticeTab
   onTabChange: (tab: AudioPracticeTab) => void
@@ -23,13 +24,15 @@ interface AudioPracticeTopTabsProps {
 
 export default function AudioPracticeTopTabs({
   includeRecording = false,
+  includeGames = true,
   onBackToRecording,
   activeTab,
   onTabChange,
 }: AudioPracticeTopTabsProps) {
   const [pending, startTabTransition] = useTransition()
   const [selectedTab, setSelectedTab] = useOptimistic(activeTab)
-  const tabs = includeRecording ? [{ id: 'audio' as const, label: 'Record' }, ...TABS] : TABS
+  const toolTabs = includeGames ? TABS : TABS.filter(tab => tab.id !== 'games')
+  const tabs = includeRecording ? [{ id: 'audio' as const, label: 'Record' }, ...toolTabs] : toolTabs
   return (
     <>
     {onBackToRecording && <button className="tools-record-return" onClick={onBackToRecording}>‹ Recording</button>}
@@ -37,7 +40,7 @@ export default function AudioPracticeTopTabs({
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
       aria-busy={pending}
-      style={{ '--electric-tab-index': Math.max(0,tabs.findIndex(tab => tab.id === selectedTab)) } as CSSProperties}
+      style={{ '--tool-tab-count': tabs.length, '--electric-tab-index': Math.max(0,tabs.findIndex(tab => tab.id === selectedTab)) } as CSSProperties}
     >
       {tabs.map((tab) => {
         const isActive = selectedTab === tab.id

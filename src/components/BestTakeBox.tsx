@@ -1,3 +1,4 @@
+import { useTakeGuidance } from '../context/TakeGuidanceContext'
 import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import {
   memo,
@@ -170,6 +171,7 @@ function BestTakeBox({
   const nativePlaybackGeneration = useRef(0)
   /** True only while this instance holds the shared stereo-playback route (native path). */
   const nativeRouteHeldRef = useRef(false)
+  const cue = useTakeGuidance('best', compact)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayArmed, setIsPlayArmed] = useState(false)
   const [nativePlaybackError, setNativePlaybackError] = useState(false)
@@ -822,7 +824,7 @@ function BestTakeBox({
                     onTouchStart={stopEventBubble}
                     onTouchEnd={stopEventBubble}
                     onClick={handlePlayPauseClick}
-                    className={pipPlayButtonClass}
+                    className={`${pipPlayButtonClass}${cue.emphasis ? ' take-guidance-emphasis' : ''}`}
                     aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
                   >
                     <span className={pipTouchIconClass}>

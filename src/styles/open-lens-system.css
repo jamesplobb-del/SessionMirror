@@ -192,8 +192,8 @@ html#lens-design-system .audio-mode-take-card__media { display:grid!important; g
 html#lens-design-system .audio-mode-take-card__play { position:static!important; grid-column:2; grid-row:1; transform:none!important; }
 html#lens-design-system .audio-mode-take-card__playback-column { grid-column:1; grid-row:1; }
 html#lens-design-system .native-bottom-sheet:not(:has(.settings-sheet)) { background:var(--ls-bg)!important; border:1px solid var(--ls-line)!important; box-shadow:0 -12px 35px #10263816!important; }
-html#lens-design-system .audio-practice-top-tabs { display:grid!important; grid-template-columns:repeat(3,minmax(0,1fr))!important; }
-html#lens-design-system .audio-practice-top-tabs::after { width:calc((100% - 10px) / 3)!important; }
+html#lens-design-system .audio-practice-top-tabs { display:grid!important; grid-template-columns:repeat(var(--tool-tab-count,3),minmax(0,1fr))!important; }
+html#lens-design-system .audio-practice-top-tabs::after { width:calc((100% - 10px) / var(--tool-tab-count,3))!important; }
 
 /* Take identity stays gold / blue in every finish, including optional finishes. */
 html#lens-design-system { --take-best:#a96900; --take-best-soft:#ffe3a0; --take-current:#0075dc; --take-current-soft:#a1e1ff; }
@@ -674,10 +674,10 @@ html#lens-design-system .practice-timeline__hero-rename { color:var(--ls-ink); b
    property is consumed ONLY on the overlay, never on its descendants. */
 html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
   /* Keep the base opaque even when the pitch wash fades to transparent. */
-  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 32%,transparent),color-mix(in srgb,var(--silk-wash) 32%,transparent)),var(--ls-bg)!important;
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 72%,transparent),color-mix(in srgb,var(--silk-wash) 72%,transparent)),var(--ls-bg)!important;
 }
 html#lens-design-system.lens-system.app-dark-mode .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
-  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 32%,transparent),color-mix(in srgb,var(--silk-wash) 32%,transparent)),var(--ls-bg)!important;
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 46%,transparent),color-mix(in srgb,var(--silk-wash) 46%,transparent)),var(--ls-bg)!important;
 }
 html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout { top:20px!important; display:flex; flex-direction:column; align-items:center; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note,
@@ -693,9 +693,7 @@ html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pi
 /* Silk's controls use the same color family as its ribbon and screen. The
    animated --silk-wash stays on the overlay; --silk-live is not animated. */
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs { background:color-mix(in srgb,var(--ls-bg) 68%,transparent)!important; }
-html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs::after { background:color-mix(in srgb,var(--silk-live) 28%,var(--ls-panel))!important; }
-html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active,
-html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active svg,
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs::after { background:var(--ls-blue)!important; }
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail strong,
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .open-lens-dock-action { color:var(--ls-ink)!important; }
 

@@ -1564,7 +1564,7 @@ html.app-dark-mode .routine-bar--audio .routine-bar__collapse::before {
   display: flex;
   align-items: stretch;
   gap: 0.35rem;
-  padding: 0.45rem 2.1rem 0.5rem 0.55rem;
+  padding: 0.45rem 0.55rem 0.5rem;
 }
 
 .routine-bar__action {
@@ -1612,36 +1612,9 @@ html.app-dark-mode .routine-bar--audio .routine-bar__collapse::before {
   padding: 0;
 }
 
-/* The corner: drag it to set the width.
- * The rows leave room for it on the right so it never sits on Done. */
-.routine-bar__resize {
-  position: absolute;
-  right: 0.15rem;
-  bottom: 0.2rem;
-  z-index: 1;
-  display: flex;
-  width: 1.9rem;
-  height: 2.75rem;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding: 0 0.3rem 0.3rem 0;
-  border: 0;
-  border-radius: 0.6rem;
-  color: inherit;
-  background: none;
-  opacity: 0.55;
-  cursor: nwse-resize;
-  touch-action: none;
-}
-
-.routine-bar__resize svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.routine-bar.is-compact .routine-bar__head {
-  padding-right: 2.1rem;
-}
+.routine-bar__toolbar { display:flex; align-items:center; justify-content:space-between; padding:0 0.5rem; }
+.routine-bar__toolbar .routine-bar__grip { height:44px; margin:0; }
+.routine-bar__size { min-height:44px; padding:0 0.5rem; border:0; border-radius:10px; background:transparent; color:inherit; font-size:12px; font-weight:600; touch-action:manipulation; }
 
 /* ── The routine, dropped down from the bar ── */
 

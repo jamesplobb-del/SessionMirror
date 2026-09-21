@@ -31,6 +31,7 @@ import type { PitchSourceHealth } from '../hooks/useLivePitchTracker'
 interface QuickTunerScreenProps {
   request: QuickTunerLaunchRequest
   onExit: () => void
+  embedded?: boolean
 }
 
 function permissionCopy(status: QuickTunerMicrophonePermissionStatus): {
@@ -55,7 +56,7 @@ function permissionCopy(status: QuickTunerMicrophonePermissionStatus): {
   }
 }
 
-export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenProps) {
+export default function QuickTunerScreen({ request, onExit, embedded = false }: QuickTunerScreenProps) {
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings)
   const [permission, setPermission] =
     useState<QuickTunerMicrophonePermissionStatus>('notDetermined')
@@ -72,6 +73,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   useEffect(() => subscribeAppForeground(setAppForeground), [])
 
   useEffect(() => {
+    if (embedded) return
     const root = document.documentElement
     root.classList.add('app-audio-mode')
     root.classList.toggle('app-dark-mode', settings.darkMode)
@@ -80,7 +82,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
       root.classList.remove('app-audio-mode', 'app-dark-mode')
       root.style.removeProperty('color-scheme')
     }
-  }, [settings.darkMode])
+  }, [settings.darkMode, embedded])
 
   useEffect(() => {
     console.info('[QuickTuner] lightweight shell mounted', {
@@ -265,8 +267,8 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
   const permissionMessage = permissionCopy(permission)
 
   return (
-    <main className="quick-tuner-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-tuner">
-      <header className="quick-tuner-header">
+    <main className={`quick-tuner-screen app-ui-overlay app-ui-overlay--audio-mode app-ui-overlay--audio-practice-tuner${embedded ? ' quick-tool-panel' : ''}`}>
+      {!embedded && <header className="quick-tuner-header">
         <button
           type="button"
           className="quick-tuner-icon-button"
@@ -285,7 +287,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
           <span aria-hidden />
           {micIsLive ? 'Live' : 'Mic idle'}
         </span>
-      </header>
+      </header>}
 
       <section className="quick-tuner-meta" aria-label="Tuner configuration">
         <span>A4 = 440 Hz</span>
@@ -366,9 +368,9 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
             </button>
           ))}
         </div>
-        <button type="button" className="quick-tuner-return" onClick={handleExit}>
+        {!embedded && <button type="button" className="quick-tuner-return" onClick={handleExit}>
           Return to BestTake
-        </button>
+        </button>}
       </footer>
     </main>
   )

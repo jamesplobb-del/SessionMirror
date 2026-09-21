@@ -287,15 +287,14 @@ final class MultitrackTransportEngine {
             // countdown timestamps drift later than the audible transport.
             let firstClickEpochMs = nowEpochMs + (firstClickHostTimeSec - currentHostTimeSec) * 1000
             let performanceEpochMs = nowEpochMs + (scheduledPerformanceHostTimeSec - currentHostTimeSec) * 1000
-            let session = AVAudioSession.sharedInstance()
             // The monitor downbeat is rendered at performanceHostTime. Shift the
-            // capture alignment anchor forward by the current hardware I/O path
-            // so newly recorded material is latency-compensated onto that same
-            // musical downbeat instead of retaining route delay in the file.
-            let hardwareLatencySec = max(
-                0,
-                session.outputLatency + session.inputLatency + session.ioBufferDuration
-            )
+            // capture alignment anchor forward by the round trip a player's note
+            // actually takes, so newly recorded material is latency-compensated
+            // onto that same musical downbeat instead of retaining route delay in
+            // the file. The shared helper adds the Bluetooth delay AVAudioSession
+            // omits and holds one value per route, so overdubs cut over Bluetooth
+            // land on the click and on each other.
+            let hardwareLatencySec = AudioRouteConfigurator.monitorRoundTripLatencySec()
             let performanceHostTimeSec = scheduledPerformanceHostTimeSec
             let captureAlignmentHostTimeSec = performanceHostTimeSec + hardwareLatencySec
 

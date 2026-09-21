@@ -1,4 +1,5 @@
-import { prepareNaturalTakePreview } from './naturalTakePreview'
+import { completedTakeBoxTone } from './takeGuidance'
+import { readyNaturalTakePreview } from './naturalTakePreview'
 import { Capacitor } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
 import BestTakeAudioPlugin from './audioSessionRoute'
@@ -39,6 +40,12 @@ export function measureInlineTakeBoxWindowRect(
   }
 }
 
+const completionSubscribers = new Set<(tone: 'current' | 'best') => void>()
+export function subscribeTakeBoxCompletion(listener: (tone: 'current' | 'best') => void): () => void {
+  completionSubscribers.add(listener)
+  return () => { completionSubscribers.delete(listener) }
+}
+
 let endedListenerInstalled = false
 const endedHandlers = new Map<string, () => void>()
 let endedListenerHandle: PluginListenerHandle | null = null
@@ -67,7 +74,9 @@ async function ensureEndedListener(): Promise<void> {
   endedListenerInstalled = true
   endedListenerHandle = await BestTakeAudioPlugin.addListener(
     'inlineTakeBoxPlaybackEnded',
-    (event: { ownerId?: string }) => {
+    (event: { ownerId?: string; completed?: boolean }) => {
+      const tone = completedTakeBoxTone(event)
+      if (tone) completionSubscribers.forEach(listener => listener(tone))
       const ownerId = event?.ownerId
       if (ownerId && ownerId === activeOwnerId) {
         activeOwnerId = null
@@ -101,7 +110,7 @@ export async function startNativeInlineTakeBoxPlayback(options: {
   await ensureEndedListener()
 
   try {
-    const url = await prepareNaturalTakePreview(fileURL, /\.(m4a|mp3|wav|caf|aac)$/i.test(fileURL) ? 'audio' : 'video')
+    const url = await readyNaturalTakePreview(fileURL, /\.(m4a|mp3|wav|caf|aac)$/i.test(fileURL) ? 'audio' : 'video')
     if (generation !== playbackGeneration) return false
     return await enqueueNativeOperation(async () => {
       if (generation !== playbackGeneration) return false

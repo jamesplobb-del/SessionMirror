@@ -885,7 +885,7 @@ function SettingsDrawer({
               />
             </SettingsGroup>
 
-            <SettingsGroup footer="Reach the tuner or metronome from the Lock Screen, Control Center, the Action Button, or Siri — without opening BestTake first.">
+            <SettingsGroup footer="Open Quick Tools from the Lock Screen, Control Center, the Action Button, or Siri. Choose which tool opens first, then switch between Tuner and Metronome using the blue tabs.">
               <LinkRow
                 icon={Smartphone}
                 tint={TINT.purple}
@@ -902,12 +902,12 @@ function SettingsDrawer({
                       value={quickAccessDestination}
                       onChange={handleQuickAccessDestinationChange}
                       segments={[
-                        { id: 'tuner', label: 'Quick Tuner' },
+                        { id: 'tuner', label: 'Tuner' },
                         { id: 'metronome', label: 'Metronome' },
                       ]}
                       layoutId="settings-quick-tool-segment"
                       size="sm"
-                      ariaLabel="Quick tool"
+                      ariaLabel="Tool to open first"
                     />
                   </div>
                 </div>
@@ -928,7 +928,7 @@ function SettingsDrawer({
                       onClick={onOpenQuickTuner}
                       className="set-subrow set-row--action"
                     >
-                      <span className="set-row__label">Test Quick Tuner</span>
+                      <span className="set-row__label">Test Quick Tools</span>
                       <ChevronRight className="set-row__chevron" aria-hidden />
                     </Pressable>
                   ) : null}
@@ -941,7 +941,7 @@ function SettingsDrawer({
                       onClick={onOpenQuickMetronome}
                       className="set-subrow set-row--action"
                     >
-                      <span className="set-row__label">Test Quick Metronome</span>
+                      <span className="set-row__label">Test Quick Tools</span>
                       <ChevronRight className="set-row__chevron" aria-hidden />
                     </Pressable>
                   ) : null}

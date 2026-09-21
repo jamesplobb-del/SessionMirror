@@ -1,3 +1,4 @@
+import { useTakeGuidance } from '../context/TakeGuidanceContext'
 import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
 import { Pause, Play, Pin, Upload, Video, X } from 'lucide-react'
@@ -136,6 +137,7 @@ function PipWindow({
   const nativePlaybackGeneration = useRef(0)
   const nativeRouteHeldRef = useRef(false)
   const autoPlayViaNativeRef = useRef(false)
+  const cue = useTakeGuidance('current', compact)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPreparing, setIsPreparing] = useState(false)
   const [playbackError, setPlaybackError] = useState(false)
@@ -679,7 +681,7 @@ function PipWindow({
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}
                 onClick={handlePlayPauseClick}
-                className={pipPlayButtonClass}
+                className={`${pipPlayButtonClass}${cue.emphasis ? ' take-guidance-emphasis' : ''}`}
                 aria-busy={isPreparing}
                 aria-label={isPlaying ? 'Pause inline preview' : 'Play inline preview'}
               >

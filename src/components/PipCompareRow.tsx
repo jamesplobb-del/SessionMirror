@@ -1,3 +1,4 @@
+import { useTakeGuidance } from '../context/TakeGuidanceContext'
 import {
   useCallback,
   useEffect,
@@ -132,6 +133,7 @@ function CompactTakeCaption({
   dragSourceArming?: boolean
   dataTutorial?: string
 }) {
+  const cue = useTakeGuidance(tone, hasMedia)
   const formattedDuration = formatCompactDuration(duration)
   const formattedTimestamp = formatCompactTimestamp(timestamp)
   const source = youtube ? 'YouTube' : library ? 'Library' : formattedTimestamp
@@ -142,7 +144,7 @@ function CompactTakeCaption({
   const content = (
     <>
       <span className="compact-take-caption__name">{hasMedia ? name : tone === 'best' ? 'Pin your best take' : 'Ready to record'}</span>
-      {hasMedia && detail && <span className="compact-take-caption__detail">{detail}</span>}
+      {cue.visible ? <span className="take-guidance-label" role="status">{cue.label}</span> : hasMedia && detail && <span className="compact-take-caption__detail">{detail}</span>}
     </>
   )
 

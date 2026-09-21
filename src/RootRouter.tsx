@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, useSyncExternalStore, type ReactNode } from 'react'
 import AppBootGate from './components/ui/AppBootGate'
-import QuickTunerScreen from './components/QuickTunerScreen'
+import QuickToolsScreen from './components/QuickToolsScreen'
 import { ActionSheetProvider } from './context/ActionSheetContext'
 import {
   dismissQuickTuner,
@@ -9,7 +9,6 @@ import {
 } from './utils/quickTunerLaunch'
 
 const FullBestTakeApp = lazy(() => import('./App'))
-const QuickMetronomeScreen = lazy(() => import('./components/QuickMetronomeScreen'))
 
 function AppLaunchFallback() { return <AppBootGate /> }
 
@@ -69,36 +68,10 @@ export default function RootRouter() {
   if (quickTunerRequest) {
     const handleExit = () => dismissQuickTuner(quickTunerRequest.id)
 
-    if (quickTunerRequest.destination === 'metronome') {
-      return (
-        <ActionSheetProvider>
-          <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
-            <Suspense
-              fallback={
-                <div
-                  className="quick-tool-loading app-ui-overlay--audio-mode"
-                  role="status"
-                  aria-label="Opening Quick Metronome"
-                >
-                  <span>Opening Metronome…</span>
-                </div>
-              }
-            >
-              <QuickMetronomeScreen
-                key={quickTunerRequest.id}
-                request={quickTunerRequest}
-                onExit={handleExit}
-              />
-            </Suspense>
-          </QuickToolErrorBoundary>
-        </ActionSheetProvider>
-      )
-    }
-
     return (
       <ActionSheetProvider>
         <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
-          <QuickTunerScreen
+          <QuickToolsScreen
             key={quickTunerRequest.id}
             request={quickTunerRequest}
             onExit={handleExit}

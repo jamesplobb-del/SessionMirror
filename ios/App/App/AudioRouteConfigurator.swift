@@ -78,6 +78,77 @@ enum AudioRouteConfigurator {
         return snapshot
     }
 
+    /// Floor for `outputLatency` on a Bluetooth route.
+    ///
+    /// Deliberately a floor and not the additive constant the WebKit path uses
+    /// (BLUETOOTH_A2DP_EXTRA_LATENCY_MS in
+    /// src/multitrack/synchronization/metronomePlaybackCompensation.ts). iOS
+    /// reports roughly the truth for some headsets and a near-zero value for
+    /// others; adding to both would pull takes early on the honest ones. Lifting
+    /// only the implausible readings can misjudge a slow headset, never a
+    /// correctly reported one.
+    static let bluetoothMinimumOutputLatencySec: Double = 0.150
+
+    private static var cachedMonitorLatency: (signature: String, seconds: Double)?
+    private static let monitorLatencyLock = NSLock()
+
+    private static func routeLatencySignature(_ session: AVAudioSession) -> String {
+        let route = session.currentRoute
+        return (route.outputs + route.inputs)
+            .map { "\($0.portType.rawValue):\($0.uid)" }
+            .joined(separator: "|")
+    }
+
+    /// Delay between a monitor downbeat leaving the mixer and the microphone
+    /// capturing the note a player made on hearing it.
+    ///
+    /// Sampled once per route rather than once per take. iOS re-reports
+    /// `outputLatency` after each category/option change, so reading it fresh for
+    /// every count-in moved the anchor by tens of milliseconds between takes and
+    /// the overdubs drifted apart from each other. A route change re-measures.
+    static func monitorRoundTripLatencySec(for session: AVAudioSession = .sharedInstance()) -> Double {
+        let signature = routeLatencySignature(session)
+
+        monitorLatencyLock.lock()
+        defer { monitorLatencyLock.unlock() }
+
+        if let cached = cachedMonitorLatency, cached.signature == signature {
+            return cached.seconds
+        }
+
+        let bluetoothOutputPorts: Set<AVAudioSession.Port> = [
+            .bluetoothA2DP,
+            .bluetoothHFP,
+            .bluetoothLE,
+        ]
+        let reportedOutputLatency = session.outputLatency
+        let usesBluetoothOutput = session.currentRoute.outputs.contains(where: {
+            bluetoothOutputPorts.contains($0.portType)
+        })
+        let outputLatency = usesBluetoothOutput
+            ? max(reportedOutputLatency, bluetoothMinimumOutputLatencySec)
+            : reportedOutputLatency
+        let seconds = max(
+            0,
+            outputLatency + session.inputLatency + session.ioBufferDuration
+        )
+
+        // A route still settling reports zero. Measuring again next take beats
+        // pinning the whole session to a value that was never true.
+        let settled = reportedOutputLatency > 0
+        if settled {
+            cachedMonitorLatency = (signature, seconds)
+        }
+
+        print(
+            "[AudioRoute] monitorRoundTripLatency=\(seconds) reportedOutput=\(reportedOutputLatency) " +
+            "usedOutput=\(outputLatency) bluetooth=\(usesBluetoothOutput) " +
+            "input=\(session.inputLatency) ioBuffer=\(session.ioBufferDuration) " +
+            "cached=\(settled) route=\(signature)"
+        )
+        return seconds
+    }
+
     private static func compactStack(skipFrames: Int = 2, maxFrames: Int = 8) -> String {
         Thread.callStackSymbols
             .dropFirst(skipFrames)
