@@ -390,6 +390,10 @@ export default function AudioPracticeMetronomeView({
                     }}
                     className="metronome-audio-stage__bpm-input pointer-events-auto"
                     aria-label="Beats per minute"
+                    enterKeyHint="done"
+                    // Tapping the tempo to change it means replacing it, not
+                    // appending to it. The draggable widget already does this.
+                    onFocus={(event) => event.currentTarget.select()}
                   />
                 ) : (
                   <button

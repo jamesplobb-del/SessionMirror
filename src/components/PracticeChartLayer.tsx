@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import { AudioLines, Columns2, Ear, FileMusic, LayoutGrid, Maximize2, MicVocal, Minimize2, Music2, Radio, Square, Upload, X } from 'lucide-react'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -42,6 +42,12 @@ interface PracticeChartLayerProps {
   onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
   /** The Music tool is on and this surface is the practice room. */
   active: boolean
+  /**
+   * The take row, rendered by the app so the boxes keep the one set of take
+   * handlers every other surface uses. It rides in the top bar, which floats
+   * over the paper, so pinning it there costs the page no height.
+   */
+  takesSlot?: ReactNode
   boundaryRef: RefObject<HTMLElement | null>
   collapseResetKey?: string
   /** Turns the Music tool itself off — the desk toggle, from the widget's ×. */
@@ -106,7 +112,7 @@ function formatElapsed(seconds: number): string {
  * this project's folder next to the file.
  */
 export default function PracticeChartLayer({
-  projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
+  projectId, workspace, onWorkspaceChange, active, takesSlot, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
 }: PracticeChartLayerProps) {
@@ -169,7 +175,16 @@ export default function PracticeChartLayer({
     setLoadFailed(false)
   }, [paperKey])
 
-  const showing = active && paperVisible && chart !== null
+  /*
+   * `active` says whether the stand is being looked at, never whether it
+   * exists. Unmounting the paper throws away the opened PDF, where the player
+   * was on it, the marks and full screen — so anything that takes the room for
+   * a moment (a widget toggle that opens a panel, a sheet, the hub) used to
+   * cost a full reopen on the way back. The sibling MusicWidget already solved
+   * this with `visible`; the page does the same.
+   */
+  const mounted = paperVisible && chart !== null
+  const showing = active && mounted
   /*
    * An empty stand is still the music page. Without it, turning Music on for an
    * item with no part left the room exactly as it was apart from a ball on the
@@ -468,7 +483,6 @@ export default function PracticeChartLayer({
     else if (position >= 1 - TURN_ZONE) paper.current?.turn(1)
   }
 
-  if (!active) return null
 
   return <>
     <input
@@ -500,11 +514,13 @@ export default function PracticeChartLayer({
       }}
     />
 
-    {showing && chart && (
+    {mounted && chart && (
       <div
         className="practice-chart-paper"
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
+        data-inactive={showing ? undefined : 'true'}
+        aria-hidden={showing ? undefined : true}
+        onPointerDown={showing ? onPointerDown : undefined}
+        onPointerUp={showing ? onPointerUp : undefined}
         onPointerCancel={() => { gesture.current = null }}
       >
         <PracticeChartPaper
@@ -568,6 +584,18 @@ export default function PracticeChartLayer({
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
+          </div>
+        )}
+        {workspace.showTakeCards && takesSlot && (
+          /*
+           * The pill styles are all scoped under the audio-mode overlay class,
+           * and the stand is not inside it. Carrying the scope (and the wrap
+           * classes the other surfaces use) styles the row from the one source
+           * instead of a second copy that would drift. Its own background is
+           * put back to transparent below.
+           */
+          <div className="practice-chart-takes app-ui-overlay--audio-mode audio-tuner-take-pills-wrap audio-tuner-take-pills-wrap--compact">
+            {takesSlot}
           </div>
         )}
         </div>

@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
-import { PRACTICE_ALL_METERS, getPracticeRhythmOptions, getPracticePulseModeOptions, getPracticeFeelOptions, AUDIO_PRACTICE_CLICK_SOUNDS } from './audioPractice/audioPracticeMetronome'
-import { getMeterDefaults, getAccentLevelsForMeter, type MetronomeAccentLevel } from '../utils/metronomeConfig'
-import { Minus, Plus } from 'lucide-react'
+import { getPracticeRhythmOptions, AUDIO_PRACTICE_CLICK_SOUNDS } from './audioPractice/audioPracticeMetronome'
+import { SlidersHorizontal } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import RoutineMetronomeSheet from './RoutineMetronomeSheet'
 import RoutineProgramSetup from './RoutineProgramSetup'
 import { getWrittenPitchLabel, type TunerTranspositionId } from '../utils/tunerTransposition'
 import { homePitchClass } from '../utils/routinePresets'
@@ -22,11 +23,24 @@ export default function RoutineDeskSetup({
   hapticFeedback: boolean
   onChange: (patch: Partial<RoutineStep>) => void
 }) {
+  const [metronomeSheetOpen, setMetronomeSheetOpen] = useState(false)
   const savedDesk = step.desk ?? blankDesk('audio')
   const desk = { ...savedDesk, metronome: normalizeDeskMetronome(savedDesk.metronome) }
   const patchDesk = (patch: Partial<DeskSnapshot>) => onChange({ desk: { ...desk, ...patch } })
   const droneLabel = (pitchClass: number) =>
     getWrittenPitchLabel(pitchClass, desk.drone.octave, tunerTransposition).label
+
+  const metronome = desk.metronome
+  const subdivisionLabel = getPracticeRhythmOptions(metronome.meter, metronome.pulseModeId)
+    .find(option => option.value === metronome.subdivision)?.name
+  const soundLabel = AUDIO_PRACTICE_CLICK_SOUNDS
+    .find(option => option.id === metronome.soundId)?.label
+  const metronomeSummary = [
+    `${Math.round(metronome.bpm)} BPM`,
+    metronome.meter,
+    subdivisionLabel,
+    soundLabel,
+  ].filter(Boolean).join(' · ')
 
   return (
     <section className="practice-menu-section">
@@ -48,76 +62,21 @@ export default function RoutineDeskSetup({
           </Pressable>
           <small className="routine-tool__hint">Keep a steady pulse at your chosen tempo.</small>
           {desk.showMetronome && (
-            <div className="routine-metronome-controls"><div className="routine-stepper routine-stepper--wide" role="group" aria-label="Tempo">
+            <div className="routine-metronome-controls">
               <Pressable
                 type="button"
-                intensity="icon"
+                intensity="soft"
                 haptic="light"
                 hapticFeedback={hapticFeedback}
-                aria-label="Slower"
-                onClick={() =>
-                  patchDesk({ metronome: { ...desk.metronome, bpm: Math.max(30, desk.metronome.bpm - 4) } })
-                }
+                className="routine-metronome-open"
+                onClick={() => setMetronomeSheetOpen(true)}
               >
-                <Minus aria-hidden />
+                <SlidersHorizontal aria-hidden />
+                <span>
+                  <strong>{metronomeSummary}</strong>
+                  <small>Open the metronome to set this item's click</small>
+                </span>
               </Pressable>
-              <label className="routine-tempo-field"><span>BPM</span><input type="number" min={30} max={240} value={desk.metronome.bpm} aria-label="Tempo in beats per minute" onChange={event => {
-                const bpm = event.target.valueAsNumber
-                if (Number.isFinite(bpm)) patchDesk({ metronome: { ...desk.metronome, bpm: Math.min(240, Math.max(30, Math.round(bpm))) } })
-              }} /></label>
-              <Pressable
-                type="button"
-                intensity="icon"
-                haptic="light"
-                hapticFeedback={hapticFeedback}
-                aria-label="Faster"
-                onClick={() =>
-                  patchDesk({ metronome: { ...desk.metronome, bpm: Math.min(240, desk.metronome.bpm + 4) } })
-                }
-              >
-                <Plus aria-hidden />
-              </Pressable>
-              <select
-                value={desk.metronome.meter}
-                aria-label="Time signature"
-                onChange={event =>
-                  patchDesk({
-                    metronome: {
-                      ...desk.metronome,
-                      meter: event.target.value as DeskSnapshot['metronome']['meter'],
-                      ...getMeterDefaults(event.target.value as DeskSnapshot['metronome']['meter']),
-                    },
-                  })
-                }
-              >
-                {PRACTICE_ALL_METERS.map(meter => (
-                  <option key={meter} value={meter}>{meter}</option>
-                ))}
-              </select>
-            </div>
-            <div className="routine-metronome-fields">
-              <label>Pulse<select value={desk.metronome.pulseModeId ?? getMeterDefaults(desk.metronome.meter).pulseModeId} onChange={event => patchDesk({ metronome: { ...desk.metronome, ...getMeterDefaults(desk.metronome.meter, event.target.value) } })}>
-                {getPracticePulseModeOptions(desk.metronome.meter).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select></label>
-              <label>Subdivision<select value={desk.metronome.subdivision} onChange={event => patchDesk({ metronome: { ...desk.metronome, subdivision: event.target.value as DeskSnapshot['metronome']['subdivision'] } })}>
-                {getPracticeRhythmOptions(desk.metronome.meter, desk.metronome.pulseModeId).map(option => <option key={option.value} value={option.value}>{option.name}</option>)}
-              </select></label>
-              {getPracticeFeelOptions(desk.metronome.meter, desk.metronome.pulseModeId).length > 0 && <label>Grouping<select value={desk.metronome.feelId} onChange={event => patchDesk({ metronome: { ...desk.metronome, feelId: event.target.value, accentLevels: getAccentLevelsForMeter(desk.metronome.meter, event.target.value, desk.metronome.pulseModeId) } })}>
-                {getPracticeFeelOptions(desk.metronome.meter, desk.metronome.pulseModeId).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select></label>}
-              <label>Sound<select value={desk.metronome.soundId} onChange={event => patchDesk({ metronome: { ...desk.metronome, soundId: event.target.value } })}>
-                {AUDIO_PRACTICE_CLICK_SOUNDS.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-              </select></label>
-            </div>
-            <div className="routine-metronome-accents" role="group" aria-label="Beat accents">
-              <span>Beat accents</span>
-              {desk.metronome.accentLevels.map((accent, index) => <button key={index} type="button" data-accent={accent} aria-label={`Beat ${index + 1}: ${accent}. Tap to change accent.`} onClick={() => {
-                const levels: MetronomeAccentLevel[] = ['strong', 'medium', 'weak', 'silent']
-                const accentLevels = [...desk.metronome.accentLevels]
-                accentLevels[index] = levels[(levels.indexOf(accent) + 1) % levels.length]
-                patchDesk({ metronome: { ...desk.metronome, accentLevels } })
-              }}>{index + 1}<small>{accent}</small></button>)}
-            </div>
             </div>
           )}
         </div>
@@ -201,6 +160,12 @@ export default function RoutineDeskSetup({
         )}
       </div>
       <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />
+      <RoutineMetronomeSheet
+        isOpen={metronomeSheetOpen}
+        value={desk.metronome}
+        onSave={prefs => patchDesk({ metronome: prefs })}
+        onClose={() => setMetronomeSheetOpen(false)}
+      />
     </section>
   )
 }

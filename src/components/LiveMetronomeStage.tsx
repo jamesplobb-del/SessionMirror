@@ -163,6 +163,8 @@ export default function LiveMetronomeStage({
               }}
               className="metronome-audio-stage__bpm-input pointer-events-auto"
               aria-label="Beats per minute"
+              enterKeyHint="done"
+              onFocus={(event) => event.currentTarget.select()}
             />
           ) : (
             <button

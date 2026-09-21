@@ -880,7 +880,9 @@ html.app-dark-mode
 }
 
 .app-ui-overlay--audio-practice-tuner .audio-tuner-take-pills,
-.app-ui-overlay--practice-session-active .audio-tuner-take-pills {
+.app-ui-overlay--practice-session-active .audio-tuner-take-pills,
+/* The music stand shows the same two pills, side by side, over the part. */
+.practice-chart-takes .audio-tuner-take-pills {
   position: relative;
   z-index: 8;
   flex-shrink: 0;

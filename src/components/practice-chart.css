@@ -917,3 +917,32 @@ html.app-dark-mode .takes-widget .audio-mode-take-card__mini-btn--best {
 .takes-widget .audio-mode-take-card__title-row p { font-size: 12px; white-space: normal; max-width: none; }
 .takes-widget .audio-mode-waveform { height: 48px; }
 .takes-widget__status { padding: 0 .8rem .8rem; font-size: 12px; }
+
+/*
+ * Takes on the page.
+ *
+ * The top bar floats over the paper, so the row costs the part no height and
+ * the runtime-measured page insets stay correct. Pointer events are re-enabled
+ * only on the row itself — the rest of the bar stays transparent to the page
+ * turn taps underneath.
+ */
+.practice-chart-takes {
+  margin: 8px auto 0;
+  width: min(100%, 26rem);
+  pointer-events: auto;
+}
+.practice-chart-takes > * { width: 100%; }
+/* Borrowing the audio-mode scope brings its slab background with it. */
+.practice-chart-takes.app-ui-overlay--audio-mode { background: transparent !important; }
+
+/*
+ * Off-duty stand.
+ *
+ * Hidden, not unmounted: the opened PDF, the scroll position, the marks and
+ * full screen all live in this subtree, and re-creating them is the reload a
+ * player sees when something borrows the room for a moment.
+ */
+.practice-chart-paper[data-inactive] {
+  visibility: hidden;
+  pointer-events: none;
+}

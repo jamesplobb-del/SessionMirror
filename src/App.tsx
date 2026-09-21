@@ -166,6 +166,7 @@ import {
   type BestTakeHistoryEntry,
   type PracticeItemState,
   type Project,
+  type VaultTake,
 } from './db'
 import { resolveBenchmarkPlayback } from './utils/benchmarkReference'
 import { hydrateLibraryItems, type HydratedLibraryItem } from './utils/libraryBridge'
@@ -382,6 +383,8 @@ interface AppBootSnapshot {
   projects: Project[]
   activeProjectId: string | null
   takes: Take[]
+  /** Raw rows, so hydration can finish in the background after first render. */
+  takeRows: VaultTake[]
   benchmarkId: string | null
   challengerId: string | null
   libraryItems: HydratedLibraryItem[]
@@ -405,6 +408,7 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
   const projectList = await listProjects()
   const initialId = projectList[0]?.id ?? null
   let takes: Take[] = []
+  let takeRows: VaultTake[] = []
   let benchmarkId: string | null = null
   let challengerId: string | null = null
   let libraryItems: HydratedLibraryItem[] = []
@@ -415,37 +419,47 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
   ])
 
   if (initialId) {
-    const rows = await getTakesByProject(initialId)
-    const loadedFast = uiTakesFromVaultRowsFast(rows)
+    // None of these three reads depends on the others; awaiting them one after
+    // another added their latencies together on every launch.
+    const [rows, hydratedLibrary, binding] = await Promise.all([
+      getTakesByProject(initialId),
+      getLibraryItemsByProject(initialId).then((libraryRows) =>
+        hydrateLibraryItems(
+          libraryRows.map((row) => ({
+            id: row.id,
+            projectId: row.projectId,
+            kind: row.kind,
+            name: row.name,
+            createdAt: row.createdAt,
+            filePath: row.filePath,
+            mimeType: row.mimeType,
+            duration: row.duration,
+          }))
+        )
+      ),
+      getProjectBenchmarkBinding(initialId),
+    ])
+
+    takeRows = rows
+    libraryItems = hydratedLibrary
+    benchmarkBinding = binding
     benchmarkId = findBestTakeId(rows)
     const defaultChallengerId = rows.find((row) => !row.isBestTake)?.id ?? null
     challengerId = settings.showTakeCards ? defaultChallengerId : null
 
-    const libraryRows = await getLibraryItemsByProject(initialId)
-    libraryItems = await hydrateLibraryItems(
-      libraryRows.map((row) => ({
-        id: row.id,
-        projectId: row.projectId,
-        kind: row.kind,
-        name: row.name,
-        createdAt: row.createdAt,
-        filePath: row.filePath,
-        mimeType: row.mimeType,
-        duration: row.duration,
-      }))
-    )
-    benchmarkBinding = await getProjectBenchmarkBinding(initialId)
-
-    const hydrated = await hydrateVaultTakeRowsProgressive(rows, {
-      priorityIds: [benchmarkId, defaultChallengerId].filter((id): id is string => Boolean(id)),
-    })
-    takes = mergeHydratedTakes(loadedFast, hydrated)
+    // Metadata only: no filesystem or URL work. Playback URLs and thumbnails
+    // stream in after first render, exactly as they do when the active project
+    // changes. Awaiting hydrateVaultTakeRowsProgressive here made cold start
+    // scale with the size of the vault — it does one native file-exists round
+    // trip per take, then yields a frame between every batch of three.
+    takes = uiTakesFromVaultRowsFast(rows)
   }
 
   return {
     projects: projectList,
     activeProjectId: initialId,
     takes,
+    takeRows,
     benchmarkId,
     challengerId,
     libraryItems,
@@ -1492,9 +1506,45 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
 
   useEffect(() => {
-    if (bootSnapshot.takes.length === 0) return
-    void hydrateTakeThumbnailsInBackground(bootSnapshot.takes, applyTakeThumbnails)
-  }, [applyTakeThumbnails, bootSnapshot.takes])
+    const rows = bootSnapshot.takeRows
+    if (rows.length === 0) return
+
+    // Boot now renders from metadata alone, so playback URLs and thumbnails are
+    // resolved here instead — a large vault costs the first screen nothing.
+    // Mirrors the background hydration reloadTakes runs on a project switch,
+    // and defers to it: a switch bumps the generation and this drops out.
+    const generation = reloadTakesGenerationRef.current
+    const priorityIds = [bootSnapshot.benchmarkId, bootSnapshot.challengerId].filter(
+      (id): id is string => Boolean(id),
+    )
+    let cancelled = false
+
+    const cancelIdle = scheduleIdle(() => {
+      if (cancelled || generation !== reloadTakesGenerationRef.current) return
+
+      void hydrateVaultTakeRowsProgressive(rows, {
+        priorityIds,
+        onBatch: (partial) => {
+          if (cancelled || generation !== reloadTakesGenerationRef.current) return
+          setTakes((current) => mergeHydratedTakes(current, partial))
+        },
+      }).then((loaded) => {
+        if (cancelled || generation !== reloadTakesGenerationRef.current) return
+        setTakes((current) => mergeHydratedTakes(current, loaded))
+        void hydrateTakeThumbnailsInBackground(loaded, applyTakeThumbnails)
+      })
+    }, 500)
+
+    return () => {
+      cancelled = true
+      cancelIdle()
+    }
+  }, [
+    applyTakeThumbnails,
+    bootSnapshot.takeRows,
+    bootSnapshot.benchmarkId,
+    bootSnapshot.challengerId,
+  ])
 
   const handleSelectProject = useCallback(
     async (projectId: string) => {
@@ -3245,6 +3295,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       showTakeCardsRef.current = desk.showTakeCards
       if (desk.autoSoundRecording !== autoSoundRecordingEnabledRef.current) {
         handleAutoSoundRecordingChange(desk.autoSoundRecording)
+      } else if (desk.autoSoundRecording) {
+        // Same value, but not the same monitor. Opening a routine item runs
+        // inside a practice transition, which holds monitoringAllowed false and
+        // tears the listener down; with the flag already on, nothing used to
+        // build it back and hands-free sat on "Your turn" without hearing the
+        // room. A desk hand-off is the restart case `force` exists for.
+        void warmAutoRecording().finally(() => {
+          if (autoSoundRecordingEnabledRef.current) {
+            restartHandsFreeMonitorRef.current({ force: true })
+          }
+        })
       }
       const metronome = normalizeDeskMetronome(desk.metronome)
       sharedMetronomeEngine.setMeter(metronome.meter)
@@ -3266,7 +3327,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         handleRecordingModeChangeRef.current(desk.mode)
       }
     },
-    [handleAutoSoundRecordingChange, updateSettings],
+    [handleAutoSoundRecordingChange, updateSettings, warmAutoRecording],
   )
 
   /* ---- Share from the card ----------------------------------------------
@@ -6217,6 +6278,20 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       }
                     }}
                     active={musicRoomActive}
+                    takesSlot={
+                      <TunerTakePillRow
+                        compact
+                        ariaLabel="Takes"
+                        benchmarkTake={benchmarkTake}
+                        libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                        challengerTake={challengerTake}
+                        onExpandBenchmark={handleExpandBenchmark}
+                        onExpandChallenger={handleExpandChallenger}
+                        onPinCurrentAsBest={handlePinCurrentAsBest}
+                        onClearBenchmark={handleClearAudioBenchmark}
+                        onClearChallenger={handleClearAudioChallenger}
+                      />
+                    }
                     boundaryRef={appShellRef}
                     collapseResetKey={routineActiveStep?.id}
                     onClose={handleCloseMusic}

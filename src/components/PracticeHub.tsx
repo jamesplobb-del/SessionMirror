@@ -108,6 +108,30 @@ interface PracticeHubProps {
 
 type HubPage = 'home' | 'routine' | 'instrument' | 'today'
 
+const HUB_PAGE_STORAGE_KEY = 'SessionMirror.practiceHubPage'
+
+/**
+ * Only the two pages a practitioner moves between deliberately. The builder is
+ * opened by a request and the instrument picker is a one-off errand, so neither
+ * should be what the hub reopens on.
+ */
+function loadHubPage(): HubPage {
+  try {
+    return localStorage.getItem(HUB_PAGE_STORAGE_KEY) === 'today' ? 'today' : 'home'
+  } catch {
+    return 'home'
+  }
+}
+
+function saveHubPage(page: HubPage): void {
+  if (page !== 'home' && page !== 'today') return
+  try {
+    localStorage.setItem(HUB_PAGE_STORAGE_KEY, page)
+  } catch {
+    /* private mode or full storage: the hub simply opens on home next time */
+  }
+}
+
 export default function PracticeHub({
   isOpen,
   projects,
@@ -142,16 +166,17 @@ export default function PracticeHub({
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const reducedMotion = useReducedMotion()
-  const [page, setPage] = useState<HubPage>('home')
+  const [page, setPage] = useState<HubPage>(loadHubPage)
   const pageRef = useRef<HubPage>(page)
   pageRef.current = page
+  useEffect(() => { saveHubPage(page) }, [page])
   const [launchError, setLaunchError] = useState('')
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
-    setPage(routineBuilderRequest ? 'routine' : 'home')
+    setPage(routineBuilderRequest ? 'routine' : loadHubPage())
     setLaunchError('')
     setMetronomePrefs(loadMetronomePrefs())
   }, [isOpen])
