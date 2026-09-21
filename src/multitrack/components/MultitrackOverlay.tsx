@@ -1705,7 +1705,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         ref={sheetMusicInputRef}
         type="file"
         accept={sheetMusicAcceptAttribute()}
-        className="hidden"
+        className="sr-only"
+        aria-label="Import multitrack photo or PDF"
+        tabIndex={-1}
         onChange={(event) => {
           const file = event.target.files?.[0]
           const atSec = pendingImageAtSecRef.current
@@ -1739,18 +1741,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         }}
       />
 
-      {layoutSheetAsset ? (
         <AnimatedBottomSheet
           isOpen={activeSourceSheet === 'visual' && isOpen}
           onClose={() => setActiveSourceSheet(null)}
-          ariaLabel="Image and sheet layout"
+          ariaLabel={layoutSheetAsset ? "Image and sheet layout" : "Music, photo or PDF"}
           elevated
           elevatedLight
           transparentBackdrop
           zClass={MULTITRACK_SHEET_Z}
           maxHeightClass="max-h-[60vh]"
         >
-          <div className="multitrack-sheet multitrack-visual-editor">
+          {layoutSheetAsset ? <div className="multitrack-sheet multitrack-visual-editor">
             <div className="multitrack-visual-editor__heading">
               <div>
                 <p className="multitrack-sheet__title">Image &amp; sheet layout</p>
@@ -1941,15 +1942,24 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               <Pressable
                 type="button"
                 intensity="soft"
-                onClick={() => sheetMusicInputRef.current?.click()}
+                onClick={() => { pendingImageAtSecRef.current = null; sheetMusicInputRef.current?.click() }}
               >
                 <FileMusic className="h-4 w-4" />
                 Replace file
               </Pressable>
             </div>
-          </div>
+          </div> : <div className="multitrack-sheet multitrack-visual-editor">
+            <div className="multitrack-visual-editor__heading"><div>
+              <h2 className="multitrack-sheet__title">Music, photo or PDF</h2>
+              <p>Add sheet music or an image to your composition.</p>
+            </div><button type="button" onClick={() => setActiveSourceSheet(null)}>Done</button></div>
+            <div className="multitrack-quiet-option-list">
+              <button type="button" onClick={() => { pendingImageAtSecRef.current = null; sheetMusicInputRef.current?.click() }}>
+                <FileMusic /><span><strong>Choose a photo or PDF</strong><small>Open your photos or files</small></span><ChevronRight />
+              </button>
+            </div>
+          </div>}
         </AnimatedBottomSheet>
-      ) : null}
 
       {/* Tile action sheet: "What do you want here?" */}
       <AnimatedBottomSheet
@@ -1998,6 +2008,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 intensity="soft"
                 className="multitrack-sheet__more"
                 onClick={() => {
+                  pendingImageAtSecRef.current = null
                   sheetMusicInputRef.current?.click()
                   setTileSheetPanelId(null)
                 }}
@@ -2068,15 +2079,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       </AnimatedBottomSheet>
 
 
-      <AnimatedBottomSheet isOpen={activeSourceSheet === 'tools' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Workspace tools" elevated elevatedLight zClass={{ backdrop: 'z-[155]', sheet: 'z-[160]' }} maxHeightClass="max-h-[80vh]">
+      <AnimatedBottomSheet isOpen={activeSourceSheet === 'tools' && isOpen} onClose={() => setActiveSourceSheet(current => current === 'tools' ? null : current)} ariaLabel="Workspace tools" elevated elevatedLight zClass={{ backdrop: 'z-[155]', sheet: 'z-[160]' }} maxHeightClass="max-h-[80vh]">
         <div className="multitrack-sheet multitrack-quiet-tools-sheet"><header className="multitrack-tools-sheet-header"><h2>Workspace tools</h2><button onClick={() => setActiveSourceSheet(null)}>Done</button></header><p>Choose the widgets you want to keep open.</p>
           <h3>Practice</h3><div className="multitrack-quiet-option-list">
             <button aria-pressed={session.practice.showPitch} onClick={() => { handlePracticeChange({ showPitch: !session.practice.showPitch, practiceOverlayEnabled: true }) }}><Activity /><span><strong>Tuner</strong><small>Live pitch in your workspace</small></span><small>{session.practice.showPitch ? 'Remove' : 'Pin'}</small></button>
             <button aria-pressed={session.practice.showMetronome} onClick={() => { handlePracticeChange({ showMetronome: !session.practice.showMetronome, practiceOverlayEnabled: true }) }}><Timer /><span><strong>Click & tempo</strong><small>{session.practice.bpm} BPM · {session.practice.meter ?? '4/4'}</small></span><small>{session.practice.showMetronome ? 'Remove' : 'Pin'}</small></button>
           </div>
           <h3>Media</h3><div className="multitrack-quiet-option-list">
-            <button disabled={!!activePanel} onClick={() => setActiveSourceSheet('backing')}><Music4 /><span><strong>Backing track</strong><small>{backingChipLabel}</small></span><ChevronRight /></button>
-            <button disabled={!!activePanel} onClick={() => { if (layoutSheetAsset) setActiveSourceSheet('visual'); else { setActiveSourceSheet(null); sheetMusicInputRef.current?.click() } }}><FileMusic /><span><strong>Music / photo / PDF</strong><small>{layoutSheetAsset?.fileName || 'Add a visual to your composition'}</small></span><ChevronRight /></button>
+            <button disabled={isRestoring || isExporting || isRecording || isStopping || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('backing') }}><Music4 /><span><strong>Backing track</strong><small>{backingChipLabel}</small></span><ChevronRight /></button>
+            <button disabled={isRestoring || isExporting || isRecording || isStopping || recording.phase !== 'idle'} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('visual') }}><FileMusic /><span><strong>Music / photo / PDF</strong><small>{layoutSheetAsset?.fileName || 'Add a visual to your composition'}</small></span><ChevronRight /></button>
           </div>
           <h3>Setup</h3><div className="multitrack-quiet-option-list"><button disabled={isRecording || isStopping || recording.phase !== 'idle'} onClick={() => setActiveSourceSheet('click')}><SlidersHorizontal /><span><strong>Click & count-in</strong><small>Count-in bars, tempo, time, and sound</small></span><ChevronRight /></button></div>
         </div>

@@ -1,9 +1,9 @@
 /* Approved Quiet workspace. Tokens also reach the existing portalled sheets. */
 body:has(.multitrack-quiet-workspace),.multitrack-quiet-workspace {
-  --mt-bg:#f7f9fc;--mt-panel:#fff;--mt-ink:#1d344e;--mt-muted:#738399;--mt-line:#e2e9f2;--mt-soft:#eef3f9;--mt-blue:#1674df;--mt-blue-soft:#eaf3ff;
+  --mt-bg:#fbfdff;--mt-panel:#fff;--mt-ink:#1d344e;--mt-muted:#586e86;--mt-line:#dde9f5;--mt-soft:#f2f8ff;--mt-blue:#0075dc;--mt-blue-soft:#e8f4ff;
 }
 .app-dark-mode body:has(.multitrack-quiet-workspace),.app-dark-mode .multitrack-quiet-workspace {
-  --mt-bg:#142235;--mt-panel:#1b2b41;--mt-ink:#e5eefb;--mt-muted:#9caec4;--mt-line:#2b3d54;--mt-soft:#203149;--mt-blue:#69b5ff;--mt-blue-soft:#203f60;
+  --mt-bg:#1b2e43;--mt-panel:#263e57;--mt-ink:#f0f7ff;--mt-muted:#bbcede;--mt-line:#44617e;--mt-soft:#2b4662;--mt-blue:#8ed2ff;--mt-blue-soft:#315878;
 }
 .multitrack-overlay.multitrack-quiet-workspace{background:var(--mt-bg);color:var(--mt-ink);padding:0;isolation:isolate}
 .multitrack-quiet-workspace .multitrack-overlay__header{background:var(--mt-bg);border:0;padding:max(.75rem,env(safe-area-inset-top)) 1rem .75rem;min-height:76px;gap:10px;box-shadow:none}

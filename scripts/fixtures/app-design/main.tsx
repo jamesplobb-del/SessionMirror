@@ -30,6 +30,7 @@ import '../../../src/components/practice-chart.css'
 import { DEFAULT_APP_SETTINGS } from '../../../src/utils/appSettings'
 import { pickHudQuickSettings } from '../../../src/utils/hudQuickSettings'
 import { drawSilkTuner } from '../../../src/utils/reactiveSilkTuner'
+import { drawTraceOption, type TraceOption } from '../tuner-line-options/renderers'
 import { appendTunerTrace, createTunerTrace, tunerTracePoints } from '../../../src/utils/tunerTrace'
 import { appendTunerHistory } from '../../../src/utils/tunerHistory'
 import type { TunerHistorySample } from '../../../src/utils/tunerHistory'
@@ -168,9 +169,13 @@ function TunerPreview({widget=false}:{widget?:boolean}){
       if(c.width!==Math.round(w*dpr)||c.height!==Math.round(h*dpr)){c.width=Math.round(w*dpr);c.height=Math.round(h*dpr)}
       const ctx=c.getContext('2d');if(!ctx)return
       ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h)
-      const color=drawSilkTuner(ctx,w,h,tunerTracePoints(trace.current.samples,now,w,h),true,dark,!originalElectric && !widget)
+      const study=params.get('traceStudy')
+      const points=tunerTracePoints(trace.current.samples,now,w,h)
+      const color=study && ['clean','beads','focus'].includes(study) && !widget
+        ? drawTraceOption(ctx,w,h,points,dark,study as TraceOption)
+        : drawSilkTuner(ctx,w,h,points,true,dark,!originalElectric && !widget)
       const overlay=c.closest<HTMLElement>('.app-ui-overlay--audio-practice-tuner')
-      if(overlay && now-lastWash>=100){overlay.style.setProperty('--silk-wash',color);lastWash=now}
+      if(overlay && now-lastWash>=100){overlay.style.setProperty('--silk-wash',color);overlay.style.setProperty('--silk-live',color);lastWash=now}
       if(soak){frames++;if(now-lastReport>=1000){
         const heap=(performance as Performance & {memory?:{usedJSHeapSize:number}}).memory?.usedJSHeapSize
         report.textContent=JSON.stringify({elapsedSeconds:Math.round((now-started)/1000),frames,traceSamples:trace.current.samples.length,historySamples:history.current.length,canvas:[c.width,c.height],heapMiB:heap?Math.round(heap/1048576):null})

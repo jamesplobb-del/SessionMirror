@@ -12,6 +12,19 @@ export function silkPitchColor(cents: number): string {
   const blend = t * t * (3 - 2 * t)
   return '#' + from.map((value, i) => Math.round(value + (to[i] - value) * blend).toString(16).padStart(2, '0')).join('')
 }
+/** Approved Flow palette, shared by the pitch line and full-screen tint. */
+export function silkFlowColor(cents: number, dark = false): string {
+  const green = dark ? [89, 231, 181] : [3, 156, 112]
+  const amber = dark ? [255, 210, 115] : [223, 149, 28]
+  const red = dark ? [255, 139, 158] : [239, 92, 120]
+  const distance = Math.abs(cents)
+  const lower = distance < 10
+  const from = lower ? green : amber, to = lower ? amber : red
+  const t = Math.max(0, Math.min(1, (distance - (lower ? 3 : 12)) / (lower ? 7 : 10)))
+  const blend = t * t * (3 - 2 * t)
+  return '#' + from.map((value, i) => Math.round(value + (to[i] - value) * blend).toString(16).padStart(2, '0')).join('')
+}
+
 export function silkTunerGeometry(width: number, height: number) {
   const center = height * .51, range = height * .19
   const centsToY = (cents: number) => center - Math.max(-40, Math.min(40, cents)) / 30 * range
@@ -53,6 +66,7 @@ function silkGradient(
   startAlpha: number,
   endAlpha: number,
   contrast = false,
+  flowDark?: boolean,
 ) {
   const firstX = run[0].point.x
   const lastX = Math.max(firstX + 1, run[run.length - 1].point.x)
@@ -65,17 +79,30 @@ function silkGradient(
     const age = totalPoints <= 1 ? 1 : entry.index / (totalPoints - 1)
     gradient.addColorStop(
       Math.max(0, Math.min(1, (entry.point.x - firstX) / (lastX - firstX))),
-      colorWithAlpha(silkPitchColor(entry.point.cents), startAlpha + (endAlpha - startAlpha) * age, contrast),
+      colorWithAlpha(flowDark == null ? silkPitchColor(entry.point.cents) : silkFlowColor(entry.point.cents, flowDark), startAlpha + (endAlpha - startAlpha) * age, contrast),
     )
   }
   const last = run[run.length - 1]
   const lastAge = totalPoints <= 1 ? 1 : last.index / (totalPoints - 1)
-  gradient.addColorStop(1, colorWithAlpha(silkPitchColor(last.point.cents), startAlpha + (endAlpha - startAlpha) * lastAge, contrast))
+  gradient.addColorStop(1, colorWithAlpha(flowDark == null ? silkPitchColor(last.point.cents) : silkFlowColor(last.point.cents, flowDark), startAlpha + (endAlpha - startAlpha) * lastAge, contrast))
   return gradient
 }
 
 function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], totalPoints: number, air = false, dark = false) {
   if (run.length < 2) return
+  if (air) {
+    // The approved Clean line: constant width and opacity, centered on the
+    // measured trace. Keep timing, pitch values, and real silence gaps intact.
+    ctx.strokeStyle = silkGradient(ctx, run, totalPoints, .92, .92, false, dark)
+    ctx.lineWidth = 6
+    ctx.beginPath()
+    ctx.moveTo(run[0].point.x, run[0].point.y)
+    for (let index = 1; index < run.length; index += 1) {
+      ctx.lineTo(run[index].point.x, run[index].point.y)
+    }
+    ctx.stroke()
+    return
+  }
   if (!air) {
   ctx.fillStyle = silkGradient(ctx, run, totalPoints, .02, .13)
   ctx.beginPath()
@@ -108,22 +135,17 @@ export function drawSilkTuner(
   const g = silkTunerGeometry(width, height)
   ctx.save()
   ctx.fillStyle = air ? '#20ed7817' : '#20ed782e'
-  ctx.fillRect(air ? 48 : 10, g.centsToY(5), width - (air ? 58 : 20), g.bandBottom - g.centsToY(5))
+  ctx.fillRect(air ? 14 : 10, g.centsToY(5), width - (air ? 28 : 20), g.bandBottom - g.centsToY(5))
   ctx.strokeStyle = '#00d85a59'; ctx.lineWidth = 1
   for (const y of air ? [] : [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
   ctx.strokeStyle = dark ? '#adcfcf44' : '#567b8333'
-  ctx.beginPath();ctx.moveTo(air ? 48 : 14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
+  ctx.beginPath();ctx.moveTo(14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
   // No Sharp / Flat / TARGET captions. The green band already says where in
   // tune is, and up/down needs no caption once the trace is moving. Geometry
   // keeps targetY and flatY: they still reserve the space the labels used to
   // occupy, so the trace and its endpoint dot stay clear of the bottom edge.
   if (air) {
-    ctx.font = '500 9px -apple-system, system-ui, sans-serif'
-    ctx.fillStyle = dark ? '#c0d1d6' : '#405c66'
-    ctx.fillText('SHARP', 8, g.centsToY(30))
-    ctx.fillText('TARGET', 8, g.center + 3)
-    ctx.fillText('FLAT', 8, g.centsToY(-30))
-    ctx.save(); ctx.beginPath(); ctx.rect(48, 0, Math.max(0,width-48), height); ctx.clip()
+    ctx.save(); ctx.beginPath(); ctx.rect(8, 0, Math.max(0,width-8), height); ctx.clip()
   }
   ctx.lineCap='round';ctx.lineJoin='round'
   let run: IndexedSilkPoint[] = []
@@ -157,15 +179,15 @@ export function drawSilkTuner(
   }
   drawSilkRun(ctx, run, points.length, air, dark)
   const last=points.at(-1)
-  const color=active&&last&&!isSilenceFloorSample(last.cents)?silkPitchColor(last.cents):'transparent'
+  const color=active&&last&&!isSilenceFloorSample(last.cents)?(air ? silkFlowColor(last.cents, dark) : silkPitchColor(last.cents)):'transparent'
   if(color!=='transparent'&&last) {
     if (!air) {
     const halo=ctx.createRadialGradient(last.x,last.y,0,last.x,last.y,33)
     halo.addColorStop(0,color+'b3');halo.addColorStop(.38,color+'57');halo.addColorStop(1,color+'00')
     ctx.fillStyle=halo;ctx.beginPath();ctx.arc(last.x,last.y,33,0,Math.PI*2);ctx.fill()
     }
-    ctx.fillStyle=air && !dark ? colorWithAlpha(color,1,true) : color;ctx.beginPath();ctx.arc(last.x,last.y,air ? 4.5 : 8,0,Math.PI*2);ctx.fill()
-    ctx.strokeStyle='#ffffffd9';ctx.lineWidth=1.7;ctx.stroke()
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(last.x,last.y,air ? 6 : 8,0,Math.PI*2);ctx.fill()
+    if (!air) {ctx.strokeStyle='#ffffffd9';ctx.lineWidth=1.7;ctx.stroke()}
     if (!air) {ctx.fillStyle='white';ctx.beginPath();ctx.arc(last.x,last.y,2.4,0,Math.PI*2);ctx.fill()}
   }
   if (air) ctx.restore()

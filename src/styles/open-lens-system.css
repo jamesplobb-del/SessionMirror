@@ -2,19 +2,19 @@
    Every selector is opt-in; review and app will use this same file, not a recreation.
    No pitch, audio, recording, or timing logic lives here. */
 html#lens-design-system.lens-system {
-  --ls-bg:#ffffff; --ls-panel:#ffffff; --ls-soft:#f2f8ff; --ls-ink:#142b43;
-  --ls-muted:#49647d; --ls-blue:#007ee5; --ls-line:#d8e6f2; --ls-radius:22px;
+  --ls-bg:#ffffff; --ls-panel:#ffffff; --ls-soft:#f5faff; --ls-ink:#142b43;
+  --ls-muted:#49647d; --ls-blue:#0075dc; --ls-line:#d8e6f2; --ls-radius:22px;
   --ls-shadow:0 4px 18px #24577b05; --ls-glass:#fffffff5;
   --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line);
   --guide-panel:var(--ls-panel); color-scheme:light;
 }
 html#lens-design-system.lens-system.app-dark-mode {
-  --ls-bg:#101e2c; --ls-panel:#1b2d3e; --ls-soft:#21394d; --ls-ink:#edf5fc;
-  --ls-muted:#9fb4c8; --ls-blue:#83cdf8; --ls-line:#34516a; --ls-glass:#192c3de8;
+  --ls-bg:#182b3e; --ls-panel:#243c52; --ls-soft:#2b4861; --ls-ink:#edf5fc;
+  --ls-muted:#b8cddd; --ls-blue:#8dd6ff; --ls-line:#45627a; --ls-glass:#243c52f5;
   --ls-shadow:0 8px 24px #030c141a; color-scheme:dark;
 }
-html#lens-design-system.lens-system[data-lens-finish='studio'] { --ls-bg:#ecf1f7; --ls-panel:#fafcfe; --ls-blue:#0769c6; --ls-line:#becedf; --ls-radius:16px; --ls-shadow:none; }
-html#lens-design-system.lens-system.app-dark-mode[data-lens-finish='studio'] { --ls-bg:#121c29; --ls-panel:#1e2c3f; --ls-blue:#7bb8ff; --ls-line:#3e526d; }
+html#lens-design-system.lens-system[data-lens-finish='studio'] { --ls-bg:#f6faff; --ls-panel:#ffffff; --ls-blue:#0075dc; --ls-line:#d4e3f1; --ls-radius:16px; --ls-shadow:none; }
+html#lens-design-system.lens-system.app-dark-mode[data-lens-finish='studio'] { --ls-bg:#1a2b3f; --ls-panel:#293e56; --ls-blue:#93caff; --ls-line:#4b6480; }
 html#lens-design-system.lens-system body { color:var(--ls-ink); background:var(--ls-bg); font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif; }
 html#lens-design-system.lens-system button:focus-visible { outline:2px solid var(--ls-blue); outline-offset:3px; }
 html#lens-design-system.lens-system .open-lens-recording { --lens-bg:var(--ls-bg); --lens-panel:var(--ls-panel); --lens-ink:var(--ls-ink); --lens-muted:var(--ls-muted); --lens-line:var(--ls-line); --lens-blue:var(--ls-blue); }
@@ -36,7 +36,7 @@ html#lens-design-system.lens-system .open-lens-dock-action span { color:var(--ls
 html#lens-design-system.lens-system .open-lens-dock-action svg { stroke-width:1.6; width:24px; height:24px; }
 html#lens-design-system.lens-system .record-carousel-slot--active { box-shadow:none!important; }
 html#lens-design-system.lens-system .open-lens-dock .record-carousel-slot--active { background:var(--ls-panel)!important; border:1.5px solid var(--ls-line)!important; box-shadow:0 0 0 4px color-mix(in srgb,var(--ls-panel) 55%,transparent)!important; }
-html#lens-design-system.lens-system .open-lens-record-dot { background:#e95964; width:43px; height:43px; }
+html#lens-design-system.lens-system .open-lens-record-dot { background:#f04460; width:43px; height:43px; }
 html#lens-design-system.lens-system .open-lens-record-dot.is-recording { width:24px; height:24px; }
 
 /* Home retains the original arrangement and sizing, with the proposed finish. */
@@ -67,7 +67,7 @@ html#lens-design-system .daily-challenges { background:transparent!important; bo
 html#lens-design-system .daily-challenges__disclosure strong { color:var(--ls-ink); }
 html#lens-design-system .daily-challenges__disclosure small { color:var(--ls-muted); }
 html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-focus-tools { grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
-html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:color-mix(in srgb,var(--home-tool-color,var(--ls-blue)) 7%,var(--ls-panel))!important; border:0!important; box-shadow:none!important; color:var(--ls-ink); }
+html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:color-mix(in srgb,var(--home-tool-color,var(--ls-blue)) 11%,var(--ls-panel))!important; border:0!important; box-shadow:none!important; color:var(--ls-ink); }
 html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:var(--home-tool-color,var(--ls-blue))!important; stroke-width:1.6; }
 @media(max-height:760px){
   html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .practice-menu-header { min-height:64px; padding:10px 16px 8px; }
@@ -129,7 +129,7 @@ html#lens-design-system.lens-system .metronome-live-stage__glow { display:none; 
 html#lens-design-system.lens-system .metronome-columns { gap:12px; }
 html#lens-design-system.lens-system .metronome-columns__column { background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; border-radius:14px; box-shadow:none!important; }
 html#lens-design-system.lens-system .metronome-columns__column i { background:var(--ls-blue)!important; opacity:.25; }
-html#lens-design-system.lens-system .metronome-columns__column--downbeat i { background:#dfb45b!important; }
+html#lens-design-system.lens-system .metronome-columns__column--downbeat i { background:#f3c653!important; }
 html#lens-design-system.lens-system .metronome-columns__column--active i { opacity:1; }
 html#lens-design-system.lens-system .audio-practice-metronome__bottom-dock { gap:14px; background:transparent!important; }
 html#lens-design-system.lens-system .audio-practice-metronome__selectors { padding:12px 8px!important; background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:var(--ls-radius)!important; box-shadow:var(--ls-shadow)!important; }
@@ -195,7 +195,7 @@ html#lens-design-system .audio-practice-top-tabs { display:grid!important; grid-
 html#lens-design-system .audio-practice-top-tabs::after { width:calc((100% - 10px) / 3)!important; }
 
 /* Take identity stays gold / blue in every finish, including optional finishes. */
-html#lens-design-system { --take-best:#b97b0c; --take-best-soft:#f5d283; --take-current:#087bce; --take-current-soft:#8fd3ff; }
+html#lens-design-system { --take-best:#a96900; --take-best-soft:#ffe3a0; --take-current:#0075dc; --take-current-soft:#a1e1ff; }
 html#lens-design-system.app-dark-mode { --take-best:#efc361; --take-best-soft:#a9843d; --take-current:#7dcbff; --take-current-soft:#4d91b9; }
 html#lens-design-system .audio-mode-take-card--best { --take-accent:var(--take-best); --take-accent-soft:var(--take-best-soft); border-color:color-mix(in srgb,var(--take-best) 33%,var(--ls-line))!important; }
 html#lens-design-system .audio-mode-take-card--current { --take-accent:var(--take-current); --take-accent-soft:var(--take-current-soft); border-color:color-mix(in srgb,var(--take-current) 33%,var(--ls-line))!important; }
@@ -314,14 +314,14 @@ html#lens-design-system .lens-camera .open-lens-dock .record-carousel-slot--acti
 html#lens-design-system .lens-camera .open-lens-dock .record-carousel-slot--active::after { content:none!important; }
 
 /* Small individual color cues on Home, with quiet card surfaces. */
-html#lens-design-system .practice-menu-shortcut:nth-child(1) { --home-tool-color:#8853cc; }
-html#lens-design-system .practice-menu-shortcut:nth-child(2) { --home-tool-color:#b7780e; }
-html#lens-design-system .practice-menu-shortcut:nth-child(3) { --home-tool-color:#008d79; }
-html#lens-design-system .practice-menu-shortcut:nth-child(4) { --home-tool-color:#087bce; }
-html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(1) { --home-tool-color:#bd9dea; }
-html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(2) { --home-tool-color:#e9bb70; }
-html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(3) { --home-tool-color:#70cebb; }
-html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(4) { --home-tool-color:#84c5ea; }
+html#lens-design-system .practice-menu-shortcut:nth-child(1) { --home-tool-color:#9255e8; }
+html#lens-design-system .practice-menu-shortcut:nth-child(2) { --home-tool-color:#a96900; }
+html#lens-design-system .practice-menu-shortcut:nth-child(3) { --home-tool-color:#008975; }
+html#lens-design-system .practice-menu-shortcut:nth-child(4) { --home-tool-color:#0075dc; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(1) { --home-tool-color:#d0afff; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(2) { --home-tool-color:#ffda85; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(3) { --home-tool-color:#88ead1; }
+html#lens-design-system.app-dark-mode .practice-menu-shortcut:nth-child(4) { --home-tool-color:#91d8ff; }
 
 /* Separate floating tools from full-screen recording views. */
 html#lens-design-system .settings-branch-tray__section-heading { grid-column:1 / -1; margin:9px 0 0; padding:0 2px; color:var(--ls-muted); font-size:11px; line-height:1.4; font-weight:600; text-align:left; letter-spacing:.3px; }
@@ -650,21 +650,31 @@ html#lens-design-system .practice-timeline__hero-sub { color:var(--ls-muted); }
 html#lens-design-system .practice-timeline__hero-name svg { color:var(--ls-blue); }
 html#lens-design-system .practice-timeline__section-count { color:var(--ls-blue); background:var(--ls-soft); }
 html#lens-design-system .practice-timeline__hero-rename { color:var(--ls-ink); background:var(--ls-soft); border-color:var(--ls-line); }
-/* Original Air tuner. --silk-wash remains non-inheriting: the registered
+/* Approved Clean line. --silk-wash remains non-inheriting: the registered
    property is consumed ONLY on the overlay, never on its descendants. */
 html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
-  background:color-mix(in srgb,var(--silk-wash) 27%,var(--ls-bg))!important;
+  /* Keep the base opaque even when the pitch wash fades to transparent. */
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 32%,transparent),color-mix(in srgb,var(--silk-wash) 32%,transparent)),var(--ls-bg)!important;
 }
 html#lens-design-system.lens-system.app-dark-mode .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
-  background:color-mix(in srgb,var(--silk-wash) 16%,var(--ls-bg))!important;
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 32%,transparent),color-mix(in srgb,var(--silk-wash) 32%,transparent)),var(--ls-bg)!important;
 }
 html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout { top:20px!important; display:flex; flex-direction:column; align-items:center; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note,
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note span {
-  font-family:-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important; font-size:72px; font-weight:500!important; letter-spacing:-3px!important; line-height:1.1; text-shadow:none!important;
+  font-family:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif!important; font-size:82px; font-weight:650!important; letter-spacing:-2.5px!important; line-height:1.1; text-shadow:none!important;
 }
-html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note small { font-size:30px; color:var(--ls-ink)!important; }
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note small { font-size:26px; font-weight:500!important; letter-spacing:-.5px!important; color:var(--ls-ink)!important; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__coach { order:-1; margin:0 0 14px; padding:0; border:0!important; background:transparent!important; font-size:11px; line-height:1.5; color:var(--ls-muted)!important; }
 html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail { margin-top:6px; font-size:11px; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button,
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button svg { color:var(--ls-ink)!important; }
+
+/* Silk's controls use the same color family as its ribbon and screen. The
+   animated --silk-wash stays on the overlay; --silk-live is not animated. */
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs { background:color-mix(in srgb,var(--ls-bg) 68%,transparent)!important; }
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs::after { background:color-mix(in srgb,var(--silk-live) 28%,var(--ls-panel))!important; }
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active,
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active svg,
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail strong,
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .open-lens-dock-action { color:var(--ls-ink)!important; }
