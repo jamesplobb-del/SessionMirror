@@ -48,3 +48,11 @@ html:not(.lens-system) .lens-dock-container { min-height:88px; }
 .lens-widget-layer { position:absolute; inset:0; z-index:25; pointer-events:none; }
 .lens-widget-layer[hidden] { display:none; }
 .lens-widget-layer .reference-widget-live { pointer-events:auto; }
+
+/* Match production's non-intercepting HUD above the music paper. */
+.lens-screen.app-shell--music-page .lens-content.app-ui-overlay { pointer-events:none!important; }
+.lens-screen.app-shell--music-page .lens-dock-container { pointer-events:auto; }
+
+.reference-expanded-preview { position:absolute; inset:0 0 120px; z-index:60; display:flex; flex-direction:column; min-height:0; background:var(--ls-bg); pointer-events:auto; }
+.reference-expanded-preview>.split-compare-layout { flex:1; min-height:0; }
+.reference-expanded-back { align-self:flex-start; min-height:44px; padding:8px 16px; color:var(--ls-blue); }

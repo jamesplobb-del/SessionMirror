@@ -58,9 +58,27 @@ try {
   appendTunerTrace(dropout,50,12)
   assert.ok(dropout.samples.every(p=>p.cents!==silence),'brief dropout must not blink the line or dot')
   appendTunerTrace(dropout,140,silence)
+  assert.notEqual(dropout.samples.at(-1).cents,silence,'a 90ms detector dropout must not fragment a held note')
+  appendTunerTrace(dropout,201,silence)
   assert.equal(dropout.samples.at(-1).cents,silence,'real silence must remain a break')
   appendTunerTrace(dropout,1000,20)
   assert.equal(dropout.samples.at(-2).cents,silence,'background interruption is a gap')
+  for (const fps of [30,60,120]) {
+    const stream = createTunerTrace()
+    for (let t=0;t<1800;t+=1000/fps) {
+      // Repeated 100ms clarity dropouts inside a sustained tone.
+      appendTunerTrace(stream,t,t % 300 < 180 ? 10 : silence)
+    }
+    assert.ok(stream.samples.every(p=>p.cents!==silence),`${fps}Hz sustained tone stays continuous through brief dropouts`)
+    const lastVoicedAt = stream.lastVoicedAt
+    for(let t=1800;t<2200;t+=1000/fps) appendTunerTrace(stream,t,silence)
+    assert.equal(stream.lastVoicedAt,lastVoicedAt,'held frames cannot restart the grace period')
+    assert.equal(stream.samples.at(-1).cents,silence,'sustained silence still creates a gap')
+  }
+  const hitch = createTunerTrace()
+  appendTunerTrace(hitch,0,10)
+  appendTunerTrace(hitch,180,11)
+  assert.equal(hitch.samples.length,2,'a short rendering hitch must not insert false silence')
   const long=createTunerTrace()
   for(let t=0;t<180000;t+=1000/120) appendTunerTrace(long,t,5)
   assert.ok(long.samples.length<15000,'two minute history stays bounded')

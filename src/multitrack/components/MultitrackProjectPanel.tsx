@@ -49,7 +49,7 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
         {!p.take && <button onClick={() => onRecord(p.id, time)}>Record here</button>}
       </div>
       <details className="multitrack-advanced"><summary>Advanced composition</summary>
-        <button aria-pressed={!!p.overlay} disabled={!!p.overlay && session.panels.filter(p => p.kind === 'performance' && !p.overlay).length >= 12} onClick={() => onPanel(p.id, { overlay: p.overlay ? undefined : { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } })}>{p.overlay ? 'Move into main layout' : 'Make an extra box'}</button>
+        <button aria-pressed={!!p.overlay} disabled={p.overlay ? session.panels.filter(p => p.kind === 'performance' && !p.overlay).length >= 12 : session.panels.filter(p => p.kind === 'performance' && p.overlay).length >= 4} onClick={() => onPanel(p.id, { overlay: p.overlay ? undefined : { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } })}>{p.overlay ? 'Move into main layout' : 'Make an extra box'}</button>
       {p.overlay && <>
         <div className="multitrack-studio-actions">{['Top left', 'Top right', 'Bottom left', 'Bottom right'].map((label, n) => <button key={label} onClick={() => onPanel(p.id, { overlay: { ...p.overlay!, xPercent: n % 2 ? Math.max(0, 98 - p.overlay!.widthPercent) : Math.min(2, 100 - p.overlay!.widthPercent), yPercent: n >= 2 ? Math.max(0, 98 - p.overlay!.heightPercent) : Math.min(2, 100 - p.overlay!.heightPercent) } })}>{label}</button>)}</div>
 

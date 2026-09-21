@@ -24,7 +24,7 @@ const mocks = {
     export const nativeMetronomeIsPlaying = async () => { const playing = n.statusUnknown ? null : n.playing; if(n.statusGate) await n.statusGate; return playing };
     export const nativeMetronomeSetMuted = async muted => { n.muted = muted };
     export const nativeMetronomePrepare = async () => true;
-    export const nativeMetronomeUpdate = ${noop};
+    export const nativeMetronomeUpdate = async payload => { n.timing = payload };
     export const nativeMetronomeAddPulseListener = ${noop};
     export const nativeMetronomeAddBarListener = ${noop};
     export const nativeMetronomeAddStateListener = async fn => { n.onState = fn };`,
@@ -77,3 +77,21 @@ engine.stop(); await flush()
 await engine.start(); native.playing = false; native.onState({playing:false}); await flush()
 assert.equal(engine.getSnapshot().playing, false, 'Foreground interruptions update controls immediately')
 console.log('PASS: background continuity, no duplicate start on unlock, explicit stop, native interruption, delayed Start and stale foreground response.')
+
+// Exercise the actual shared engine's meter-switch payload sent to iOS.
+await engine.start()
+engine.setMeter('3/4')
+engine.setBpm(120)
+engine.setSubdivision('off')
+engine.setMeter('3/8')
+await flush()
+assert.equal(engine.getSnapshot().bpmSymbol, '♩·')
+assert.equal(engine.getSnapshot().pulseCount, 1)
+assert.equal(engine.getSnapshot().subdivision, '8ths')
+assert.equal(native.timing.pulseTicks, 3)
+assert.equal(native.timing.ticksPerBar, 3)
+assert.equal(native.timing.secondsPerTick, 1 / 6)
+assert.deepEqual(native.timing.tierPattern, ['downbeat', 'subdivision', 'subdivision'])
+engine.stop()
+await flush()
+console.log('PASS: selecting 3/8 at 120 sends iOS one dotted-quarter pulse with three eighths, not three quarter-note clicks.')

@@ -40,15 +40,15 @@ class QuickToolErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <main className="quick-tuner-screen app-ui-overlay--audio-mode flex flex-col items-center justify-center p-6 text-center text-white">
+        <main className="quick-tool-error app-ui-overlay--audio-mode">
           <h2 className="text-lg font-semibold">Quick Tool Unavailable</h2>
-          <p className="mt-2 text-sm text-white/75">
+          <p>
             Tap below to open BestTake.
           </p>
           <button
             type="button"
             onClick={this.props.onExit}
-            className="mt-4 rounded-lg bg-white/15 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-md active:bg-white/25"
+            className="quick-tuner-return"
           >
             Open BestTake
           </button>

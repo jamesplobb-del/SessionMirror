@@ -127,6 +127,7 @@ html#lens-design-system.lens-system .audio-practice-metronome__step-btn { backgr
 html#lens-design-system.lens-system .metronome-live-stage { background:transparent!important; border:0!important; box-shadow:none!important; }
 html#lens-design-system.lens-system .metronome-live-stage__glow { display:none; }
 html#lens-design-system.lens-system .metronome-columns { gap:12px; }
+html#lens-design-system.lens-system .metronome-columns--compact { gap:3px; }
 html#lens-design-system.lens-system .metronome-columns__column { background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; border-radius:14px; box-shadow:none!important; }
 html#lens-design-system.lens-system .metronome-columns__column i { background:var(--ls-blue)!important; opacity:.25; }
 html#lens-design-system.lens-system .metronome-columns__column--downbeat i { background:#f3c653!important; }
@@ -173,7 +174,7 @@ html#lens-design-system .metronome-audio-stage__beats { display:flex; flex:1 1 0
 html#lens-design-system .metronome-live-stage { display:flex; flex-direction:column; height:100%; min-height:0!important; max-height:none!important; flex:1 1 0; }
 html#lens-design-system .metronome-live-stage__canvas { flex:1 1 0; min-height:0; }
 html#lens-design-system .metronome-columns { height:100%; max-height:210px; padding:6px 0 12px; }
-html#lens-design-system .metronome-columns__column { width:40px; }
+html#lens-design-system .metronome-columns__column { width:min(40px,100%); min-width:0; }
 html#lens-design-system .audio-practice-metronome__bottom-dock { padding-top:14px; }
 html#lens-design-system .audio-practice-metronome__play-btn { background:var(--ls-blue)!important; border:0!important; color:var(--ls-panel)!important; width:56px!important; height:56px!important; }
 html#lens-design-system .audio-practice-metronome__tap-btn,html#lens-design-system .audio-practice-metronome__program-btn { min-height:44px; height:44px; font-size:12px; font-weight:500; background:var(--ls-panel)!important; color:var(--ls-blue)!important; border:1px solid var(--ls-line)!important; }
@@ -560,6 +561,25 @@ html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-se
 html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__selection { width:100%; justify-content:center; }
 html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__selection::before { content:none; }
 html#lens-design-system .audio-practice-metronome__selectors .metronome-audio-select__chevron { position:absolute; right:2px; top:50%; transform:translateY(-50%); }
+/* Pulse / Feel use a compact horizontal row, not the primary row's full-width caption. */
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select {
+  padding:4px 8px; gap:8px; min-width:0;
+}
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select__label {
+  width:auto; margin:0; flex:0 0 auto;
+}
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select__field {
+  min-width:0; max-width:100%;
+}
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select__control {
+  min-height:44px; height:auto; padding:6px 16px 6px 4px;
+}
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select__value {
+  white-space:normal; overflow-wrap:anywhere;
+}
+html#lens-design-system .audio-practice-metronome__select-row--secondary .metronome-audio-select__chevron {
+  display:block;
+}
 /* Neutral Multitrack surfaces; blue identifies actions rather than tinting the page. */
 html#lens-design-system:not(.app-dark-mode) body:has(.multitrack-quiet-workspace),
 html#lens-design-system:not(.app-dark-mode) .multitrack-quiet-workspace {
@@ -678,3 +698,115 @@ html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs__btn--active svg,
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail strong,
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .open-lens-dock-action { color:var(--ls-ink)!important; }
+
+
+/* Music shares the recording shell on phone and tablet. Keep the HUD clear
+   so its higher stacking layer never paints over the actual sheet music. */
+html#lens-design-system.lens-system.app-music-page .app-shell--music-page .app-ui-overlay.app-ui-overlay--audio-mode {
+  background:transparent!important; box-shadow:none!important;
+}
+html#lens-design-system .practice-chart-paper { background:var(--ls-bg); color:var(--ls-ink); }
+html#lens-design-system .practice-chart-empty { padding-inline:24px; }
+html#lens-design-system .practice-chart-empty h2 { color:var(--ls-ink); font-weight:600; letter-spacing:-.5px; }
+html#lens-design-system .practice-chart-empty p { color:var(--ls-muted); }
+html#lens-design-system .practice-chart-empty > svg { color:var(--ls-blue); stroke-width:1.5; }
+html#lens-design-system :is(.practice-chart-empty button,.practice-chart-failed button,.practice-chart-control) {
+  min-height:44px; border:1px solid var(--ls-line); background:var(--ls-panel);
+  color:var(--ls-ink); box-shadow:var(--ls-shadow); font-weight:500;
+}
+html#lens-design-system :is(.practice-chart-empty button:first-child,.practice-chart-failed button:first-child) {
+  background:var(--ls-blue); border-color:var(--ls-blue); color:var(--ls-bg);
+}
+html#lens-design-system .practice-chart-topbar { left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); }
+html#lens-design-system .practice-chart-control { background:var(--ls-glass); gap:7px; }
+html#lens-design-system .practice-chart-control svg { stroke-width:1.6; }
+html#lens-design-system .practice-chart-workspace { border:1px solid var(--ls-line); background:var(--ls-soft); border-radius:22px; padding:4px; }
+html#lens-design-system .practice-chart-workspace button { color:var(--ls-muted); border-radius:18px; font-weight:500; }
+html#lens-design-system .practice-chart-workspace button[aria-pressed='true'] { background:var(--ls-panel); color:var(--ls-blue); box-shadow:var(--ls-shadow); }
+html#lens-design-system .practice-chart-rail__record { background:var(--ls-panel); color:#f04460; border:1px solid var(--ls-line); box-shadow:var(--ls-shadow); }
+html#lens-design-system .practice-chart-rail__record[data-recording='true'] { background:#f04460; color:#fff; }
+html#lens-design-system .practice-chart-rail__record[data-hands-free='true'] { border-color:var(--ls-blue); box-shadow:0 0 0 3px color-mix(in srgb,var(--ls-blue) 18%,transparent); }
+html#lens-design-system :is(.practice-chart-rail__status,.practice-chart-rail__elapsed) { background:var(--ls-glass); color:var(--ls-ink); border-color:var(--ls-line); }
+html#lens-design-system .practice-chart-failed { background:var(--ls-glass); color:var(--ls-ink); }
+html#lens-design-system :is(.music-widget__turn button,.music-widget__row,.music-widget__fit,.music-widget__actions button,.music-widget__marker,.music-widget__nib button) {
+  background:var(--widget-control)!important; color:var(--widget-ink)!important; border-color:var(--widget-border)!important; box-shadow:none;
+}
+html#lens-design-system :is(.music-widget__fit button,.music-widget__marker button) { color:var(--widget-muted); min-height:44px; }
+html#lens-design-system :is(.music-widget__fit button,.music-widget__marker button,.music-widget__nib button)[aria-pressed='true'] {
+  background:var(--widget-surface)!important; color:var(--widget-accent)!important; box-shadow:inset 0 0 0 1px var(--widget-border);
+}
+html#lens-design-system .music-widget__row small { color:var(--widget-muted); }
+html#lens-design-system .music-widget__row[aria-pressed='true'] i { background:var(--widget-accent); }
+@media (min-width:768px) {
+  html#lens-design-system .practice-chart-topbar { left:max(24px,env(safe-area-inset-left)); right:max(24px,env(safe-area-inset-right)); }
+  html#lens-design-system .practice-chart-control { padding-inline:16px; }
+  html#lens-design-system .practice-chart-workspace { gap:8px; }
+}
+
+
+/* Reading controls stay compact; marking and file management are deliberate reveals. */
+html#lens-design-system .music-widget { width:min(288px,calc(100vw - 24px)); }
+html#lens-design-system .music-widget__panel { padding:12px; gap:5px; max-height:calc(100dvh - 100px); overflow-y:auto; touch-action:pan-y; }
+html#lens-design-system .music-widget__head { gap:8px; margin-bottom:8px; cursor:grab; touch-action:none; }
+html#lens-design-system .music-widget__file { font-size:13px; font-weight:600; }
+html#lens-design-system .music-widget__close { width:44px; height:44px; flex:0 0 44px; background:transparent!important; }
+html#lens-design-system .music-widget__turn { margin:0 0 12px; gap:12px; }
+html#lens-design-system .music-widget__turn button { min-width:44px; min-height:44px; border-radius:14px; }
+html#lens-design-system .music-widget__turn span { font-size:16px; font-weight:550; font-variant-numeric:tabular-nums; }
+html#lens-design-system .music-widget__sections { display:flex; gap:4px; padding:3px; margin-bottom:10px; border-radius:14px; background:var(--widget-control); }
+html#lens-design-system .music-widget__sections button { flex:1; min-height:38px; border-radius:11px; font-size:12px; color:var(--widget-muted); }
+html#lens-design-system .music-widget__sections button[aria-pressed='true'] { background:var(--widget-surface); color:var(--widget-accent); box-shadow:0 1px 4px #15334a0a; }
+html#lens-design-system .music-widget__row { padding:8px 2px; min-height:48px; background:transparent!important; border-radius:0; }
+html#lens-design-system .music-widget__row span { font-size:12px; font-weight:500; }
+html#lens-design-system .music-widget__fit { margin:8px 0; border-radius:12px; }
+html#lens-design-system .music-widget__fit button { font-size:11px; border-radius:9px; }
+html#lens-design-system .music-widget__marker { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; background:transparent!important; padding:0; }
+html#lens-design-system .music-widget__marker button { justify-content:flex-start; gap:9px; padding:8px 12px; border-radius:12px; background:var(--widget-control); }
+html#lens-design-system .music-widget__more { margin-top:10px; padding-top:8px; border-top:1px solid var(--widget-border); }
+html#lens-design-system .music-widget__more summary { display:flex; justify-content:space-between; align-items:center; min-height:36px; list-style:none; color:var(--widget-muted); font-size:12px; cursor:pointer; }
+html#lens-design-system .music-widget__more summary::-webkit-details-marker { display:none; }
+html#lens-design-system .music-widget__more[open] summary svg { transform:rotate(180deg); }
+html#lens-design-system .music-widget__actions { margin-top:8px; }
+html#lens-design-system .music-widget__actions button { min-height:44px; border-radius:12px; }
+
+/* Routine: a quiet single-row default, with the full step list on demand. */
+html#lens-design-system :is(.routine-bar,.routine-ball) {
+  --sm-gold:var(--ls-blue); --sm-gold-border:var(--ls-line); --sm-gold-soft:var(--ls-soft);
+  color:#f1f8ff; background:#173449eb; border:1px solid #d6edff55; box-shadow:0 6px 20px #102b4515;
+  border-radius:18px;
+}
+html#lens-design-system :is(.routine-bar--audio,.routine-ball--audio) { color:var(--ls-ink); background:var(--ls-glass); border-color:var(--ls-line); }
+html#lens-design-system .routine-bar__head { padding:2px 5px; gap:2px; }
+html#lens-design-system .routine-bar__title { font-size:12px; font-weight:550; }
+html#lens-design-system .routine-bar__clock { font-size:10px; }
+html#lens-design-system .routine-bar__action { min-width:44px; min-height:44px; border:0; border-radius:13px; background:transparent; color:inherit; box-shadow:none; }
+html#lens-design-system .routine-bar__action.is-primary { background:var(--ls-soft); color:var(--ls-blue); border:1px solid var(--ls-line); box-shadow:none; }
+html#lens-design-system .routine-bar__panel { color:var(--ls-ink); background:var(--ls-glass); border:1px solid var(--ls-line); box-shadow:0 8px 26px #1232; border-radius:18px; }
+html#lens-design-system .routine-bar__row:is(.is-current,.is-done) > button { background:var(--ls-soft); border-color:var(--ls-line); }
+html#lens-design-system .routine-bar__row em,html#lens-design-system .routine-bar__row.is-current .routine-bar__marker { color:var(--ls-bg); background:var(--ls-blue); }
+html#lens-design-system .routine-bar__collapse::before { background:var(--ls-panel); border-color:var(--ls-line); box-shadow:0 2px 8px #1231; }
+html#lens-design-system .routine-bar__collapse { color:var(--ls-muted); }
+
+html#lens-design-system .music-widget__panel { gap:8px; }
+html#lens-design-system :is(.music-widget__head,.music-widget__turn,.music-widget__sections,.music-widget__fit) { margin:0; }
+html#lens-design-system .music-widget__row { border:0!important; margin:0; }
+html#lens-design-system .music-widget__more { margin-top:0; padding-top:4px; }
+
+
+/* A small single-chevron tab inside an unchanged, comfortable touch target. */
+html#lens-design-system :is(.widget-collapse,.routine-bar__collapse) {
+  width:44px; height:44px; padding:0; border:0!important; border-radius:14px;
+  background:transparent!important; color:var(--widget-muted,var(--ls-muted))!important; box-shadow:none!important;
+}
+html#lens-design-system :is(.widget-collapse,.routine-bar__collapse)::before {
+  content:''; inset:10px 6px; border:1px solid var(--widget-border,var(--ls-line)); border-radius:9px;
+  background:var(--widget-surface,var(--ls-glass)); box-shadow:none; backdrop-filter:none; -webkit-backdrop-filter:none;
+}
+html#lens-design-system :is(.widget-collapse,.routine-bar__collapse,.music-widget__close) svg { width:16px; height:16px; stroke-width:1.7; }
+html#lens-design-system .widget-ball__expand { width:12px; height:12px; stroke-width:1.7; }
+html#lens-design-system .routine-bar:not(.routine-bar--audio) .routine-bar__collapse { --widget-muted:#bfd5e5; --widget-border:#d6edff55; --widget-surface:#173449eb; }
+
+html#lens-design-system .reference-widget-live .reference-widget-media { height:auto; min-height:0; }
+html#lens-design-system .reference-widget-panel header button { width:44px; height:44px; flex-shrink:0; }
+html#lens-design-system .reference-widget-size-bar { color:var(--widget-muted); border-top:1px solid var(--widget-border); }
+html#lens-design-system .reference-widget-panel header svg { stroke-width:1.7; }

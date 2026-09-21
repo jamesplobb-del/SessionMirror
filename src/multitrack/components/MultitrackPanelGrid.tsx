@@ -71,6 +71,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
   useEffect(() => () => { if (frame.current !== null) cancelAnimationFrame(frame.current) }, [])
   useEffect(() => {
     if (!interactionDisabled) return
+    setSelectedId(null)
     drag.current = null
     if (frame.current !== null) cancelAnimationFrame(frame.current)
     frame.current = null
@@ -132,8 +133,8 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
   }
   const selectedPanel = panels.find(panel => panel.id === selectedId && panel.kind === 'performance')
   const selectedRect = selectedId ? (draft?.id === selectedId ? spacedLayoutRect(draft.rect, layoutStyle) : panelRects[selectedId]) : null
-  const showSelectionTools = !interactionDisabled && selectedPanel?.kind === 'performance' && (editable || !!selectedPanel.overlay) && selectedRect
-  const showTakeControls = controlsPanelId && recordingPhase === 'idle'
+  const showSelectionTools = !interactionDisabled && selectedPanel?.kind === 'performance' && editable && selectedRect
+  const showTakeControls = controlsPanelId && recordingPhase === 'idle' && !interactionDisabled
   const width = Math.min(size.width, Math.max(1, size.height) * w / h)
   return (
     <div className="multitrack-canvas-frame" ref={frameRef} inert={interactionDisabled}>
@@ -160,7 +161,7 @@ export default function MultitrackPanelGrid({ layout, panels, sheetMusicPanel, r
         </div>
       ) : null}
       {panels.map((panel) => {
-        const canEdit = !interactionDisabled && panel.kind === 'performance' && (editable || !!panel.overlay)
+        const canEdit = !interactionDisabled && panel.kind === 'performance' && editable
         const name = panel.kind === 'performance' ? panel.label || (panel.overlay ? 'extra box' : 'box') : 'image'
         return (
         // Out-of-window boxes stay mounted and merely hidden — unmounting would

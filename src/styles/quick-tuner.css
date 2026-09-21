@@ -464,3 +464,68 @@
 
 .tuner-input-advice { position: absolute; z-index: 40; top: 12px; left: 16px; right: 16px; display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--audio-surface, #fff); color: var(--audio-text-primary, #182b44); box-shadow: 0 4px 20px #0002; font-size: 13px; pointer-events: auto; }
 .tuner-input-advice button { flex-shrink: 0; min-height: 44px; font-weight: 600; color: #0876cb; }
+
+/* Quick launches use the same palette and controls as the full app, including
+   loading and recovery screens that render before the tool has mounted. */
+html#lens-design-system.lens-system :is(.quick-tuner-screen, .quick-metronome-screen, .quick-tool-loading, .quick-tool-error) {
+  --audio-bg-base: var(--ls-bg);
+  --audio-surface: var(--ls-panel);
+  --audio-text-primary: var(--ls-ink);
+  --audio-text-secondary: var(--ls-muted);
+  --audio-divider: var(--ls-line);
+  --audio-border: var(--ls-line);
+  --audio-blue: var(--ls-blue);
+  --audio-blue-soft: var(--ls-soft);
+  --audio-blue-border: var(--ls-line);
+  color: var(--ls-ink);
+  background: var(--ls-bg) !important;
+}
+
+html#lens-design-system .quick-tuner-header p {
+  color: var(--ls-muted);
+  font-weight: 500;
+}
+
+html#lens-design-system .quick-tuner-header h1 {
+  color: var(--ls-ink);
+  font-weight: 550;
+  letter-spacing: -0.025em;
+}
+
+html#lens-design-system :is(.quick-tuner-icon-button, .quick-tuner-return, .quick-tuner-live-badge, .quick-metronome-status, .quick-tuner-instrument-picker) {
+  color: var(--ls-ink);
+  background: var(--ls-panel);
+  border-color: var(--ls-line);
+  box-shadow: none;
+  font-weight: 500;
+}
+
+html#lens-design-system :is(.quick-tuner-return, .quick-tuner-icon-button, .quick-tuner-live-badge, .quick-metronome-status--playing) {
+  color: var(--ls-blue);
+}
+
+html#lens-design-system .quick-tuner-live-badge--idle { color: var(--ls-muted); }
+html#lens-design-system .quick-metronome-status--playing > span { background: var(--ls-blue); box-shadow: none; }
+html#lens-design-system .quick-tuner-instrument-picker { background: var(--ls-soft); }
+html#lens-design-system .quick-tuner-instrument-picker button { color: var(--ls-muted); font-weight: 500; min-height: 44px; }
+html#lens-design-system .quick-tuner-instrument-picker button[aria-pressed='true'] {
+  color: var(--ls-blue);
+  background: var(--ls-panel);
+  box-shadow: 0 2px 6px #1932490b;
+}
+
+.quick-tool-error {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+  text-align: center;
+  color: var(--audio-text-primary, #142b43);
+  background: var(--audio-bg-base, #fff);
+}
+.quick-tool-error p { margin: 8px 0 16px; color: var(--audio-text-secondary, #49647d); }
+.quick-tool-error .quick-tuner-return { max-width: 24rem; }

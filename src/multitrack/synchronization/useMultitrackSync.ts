@@ -535,13 +535,24 @@ export function useMultitrackSync() {
    * keep the corresponding videos moving in their layout tiles without routing
    * any WebKit audio or introducing a second audible clock.
    */
-  const prepareVisualAtStart = useCallback((startTime = 0) => {
+  const prepareVisualAtStart = useCallback(async (startTime = 0) => {
+    const generation = visualPlaybackGenerationRef.current
     visualOnlyModeRef.current = true
     preparedStartRef.current = startTime
     lastReseekAtRef.current.clear()
     for (const timer of visualStartTimersRef.current) window.clearTimeout(timer)
     visualStartTimersRef.current = []
-    for (const [panelId, element] of getEntries()) {
+    const entries = getEntries()
+    await Promise.allSettled(entries.map(async ([, element]) => {
+      element.preload = 'auto'
+      if (element.readyState < HTMLMediaElement.HAVE_METADATA && (element.src || element.currentSrc)) {
+        try { element.load() } catch { /* readiness check below handles this */ }
+      }
+      await waitForMediaReady(element, 2000)
+    }))
+    if (generation !== visualPlaybackGenerationRef.current) return
+    for (const [panelId, element] of entries) {
+      if (mediaMapRef.current.get(panelId) !== element) continue
       element.pause()
       applyMixState(panelId, element)
       element.setAttribute('playsinline', 'true')
@@ -603,7 +614,8 @@ export function useMultitrackSync() {
     preparedStartRef.current = startTime
     setPreRollRemaining(Math.max(0, -startTime))
     multitrackTransport.arm(Math.max(0, startTime))
-    prepareVisualAtStart(startTime)
+    await prepareVisualAtStart(startTime)
+    if (generation !== visualPlaybackGenerationRef.current) return false
     setCurrentTime(Math.max(0, startTime))
 
     const delayMs = Math.max(0, epochMs - Date.now())

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { RefObject } from 'react'
-import { Plus, Film, MoreHorizontal, Pause, Play, X } from 'lucide-react'
+import { Plus, MoreHorizontal, Pause, Play, X } from 'lucide-react'
 import { playTakeMediaFromUserGesture } from '../../utils/takePlaybackAudio'
 import Pressable from '../../components/ui/Pressable'
 import TakeVideoPlayer from '../../components/TakeVideoPlayer'
@@ -182,10 +182,7 @@ export default function PerformancePanel({
           </Pressable>
         </div>
       </>, controlsHost)}
-      <div className="multitrack-panel__overlay">
-        <button type="button" data-box-control className="multitrack-panel__options" onClick={onTap} aria-label={`${displayName || panel.take.name || 'Part'} options`}><MoreHorizontal size={18} /></button>
-        <div className="multitrack-panel__label"><Film className="h-3.5 w-3.5" /><span>{panel.label || panel.take.name || 'Performance'}</span></div>
-      </div>
+
     </div>
   )
 }

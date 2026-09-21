@@ -113,17 +113,18 @@ export default function OnboardingTutorial({ onComplete, onSkip, onQuickPlay, on
           {card.id === 'record' && <div className="practice-intro__list">
             <div><Play /><span><strong>Listen back</strong><p>Tap Record to start and stop. Tap the saved take to play it.</p></span></div>
             <div><Pin /><span><strong>Keep your best</strong><p>Pin a Best Take to compare with your next try.</p></span></div>
-            <div><FolderOpen /><span><strong>Vault</strong><p>Takes save automatically. Find and share them from Home → Vault.</p></span></div>
+            <div><FolderOpen /><span><strong>Library</strong><p>Takes save automatically. Open Library above Record to listen or share.</p></span></div>
             <p className="practice-intro__tip">Hands-free: hold Record to turn it on. Play to start; pause to stop.</p>
           </div>}
 
           {card.id === 'workspace' && <div className="practice-intro__list">
-            <div><Layers /><span><strong>Floating tools</strong><p>Keep pitch or tempo visible while recording.</p></span></div>
-            <div><Music2 /><span><strong>References</strong><p>Use Expand View to play beside a reference. Headphones keep it out of your take.</p></span></div>
-            <div><SlidersHorizontal /><span><strong>Audio Enhance & Multitrack</strong><p>Refine your sound or layer recordings in Camera’s Workspace.</p></span></div>
+            <div><Layers /><span><strong>Floating tools</strong><p>Tap a widget’s circle to open it. Drag its header to move it; use the chevron to collapse it.</p></span></div>
+            <div><Music2 /><span><strong>References</strong><p>Add YouTube or audio in References. Use its Resize grip for size, expand button for Expand View, or minus to collapse.</p></span></div>
+            <div><SlidersHorizontal /><span><strong>Audio Enhance & Multitrack</strong><p>Open these from Workspace. Multitrack uses separate parts, a portrait layout, and waveform trimming.</p></span></div>
           </div>}
 
           {last && <>
+            <p className="practice-intro__note">Your routine stays in a small widget. Tap its title for every step; pause or finish from the widget.</p>
             <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Quick Play<ArrowRight /></button>
             <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('presets'))}><ListChecks />Choose a routine<ArrowRight /></button>
             <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('build'))}>Build my own routine<ArrowRight /></button>

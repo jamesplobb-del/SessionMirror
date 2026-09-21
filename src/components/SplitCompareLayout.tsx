@@ -12,6 +12,7 @@ import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface SplitCompareLayoutProps {
+  referenceMode?: boolean
   splitRatio: number
   onSplitRatioChange: (ratio: number) => void
   benchmarkTake: Take | null
@@ -63,6 +64,7 @@ interface SplitCompareLayoutProps {
 }
 
 export default function SplitCompareLayout({
+  referenceMode = false,
   splitRatio,
   onSplitRatioChange,
   benchmarkTake,
@@ -119,7 +121,7 @@ export default function SplitCompareLayout({
   const cameraPanelHeight = (ratio: number) =>
     recordingMode === 'video' ? `calc(${ratio}% - 0.4375rem)` : `${ratio}%`
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
-  const benchmarkAcceptsTakeTransfer = !libraryBenchmarkPlayback && !youtubeEmbedUrl
+  const benchmarkAcceptsTakeTransfer = !referenceMode && !libraryBenchmarkPlayback && !youtubeEmbedUrl
   const benchmarkTransferLabel =
     challengerTake?.id && challengerTake.id !== benchmarkTake?.id
       ? 'Swap Takes'
@@ -179,7 +181,7 @@ export default function SplitCompareLayout({
   })
 
   const edgeChrome = recordingMode === 'video'
-  const bestPanelLabel = edgeChrome ? 'Best' : 'Best Take'
+  const bestPanelLabel = referenceMode ? 'Reference' : edgeChrome ? 'Best' : 'Best Take'
   const currentPanelLabel = isRecording
     ? edgeChrome
       ? 'Live'
@@ -226,6 +228,8 @@ export default function SplitCompareLayout({
             </span>
             <BestTakeBox
               layout="fill"
+              displayLabel={referenceMode ? 'Reference' : undefined}
+              uploadAccept={referenceMode ? 'audio/*,.mp3,.m4a,.wav' : undefined}
               take={benchmarkTake}
               libraryPlayback={libraryBenchmarkPlayback}
               youtubeEmbedUrl={youtubeEmbedUrl}

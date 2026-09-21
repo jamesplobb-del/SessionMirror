@@ -629,6 +629,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubeExpandTipNonce, setYoutubeExpandTipNonce] = useState(0)
   const [youtubePlayAlongUi, setYoutubePlayAlongUi] = useState(getYoutubePlayAlongUiState)
   const [isSplitView, setIsSplitView] = useState(false)
+  const [splitReferenceActive, setSplitReferenceActive] = useState(false)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   // The legacy compact/full card state remains available to the existing
@@ -5785,7 +5786,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [routine, routineActiveStep])
 
 
+  const handleReferenceUpload = (file: File) => {
+    if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(file.name)) { setTakeDeleteError('Choose an audio file for References.'); return }
+    const projectId = activeProjectIdRef.current
+    void handleImportLibraryAudio(file).then(item => {
+    if (!item) throw new Error('No reference imported')
+    if (activeProjectIdRef.current !== projectId) return
+    handleClearYoutube(); selectReferenceAudio(item.id); setReferenceExpanded(true)
+    }).catch(() => setTakeDeleteError('Could not import reference audio. Please try another file.'))
+  }
+
   const handleToggleSplitView = useCallback(() => {
+    setSplitReferenceActive(false)
     setQuickSettingsOpen(false)
     // Expanded takes must remain available even when their floating cards are hidden.
     if (!isSplitView) {
@@ -5896,7 +5908,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           >
             <div
               ref={appShellRef}
-              className={`app-shell lens-screen${recordingMode === 'video' ? ' lens-camera' : ''}${!musicPageVisible && !isLabsOpen && !multitrackOpen ? ' open-lens-recording' : ''}${recordingMode === 'video' && isRecording ? ' open-lens-capturing' : ''}${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
+              className={`app-shell lens-screen${recordingMode === 'video' ? ' lens-camera' : ''}${!isLabsOpen && !multitrackOpen ? ' open-lens-recording' : ''}${recordingMode === 'video' && isRecording ? ' open-lens-capturing' : ''}${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
                 isSplitView ? ' app-shell--split-open' : ''
               }${musicPageVisible ? ' app-shell--music-page' : ''}${
                 musicChromeHidden ? ' app-shell--music-chrome-hidden' : ''
@@ -6416,19 +6428,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               />
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
                 {onRecordSurface && !isSplitView && !musicPageVisible && !isLabsOpen && !multitrackOpen && (
-                  <ReferenceWidget showTrackName visible={referenceVisible} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded}
+                  <ReferenceWidget onExpandView={() => { handleReferenceBeforePlay(); handleToggleSplitView(); setSplitReferenceActive(true) }} showTrackName visible={referenceVisible} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded}
                     youtubeUrl={youtubeUrl} libraryPlayback={referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null}
                     suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || !referenceExpanded || autoPlaybackPlaying}
                     onSubmitYoutube={(url) => { selectReferenceAudio(null); handleSubmitYoutube(url); setYoutubeAutoPlayOnLoad(false); setShowYoutubeExpandTip(false); setReferenceExpanded(true) }}
-                    onUpload={(file) => {
-                      if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(file.name)) { setTakeDeleteError('Choose an audio file for References.'); return }
-                      const projectId = activeProjectIdRef.current
-                      void handleImportLibraryAudio(file).then(item => {
-                        if (!item) throw new Error('No reference imported')
-                        if (activeProjectIdRef.current !== projectId) return
-                        handleClearYoutube(); selectReferenceAudio(item.id); setReferenceExpanded(true)
-                      }).catch(() => setTakeDeleteError('Could not import reference audio. Please try another file.'))
-                    }}
+                    onUpload={handleReferenceUpload}
                     onClearAudio={() => selectReferenceAudio(null)} onClearYoutube={handleClearYoutube}
                     onYoutubeHostChange={handleYoutubeHostChange} youtubeIframeRef={youtubeIframeRef}
                     onBeforePlay={handleReferenceBeforePlay} onPlaybackChange={setReferencePlaying} />
@@ -6645,10 +6649,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         style={pipScaleStyle}
                       >
                         <SplitCompareLayout
+                          referenceMode={splitReferenceActive}
                           splitRatio={splitRatio}
                           onSplitRatioChange={setSplitRatio}
-                          benchmarkTake={benchmarkTake}
-                          libraryBenchmarkPlayback={libraryBenchmarkPlayback}
+                          benchmarkTake={splitReferenceActive ? null : benchmarkTake}
+                          libraryBenchmarkPlayback={splitReferenceActive ? (referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null) : libraryBenchmarkPlayback}
                           challengerTake={challengerTake}
                           youtubeEmbedUrl={youtubeUrl}
                           suspendPipPlayback={suspendPipPlayback}
@@ -6673,16 +6678,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
                           }
                           metronomeStageActive={metronomeStageActive}
-                          onUnpinBenchmark={handleUnpinBenchmark}
-                          onClearLibraryReference={handleClearLibraryReference}
+                          onUnpinBenchmark={splitReferenceActive ? () => selectReferenceAudio(null) : handleUnpinBenchmark}
+                          onClearLibraryReference={splitReferenceActive ? () => selectReferenceAudio(null) : handleClearLibraryReference}
                           onUnpinChallenger={handleUnpinChallenger}
                           onClearYoutube={handleClearYoutube}
-                          onSubmitYoutube={handleSubmitYoutube}
-                          onUploadBenchmark={handleUploadBenchmark}
+                          onSubmitYoutube={splitReferenceActive ? (url) => { selectReferenceAudio(null); handleSubmitYoutube(url) } : handleSubmitYoutube}
+                          onUploadBenchmark={splitReferenceActive ? handleReferenceUpload : handleUploadBenchmark}
                           onToggleSplitView={handleExitSplitView}
-                          onExpandBenchmark={handleExpandBenchmark}
+                          onExpandBenchmark={splitReferenceActive ? undefined : handleExpandBenchmark}
                           onExpandChallenger={handleExpandChallenger}
-                          onBenchmarkPlaybackChange={setBenchmarkPipPlaying}
+                          onBenchmarkPlaybackChange={splitReferenceActive ? setReferencePlaying : setBenchmarkPipPlaying}
                           onChallengerPlaybackChange={handleChallengerPlaybackChange}
                           onChallengerAutoPlayComplete={handleChallengerAutoPlayComplete}
                           showPinCurrentAsBest={showPinCurrentAsBest}
@@ -6807,8 +6812,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       ) && (
                       <ControlDeck
                         onOpenReferences={onRecordSurface && !isSplitView ? () => { setQuickSettingsOpen(false); setReferenceVisible(true); setReferenceExpanded(true) } : undefined}
-                        openLens={!musicPageVisible}
-                        libraryAboveRecord={!musicPageVisible}
+                        openLens
+                        libraryAboveRecord
                         workspaceSections
                         toolsActive={isAudioPracticeToolTab}
                         onOpenTools={() => handleOpenFullPracticeTool(lastFullToolTab.current)}

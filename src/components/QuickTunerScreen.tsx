@@ -367,7 +367,7 @@ export default function QuickTunerScreen({ request, onExit }: QuickTunerScreenPr
           ))}
         </div>
         <button type="button" className="quick-tuner-return" onClick={handleExit}>
-          Return to full app
+          Return to BestTake
         </button>
       </footer>
     </main>

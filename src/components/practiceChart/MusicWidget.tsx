@@ -1,10 +1,9 @@
-import { motion, useMotionValue } from 'framer-motion'
+import { motion, useMotionValue, useDragControls } from 'framer-motion'
 import {
-  ChevronLeft, ChevronRight, Eraser, Eye, EyeOff, FileMusic, Maximize2, Pen, Plus, RefreshCw,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Eraser, Eye, EyeOff, FileMusic, Maximize2, Pen, Plus, RefreshCw,
   Share, SquareSplitVertical, Trash2, Undo2,
 } from 'lucide-react'
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import WidgetCollapseButton from '../WidgetCollapseButton'
 import { useCollapsibleWidget } from '../useCollapsibleWidget'
 import {
   clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition,
@@ -75,6 +74,8 @@ export default function MusicWidget({
   const dragY = useMotionValue(0)
   const placed = useRef(false)
   const [nibOpen, setNibOpen] = useState(false)
+  const [section, setSection] = useState<'read' | 'mark'>('read')
+  const dragControls = useDragControls()
 
   useLayoutEffect(() => {
     if (placed.current) return
@@ -124,6 +125,8 @@ export default function MusicWidget({
       ref={widgetRef}
       aria-hidden={fold.collapsed}
       drag
+      dragListener={false}
+      dragControls={dragControls}
       dragMomentum={false}
       dragElastic={0.04}
       dragConstraints={boundaryRef}
@@ -133,15 +136,12 @@ export default function MusicWidget({
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
-      style={{ x: dragX, y: dragY, touchAction: 'none' }}
+      style={{ x: dragX, y: dragY, touchAction: 'pan-y' }}
     >
-      {/* Both the chevron and the x fold this panel away. Leaving the room is
-          Exit music, in the corner of the page: a control that closes a panel
-          and a control that closes a feature must not look the same. */}
-      <WidgetCollapseButton label="music" onCollapse={fold.collapse} />
+      {/* One collapse control in the drag header. Exit music stays on the page. */}
       <div className="music-widget__panel ui-orient-spin">
         {hasChart ? <>
-          <div className="music-widget__head">
+          <div className="music-widget__head" onPointerDown={event => dragControls.start(event)}>
             <p className="music-widget__file" title={fileName ?? undefined}>{fileName ?? 'Music'}</p>
             <button
               type="button"
@@ -150,9 +150,7 @@ export default function MusicWidget({
               onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >
-              <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
-                <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
+              <ChevronUp size={18} aria-hidden />
             </button>
           </div>
 
@@ -166,6 +164,11 @@ export default function MusicWidget({
             </button>
           </div>
 
+          <div className="music-widget__sections" role="group" aria-label="Music controls">
+            <button type="button" aria-pressed={section === 'read'} onClick={() => { setSection('read'); setNibOpen(false); onMarkerChange(null) }}>Read</button>
+            <button type="button" aria-pressed={section === 'mark'} onClick={() => setSection('mark')}>Mark up</button>
+          </div>
+          {section === 'read' && <>
           <button
             type="button"
             className="music-widget__row"
@@ -173,7 +176,7 @@ export default function MusicWidget({
             onClick={() => onHalfTurnChange(!halfTurn)}
           >
             <SquareSplitVertical aria-hidden />
-            <span>Half turns<small>Keep the bottom, next page comes in above</small></span>
+            <span>Half-page turns</span>
             <i aria-hidden />
           </button>
 
@@ -189,17 +192,10 @@ export default function MusicWidget({
             <button type="button" aria-pressed={fit === 'width'} onClick={() => onFitChange('width')}>Fill width</button>
           </div>
 
-          <button
-            type="button"
-            className="music-widget__row"
-            aria-pressed={chromeHidden}
-            onClick={() => onChromeHiddenChange(!chromeHidden)}
-          >
-            <Maximize2 aria-hidden />
-            <span>Full page<small>Put the tabs and the deck away</small></span>
-            <i aria-hidden />
-          </button>
 
+
+          </>}
+          {section === 'mark' && <>
           {/*
             * A marker, not a pencil: two colours, three nibs, and an eraser.
             * Tap a colour to pick it up; tap it again for thickness. Capped by
@@ -270,6 +266,19 @@ export default function MusicWidget({
             </div>
           )}
 
+          </>}
+          <details className="music-widget__more">
+          <summary>More options <ChevronDown size={15} aria-hidden /></summary>
+          <button
+            type="button"
+            className="music-widget__row"
+            aria-pressed={chromeHidden}
+            onClick={() => onChromeHiddenChange(!chromeHidden)}
+          >
+            <Maximize2 aria-hidden />
+            <span>Full screen</span>
+            <i aria-hidden />
+          </button>
           <div className="music-widget__actions">
             <button type="button" onClick={() => onPaperVisibleChange(!paperVisible)}>
               {paperVisible ? <><EyeOff aria-hidden />Hide page</> : <><Eye aria-hidden />Show page</>}
@@ -277,8 +286,9 @@ export default function MusicWidget({
             <button type="button" disabled={busy} onClick={onAdd}><RefreshCw aria-hidden />Replace</button>
             <button type="button" disabled={busy} onClick={onRemove}><Trash2 aria-hidden />Remove</button>
           </div>
+          </details>
         </> : <>
-          <div className="music-widget__head">
+          <div className="music-widget__head" onPointerDown={event => dragControls.start(event)}>
             <p className="music-widget__file">No music on this item</p>
             <button
               type="button"
@@ -287,9 +297,7 @@ export default function MusicWidget({
               onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >
-              <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden>
-                <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-              </svg>
+              <ChevronUp size={18} aria-hidden />
             </button>
           </div>
           <button type="button" className="music-widget__add" disabled={busy} onClick={onAdd}>

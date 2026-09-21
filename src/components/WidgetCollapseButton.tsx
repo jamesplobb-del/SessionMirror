@@ -1,4 +1,4 @@
-import { ChevronsUp } from 'lucide-react'
+import { ChevronUp } from 'lucide-react'
 
 export default function WidgetCollapseButton({ label, onCollapse }: {
   label: string
@@ -8,6 +8,6 @@ export default function WidgetCollapseButton({ label, onCollapse }: {
     aria-label={`Collapse ${label}`} aria-expanded
     onPointerDown={event => event.stopPropagation()}
     onClick={event => { event.stopPropagation(); onCollapse() }}>
-    <ChevronsUp aria-hidden />
+    <ChevronUp aria-hidden />
   </button>
 }

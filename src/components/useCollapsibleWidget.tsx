@@ -1,5 +1,5 @@
 import { reportFeatureAction } from '../utils/featureGuidance'
-import { ChevronsDown } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
@@ -184,7 +184,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: reducedMotion ? 0 : 0.18 }}
   >
-    {icon}<span>{detail ?? label}</span><ChevronsDown className="widget-ball__expand" aria-hidden /><i aria-hidden />
+    {icon}<span>{detail ?? label}</span><ChevronDown className="widget-ball__expand" aria-hidden /><i aria-hidden />
     </motion.button>
     {ballAccessory && <motion.div className="widget-ball-accessory pointer-events-auto" style={{ x: ballX, y: ballY }}>{ballAccessory}</motion.div>}
   </> : null

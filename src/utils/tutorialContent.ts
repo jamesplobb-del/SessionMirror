@@ -81,6 +81,7 @@ export type HelpTopicId =
   | 'expand-mode'
   | 'vault-settings'
   | 'media-youtube'
+  | 'music-mode'
   | 'reset-tutorials'
 
 export interface OnboardingCard {
@@ -126,11 +127,11 @@ export const ONBOARDING_CARDS: OnboardingCard[] = [
   { id: 'tools', title: 'Your practice tools',
     body: 'Find these in Tools.', cta: 'Continue' },
   { id: 'record', title: 'Record a take',
-    body: 'Camera records video. Record in Tools captures audio.', cta: 'Continue' },
+    body: 'Choose Audio or Video at the top, then tap Record.', cta: 'Continue' },
   { id: 'workspace', title: 'Set up your space',
     body: 'Tap Workspace beside Record.', cta: 'Continue' },
   { id: 'routine', title: 'Ready to play?',
-    body: 'Put your exercises in order. Each step opens the tools you need.', cta: 'Explore on my own' },
+    body: 'Put your exercises in order. A compact routine widget keeps your current step and timer close.', cta: 'Explore on my own' },
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [
@@ -257,7 +258,7 @@ export const COACH_MARKS: CoachMarkContent[] = [
   {
     id: 'switch-to-practice',
     title: 'Open Tools',
-    body: 'Tap Tools to open Audio, Metronome, Tuner, and Practice routines.',
+    body: 'Tap Tools for Tuner, Metronome, and Games. Find routines in Home.',
     selector: '[data-tutorial="practice-button"]',
     placement: 'top',
     advance: 'audio-mode',
@@ -358,11 +359,11 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Camera Mode',
     body: 'Record video takes and compare them side by side.',
     bullets: [
-      'Bottom pill: Practice Home, Workspace, Record, Tools, Settings',
+      'Bottom controls: Home, Workspace, Record, Tools, Settings. Library sits above Record.',
       'Tap the full red Record button to start or stop a video take',
       'Drag a take label directly to swap Best and Current; hold the picture area to move the card',
       'Use Expand for a larger comparison or Multitrack to layer performances',
-      'Tap Tools to move to the Audio workspace',
+      'Choose Audio or Video at the top; Tools opens the tuner, metronome, and games',
     ],
   },
   {
@@ -370,10 +371,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Audio Mode',
     body: 'Record without video. Each take plays back the moment you stop.',
     bullets: [
-      'Bottom pill: Practice Home, Workspace, Record, Camera, Settings',
-      'Use Record, Tuner, Metronome, and Games from the top tabs',
+      'Use Home, Workspace, Record, Tools, and Settings; Library sits above Record',
+      'Tap Tools for Tuner, Metronome, and Games; tap Record in the bottom controls to return',
       'Open Practice Home for your routine, or Program in Metronome for tempo sequences',
-      'Tap Camera to return to video recording',
+      'Choose Video at the top to return to camera recording',
       'Best Take and Current Take stay ready for quick comparison',
     ],
   },
@@ -391,12 +392,12 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'overlays',
     title: 'Workspace',
-    body: 'Tap the stacked-layers icon beside Record in Camera or Audio Mode to arrange the recorder and open related views.',
+    body: 'Tap Workspace beside Record to choose widgets and open related views.',
     bullets: [
       'Camera: Pitch Analysis, Take Cards, Metronome, Audio Enhance, Hands-free, Expand View, and Multitrack',
       'Audio and tool tabs show the controls that fit the current workspace',
       'Tap a control to show, hide, or open it without visiting Settings',
-      'Use the cog at the right end of the pill for full settings',
+      'Tap a widget’s circle to open it. Use its collapse control to put it away.',
     ],
   },
   {
@@ -404,9 +405,11 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Multitrack',
     body: 'Open Workspace and tap Multitrack to layer separate performances into one project.',
     bullets: [
-      'Record or assign a take to each performance panel',
-      'Add a backing track, click, pitch guide, or sheet music when needed',
-      'Balance the parts and align their starts before exporting',
+      'Tap an empty box to record a part or choose a recording from Take Vault',
+      'Layout keeps the project in portrait and adds up to four extra boxes',
+      'Tools opens backing audio, sheet music, tuner, and click controls',
+      'Use Play all to hear the mix. In Editor, drag the waveform edges to trim and move clips to align them',
+      'Use headphones when recording over the other parts. Each box is a part, not a Best Take comparison',
     ],
   },
   {
@@ -426,8 +429,8 @@ export const HELP_TOPICS: HelpTopic[] = [
     bullets: [
       'Choose a preset or add your own exercises, then tap Start routine',
       'Set each exercise’s tools and add an optional reference',
-      'Drag the routine bar anywhere, and drag its corner to resize it',
-      'Tap the bar to see every exercise, jump to one, or skip ahead',
+      'The compact widget shows the current step, timer, pause, and finish controls; drag it by its title or grip',
+      'Tap the step title to see the full routine. Drag the corner to resize, or use the chevron to collapse it',
       'Tap Done & next to continue, or Finish routine on the last exercise',
     ],
   },
@@ -524,10 +527,10 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Expand View',
     body: 'A bigger split screen for takes, imported references, and YouTube.',
     bullets: [
-      'Open Workspace and tap Expand View',
+      'Open Workspace and tap Expand View, or use the expand button on a loaded reference widget',
       'Drag the middle divider to give either side more room',
-      'Load YouTube or upload audio and video references while expanded',
-      'Tap the collapse control to return to the normal Camera layout',
+      'References supports YouTube links and imported audio; expanding a reference keeps your Best Take selection separate',
+      'Tap Return to normal view to return to the recording workspace',
     ],
   },
   {
@@ -545,9 +548,20 @@ export const HELP_TOPICS: HelpTopic[] = [
     title: 'Media & YouTube',
     body: 'Practice beside a reference recording without mixing it into your saved takes.',
     bullets: [
-      'Open Expand View for the clearest side-by-side layout',
-      'Load a YouTube play-along or upload an audio or video reference',
+      'Open References from Workspace. Drag its header to move it, and its Resize grip to change its size',
+      'Load a YouTube play-along or import audio. The expand button opens Expand View; the minus collapses the widget',
       'Use headphones, or the mic will pick up the reference along with you',
+    ],
+  },
+  {
+    id: 'music-mode',
+    title: 'Music Mode',
+    body: 'Open Music from Home and choose a PDF or photo of your part.',
+    bullets: [
+      'Tap the Music circle to open page controls. Drag the widget by its header',
+      'Read contains page size and half-page turns. Mark up opens markers, eraser, and annotation actions',
+      'More options contains full screen, hide page, replace, and remove',
+      'Use Workspace for practice widgets; Exit music returns to your recording workspace',
     ],
   },
   {

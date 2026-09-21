@@ -599,7 +599,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
 
     return sources
-  }, [session.backing, session.panels, session.endSec, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
+  }, [session.backing, session.panels, session.endSec, session.practice.bpm, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
 
   const playAllFromStart = useCallback(async (requestedStart = 0) => {
     const duration = session.endSec ?? Math.max(sync.state.duration,
@@ -744,9 +744,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         .filter((panel) =>
           panel.kind === 'performance' &&
           panel.id !== panelId &&
-          panel.take !== null &&
-          !panel.muted &&
-          !monitorMutesRef.current.has(panel.id),
+          panel.take !== null && !panel.hidden,
         )
         .map((panel) => panel.id)
       sync.setReferencePanelIds(referenceIds)
@@ -768,7 +766,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const sources = await buildNativeMonitorSources(panelId, true, startSec)
       nativeTransportActiveRef.current = await prepareNativeMultitrackMonitor(sources)
       if (nativeTransportActiveRef.current) {
-        sync.prepareVisualAtStart(startSec)
+        await sync.prepareVisualAtStart(startSec)
         return true
       }
       if (isNativeMultitrackTransportAvailable()) return false
@@ -1202,7 +1200,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           .filter((panel) => panel.kind === 'performance' && panel.id !== panelId && panel.take)
           .map((panel) => panel.id),
       )
-      void restoreRecordingReadiness()
+      // A previous preview can leave reference videos parked at their ends
+      // (opacity zero). Restore their frames before the player presses Record.
+      sync.seek(Math.max(0, startSec))
+      void restoreRecordingReadiness().then(async () => {
+        if (activePanelIdRef.current !== panelId) return
+        await sync.prepareVisualAtStart(Math.max(0, startSec))
+      }).catch(error => console.warn('[Multitrack] reference preview failed', error))
     },
     [hapticFeedback, onOpenRecordingStage, restoreRecordingReadiness, session.panels, sync],
   )
@@ -1246,14 +1250,17 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         })
         return
       }
-      const startSec = snapToDownbeat(atSec)
+      pauseAllPlayback()
+      const duration = session.endSec ?? Math.max(sync.state.duration,
+        ...session.panels.map(p => p.kind === 'performance' && !p.hidden ? panelEndSec(p, session.practice.bpm) : 0))
+      const startSec = snapToDownbeat(playbackStartPosition(atSec, duration))
       // Park the playhead on the bar we snapped to so the timeline shows exactly
       // where the new part will come in.
       if (startSec !== atSec) sync.seek(startSec)
       setPanelSection(panelId, startSec, undefined)
       setTileSheetPanelId(panelId)
     },
-    [addPerformanceBox, setPanelSection, showAlert, snapToDownbeat, sync],
+    [addPerformanceBox, pauseAllPlayback, session.endSec, session.panels, session.practice.bpm, setPanelSection, showAlert, snapToDownbeat, sync],
   )
 
   /** Timeline lane "Record here": overdub into an existing empty box. */
@@ -2014,7 +2021,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 }}
               >
                 <FileMusic className="h-4 w-4" />
-                Music / photo / PDF
+                Add sheet music to workspace
               </Pressable>
             </div>
           ) : (

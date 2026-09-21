@@ -91,6 +91,7 @@ export default function AudioPracticeMetronomeView({
     accumulatedPixels: number
     lastBpm: number
     moved: boolean
+    startedOnValue: boolean
   } | null>(null)
   const currentBpmRef = useRef(0)
   const [editingBpm, setEditingBpm] = useState(false)
@@ -243,7 +244,7 @@ export default function AudioPracticeMetronomeView({
 
   const handleTempoPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return
+      if (event.button !== 0 || editingBpm) return
       event.preventDefault()
       tempoDragRef.current = {
         pointerId: event.pointerId,
@@ -251,11 +252,12 @@ export default function AudioPracticeMetronomeView({
         accumulatedPixels: 0,
         lastBpm: currentBpmRef.current,
         moved: false,
+        startedOnValue: (event.target as Element).closest('.metronome-audio-stage__bpm') !== null,
       }
       setTempoScrubbing(true)
       event.currentTarget.setPointerCapture(event.pointerId)
     },
-    [],
+    [editingBpm],
   )
 
   const handleTempoPointerMove = useCallback(
@@ -283,6 +285,12 @@ export default function AudioPracticeMetronomeView({
     [setPracticeBpm],
   )
 
+  const openBpmEditor = useCallback(() => {
+    if (playing) stop()
+    setBpmDraft(String(bpm))
+    setEditingBpm(true)
+  }, [bpm, playing, stop])
+
   const handleTempoPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const drag = tempoDragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
@@ -291,13 +299,11 @@ export default function AudioPracticeMetronomeView({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
-  }, [])
-
-  const openBpmEditor = useCallback(() => {
-    if (playing) stop()
-    setBpmDraft(String(bpm))
-    setEditingBpm(true)
-  }, [bpm, playing, stop])
+    // Pointer capture routes release to the scrubber, not the nested BPM button.
+    if (event.type === 'pointerup' && drag.startedOnValue && !drag.moved) {
+      openBpmEditor()
+    }
+  }, [openBpmEditor])
 
   const commitBpmDraft = useCallback(() => {
     const parsed = Number.parseInt(bpmDraft, 10)
@@ -390,10 +396,9 @@ export default function AudioPracticeMetronomeView({
                     type="button"
                     className="metronome-audio-stage__bpm pointer-events-auto"
                     aria-label={`${bpm} beats per minute. Tap to edit.`}
-                    onPointerUp={(event) => {
-                      if (event.button !== 0) return
-                      if (tempoDragRef.current?.moved) return
-                      openBpmEditor()
+                    onClick={(event) => {
+                      // Keyboard and assistive activation have no pointer gesture.
+                      if (event.detail === 0) openBpmEditor()
                     }}
                   >
                     <span

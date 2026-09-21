@@ -20,7 +20,7 @@ import {
 import {
   Check,
   ChevronDown,
-  ChevronsDown,
+  ChevronUp,
   GripHorizontal,
   House,
   MoveDiagonal2,
@@ -104,7 +104,7 @@ const FOLDED_KEY = 'besttake:routine-bar-folded:v1'
 const EDGE = 12
 const MIN_WIDTH = 264
 const MAX_WIDTH = 560
-const DEFAULT_WIDTH = 384
+const DEFAULT_WIDTH = 304
 /** Narrower than this the bar folds to one row and its buttons drop their words. */
 const COMPACT_BELOW = 330
 /** Matches `.routine-ball` (4rem). */
@@ -657,7 +657,7 @@ export default function RoutineBar({
           onPointerDown={event => event.stopPropagation()}
           onClick={fold}
         >
-          <ChevronsDown aria-hidden />
+          <ChevronUp aria-hidden />
         </button>
         <button
           type="button"

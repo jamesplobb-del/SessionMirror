@@ -105,3 +105,16 @@ html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-car
 html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut { background:transparent!important; border:0!important; box-shadow:none!important; }
 html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#237fbe!important; }
 html.app-dark-mode[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#87c9f6!important; }
+
+/* Resizing keeps the same media host mounted, including an active YouTube iframe. */
+.reference-widget-live.is-expanded .reference-widget-panel { width:100%; height:100%; display:flex; flex-direction:column; }
+.reference-widget-live .reference-widget-panel[hidden] { display:none; }
+.reference-widget-live .reference-widget-panel header { flex-shrink:0; }
+.reference-widget-live .reference-widget-media { flex:1; min-height:0; height:auto; }
+.reference-widget-size-bar { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-shrink:0; height:44px; padding:0 4px 0 12px; }
+.reference-widget-size-bar span { font-size:10px; opacity:.65; }
+.reference-widget-resize { display:grid; place-items:center; width:44px; height:44px; border:0; background:transparent; color:inherit; touch-action:none; cursor:nwse-resize; }
+.reference-widget-resize svg { width:17px; height:17px; stroke-width:1.6; }
+
+.reference-widget-chip { touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+.reference-widget-chip:active { cursor:grabbing; }
