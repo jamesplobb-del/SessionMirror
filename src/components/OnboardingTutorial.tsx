@@ -125,7 +125,7 @@ export default function OnboardingTutorial({ onComplete, onSkip, onQuickPlay, on
 
           {last && <>
             <p className="practice-intro__note">Your routine stays in a small widget. Tap its title for every step; pause or finish from the widget.</p>
-            <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Quick Play<ArrowRight /></button>
+            <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Record & compare<ArrowRight /></button>
             <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('presets'))}><ListChecks />Choose a routine<ArrowRight /></button>
             <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('build'))}>Build my own routine<ArrowRight /></button>
           </>}

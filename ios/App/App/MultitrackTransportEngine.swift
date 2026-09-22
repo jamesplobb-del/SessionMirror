@@ -180,6 +180,9 @@ final class MultitrackTransportEngine {
                 engine.prepare()
                 try startEngineRecoveringFromStaleFormat()
             }
+            // A take muted because its headphones went away must not leave
+            // the next one silent.
+            engine.mainMixerNode.outputVolume = 1
 
             stopScheduledNodesLocked()
 
@@ -320,6 +323,15 @@ final class MultitrackTransportEngine {
     func stop() {
         controlQueue.sync {
             stopLocked(resetPreparedSources: true)
+        }
+    }
+
+    /// Silences everything this engine plays — click, earlier parts, backing —
+    /// without stopping its clock. The take is captured by a separate session,
+    /// so recording carries on; only the speaker stops feeding the microphone.
+    func setOutputMuted(_ muted: Bool) {
+        controlQueue.sync {
+            engine.mainMixerNode.outputVolume = muted ? 0 : 1
         }
     }
 

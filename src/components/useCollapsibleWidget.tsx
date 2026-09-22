@@ -2,7 +2,8 @@ import { reportFeatureAction } from '../utils/featureGuidance'
 import { ChevronDown } from 'lucide-react'
 import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
+import { animate, motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
+import { iosDragRelease } from '../utils/motionPresets'
 import { findAvailableWidgetBallPosition, clampWidgetPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, type WidgetPosition } from '../utils/floatingWidgetLayout'
 import './widget-ball.css'
 
@@ -16,7 +17,6 @@ const ballPlacements = new Map<symbol, {
 /** Presentation only. The full widget stays mounted and retains its audio owner. */
 export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId, label,
   icon, detail, active = false, resetKey, onRestore, ballSlot = 0, visible = true,
-  ballAccessory,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
   widgetRef: RefObject<HTMLDivElement | null>
@@ -25,7 +25,6 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   onRestore?: (position: WidgetPosition) => void
   ballSlot?: number
   visible?: boolean
-  ballAccessory?: ReactNode
 }) {
   const [collapsed, setCollapsed] = useState(true)
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
@@ -85,6 +84,27 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
 
   const rememberBall = () => savePersistentWidgetPosition(`${positionId}-ball`, ballX.get(), ballY.get())
 
+  /**
+   * Let go of a ball and it settles on the nearer side edge, clear of the
+   * other balls — so tools line up along the sides instead of being left
+   * wherever a finger lifted, mid-page.
+   */
+  const settleBall = () => {
+    const width = boundaryRef.current?.clientWidth ?? window.innerWidth
+    const fromX = ballX.get()
+    const fromY = ballY.get()
+    const edgeX = fromX + BALL_SIZE / 2 < width / 2 ? 12 : width - BALL_SIZE - 12
+    clampBall(edgeX, fromY)
+    const toX = ballX.get()
+    const toY = ballY.get()
+    savePersistentWidgetPosition(`${positionId}-ball`, toX, toY)
+    if (reducedMotion) return
+    ballX.set(fromX)
+    ballY.set(fromY)
+    void animate(ballX, toX, iosDragRelease)
+    void animate(ballY, toY, iosDragRelease)
+  }
+
   useLayoutEffect(() => {
     if (!collapsed) return
     const resize = () => { if (!ballGesture.current) clampBall(ballX.get(), ballY.get()) }
@@ -128,7 +148,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     if (cancel) {
       clampBall(gesture.x, gesture.y, false)
       dragged.current = true
-    } else if (dragged.current) rememberBall()
+    } else if (dragged.current) settleBall()
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
@@ -137,7 +157,11 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   const collapse = () => {
     const widget = widgetRef.current
     if (!widget) return
-    clampBall(x.get() + widget.offsetWidth - BALL_SIZE, y.get())
+    const width = boundaryRef.current?.clientWidth ?? window.innerWidth
+    const cornerX = x.get() + widget.offsetWidth - BALL_SIZE
+    // The ball goes to the side the panel was nearer, not mid-page.
+    clampBall(cornerX + BALL_SIZE / 2 < width / 2 ? 12 : width - BALL_SIZE - 12, y.get())
+    rememberBall()
     transferFocus.current = widget.contains(document.activeElement)
     dragged.current = false
     setCollapsed(true)
@@ -186,7 +210,6 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   >
     {icon}<span>{detail ?? label}</span><ChevronDown className="widget-ball__expand" aria-hidden /><i aria-hidden />
     </motion.button>
-    {ballAccessory && <motion.div className="widget-ball-accessory pointer-events-auto" style={{ x: ballX, y: ballY }}>{ballAccessory}</motion.div>}
   </> : null
 
   return { collapsed, collapse, ball: ball && portalHost ? createPortal(ball, portalHost) : ball,

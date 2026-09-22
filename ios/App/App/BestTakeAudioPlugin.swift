@@ -41,6 +41,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "prepareMultitrackMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startMultitrackTransport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopMultitrackTransport", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMultitrackOutputMuted", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraBridge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraBridge", returnType: CAPPluginReturnPromise),
@@ -1156,6 +1157,16 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             MultitrackTransportEngine.shared.stop()
             DispatchQueue.main.async {
                 call.resolve(["stopped": true])
+            }
+        }
+    }
+
+    @objc func setMultitrackOutputMuted(_ call: CAPPluginCall) {
+        let muted = call.getBool("muted") ?? true
+        DispatchQueue.global(qos: .userInitiated).async {
+            MultitrackTransportEngine.shared.setOutputMuted(muted)
+            DispatchQueue.main.async {
+                call.resolve(["muted": muted])
             }
         }
     }

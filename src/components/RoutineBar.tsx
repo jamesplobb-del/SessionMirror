@@ -21,6 +21,8 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ChevronsLeftRight,
+  ChevronsRightLeft,
   GripHorizontal,
   House,
   Pause,
@@ -80,6 +82,11 @@ interface RoutineBarProps {
   onJumpToStep: (stepId: string) => void
   onEditRoutine?: () => void
   onOpenToday: () => void
+  /**
+   * The surface underneath is something to read — the music page. The bar
+   * becomes a ball there so it never sits on a staff; tap it to open.
+   */
+  preferBall?: boolean
 }
 
 interface Insets {
@@ -106,10 +113,10 @@ const MAX_WIDTH = 560
 const DEFAULT_WIDTH = 304
 /** Narrower than this the bar folds to one row and its buttons drop their words. */
 const COMPACT_BELOW = 330
-/** Matches `.routine-ball` (4rem). */
-const BALL_SIZE = 64
-/** Space above the bar for the floating collapse control. */
-const COLLAPSE_HEADROOM = 36
+/** Matches `.routine-ball` and every other widget ball (56px). */
+const BALL_SIZE = 56
+/** The collapse control sits inside the bar now; nothing floats above it. */
+const COLLAPSE_HEADROOM = 0
 /** First run sits just above the control deck, where the bar used to be pinned. */
 const DEFAULT_BOTTOM_GAP = 124
 const KEY_STEP = 16
@@ -221,6 +228,7 @@ export default function RoutineBar({
   onJumpToStep,
   onEditRoutine,
   onOpenToday,
+  preferBall = false,
 }: RoutineBarProps) {
   const reducedMotion = useReducedMotion()
   const panelId = useId()
@@ -281,7 +289,11 @@ export default function RoutineBar({
   const rememberSpot = useCallback(() => {
     const el = nodeRef.current
     if (!el) return null
-    const next = clampToViewport(x.get(), y.get(), el.offsetWidth, el.offsetHeight, insetsRef.current)
+    // A ball settles on the nearer side edge, like every other widget ball.
+    const ballX = foldedRef.current
+      ? (x.get() + el.offsetWidth / 2 < window.innerWidth / 2 ? EDGE : window.innerWidth - EDGE - el.offsetWidth)
+      : x.get()
+    const next = clampToViewport(ballX, y.get(), el.offsetWidth, el.offsetHeight, insetsRef.current)
     restRef.current = next
     saveWidgetPosition(foldedRef.current ? BALL_POSITION_ID : POSITION_ID, next.x, next.y)
     return next
@@ -410,14 +422,16 @@ export default function RoutineBar({
     saveWidgetPosition(foldedRef.current ? BALL_POSITION_ID : POSITION_ID, next.x, next.y)
   }
 
-  /** Into the ball, anchored at the bar's lower-right corner. */
-  const fold = () => {
+  /** Into the ball, on the side edge nearer the bar, level with its bottom. */
+  const fold = (silent = false) => {
     const el = nodeRef.current
     if (!el) return
-    triggerLightHaptic(hapticFeedback)
+    if (!silent) triggerLightHaptic(hapticFeedback)
     barHeightRef.current = el.offsetHeight
+    // Like every widget ball, it goes to the nearer side edge, never mid-page.
+    const nearLeft = x.get() + el.offsetWidth / 2 < window.innerWidth / 2
     const next = clampToViewport(
-      x.get() + el.offsetWidth - BALL_SIZE,
+      nearLeft ? EDGE : window.innerWidth - EDGE - BALL_SIZE,
       y.get() + el.offsetHeight - BALL_SIZE,
       BALL_SIZE,
       BALL_SIZE,
@@ -452,6 +466,15 @@ export default function RoutineBar({
     setFolded(false)
     saveFolded(false)
   }
+
+  // On the music page a step opens as a ball, and the page coming up folds a
+  // bar that is already open. The player can still tap the ball open; this
+  // only runs when the page appears or the step changes.
+  const foldRef = useRef(fold)
+  foldRef.current = fold
+  useEffect(() => {
+    if (preferBall && !foldedRef.current) foldRef.current(true)
+  }, [preferBall, step.id])
 
   const expandedWidth = clampWidth(400)
   const widthExpanded = width >= expandedWidth - 1
@@ -529,12 +552,12 @@ export default function RoutineBar({
             />
           )}
         </svg>
-        <span className="routine-ball__label">Routine</span>
         <span className="routine-ball__step">
           {index}
           <small>/{count}</small>
         </span>
         <span className="routine-ball__time">{paused ? 'Paused' : formatElapsed(elapsed)}</span>
+        <ChevronDown className="routine-ball__expand" aria-hidden />
       </motion.button>,
       document.body,
     )
@@ -612,17 +635,8 @@ export default function RoutineBar({
           close(true)
         }}
       >
-        <button
-          type="button"
-          className="routine-bar__collapse"
-          aria-label="Collapse routine"
-          title="Collapse routine"
-          data-no-drag
-          onPointerDown={event => event.stopPropagation()}
-          onClick={fold}
-        >
-          <ChevronUp aria-hidden />
-        </button>
+        {/* Same corner as every floating tool: move on the left, then width,
+            collapse to a ball, and close on the right. */}
         <div className="routine-bar__toolbar">
           <button
             type="button"
@@ -633,11 +647,36 @@ export default function RoutineBar({
           >
             <GripHorizontal aria-hidden />
           </button>
-          <button type="button" className="routine-bar__size" data-no-drag
-            aria-label={widthExpanded ? 'Compact routine widget' : 'Expand routine widget'}
-            aria-pressed={widthExpanded} onClick={toggleWidth}>
-            {widthExpanded ? 'Compact' : 'Expand'}
-          </button>
+          <span className="routine-bar__toolbar-actions">
+            <button type="button" className="routine-bar__size" data-no-drag
+              aria-label={widthExpanded ? 'Make the routine widget narrower' : 'Make the routine widget wider'}
+              aria-pressed={widthExpanded} onClick={toggleWidth}>
+              {widthExpanded ? <ChevronsRightLeft aria-hidden /> : <ChevronsLeftRight aria-hidden />}
+            </button>
+            <button
+              type="button"
+              className="routine-bar__collapse"
+              aria-label="Collapse routine"
+              title="Collapse routine"
+              data-no-drag
+              onPointerDown={event => event.stopPropagation()}
+              onClick={() => fold()}
+            >
+              <ChevronUp aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="routine-bar__close"
+              aria-label="Close routine"
+              title="End this routine session"
+              disabled={busy}
+              data-no-drag
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={onClose}
+            >
+              <X aria-hidden />
+            </button>
+          </span>
         </div>
 
         <div className="routine-bar__head" onPointerDown={startDrag}>
@@ -663,18 +702,6 @@ export default function RoutineBar({
             <ChevronDown className="routine-bar__chevron" aria-hidden />
           </button>
           {compact && actions}
-          <button
-            type="button"
-            className="routine-bar__close"
-            aria-label="Close routine"
-            title="End this routine session"
-            disabled={busy}
-            data-no-drag
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onClose}
-          >
-            <X aria-hidden />
-          </button>
         </div>
 
         {targetMs > 0 && (

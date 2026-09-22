@@ -39,6 +39,21 @@ export async function startNativeMultitrackTransport(options: {
   return enqueueTransport(() => BestTakeAudioPlugin.startMultitrackTransport(options))
 }
 
+/**
+ * Silence the running mix without stopping the transport — used when the
+ * headphones go away mid-take, so nothing plays out of the speaker into the mic.
+ * Not queued behind prepare/stop: it has to land now, and the next start
+ * resets it anyway.
+ */
+export async function setNativeMultitrackOutputMuted(muted: boolean): Promise<void> {
+  if (!isNativeMultitrackTransportAvailable()) return
+  try {
+    await BestTakeAudioPlugin.setMultitrackOutputMuted({ muted })
+  } catch (error) {
+    console.warn('[MultitrackTransport] native mute failed', error)
+  }
+}
+
 export async function stopNativeMultitrackTransport(): Promise<void> {
   if (!isNativeMultitrackTransportAvailable()) return
   try {

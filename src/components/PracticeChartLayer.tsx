@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
-import { AudioLines, Columns2, Ear, FileMusic, LayoutGrid, Maximize2, MicVocal, Minimize2, Music2, Radio, Square, Upload, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, Square, Upload, X } from 'lucide-react'
+import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
@@ -24,9 +25,9 @@ import './practice-chart.css'
 type MusicWorkspaceKey = Exclude<keyof HudQuickSettings, 'showMusic' | 'audioEnhancerEnabled'>
 const MUSIC_WORKSPACE_TOOLS = [
   { key: 'pitchTrackerEnabled', label: 'Pitch', icon: AudioLines },
-  { key: 'showMetronome', label: 'Metronome', icon: Music2 },
+  { key: 'showMetronome', label: 'Metronome', icon: MetronomeToolIcon },
   { key: 'showDrone', label: 'Drone', icon: Radio },
-  { key: 'showTakeCards', label: 'Takes', icon: Columns2 },
+  { key: 'showTakeCards', label: 'Takes', icon: TakesToolIcon },
 ] as const
 
 /** A tap this short and this still is a page turn; anything else is a scroll. */
@@ -42,12 +43,6 @@ interface PracticeChartLayerProps {
   onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
   /** The Music tool is on and this surface is the practice room. */
   active: boolean
-  /**
-   * The take row, rendered by the app so the boxes keep the one set of take
-   * handlers every other surface uses. It rides in the top bar, which floats
-   * over the paper, so pinning it there costs the page no height.
-   */
-  takesSlot?: ReactNode
   boundaryRef: RefObject<HTMLElement | null>
   collapseResetKey?: string
   /** Turns the Music tool itself off — the desk toggle, from the widget's ×. */
@@ -112,7 +107,7 @@ function formatElapsed(seconds: number): string {
  * this project's folder next to the file.
  */
 export default function PracticeChartLayer({
-  projectId, workspace, onWorkspaceChange, active, takesSlot, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
+  projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
 }: PracticeChartLayerProps) {
@@ -140,8 +135,11 @@ export default function PracticeChartLayer({
    * it would mean opening a part next week to an app with no tabs and no deck
    * and no memory of asking for that — which reads as broken, not as a feature.
    */
-  const [workspaceOpen, setWorkspaceOpen] = useState(true)
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [chromeOff, setChromeOff] = useState(false)
+  // Full screen is for the page. The tool row waits behind Workspace, closed,
+  // every time the player steps in.
+  useEffect(() => { if (chromeOff) setWorkspaceOpen(false) }, [chromeOff])
   const [saving, setSaving] = useState(false)
   const [hint, setHint] = useState(false)
 
@@ -561,7 +559,7 @@ export default function PracticeChartLayer({
           {chromeOff && (
             <button type="button" className="practice-chart-control" aria-expanded={workspaceOpen}
               data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => setWorkspaceOpen(value => !value)}>
-              <LayoutGrid aria-hidden /><span>Workspace</span>
+              <Grid2X2 aria-hidden /><span>Workspace</span>
             </button>
           )}
           <button
@@ -584,18 +582,6 @@ export default function PracticeChartLayer({
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
-          </div>
-        )}
-        {workspace.showTakeCards && takesSlot && (
-          /*
-           * The pill styles are all scoped under the audio-mode overlay class,
-           * and the stand is not inside it. Carrying the scope (and the wrap
-           * classes the other surfaces use) styles the row from the one source
-           * instead of a second copy that would drift. Its own background is
-           * put back to transparent below.
-           */
-          <div className="practice-chart-takes app-ui-overlay--audio-mode audio-tuner-take-pills-wrap audio-tuner-take-pills-wrap--compact">
-            {takesSlot}
           </div>
         )}
         </div>

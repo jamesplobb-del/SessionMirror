@@ -70,6 +70,7 @@ import ArcadePickerChip from '../../components/labs/ArcadePickerChip'
 import BalanceArcadeShell from '../balance/BalanceArcadeShell'
 import StaffJumperGame from './StaffJumperGame'
 import StaffJumperRangePicker from './StaffJumperRangePicker'
+import { difficultyRangeFor } from './staffJumperDifficultyRanges'
 import StaffPreview from './StaffPreview'
 import { loadStaffJumperSetupPrefs, saveStaffJumperSetupPrefs } from './staffJumperSetupPrefs'
 
@@ -241,13 +242,18 @@ export default function StaffJumperScreen({
     return savedSetup.key
   })
   const [draftRange, setDraftRange] = useState<StaffJumperRange>(() => savedPrefs?.range ?? '1-octave')
+  // A range the player set for this instrument wins; otherwise the level's own.
   const [draftRangeLowMidi, setDraftRangeLowMidi] = useState<number | undefined>(() => {
-    if (!savedPrefs || savedPrefs.instrumentId !== savedSetup.instrumentId) return undefined
-    return savedPrefs.rangeLowMidi
+    if (savedPrefs?.instrumentId === savedSetup.instrumentId && savedPrefs.rangeLowMidi !== undefined) {
+      return savedPrefs.rangeLowMidi
+    }
+    return difficultyRangeFor(savedSetup.instrumentId, savedPrefs?.difficulty ?? 'easy')?.lowMidi
   })
   const [draftRangeHighMidi, setDraftRangeHighMidi] = useState<number | undefined>(() => {
-    if (!savedPrefs || savedPrefs.instrumentId !== savedSetup.instrumentId) return undefined
-    return savedPrefs.rangeHighMidi
+    if (savedPrefs?.instrumentId === savedSetup.instrumentId && savedPrefs.rangeHighMidi !== undefined) {
+      return savedPrefs.rangeHighMidi
+    }
+    return difficultyRangeFor(savedSetup.instrumentId, savedPrefs?.difficulty ?? 'easy')?.highMidi
   })
   const [showRangePicker, setShowRangePicker] = useState(false)
   const [draftDifficulty, setDraftDifficulty] = useState<StaffJumperDifficulty>(() => savedPrefs?.difficulty ?? 'easy')
@@ -296,13 +302,29 @@ export default function StaffJumperScreen({
    * opens on. That last one is the point — a trombonist should land on B♭ in
    * bass clef, not on the concert C every setup used to start from.
    */
+  /**
+   * The level decides where the notes sit, not just how they move: Easy on a
+   * clarinet stays below the break, the way a Grade 1 part does. The range
+   * picker can still move it anywhere afterwards.
+   */
+  const applyDifficultyRange = (instrumentId: string | null, difficulty: StaffJumperDifficulty) => {
+    const range = difficultyRangeFor(instrumentId, difficulty)
+    setDraftRangeLowMidi(range?.lowMidi)
+    setDraftRangeHighMidi(range?.highMidi)
+    if (range) setDraftRange(range.highMidi - range.lowMidi > 12 ? '2-octaves' : '1-octave')
+  }
+
+  const chooseDifficulty = (difficulty: StaffJumperDifficulty) => {
+    setDraftDifficulty(difficulty)
+    applyDifficultyRange(draftInstrumentId, difficulty)
+  }
+
   const chooseInstrument = (id: string) => {
     const instrument = getStaffJumperInstrument(id)
     setDraftInstrumentId(instrument?.id ?? null)
     saveStaffJumperInstrumentId(instrument?.id ?? null)
     if (instrument) savePracticeGameInstrumentId(instrument.id)
-    setDraftRangeLowMidi(undefined)
-    setDraftRangeHighMidi(undefined)
+    applyDifficultyRange(instrument?.id ?? null, draftDifficulty)
     if (!instrument) return
     setDraftClef(instrument.clef)
     setDraftTransposition(instrument.transposition)
@@ -699,7 +721,7 @@ export default function StaffJumperScreen({
             step={Math.max(0, difficultyIndex)}
             stepCount={STAFF_JUMPER_DIFFICULTIES.length}
             hapticFeedback={hapticFeedback}
-            onCycle={() => setDraftDifficulty(cycleNext(STAFF_JUMPER_DIFFICULTIES, draftDifficulty))}
+            onCycle={() => chooseDifficulty(cycleNext(STAFF_JUMPER_DIFFICULTIES, draftDifficulty))}
           />
           <Pressable
             type="button"
@@ -819,7 +841,7 @@ export default function StaffJumperScreen({
             <Options
               label="Difficulty"
               value={draftDifficulty}
-              onChange={setDraftDifficulty}
+              onChange={chooseDifficulty}
               options={STAFF_JUMPER_DIFFICULTIES.map((level) => ({
                 id: level,
                 label: DIFFICULTY_LABELS[level],

@@ -52,6 +52,7 @@ import { extensionForBlob, writeBlobToNativeCache } from '../../utils/nativeAsse
 import {
   isNativeMultitrackTransportAvailable,
   prepareNativeMultitrackMonitor,
+  setNativeMultitrackOutputMuted,
   startNativeMultitrackTransport,
   stopNativeMultitrackTransport,
   type MultitrackMonitorSource,
@@ -1323,6 +1324,25 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const headphonesConnected = useHeadphoneOutput()
   const headphoneNoticeShownForOpenRef = useRef(false)
 
+  // Headphones that go away mid-take — unplugged, AirPods out, a dead battery —
+  // hand the click and the other parts to the speaker, and the mic records
+  // them. Silence the mix the moment that happens; the take itself keeps going.
+  const [speakerMuted, setSpeakerMuted] = useState(false)
+  const headphonesBeforeRef = useRef(headphonesConnected)
+  useEffect(() => {
+    const had = headphonesBeforeRef.current
+    headphonesBeforeRef.current = headphonesConnected
+    const live = recording.phase === 'count-in' || recording.phase === 'recording'
+    if (!live) {
+      setSpeakerMuted(false)
+      return
+    }
+    if (!had || headphonesConnected) return
+    setSpeakerMuted(true)
+    void setNativeMultitrackOutputMuted(true)
+    pauseBacking()
+  }, [headphonesConnected, recording.phase, pauseBacking])
+
   useEffect(() => {
     if (!isOpen) {
       headphoneNoticeShownForOpenRef.current = false
@@ -1501,6 +1521,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               tunerInstrument={tunerInstrument}
               practice={session.practice}
               phase={recording.phase}
+              speakerMuted={speakerMuted}
               countInRemaining={recording.countInRemaining}
               isRecording={isRecording}
               isStopping={isStopping}

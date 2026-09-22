@@ -1,10 +1,12 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
-import { memo, useRef } from 'react'
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMotionValue } from 'framer-motion'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useHandsFreePanelLayout } from '../hooks/useHandsFreePanelLayout'
 import '../styles/hands-free-panel.css'
-import { Settings2, GripHorizontal, Mic } from 'lucide-react'
+import { Settings2 } from 'lucide-react'
+import { HandsFreeToolIcon } from './icons/toolIcons'
+import HandsFreeSettingsRows from './HandsFreeSettingsRows'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 
 /**
@@ -29,8 +31,15 @@ interface HandsFreeStageProps {
   /** Audio mode paints a light backdrop; camera mode is dark behind the copy. */
   onLightBackground?: boolean
   placement?: HandsFreeStagePlacement
-  /** Opens quiet-gap / start-level settings before recording. */
+  /** Settings opened inside the widget — also an explicit mic-recovery gesture. */
   onTapForSettings?: () => void
+  /** Seconds of quiet before a take stops. */
+  silenceSeconds: number
+  /** Start level 1–100. */
+  volumeThreshold: number
+  hapticFeedback?: boolean
+  onSilenceSecondsChange: (seconds: number) => void
+  onVolumeThresholdChange: (threshold: number) => void
   /** Turns hands-free off — same as closing any other widget with its ×. */
   onClose?: () => void
 }
@@ -67,8 +76,31 @@ function HandsFreeStage({
   onLightBackground = false,
   placement = 'center',
   onTapForSettings,
+  silenceSeconds,
+  volumeThreshold,
+  hapticFeedback,
+  onSilenceSecondsChange,
+  onVolumeThresholdChange,
   onClose,
 }: HandsFreeStageProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Settings close with the widget: turning hands-free back on starts clean.
+  useEffect(() => { if (!phase) setSettingsOpen(false) }, [phase])
+  const openSettings = () => {
+    if (!settingsOpen) onTapForSettings?.()
+    setSettingsOpen(open => !open)
+  }
+  // The rows make the panel taller. Lift it so they never land on Record.
+  useLayoutEffect(() => {
+    if (!settingsOpen || !movable) return
+    const panelEl = panel.panelRef.current
+    const dock = document.querySelector('.open-lens-dock, [data-tutorial="record-controls"]')
+    if (!panelEl || !dock) return
+    const overlap = panelEl.getBoundingClientRect().bottom - (dock.getBoundingClientRect().top - 8)
+    if (overlap > 0) panel.moveTo({ x: panel.layout.x, y: Math.max(12, panel.layout.y - overlap) })
+    // Only the moment settings open; after that the player owns the position.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsOpen])
   const panel = useHandsFreePanelLayout(movable)
   const boundaryRef = useRef<HTMLDivElement>(null)
   const x = useMotionValue(0)
@@ -76,27 +108,11 @@ function HandsFreeStage({
   const ballDetail = phase === 'recording' ? formatElapsed(elapsed)
     : phase === 'countdown' ? `${replayCountdown ?? 0}s`
     : phase === 'playback' ? 'Listen' : phase === 'saving' ? 'Saving' : phase === 'preparing' ? 'Mic…' : 'Ready'
-  // Keep recovery controls reachable even while the widget is collapsed.
-  const settingsTappable = Boolean(phase && onTapForSettings)
+  const settingsTappable = Boolean(phase)
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef: panel.panelRef,
     x, y, positionId: 'hands-free-tools', label: `hands-free${phase ? `, ${PHASE_COPY[phase].title}` : ''}`,
-    icon: <Mic aria-hidden />, detail: ballDetail, active: phase === 'recording',
-    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase),
-    ballAccessory: settingsTappable && (
-      <button
-        type="button"
-        className="widget-ball-settings"
-        aria-label="Hands-free settings"
-        title="Hands-free settings"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation()
-          onTapForSettings?.()
-        }}
-      >
-        <Settings2 aria-hidden />
-      </button>
-    ) })
+    icon: <HandsFreeToolIcon aria-hidden />, detail: ballDetail, active: phase === 'recording',
+    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase) })
   const copy = phase ? PHASE_COPY[phase] : null
 
   return (<>
@@ -151,7 +167,7 @@ function HandsFreeStage({
             </svg>
           </button>
         )}
-        {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><GripHorizontal aria-hidden />Move</button>}
+        {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><span aria-hidden /></button>}
         <span className="hands-free-stage__pulse" aria-hidden />
         <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
         <small className="hands-free-stage__detail">{copy?.detail ?? ''}</small>
@@ -171,27 +187,28 @@ function HandsFreeStage({
             ? 'The start level may be too sensitive: background sound or repeated short takes were detected. Raise the start level to trigger only when you play.'
             : notice === 'microphone' ? 'Microphone signal interrupted. Reconnecting automatically… Check your audio connection if this continues.'
             : 'Recording did not start. Rearming automatically for your next take.'}</small>
-          {notice === 'sensitive' && onTapForSettings && <button type="button" onClick={onTapForSettings}>Adjust start level</button>}
+          {notice === 'sensitive' && !settingsOpen && <button type="button" onClick={openSettings}>Adjust start level</button>}
         </div>}
-        {/* The centre treatment has room for the words; the compact pill on the
-          * dense Tools tabs takes a glyph instead, so the status copy is never
-          * squeezed on a narrow phone. Both open the same card. */}
         {settingsTappable && (
           <button
             type="button"
             className="hands-free-stage__settings"
-            onClick={onTapForSettings}
-            aria-label="Hands-free settings: quiet gap and start level"
+            onClick={openSettings}
+            aria-expanded={settingsOpen}
+            aria-label={settingsOpen ? 'Hide hands-free settings' : 'Hands-free settings: quiet gap and start level'}
           >
-            {placement === 'chip' ? (
-              <>
-                <Settings2 aria-hidden />
-                <span>Tap for settings</span>
-              </>
-            ) : (
-              'Tap for settings'
-            )}
+            <Settings2 aria-hidden />
+            <span>{settingsOpen ? 'Done' : 'Settings'}</span>
           </button>
+        )}
+        {settingsTappable && settingsOpen && (
+          <HandsFreeSettingsRows
+            silenceSeconds={silenceSeconds}
+            volumeThreshold={volumeThreshold}
+            hapticFeedback={hapticFeedback}
+            onSilenceSecondsChange={onSilenceSecondsChange}
+            onVolumeThresholdChange={onVolumeThresholdChange}
+          />
         )}
       </div>
     </div></>

@@ -1,4 +1,3 @@
-import { isIPhoneDevice } from '../utils/deviceFormFactor'
 import SwipeRoutineItem from './SwipeRoutineItem'
 import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -37,7 +36,7 @@ const GAMES: Array<{ route: LabsRoute; label: string; hint: string }> = [
 ]
 
 function toolKeyForStep(step: RoutineStep): string {
-  if (step.desk?.showMusic && !isIPhoneDevice()) return 'music'
+  if (step.desk?.showMusic) return 'music'
   if (step.kind === 'record' || step.kind === 'focus') return step.desk?.mode === 'video' ? 'camera' : 'audio'
   if (step.kind === 'tune') return 'tuner'
   if (step.kind === 'metro') return 'metronome'
@@ -495,7 +494,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           </div>}
           {screen === 'custom-tool' && <>
             {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}
-            <div className="routine-guide-tool-list">{toolChoices.filter(choice => choice.key !== 'music' || !isIPhoneDevice()).map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
+            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
             {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
             {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
           </>}

@@ -69,6 +69,8 @@ interface MultitrackRecordingStageProps {
   onToggleMonitorSource: (id: string) => void
   /** A backing track is loaded — the click starts off because it rarely lines up with it. */
   hasBacking?: boolean
+  /** Headphones went away mid-take, so the mix was silenced to keep it out of the mic. */
+  speakerMuted?: boolean
   /** Native iOS camera bridge is delivering live frames — show the canvas, hide the WebKit video. */
   nativeLivePreviewActive?: boolean
   /** Keep the bridge canvas mounted so record-start handoff can paint instantly. */
@@ -108,6 +110,7 @@ export default function MultitrackRecordingStage({
   monitorSources,
   onToggleMonitorSource,
   hasBacking = false,
+  speakerMuted = false,
   nativeLivePreviewActive = false,
   nativeCameraBridgeEnabled = false,
   onPracticeChange,
@@ -347,7 +350,12 @@ export default function MultitrackRecordingStage({
             </Pressable>
           ))}
           {monitorSources.some(source => source.unavailableReason) && <span>Adjust part mute and volume in the Editor.</span>}
-          {anyMonitorAudible ? (
+          {speakerMuted ? (
+            <span className="multitrack-headphone-chip multitrack-headphone-chip--warn" role="status">
+              <Headphones className="h-3 w-3" />
+              Headphones disconnected — playback muted, still recording
+            </span>
+          ) : anyMonitorAudible ? (
             <span
               className={`multitrack-headphone-chip ${headphonesActive ? 'multitrack-headphone-chip--on' : 'multitrack-headphone-chip--warn'}`}
             >

@@ -1,4 +1,3 @@
-import { isIPhoneDevice } from './deviceFormFactor'
 import type { RecordingMode } from '../types'
 import type { MetronomePrefs } from './metronomeConfig'
 import { normalizeDeskMetronome } from './deskMetronome'
@@ -6,7 +5,7 @@ import { getWrittenPitchLabel, type TunerTranspositionId } from './tunerTranspos
 
 /**
  * A desk is the whole room set up for one kind of practice: which overlays
- * are on, the click, the drone note, the hands-free gap, and which surface
+ * are on, the click, the drone note, and which surface
  * it lives on. Saving one turns four toggles into one tap. Up to three live
  * as chips at the top of the Workspace tray — never a gallery.
  */
@@ -139,8 +138,7 @@ export function deskMatchesSnapshot(desk: WorkspaceDesk, live: DeskSnapshot): bo
       JSON.stringify(normalizeDeskMetronome(desk.metronome)) === JSON.stringify(normalizeDeskMetronome(live.metronome))) &&
     (!desk.showDrone ||
       (desk.drone.pitchClass === live.drone.pitchClass &&
-        desk.drone.octave === live.drone.octave)) &&
-    (!desk.autoSoundRecording || desk.soundSilenceSeconds === live.soundSilenceSeconds)
+        desk.drone.octave === live.drone.octave))
   )
 }
 
@@ -159,8 +157,8 @@ export function summarizeDesk(
     parts.push('Drone')
   }
   if (desk.pitchTrackerEnabled) parts.push('Pitch')
-  if (desk.showMusic && !isIPhoneDevice()) parts.push('Music')
-  if (desk.autoSoundRecording) parts.push(`Hands-free ${desk.soundSilenceSeconds}s`)
+  if (desk.showMusic) parts.push('Music')
+  if (desk.autoSoundRecording) parts.push('Hands-free')
   if (desk.audioEnhancerEnabled) parts.push('Enhancer')
   if (desk.mode === 'video' && !desk.showTakeCards) parts.push('Cards off')
   parts.push(desk.mode === 'video' ? 'Camera' : 'Audio')

@@ -308,6 +308,9 @@ export function useAutoSoundRecording({
         startLatchRef.current || isRecordingRef.current || suppressStartRef.current) {
       return
     }
+    // Remember a running click before capture steals the session. Listen-back
+    // brings it back; this is what a routine step was making the player tap for.
+    sharedMetronomeEngine.holdClickAcrossPlayback()
 
     const mark = tryMarkAutoPerformanceRef.current?.()
     if (mark === 'started') {
@@ -362,6 +365,7 @@ export function useAutoSoundRecording({
     const mark = tryMarkAutoPerformanceRef.current?.()
     if (mark !== 'started') return false
 
+    sharedMetronomeEngine.holdClickAcrossPlayback()
     pendingPerformanceGateRef.current = false
     autoTriggeredRef.current = true
     silenceGateRef.current.reset()

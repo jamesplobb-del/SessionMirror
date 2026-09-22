@@ -41,8 +41,3 @@ export function syncFormFactorClass(width = readViewportWidth()): boolean {
   document.documentElement.classList.toggle('form-factor-tablet', tablet)
   return tablet
 }
-
-/** Hardware check so landscape iPhones never gain routine sheet-music tools. */
-export function isIPhoneDevice(): boolean {
-  return typeof navigator !== 'undefined' && /iPhone|iPod/.test(navigator.userAgent)
-}

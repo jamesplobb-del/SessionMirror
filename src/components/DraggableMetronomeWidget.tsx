@@ -1,6 +1,7 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { Check, Pause, Play, Music2 } from 'lucide-react'
+import { Check, Pause, Play } from 'lucide-react'
+import { MetronomeToolIcon } from './icons/toolIcons'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import {
   useCallback,
@@ -467,7 +468,7 @@ export default function DraggableMetronomeWidget({
   }, [playing, togglePlay])
 
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
-    positionId, label: 'metronome', icon: <Music2 aria-hidden />, detail: `${bpm} BPM`,
+    positionId, label: 'metronome', icon: <MetronomeToolIcon />, detail: `${bpm} BPM`,
     active: playing && !(isTakePlaying && muteDuringPlayback), resetKey: collapseResetKey, visible })
 
   return (<>

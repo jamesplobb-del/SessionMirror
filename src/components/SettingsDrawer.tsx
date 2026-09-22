@@ -9,6 +9,7 @@ import {
   Mic,
   Moon,
   RotateCcw,
+  ShieldCheck,
   Smartphone,
   Sparkles,
   VolumeX,
@@ -29,6 +30,7 @@ import IOSSwitch from './ui/IOSSwitch'
 import Pressable from './ui/Pressable'
 import { iosSpringSnappy, motionGpuLayer } from '../utils/motionPresets'
 import HelpSheet from './HelpSheet'
+import PrivacyPolicySheet from './PrivacyPolicySheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
 import { useTutorialAction } from '../context/TutorialContext'
@@ -583,6 +585,7 @@ function SettingsDrawer({
     return () => window.removeEventListener(GUIDANCE_PREFERENCES_EVENT, sync)
   }, [])
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
+  const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false)
   const [activeQuickFunctionSetup, setActiveQuickFunctionSetup] =
     useState<QuickFunctionSetup | null>(null)
   const [quickFunctionsAccessOpen, setQuickFunctionsAccessOpen] = useState(false)
@@ -606,6 +609,7 @@ function SettingsDrawer({
 
   useEffect(() => {
     if (!isOpen) {
+      setPrivacyPolicyOpen(false)
       setActiveQuickFunctionSetup(null)
       setQuickFunctionsAccessOpen(false)
       setQuickAccessDestination('tuner')
@@ -990,8 +994,14 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="help" title="Help">
-            <SettingsGroup title="Support" footer="Opens an email draft for you to review and send. If your email app doesn’t open, email jamesplobb@gmail.com.">
+            <SettingsGroup title="Support" footer="Report a bug opens an email draft for you to review and send. If your email app doesn’t open, email jamesplobb@gmail.com.">
               <BugReportLink email="jamesplobb@gmail.com" instrument={activeInstrument.label} />
+              <LinkRow
+                icon={ShieldCheck}
+                tint={TINT.green}
+                label="Privacy policy"
+                onClick={() => setPrivacyPolicyOpen(true)}
+              />
             </SettingsGroup>
             <SettingsGroup title="Promo codes" footer="Have a code? Redeem it securely with the App Store. Any offer price is shown before you confirm.">
               <LinkRow
@@ -1080,6 +1090,7 @@ function SettingsDrawer({
       </div>
       </AnimatedBottomSheet>
       <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
+      <PrivacyPolicySheet isOpen={privacyPolicyOpen} onClose={() => setPrivacyPolicyOpen(false)} />
       <AnimatedBottomSheet
         isOpen={activeQuickFunctionSetup !== null}
         onClose={handleCloseQuickFunctionSetup}

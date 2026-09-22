@@ -133,6 +133,15 @@ class SharedMetronomeEngine {
 
   private isTakePlaying = false
   private muteDuringPlayback = true
+  /**
+   * The click was running when a take started playing back. Hands-free listen-back
+   * reconfigures the audio session and the native engine reports stopped; that is
+   * not the player turning the metronome off. `resumeClickWanted` brings it back
+   * when the take is done, including a routine step that started the click for them.
+   */
+  private resumeClickWanted = false
+  private clickResumeUntil = 0
+  private clickResumeGeneration = 0
   private outputGainMultiplier = 1
   private resumeOnForeground = false
   private lifecycleAttached = false
@@ -255,7 +264,18 @@ class SharedMetronomeEngine {
     this.nativeListenersAttached = true
 
     void nativeMetronomeAddStateListener(event => {
-      if (!event.playing && this.snapshot.playing && !this.startInFlight) this.stop()
+      if (event.playing || !this.snapshot.playing || this.startInFlight) return
+      // A take owns the session. Remember that the click should return, and do
+      // not treat the engine dying as Stop — Stop is what cancels the return.
+      if (this.resumeClickWanted || Date.now() < this.clickResumeUntil) {
+        this.resumeClickWanted = true
+        this.patchState({ playing: false })
+        // Listen-back owns the session. A take that is still recording does not.
+        if (this.isTakePlaying) void this.releaseNativeSpeakerRoute()
+        if (!this.isTakePlaying && Date.now() < this.clickResumeUntil) this.queueClickResume()
+        return
+      }
+      this.stop()
     })
 
     void nativeMetronomeAddPulseListener((event) => {
@@ -412,10 +432,60 @@ class SharedMetronomeEngine {
     this.applyMasterGain()
   }
 
+  /**
+   * Call at the moment listen-back is requested, before the route change, so a
+   * native stop that arrives ahead of React still counts as "the click was on".
+   */
+  holdClickAcrossPlayback = (): void => {
+    this.clickResumeGeneration += 1
+    if (!this.snapshot.playing && !this.resumeClickWanted) return
+    if (this.snapshot.playing) this.resumeClickWanted = true
+  }
+
+  private finishTakePlaybackClickHold(): void {
+    const shouldResume = this.resumeClickWanted && !this.snapshot.playing
+    if (!shouldResume) {
+      if (this.snapshot.playing) this.resumeClickWanted = false
+      return
+    }
+    this.queueClickResume()
+  }
+
+  /** Bring a click back after listen-back once the playback route has let go. */
+  private queueClickResume(): void {
+    if (!this.resumeClickWanted) return
+    this.clickResumeGeneration += 1
+    const generation = this.clickResumeGeneration
+    this.clickResumeUntil = Date.now() + 4000
+    const attempt = (index: number) => {
+      if (generation !== this.clickResumeGeneration || !this.resumeClickWanted) return
+      if (this.isTakePlaying) return
+      if (this.snapshot.playing) {
+        this.resumeClickWanted = false
+        return
+      }
+      void this.start({ recovered: true, fromStale: true }).then(ok => {
+        if (generation !== this.clickResumeGeneration) return
+        if (ok && this.snapshot.playing) {
+          window.setTimeout(() => {
+            if (generation !== this.clickResumeGeneration) return
+            if (this.snapshot.playing && !this.isTakePlaying) this.resumeClickWanted = false
+          }, 400)
+          return
+        }
+        if (index < 5) window.setTimeout(() => attempt(index + 1), 350 * (index + 1))
+      })
+    }
+    window.setTimeout(() => attempt(0), 250)
+  }
+
   setPlaybackMutePolicy(isTakePlaying: boolean, muteDuringPlayback: boolean): void {
+    const wasTakePlaying = this.isTakePlaying
+    if (!wasTakePlaying && isTakePlaying) this.holdClickAcrossPlayback()
     this.isTakePlaying = isTakePlaying
     this.muteDuringPlayback = muteDuringPlayback
     this.applyMasterGain()
+    if (wasTakePlaying && !isTakePlaying) this.finishTakePlaybackClickHold()
   }
 
   attachLifecycle(): void {
@@ -1282,6 +1352,9 @@ class SharedMetronomeEngine {
 
   stop = (): void => {
     this.resumeOnForeground = false
+    this.resumeClickWanted = false
+    this.clickResumeUntil = 0
+    this.clickResumeGeneration += 1
     this.hardStop()
   }
 

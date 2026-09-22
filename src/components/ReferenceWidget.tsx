@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject, type PointerEvent, type KeyboardEvent } from 'react'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { GripHorizontal, Grip, Minus, Maximize, Play, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, FileMusic, GripHorizontal, Grip, Maximize, X } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import type { LibraryPlaybackReference } from '../types/library'
 import { clampWidgetPosition, loadWidgetSize, saveWidgetSize } from '../utils/floatingWidgetLayout'
@@ -92,12 +92,12 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
         chipDragged.current = false
         onExpandedChange(true)
       }}
-      aria-label="Open References" title="Tap to open; drag to move"><Play aria-hidden />References</button>}
+      aria-label="Open References" title="Tap to open; drag to move"><FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden /></button>}
     <div className={`reference-widget-panel ${showTrackName && libraryPlayback ? 'reference-widget-panel--named-audio' : ''}`} hidden={!expanded}>
       <header onPointerDown={e => { if (!(e.target as HTMLElement).closest('button')) drag.start(e) }}>
         <span><GripHorizontal aria-hidden />References</span>
         <button type="button" onClick={onExpandView} disabled={!youtubeUrl && !libraryPlayback} aria-label="Open reference in Expand View" title="Open Expand View"><Maximize aria-hidden /></button>
-        <button onClick={() => onExpandedChange(false)} aria-label="Collapse References" title="Collapse to References chip"><Minus aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
+        <button onClick={() => onExpandedChange(false)} aria-label="Collapse References" title="Collapse References"><ChevronUp aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
       </header>
       {showTrackName && libraryPlayback && <p className="reference-widget-track-name">{libraryPlayback.name}</p>}
       <div className="reference-widget-media">
@@ -107,7 +107,6 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
           onYoutubeHostChange={onYoutubeHostChange} youtubeIframeRef={youtubeIframeRef} onPlaybackChange={onPlaybackChange} />
       </div>
       <footer className="reference-widget-size-bar">
-        <span>Resize</span>
         <button type="button" className="reference-widget-resize" aria-label="Resize reference. Drag, or use arrow keys."
           onPointerDown={event => {
             if (event.button !== 0) return

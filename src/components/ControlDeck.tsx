@@ -40,6 +40,8 @@ interface ControlDeckProps {
   libraryAboveRecord?: boolean
   onOpenTools?: () => void
   onOpenAudioRecorder?: () => void
+  /** The recorder the Tools return button goes back to — Tools itself is always audio. */
+  toolsReturnMode?: RecordingMode
   onOpenReferences?: () => void
   vaultRevision?: number
   onOpenVault?: () => void
@@ -130,6 +132,7 @@ function ControlDeck({
   workspaceSections = false,
   onOpenTools,
   onOpenAudioRecorder,
+  toolsReturnMode = 'audio',
   onOpenReferences,
   onOpenVault,
   vaultRevision,
@@ -413,7 +416,7 @@ function ControlDeck({
           <Pressable className="open-lens-dock-action" onClick={onOpenHome} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="home-button" aria-label="Open Practice Home"><House aria-hidden /><span>Home</span></Pressable>
           <Pressable ref={overlaysButtonRef} className="open-lens-dock-action" onClick={() => branchActive ? closeBranch() : openBranch()} disabled={settingsBranchDisabled || isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="overlays-button" aria-label={branchActive ? 'Close workspace' : 'Open workspace'} aria-expanded={branchActive}><Grid2X2 aria-hidden /><span>Workspace</span></Pressable>
           {recordStage}
-          <Pressable className="open-lens-dock-action" onClick={toolsActive ? onOpenAudioRecorder : onOpenTools} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="practice-button" aria-label={toolsActive ? 'Open recording' : 'Open Tools'}>{toolsActive ? <Mic aria-hidden /> : <Wrench aria-hidden />}<span>{toolsActive ? 'Record' : 'Tools'}</span></Pressable>
+          <Pressable className="open-lens-dock-action" onClick={toolsActive ? onOpenAudioRecorder : onOpenTools} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="practice-button" aria-label={toolsActive ? 'Back to record and compare' : 'Open Tools'}>{toolsActive ? (toolsReturnMode === 'video' ? <Camera aria-hidden /> : <Mic aria-hidden />) : <Wrench aria-hidden />}<span>{toolsActive ? 'Compare' : 'Tools'}</span></Pressable>
           {libraryAboveRecord ? <Pressable className="open-lens-dock-action" onClick={onOpenSettings} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} aria-label="Open settings"><Settings aria-hidden /><span>Settings</span></Pressable> : <Pressable className="open-lens-dock-action" onClick={() => { reportFeatureAction('take-library-opened'); onOpenVault?.() }} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-guidance="take-library" aria-label="Open Take library"><Library aria-hidden /><span>Library</span></Pressable>}
         </div>
       ) : isCameraPresentation ? (
@@ -584,7 +587,7 @@ function ControlDeck({
             >
               <span className="ui-orient-spin audio-camera-button__content">
                 {onOpenAudioRecorder ? <Mic aria-hidden strokeWidth={1.75} /> : <><span className="electric-original-icon"><Camera aria-hidden strokeWidth={1.75} /></span><ElectricControlIcon kind="camera" /></>}
-                <span>{onOpenAudioRecorder ? 'Record' : 'Camera'}</span>
+                <span>{onOpenAudioRecorder ? 'Compare' : 'Camera'}</span>
               </span>
             </Pressable>
 

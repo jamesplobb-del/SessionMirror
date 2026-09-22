@@ -1,5 +1,6 @@
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
-import { GripHorizontal, Library } from 'lucide-react'
+import { GripHorizontal } from 'lucide-react'
+import { TakesToolIcon } from './icons/toolIcons'
 import { useCallback, useLayoutEffect, useRef, type ComponentProps, type RefObject } from 'react'
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
@@ -76,7 +77,7 @@ export default function DraggableTakesWidget({
 
   const fold = useCollapsibleWidget({
     boundaryRef, widgetRef, x: dragX, y: dragY, positionId: POSITION_ID,
-    label: 'takes', icon: <Library aria-hidden />, detail: held > 0 ? `${held}` : 'Takes',
+    label: 'takes', icon: <TakesToolIcon aria-hidden />, detail: held > 0 ? `${held}` : 'Takes',
     active: held > 0, resetKey: collapseResetKey, ballSlot: 5, visible,
   })
 

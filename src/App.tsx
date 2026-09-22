@@ -1,6 +1,5 @@
 import { TakeGuidanceProvider } from './context/TakeGuidanceContext'
 import { normalizeDeskMetronome } from './utils/deskMetronome'
-import { isIPhoneDevice } from './utils/deviceFormFactor'
 import FeatureGuidance from './components/FeatureGuidance'
 import { confirmFeatureAction, reportFeatureAction } from './utils/featureGuidance'
 import { queueAudioEnhancement } from './utils/enhancementQueue'
@@ -43,7 +42,6 @@ import { useAppSettings } from './hooks/useAppSettings'
 import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
-import HandsFreeSettingsCard from './components/HandsFreeSettingsCard'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
 import type { DeskSnapshot } from './utils/workspaceDesks'
@@ -634,7 +632,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   /** Saved desks — chips at the top of the Workspace tray. */
   /** The live room, kept current so a focused take can remember the desk it was played on. */
   const liveDeskSnapshotRef = useRef<DeskSnapshot | null>(null)
-  const [handsFreeCardOpen, setHandsFreeCardOpen] = useState(false)
   /** One breath of the record button after Current finishes playing back. */
   const [againPulse, setAgainPulse] = useState(false)
   const [youtubeAutoPlayOnLoad, setYoutubeAutoPlayOnLoad] = useState(false)
@@ -1107,6 +1104,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
       autoRecordStartSuppressedRef.current = true
       setAutoRecordStartSuppressed(true)
+      sharedMetronomeEngine.holdClickAcrossPlayback()
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
       setAutoPlaybackTakeId(takeId)
@@ -1868,11 +1866,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       if (shouldAutoPlay && mediaType === 'audio') {
         // Keep the hands-free turn-around intact, but do not hand a just-written
         // file to the native player before the same readiness validation as the card.
+        sharedMetronomeEngine.holdClickAcrossPlayback()
         setHandsFreePlaybackPending(true)
       } else if (shouldAutoPlay && mediaType === 'video') {
         pendingAutoPlaybackRef.current = false
         autoRecordStartSuppressedRef.current = true
         setAutoRecordStartSuppressed(true)
+        sharedMetronomeEngine.holdClickAcrossPlayback()
         setHandsFreePlaybackPending(true)
         setAutoPlaybackPlaying(false)
         setAutoPlaybackTakeId(takeId)
@@ -2679,6 +2679,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       onAutoRecordingFinished: () => {
         pendingAutoPlaybackRef.current = true
         autoRecordStartSuppressedRef.current = true
+        sharedMetronomeEngine.holdClickAcrossPlayback()
         setHandsFreePlaybackPending(true)
         setAutoRecordStartSuppressed(true)
       },
@@ -3290,8 +3291,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         showMusic: desk.showMusic,
         showTakeCards: desk.showTakeCards,
         audioEnhancerEnabled: desk.audioEnhancerEnabled,
-        soundSilenceSeconds: desk.soundSilenceSeconds,
       })
+      // Pause-before-playback is one app setting. A routine step used to copy
+      // its own saved gap back over it, so the number reset every time the
+      // step changed.
       showTakeCardsRef.current = desk.showTakeCards
       if (desk.autoSoundRecording !== autoSoundRecordingEnabledRef.current) {
         handleAutoSoundRecordingChange(desk.autoSoundRecording)
@@ -4333,6 +4336,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // Keep audio owners mounted even when folded or visiting a full tool tab.
   // Visibility is independent of sound; the full tool's own widget steps aside.
   const onRecordSurface = recordingMode === 'video' || audioPracticeTab === 'audio'
+  // Tools always runs in audio mode. Remember which recorder the player left so
+  // the dock's Compare button (and its icon) takes them back to that one.
+  const [toolsReturnMode, setToolsReturnMode] = useState<RecordingMode>(recordingMode)
+  useEffect(() => {
+    if (onRecordSurface) setToolsReturnMode(recordingMode)
+  }, [onRecordSurface, recordingMode])
   const showFloatingMetronomeWidget = showMetronomeWidget
 
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended && !(recordingMode === 'audio' && audioPracticeTab === 'metronome')
@@ -5535,7 +5544,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
     const surfaceBefore = recordingModeRef.current
-    if (isIPhoneDevice()) updateSettings({ showMusic: false })
     setIsSplitView(false)
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
@@ -5556,7 +5564,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     let itemProjectId = step.projectId
     let sessionId: string | null = null
     const savedDesk = day.desksByStep[step.id] ?? step.desk
-    const desk = savedDesk && isIPhoneDevice() ? { ...savedDesk, showMusic: false } : savedDesk
+    const desk = savedDesk
+    // A step without music puts the paper away, even when its folder has a
+    // file. A step with music leaves it up so two parts in a row do not flash.
+    if (!desk?.showMusic) updateSettings({ showMusic: false })
     if (step.kind !== 'game' && step.kind !== 'free') {
       const existing = await findRoutinePracticeProject(target.id, step.id, itemProjectId)
       const project = existing ?? await createProject(step.title)
@@ -5944,7 +5955,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       <FeatureGuidance
         paused={showOnboardingTutorial || !isOnboardingComplete() || isPracticeHubOpen ||
           isSettingsOpen || isVaultOpen || isReviewOpen || isLabsOpen || multitrackOpen ||
-          isExperimentalOpen || handsFreeCardOpen || focusPanel !== null ||
+          isExperimentalOpen || focusPanel !== null ||
           isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
           handsFreePlaybackPending || practiceSessionActive || pipDragState.isDragging || Boolean(takeDeleteError)}
         feedbackPaused={showOnboardingTutorial || isRecording || isStopping || takePlaybackActive ||
@@ -5964,7 +5975,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     >
       <ActionSheetProvider>
         <MetronomeProvider
-          isTakePlaying={takePlaybackActive}
+          isTakePlaying={takePlaybackActive || handsFreePlaybackPending}
           muteDuringPlayback={settings.muteMetronomeDuringPlayback}
         >
           <AudioModePlaybackProvider
@@ -6060,6 +6071,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onJumpToStep={handleJumpToRoutineStep}
                     onEditRoutine={isChallengeRoutine(routine) ? undefined : handleEditRoutineFromBar}
                     onOpenToday={handleOpenRoutineToday}
+                    preferBall={musicPageVisible}
                   />
                 )}
 
@@ -6278,20 +6290,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                       }
                     }}
                     active={musicRoomActive}
-                    takesSlot={
-                      <TunerTakePillRow
-                        compact
-                        ariaLabel="Takes"
-                        benchmarkTake={benchmarkTake}
-                        libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                        challengerTake={challengerTake}
-                        onExpandBenchmark={handleExpandBenchmark}
-                        onExpandChallenger={handleExpandChallenger}
-                        onPinCurrentAsBest={handlePinCurrentAsBest}
-                        onClearBenchmark={handleClearAudioBenchmark}
-                        onClearChallenger={handleClearAudioChallenger}
-                      />
-                    }
                     boundaryRef={appShellRef}
                     collapseResetKey={routineActiveStep?.id}
                     onClose={handleCloseMusic}
@@ -6430,18 +6428,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               </div>
 
-              {/* The takes become a ball while a part is up: a panel cannot sit on
-                  a staff, and the deck they normally ride on is the first thing a
-                  player puts away for a rehearsal. */}
-              {musicPageVisible && settings.showTakeCards && (
+              {musicRoomActive && settings.showTakeCards && (
                 <Suspense fallback={null}>
-                  {/* `isRecording` freezes the cards, so it is only the live
-                      mic — not the save afterwards. A take that is still being
-                      written is already reported by `takeReadiness`, which
-                      spins on its own card and disables its own play button;
-                      freezing the whole panel through the save instead made the
-                      take you had just recorded refuse to play for no visible
-                      reason. */}
                   <DraggableTakesWidget
                     boundaryRef={appShellRef}
                     collapseResetKey={routineActiveStep?.id}
@@ -6458,6 +6446,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onShareBenchmark={benchmarkTake ? () => handleShareTake(benchmarkTake) : undefined}
                     onShareChallenger={challengerTake ? () => handleShareTake(challengerTake) : undefined}
                     isRecording={isRecording}
+                    visible={musicRoomActive}
                   />
                 </Suspense>
               )}
@@ -6490,25 +6479,16 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 placement={handsFreeStagePlacement}
                 onTapForSettings={() => {
                   reportFeatureAction('hands-free-settings-opened')
-                  setHandsFreeCardOpen(true)
                   // Opening settings is also an explicit recovery gesture for
                   // a monitor that is still preparing after playback.
                   restartHandsFreeMonitorRef.current({ force: true })
                 }}
-                onClose={handleCloseHandsFree}
-              />
-              <HandsFreeSettingsCard
-                open={handsFreeCardOpen && hudModalState === 'idle'}
                 silenceSeconds={settings.soundSilenceSeconds}
                 volumeThreshold={settings.soundVolumeThreshold}
                 hapticFeedback={settings.hapticFeedback}
-                onSilenceSecondsChange={(soundSilenceSeconds) =>
-                  updateSettings({ soundSilenceSeconds })
-                }
-                onVolumeThresholdChange={(soundVolumeThreshold) =>
-                  updateSettings({ soundVolumeThreshold })
-                }
-                onClose={() => setHandsFreeCardOpen(false)}
+                onSilenceSecondsChange={(soundSilenceSeconds) => updateSettings({ soundSilenceSeconds })}
+                onVolumeThresholdChange={(soundVolumeThreshold) => updateSettings({ soundVolumeThreshold })}
+                onClose={handleCloseHandsFree}
               />
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
                 {onRecordSurface && !isSplitView && !musicPageVisible && !isLabsOpen && !multitrackOpen && (
@@ -6901,7 +6881,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         workspaceSections
                         toolsActive={isAudioPracticeToolTab}
                         onOpenTools={() => handleOpenFullPracticeTool(lastFullToolTab.current)}
-                        onOpenAudioRecorder={() => { setMusicPageVisible(false); handleAudioPracticeTabChange('audio') }}
+                        toolsReturnMode={toolsReturnMode}
+                        onOpenAudioRecorder={() => {
+                          setMusicPageVisible(false)
+                          handleAudioPracticeTabChange('audio')
+                          if (toolsReturnMode === 'video') handleRecordingModeChange('video')
+                        }}
                         vaultRevision={takes.length}
                         isRecording={isRecording}
                         isStopping={isStopping}

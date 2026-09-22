@@ -372,7 +372,7 @@ export const HELP_TOPICS: HelpTopic[] = [
     body: 'Record without video. Each take plays back the moment you stop.',
     bullets: [
       'Use Home, Workspace, Record, Tools, and Settings; Library sits above Record',
-      'Tap Tools for Tuner, Metronome, and Games; tap Record in the bottom controls to return',
+      'Tap Tools for Tuner, Metronome, and Games; tap Compare in the bottom controls to return',
       'Open Practice Home for your routine, or Program in Metronome for tempo sequences',
       'Choose Video at the top to return to camera recording',
       'Best Take and Current Take stay ready for quick comparison',

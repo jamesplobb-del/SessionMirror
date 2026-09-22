@@ -1,6 +1,6 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useMotionValue } from 'framer-motion'
-import { Gauge } from 'lucide-react'
+import { PitchToolIcon } from './icons/toolIcons'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject, type ReactNode } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
@@ -194,7 +194,7 @@ export default function DraggablePitchWidget({
   }, [dragX, dragY, isAudioMode, resolvedPositionId])
 
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
-    positionId: resolvedPositionId, label: 'tuner', icon: <Gauge aria-hidden />, detail: 'Tuner',
+    positionId: resolvedPositionId, label: 'pitch', icon: <PitchToolIcon aria-hidden />, detail: 'Pitch',
     active: tunerProps.enabled !== false, resetKey: collapseResetKey, ballSlot: 2, visible })
 
   const tuner = children ?? (
@@ -258,7 +258,7 @@ export default function DraggablePitchWidget({
         minHeight: widgetSize.height,
       }}
     >
-      <WidgetCollapseButton label="tuner" onCollapse={fold.collapse} />
+      <WidgetCollapseButton label="pitch" onCollapse={fold.collapse} />
       <div className="ui-orient-spin relative h-full min-h-0 w-full overflow-hidden rounded-3xl">
         {onClose && <PitchWidgetCloseButton onClose={onClose} />}
         {tuner}

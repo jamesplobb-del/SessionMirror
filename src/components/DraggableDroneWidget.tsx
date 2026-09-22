@@ -1,6 +1,7 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
 import { motion, useDragControls, useMotionValue, useIsPresent } from 'framer-motion'
-import { Minus, Plus, Square, Play, AudioLines } from 'lucide-react'
+import { Minus, Plus, Square, Play } from 'lucide-react'
+import { DroneToolIcon } from './icons/toolIcons'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
 import {
   useCallback,
@@ -191,7 +192,7 @@ export default function DraggableDroneWidget({
   }, [drone, hapticFeedback, heldPitchClass, sounding])
 
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
-    positionId, label: 'drone', icon: <AudioLines aria-hidden />, detail: `Drone ${written.label}`,
+    positionId, label: 'drone', icon: <DroneToolIcon aria-hidden />, detail: `Drone ${written.label}`,
     active: sounding, resetKey: collapseResetKey, ballSlot: 1, visible })
 
   return (<>
