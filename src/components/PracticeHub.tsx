@@ -135,6 +135,7 @@ function saveHubPage(page: HubPage): void {
 export default function PracticeHub({
   isOpen,
   projects,
+  takes,
   tunerTransposition,
   hapticFeedback,
   onClose,
@@ -271,16 +272,15 @@ export default function PracticeHub({
   }, [isOpen, onClose])
 
   const instrumentProfile = instrumentId ? getInstrumentProfile(instrumentId) : undefined
-  const tunerKey = getTunerTransposition(
-    instrumentProfile?.tunerTransposition ?? tunerTransposition,
-  )
+  const tunerKey = getTunerTransposition(tunerTransposition)
   const homeSubtitle = instrumentProfile
     ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(instrumentProfile.soundVolumeThreshold)}`
-    : 'Sets the tuner, written pitch, and gate'
+    : 'Sets practice suggestions and input sensitivity; tuner stays in concert pitch'
   const homeDay = routineDay?.routineId === routine?.id ? routineDay : null
   const homeProgress = routine ? routineProgress(routine, homeDay) : null
   const homeNext = routine ? routine.steps.find(item => item.id === (homeDay?.activeStepId ?? homeDay?.pausedStepId)) ?? nextOpenStep(routine, homeDay) : null
-  const homeRoutineLabel = !routine?.steps.length ? 'Build your routine'
+  const firstSession = takes.length === 0 && !routine?.steps.length
+  const homeRoutineLabel = !routine?.steps.length ? 'Try a suggested routine'
     : homeProgress?.complete || !homeNext ? 'Routine complete'
     : homeDay?.startedAt ? 'Continue your routine' : 'Start your routine'
 
@@ -308,7 +308,7 @@ export default function PracticeHub({
 
           <motion.section
             ref={dialogRef}
-            className={`practice-menu-card ${activePage === 'home' ? 'practice-menu-card--electric-edge' : ''} ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
+            className={`practice-menu-card ${activePage === 'home' ? 'practice-menu-card--electric-edge' : ''} ${activePage === 'home' && firstSession ? 'practice-menu-card--first-session' : ''} ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby={activePage === 'routine' ? undefined : 'practice-menu-title'}
@@ -361,7 +361,7 @@ export default function PracticeHub({
                   </>
                 )}
                 {activePage === 'instrument' && (
-                  <p>Sets tuner, written pitch, and the gate</p>
+                  <p>Sets practice suggestions and input sensitivity; the tuner stays in concert pitch</p>
                 )}
                 {activePage === 'routine' && (
                   <p>Each step opens the right tool, already set.</p>
@@ -463,14 +463,14 @@ export default function PracticeHub({
                       <span id="practice-home-instrument-description" className="practice-home-sr-only">{homeSubtitle}</span>
                       <div className="practice-home-launch-actions" aria-label="Start practicing">
                         <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-primary practice-home-record-launch" onClick={onOpenQuickPractice}>
-                          <span className="practice-home-launch-copy"><CircleDot className="open-lens-home-symbol" aria-hidden /><strong>Record & compare</strong><em>Audio or video</em></span><ChevronRight aria-hidden />
+                          <span className="practice-home-launch-copy"><CircleDot className="open-lens-home-symbol" aria-hidden /><strong>{takes.length ? 'Record & compare' : 'Record your first take'}</strong><em>Audio or video</em></span><ChevronRight aria-hidden />
                           <svg className="practice-home-signal-detail" viewBox="0 0 180 55" fill="none" aria-hidden><path d="M0 28h20l5-7 6 14 7-25 8 36 8-29 7 20 6-9h23l5-12 6 25 8-34 8 43 8-27 6 12 5-7h39" stroke="currentColor" strokeWidth="1.6" /></svg>
                         </Pressable>
                         <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-quick practice-home-routine-launch" disabled={startingRoutineStepId !== null} onClick={() => {
-                          if (!routine?.steps.length) onOpenRoutineBuilder('build')
+                          if (!routine?.steps.length) onOpenRoutineBuilder('presets')
                           else if (homeNext && !homeProgress?.complete) void startRoutineStep(homeNext.id)
                           else setPage('today')
-                        }}><span className="practice-home-launch-copy"><ListMusic className="open-lens-home-symbol" aria-hidden /><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Practice with a plan'}</em></span><ChevronRight aria-hidden /></Pressable>
+                        }}><span className="practice-home-launch-copy"><ListMusic className="open-lens-home-symbol" aria-hidden /><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Start with a plan you can edit'}</em></span><ChevronRight aria-hidden /></Pressable>
                       </div>
                       <div className="practice-home-links">
                         <button className="practice-home-library" onClick={onOpenVault}><span>Take library<small>Recordings & best takes</small></span><ChevronRight aria-hidden /></button>
@@ -624,7 +624,6 @@ function InstrumentSheet({
           <ul className="practice-instrument__list">
             {getInstrumentProfilesByFamily(family).map((profile) => {
               const selected = profile.id === selectedId
-              const written = getTunerTransposition(profile.tunerTransposition)
               return (
                 <li key={profile.id}>
                   <Pressable
@@ -639,7 +638,7 @@ function InstrumentSheet({
                     <span>
                       <strong>{profile.label}</strong>
                       <small>
-                        {written.id === 'concert' ? 'Concert pitch' : `Written ${written.shortLabel}`}
+                        Concert-pitch tuner
                         {' · '}
                         {describeHandsFreeGate(profile.soundVolumeThreshold)}
                       </small>
@@ -654,8 +653,8 @@ function InstrumentSheet({
       ))}
       <p className="practice-menu-note">
         {hasRoutine
-          ? 'Switching horns retunes the app. Today’s checks and the desks you built stay.'
-          : 'This sets the tuner, the written pitch, and how loud a note must be to start a take.'}
+          ? 'Changing instruments updates suggestions and input sensitivity. Today’s checks and the desks you built stay.'
+          : 'This sets practice suggestions and how loud a note must be to start a take. The tuner stays in concert pitch.'}
       </p>
     </section>
   )

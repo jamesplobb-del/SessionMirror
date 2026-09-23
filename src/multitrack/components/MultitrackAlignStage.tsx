@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { Check, FileText, ImagePlus, Pause, Play, Plus, RotateCcw, Trash2, Video, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Check, FileText, ImagePlus, Pause, Play, Plus, RotateCcw, SkipForward, Trash2, Video, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
 import type { PerformancePanelState, SheetMusicPanelState } from '../types'
 import type { useMultitrackSync } from '../synchronization/useMultitrackSync'
@@ -51,6 +51,8 @@ interface MultitrackAlignStageProps {
   onAddBox: (atSec: number) => void
   /** Record into an existing empty box, starting at this second. */
   onRecordBox: (panelId: string, atSec: number) => void
+  /** Save editor timing, then record a part from the playhead. */
+  onRecordAt: (atSec: number, atEnd: boolean) => void
   onAddImage: (atSec: number) => void
   /** Turn to the next page of the PDF already in the panel, at this second. */
   onAddPage: (atSec: number) => void
@@ -346,6 +348,7 @@ export default function MultitrackAlignStage({
   onEditStart,
   onAddBox,
   onRecordBox,
+  onRecordAt,
   onAddImage,
   onAddPage,
   onMoveImage,
@@ -475,6 +478,7 @@ export default function MultitrackAlignStage({
       // Reset returns it to — a part overdubbed into the bridge has no earlier
       // state in this session to fall back on.
       initialClipsRef.current = { ...initialClipsRef.current, [panel.id]: arrived }
+      initialSectionsRef.current[panel.id] = [panel.sectionStartSec, panel.sectionEndSec]
       changed = true
     }
     if (changed) commitClips(next)
@@ -506,6 +510,10 @@ export default function MultitrackAlignStage({
     const start = -clip.offsetMs / 1000
     return { start, end: start + Math.max(MIN_CLIP_SEC, trimEndValue - clip.trimStart) }
   }, [])
+
+  const lastTakeEndSec = useMemo(() => Math.max(0,
+    ...Object.values(clips).map(clip => clipTimelineWindow(clip).end),
+  ), [clips, clipTimelineWindow])
 
   const updateClip = useCallback(
     (panelId: string, patch: Partial<Pick<AlignClipState, 'offsetMs' | 'trimStart' | 'trimEnd'>>) => {
@@ -592,7 +600,7 @@ export default function MultitrackAlignStage({
     onClose()
   }
 
-  const handleDone = async () => {
+  const saveDirtyClips = async () => {
     if (busy || savingRef.current) return
     savingRef.current = true
     setSaving(true)
@@ -609,13 +617,30 @@ export default function MultitrackAlignStage({
           trimEnd: clip.trimEnd,
         }))
       await onDone(changes)
-      onClose()
+      for (const change of changes) dirtyRef.current.delete(change.panelId)
+      initialClipsRef.current = { ...clipsRef.current }
+      initialSectionsRef.current = Object.fromEntries(panels.map(panel => [
+        panel.id, [panel.sectionStartSec, panel.sectionEndSec],
+      ]))
+      initialMixRef.current = panels.map(panel => ({ id: panel.id, volume: panel.volume ?? 1, muted: panel.muted === true }))
+      initialSheetMusicRef.current = sheetMusic
+      return true
     } catch {
       setSaveError('Could not save your edits. Try Done again.')
+      return false
     } finally {
       savingRef.current = false
       setSaving(false)
     }
+  }
+
+  const handleDone = async () => {
+    if (await saveDirtyClips()) onClose()
+  }
+
+  const handleRecordAtLine = async () => {
+    if (!(await saveDirtyClips())) return
+    onRecordAt(playheadSec, lastTakeEndSec > 0 && playheadSec >= lastTakeEndSec - 0.05)
   }
 
   // ── Scrubbing ────────────────────────────────────────────────────────────
@@ -834,6 +859,18 @@ export default function MultitrackAlignStage({
       {editorTab === 'mix' ? <div className="multitrack-editor-mix" role="tabpanel" aria-label="Mix">{panels.filter(p => p.take).map((p, i) => <div key={p.id}><header><span>{p.label || `Part ${i + 1}`}</span><button type="button" aria-label={`Mute ${p.label || `Part ${i + 1}`}`} aria-pressed={p.muted === true} onClick={() => onPanelMuteToggle(p.id, !p.muted)}>{p.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}Mute</button></header><label><input type="range" aria-label={`${p.label || `Part ${i + 1}`} volume`} min={0} max={1} step={.01} value={p.volume ?? 1} onChange={e => onPanelVolumeChange(p.id, Number(e.target.value))} /><output>{Math.round((p.volume ?? 1) * 100)}%</output></label></div>)}</div> : <>
       <p className="multitrack-waveform-help">Select a waveform. Drag its edges to trim, or its middle to move.</p>
       <div className="multitrack-align-stage__actions">
+        {lastTakeEndSec > 0 && <Pressable type="button" intensity="soft"
+          className="multitrack-align-stage__action" disabled={busy || saving}
+          onClick={() => { onEditStart(); sync.seek(lastTakeEndSec) }}
+          aria-label="Move playhead to end of last take">
+          <SkipForward className="h-4 w-4" /> To end
+        </Pressable>}
+        <Pressable type="button" intensity="normal" haptic="medium"
+          className="multitrack-align-stage__action multitrack-align-stage__action--primary"
+          disabled={busy || saving} onClick={() => void handleRecordAtLine()}
+          aria-label="Record a part from the playhead">
+          <Video className="h-4 w-4" /> Record here
+        </Pressable>
         <Pressable
           type="button"
           intensity="normal"

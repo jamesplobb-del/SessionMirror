@@ -15,6 +15,10 @@ import AudioModeHome from '../../../src/components/audioPractice/AudioModeHome'
 import PipCompareRow from '../../../src/components/PipCompareRow'
 import AudioPracticeTopTabs from '../../../src/components/audioPractice/AudioPracticeTopTabs'
 import AudioPracticeMetronomeView from '../../../src/components/audioPractice/AudioPracticeMetronomeView'
+import MetronomeSubdivisionConcept from './MetronomeSubdivisionConcept'
+import { sharedMetronomeEngine } from '../../../src/metronome/sharedMetronomeEngine'
+import { PRACTICE_ALL_METERS } from '../../../src/components/audioPractice/audioPracticeMetronome'
+import type { MetronomeMeter } from '../../../src/utils/metronomeConfig'
 import { LiveAudioTunerPane, LivingPitchWidgetPane } from '../../../src/components/LivePitchTuner'
 import LabsMenu from '../../../src/components/labs/LabsMenu'
 import SettingsDrawer from '../../../src/components/SettingsDrawer'
@@ -68,11 +72,19 @@ import openLensBaseCss from '../../../src/styles/open-lens.css?inline'
 import '../../../src/styles/open-lens-system.css'
 import './fixture.css'
 import TakeGuidancePreview from './TakeGuidancePreview'
+import { GuidedCompareReturn, GuidedGoalPicker, GuidedRecordingCue, type GuidedFocus } from './GuidedTakeFlowPreview'
+import GuidedTakeReview from '../../../src/components/GuidedTakeReview'
 import '../../../src/styles/pocket-arcade.css'
 
 import '../colorways/palettes.css'
 import '../home-layouts/concepts.css'
 const params = new URLSearchParams(location.search)
+const guidedReviewPreview = params.get('guidedReview') === '1'
+const subdivisionConcept = params.get('subdivisionConcept') === '1'
+const subdivisionDemo = params.get('subdivisionDemo') === '1'
+const requestedDemoMeter = params.get('demoMeter')
+const demoMeter: MetronomeMeter = requestedDemoMeter && PRACTICE_ALL_METERS.includes(requestedDemoMeter as MetronomeMeter)
+  ? requestedDemoMeter as MetronomeMeter : '3/8'
 const homeDesign = params.get('homeDesign')
 if (homeDesign && ['pair','focus','air'].includes(homeDesign)) document.documentElement.dataset.homeDesign = homeDesign
 else delete document.documentElement.dataset.homeDesign
@@ -201,7 +213,24 @@ function TunerPreview({widget=false}:{widget?:boolean}){
 }
 
 function Preview(){
+  useEffect(() => {
+    if (!subdivisionDemo) return
+    sharedMetronomeEngine.stop()
+    sharedMetronomeEngine.setMeter(demoMeter)
+    if (demoMeter === '3/8') sharedMetronomeEngine.setPulseMode('compound')
+    sharedMetronomeEngine.setSubdivision(demoMeter === '15/16' || demoMeter === '2/2' ? '16ths' : '8ths')
+    sharedMetronomeEngine.setBpm(120)
+  }, [])
   const [guidanceDismissed,setGuidanceDismissed]=useState(false)
+  const [guidedReviewOpen,setGuidedReviewOpen]=useState(guidedReviewPreview)
+  const [guidedAudioShowBoth,setGuidedAudioShowBoth]=useState(false)
+  const [guidedVideoBoxesRaised,setGuidedVideoBoxesRaised]=useState(true)
+  const [guidedFocus,setGuidedFocus]=useState<string|null>(null)
+  const [recordingFocus,setRecordingFocus]=useState<string|null>(null)
+  const [practiceGoals,setPracticeGoals]=useState<GuidedFocus[]>([])
+  const [goalPickerOpen,setGoalPickerOpen]=useState(false)
+  const [reviewNotes,setReviewNotes]=useState<Record<string,string>>({})
+  const [previewElapsed,setPreviewElapsed]=useState(0)
   const guidanceStage=params.get('takeGuidance')
   const guidanceReference=params.get('guidanceReference')==='imported'?'imported':params.get('emptyBest')==='1'?'none':'best'
   const [referenceView,setReferenceView]=useState(false),[referenceRatio,setReferenceRatio]=useState(55)
@@ -213,28 +242,75 @@ function Preview(){
   const [builder,setBuilder]=useState<RoutineBuilderMode|null>(initialScreen==='routines'?'build':null)
   const [settings,setSettings]=useState({...DEFAULT_APP_SETTINGS,darkMode:dark})
   const [takes,setTakes]=useState(params.get('empty')==='1'?[]:demoTakes)
+  const [cameraTakes,setCameraTakes]=useState(params.get('empty')==='1'?[]:demoTakes)
   const [notice,setNotice]=useState(''),[references,setReferences]=useState(demoWidget==='references'),[referenceExpanded,setReferenceExpanded]=useState(true),[referenceLoaded,setReferenceLoaded]=useState(params.get('empty')!=='1')
   const [musicVisible,setMusicVisible]=useState(initialScreen==='music'),[musicChromeHidden,setMusicChromeHidden]=useState(false)
   const [widgets,setWidgets]=useState({pitch:demoWidget==='pitch',met:demoWidget==='met',drone:demoWidget==='drone',hands:demoWidget==='hands',music:demoWidget==='music',enhance:false,cards:true})
   const boundary=useRef<HTMLDivElement|null>(null),media1=useRef<HTMLMediaElement|null>(null),media2=useRef<HTMLMediaElement|null>(null),drop=useRef<HTMLDivElement|null>(null),stream=useRef<MediaStream|null>(null),anchor=useRef<HTMLDivElement|null>(null)
   const youtubeFrame=useRef<HTMLIFrameElement|null>(null)
   const video=screen==='camera', tools=['tuner','metronome','games'].includes(screen)
+  const guidedScreen=guidedReviewPreview && (screen==='audio'||video)
+  const currentReviewTake=(video?cameraTakes:takes)[1]??null
+  const reviewNoteKey=currentReviewTake?`${video?'camera':'audio'}:${currentReviewTake.id}`:''
   const originalSurface=originalElectric || screen==='games'
   const widgetsVisible=!capturing && !['home','routines','settings','library','games'].includes(screen)
   useLayoutEffect(()=>{applyReviewSkin(originalSurface);applyGameConcept(screen)},[originalSurface,screen])
   const sampleVideo=useIllustratedVideo(video)
-  const go=(s:string)=>{setCapturing(false);setScreen(s)}
+  const go=(s:string)=>{
+    setCapturing(false)
+    if(guidedReviewPreview && (s==='audio'||s==='camera') && s!==screen){setGuidedFocus(null);setGuidedReviewOpen(true);setGuidedAudioShowBoth(false);setGuidedVideoBoxesRaised(true);setGoalPickerOpen(false)}
+    setScreen(s)
+  }
   const note=(s:string)=>{setNotice(s)}
   useEffect(()=>{if(!notice)return;const t=setTimeout(()=>setNotice(''),2600);return()=>clearTimeout(t)},[notice])
+  useEffect(()=>{
+    if(!guidedReviewPreview||!capturing)return
+    const started=Date.now()
+    const timer=window.setInterval(()=>setPreviewElapsed(Math.floor((Date.now()-started)/1000)),250)
+    return()=>window.clearInterval(timer)
+  },[capturing])
   useEffect(()=>{document.documentElement.classList.toggle('app-audio-mode',!video)},[video])
   useEffect(()=>{document.documentElement.classList.toggle('app-music-page',screen==='music'&&musicVisible);return()=>document.documentElement.classList.remove('app-music-page')},[screen,musicVisible])
   const openReferences=()=>{setReferences(true);setReferenceExpanded(true)}
-  const toggleRecord=()=>{setGuidanceDismissed(false);setCapturing(v=>!v);note(capturing?'Recording preview stopped':'Recording preview · microphone is off')}
+  const toggleRecord=()=>{
+    if (guidedScreen) {
+      if (capturing) {
+        const newTake: Take = {
+          ...demoTakes[1],
+          id: `guided-preview-${Date.now()}`,
+          name: `Long tones · Take ${(video ? cameraTakes : takes).length + 2}`,
+          videoUrl: video ? sampleVideo : sampleWav(),
+          videoMimeType: video ? 'video/webm' : 'audio/wav',
+          mediaType: video ? 'video' : 'audio',
+          thumbnailUrl: video ? '/scripts/fixtures/app-design/studio.svg' : '',
+          timestamp: Date.now(),
+          intention: recordingFocus ?? undefined,
+        }
+        const addTake=(current:Take[])=>current.length ? [current[0], newTake, ...current.slice(1)] : [newTake]
+        if(video)setCameraTakes(addTake)
+        else setTakes(addTake)
+        setGuidedFocus(null)
+        setGuidedAudioShowBoth(false)
+        setGuidedVideoBoxesRaised(true)
+        setRecordingFocus(null)
+        setGuidedReviewOpen(true)
+        setCapturing(false)
+        note('Take saved · sample recording')
+      } else {
+        setRecordingFocus(guidedFocus)
+        setGuidedReviewOpen(false)
+        setPreviewElapsed(0)
+        setCapturing(true)
+      }
+      return
+    }
+    setGuidanceDismissed(false);setCapturing(v=>!v);note(capturing?'Recording preview stopped':'Recording preview · microphone is off')
+  }
   const openRoutine=()=>{setBuilder('build');go('routines')}
   const fakeVideo=(take:Take):Take=>({...take,videoUrl:sampleVideo,videoMimeType:'video/webm',mediaType:'video',duration:1,thumbnailUrl:'/scripts/fixtures/app-design/studio.svg'})
   return <ActionSheetProvider><MetronomeProvider><AudioModePlaybackProvider>
     <TakeGuidanceProvider takeId={guidanceStage==='live'?takes[1]?.id??null:null} currentId={takes[1]?.id??null} enabled={!capturing} hasReference={guidanceReference!=='none'} importedReference={guidanceReference==='imported'} videoPlaying={false} currentVideo={media2} bestVideo={media1}>
-    <div ref={boundary} className={`lens-screen app-shell ${guidanceStage && !guidanceDismissed && !capturing ? 'lens-guidance-preview' : ''} ${originalSurface ? 'lens-original-electric' : 'open-lens-recording'} ${video?'lens-camera':'app-shell--audio-mode'} ${capturing?'open-lens-capturing':''} ${screen==='music'&&musicVisible?'app-shell--music-page':''} ${musicChromeHidden&&screen==='music'?'app-shell--music-chrome-hidden':''}`} data-screen={screen}>
+    <div ref={boundary} className={`lens-screen app-shell ${guidanceStage && !guidanceDismissed && !capturing && !guidedReviewPreview ? 'lens-guidance-preview' : ''} ${guidedReviewPreview ? 'lens-guided-app-preview' : ''} ${subdivisionConcept ? 'lens-subdivision-concept' : ''} ${originalSurface ? 'lens-original-electric' : 'open-lens-recording'} ${video?'lens-camera':'app-shell--audio-mode'} ${capturing?'open-lens-capturing':''} ${screen==='music'&&musicVisible?'app-shell--music-page':''} ${musicChromeHidden&&screen==='music'?'app-shell--music-chrome-hidden':''}`} data-screen={screen}>
       {screen==='music'&&<PracticeChartLayer projectId="design-review-music" active boundaryRef={boundary} offerFileOnOpen={false}
         workspace={{pitchTrackerEnabled:widgets.pitch,showMetronome:widgets.met,showDrone:widgets.drone,showTakeCards:widgets.cards,showMusic:true,audioEnhancerEnabled:false}}
         onWorkspaceChange={(key,value)=>{const names={pitchTrackerEnabled:'pitch',showMetronome:'met',showDrone:'drone',showTakeCards:'cards'} as const;setWidgets(w=>({...w,[names[key]]:value}))}}
@@ -245,16 +321,20 @@ function Preview(){
       <main className={`lens-content app-ui-overlay ${video?'':'app-ui-overlay--audio-mode'} ${tools?'app-ui-overlay--audio-practice-'+screen:'app-ui-overlay--audio-practice-record'}`}>
         {video&&<img className="lens-camera-backdrop" src="/scripts/fixtures/app-design/studio.svg" alt="Illustrated practice room, standing in for the camera"/>}
         {screen!=='music' && screen!=='games' && (tools || (originalSurface && !video) ? <>{originalSurface&&<div className="lens-tools-header"><button onClick={()=>go('audio')}>‹ Recording</button><span>Practice tools</span><button aria-label="Open settings" onClick={()=>go('settings')}><Settings/></button></div>}<AudioPracticeTopTabs includeRecording={originalSurface} activeTab={tools ? screen as 'tuner'|'metronome'|'games' : 'audio'} onTabChange={go}/></> : !originalSurface && <RecordingHeader mode={video?'video':'audio'} disabled={capturing} onModeChange={m=>go(m==='video'?'camera':'audio')} hapticFeedback={false}/>)}
-        <div className="lens-stage">
-          {guidanceStage && guidanceStage!=='live' && !guidanceDismissed && !capturing && takes[1] && (screen==='audio'||video) && <TakeGuidancePreview reference={guidanceReference} currentTake={takes[1]} bestTake={takes[0]??null} referenceUrl={wav} onRetry={toggleRecord} onClose={()=>setGuidanceDismissed(true)} />}
-          {screen==='audio'||screen==='workspace'?<AudioModeHome isRecording={capturing} elapsed={12} ready={false} streamRef={stream} streamGeneration={0} challengerTake={takes[1]??null} benchmarkTake={guidanceReference==='imported'||params.get('emptyBest')==='1'?null:takes[0]??null} libraryBenchmarkPlayback={guidanceReference==='imported'?{id:'guidance-reference',name:'Teacher’s long tones',playbackUrl:wav,filePath:'',mimeType:'audio/wav',duration:24}:null} onRecord={toggleRecord} onExpandBenchmark={()=>note('Take preview · sample recording')} onExpandChallenger={()=>note('Take preview · sample recording')} onPinCurrentAsBest={()=>{setTakes(v=>[v[1],v[0],...v.slice(2)]);note('Current take pinned · preview only')}} onClearBenchmark={()=>setTakes(v=>v.filter((_,i)=>i!==0))} hapticFeedback={false}/>:null}
-          {video&&widgets.cards&&<div className="app-pip-row-wrap app-pip-row-wrap--camera app-pip-row-wrap--compact"><PipCompareRow compact boundaryRef={boundary} benchmarkTake={params.get('emptyBest')==='1'?null:takes[0]?fakeVideo(takes[0]):null} challengerTake={takes[1]?fakeVideo(takes[1]):null} libraryBenchmarkPlayback={null} youtubeEmbedUrl={null} suspendPipPlayback benchmarkPipVideoRef={media1} challengerPipVideoRef={media2} deleteDropRef={drop} onPinBenchmark={noop} onMoveBenchmarkToCurrent={noop} onDeleteTake={noop} onUnpinBenchmark={noop} onUnpinChallenger={noop} onUploadBenchmark={noop} onSubmitYoutube={noop} onClearYoutube={noop} onToggleSplitView={noop} onExpandBenchmark={()=>note('Camera take preview · illustrated sample')} onExpandChallenger={()=>note('Camera take preview · illustrated sample')} hapticFeedback={false}/></div>}
+        <div className={`lens-stage${guidedScreen ? capturing ? ' lens-guided-stage--record' : guidedReviewOpen ? !video && guidedAudioShowBoth ? ' lens-guided-stage--both' : ' lens-guided-stage--review' : ' lens-guided-stage--compare' : ''}`}>
+          {guidanceStage && guidanceStage!=='live' && !guidanceDismissed && !capturing && takes[1] && !guidedReviewPreview && (screen==='audio'||video) && <TakeGuidancePreview reference={guidanceReference} currentTake={takes[1]} bestTake={takes[0]??null} referenceUrl={wav} onRetry={toggleRecord} onClose={()=>setGuidanceDismissed(true)} />}
+          {guidedScreen && capturing && <GuidedRecordingCue focus={recordingFocus}/>}
+          {guidedScreen && !capturing && !guidedReviewOpen && <GuidedCompareReturn onReturn={()=>setGuidedReviewOpen(true)}/>}
+          {screen==='audio'||screen==='workspace'?<AudioModeHome isRecording={capturing} elapsed={guidedReviewPreview?previewElapsed:12} ready={false} streamRef={stream} streamGeneration={0} challengerTake={takes[1]??null} benchmarkTake={guidedReviewPreview && screen==='audio' && guidedReviewOpen && !guidedAudioShowBoth ? null : guidanceReference==='imported'||params.get('emptyBest')==='1'?null:takes[0]??null} libraryBenchmarkPlayback={guidedReviewPreview && screen==='audio' && guidedReviewOpen && !guidedAudioShowBoth ? null : guidanceReference==='imported'?{id:'guidance-reference',name:'Teacher’s long tones',playbackUrl:wav,filePath:'',mimeType:'audio/wav',duration:24}:null} onRecord={toggleRecord} onExpandBenchmark={()=>note('Take preview · sample recording')} onExpandChallenger={()=>note('Take preview · sample recording')} onPinCurrentAsBest={()=>{setTakes(v=>[v[1],v[0],...v.slice(2)]);setGuidedReviewOpen(false);note('Current take pinned · preview only')}} onClearBenchmark={()=>setTakes(v=>v.filter((_,i)=>i!==0))} hapticFeedback={false}/>:null}
+          {guidedScreen && !capturing && guidedReviewOpen && currentReviewTake && <GuidedTakeReview key={reviewNoteKey} takeId={reviewNoteKey} initialNote={reviewNotes[reviewNoteKey]??''} focus={guidedFocus} mode={video ? 'video' : 'audio'} voiceEnabled={false} audioShowBoth={guidedAudioShowBoth} onToggleAudioView={()=>setGuidedAudioShowBoth(value=>!value)} videoBoxesRaised={guidedVideoBoxesRaised} onReleaseVideoBoxes={()=>setGuidedVideoBoxesRaised(false)} onFocusChange={setGuidedFocus} onSaveNote={(_id,value)=>setReviewNotes(notes=>({...notes,[reviewNoteKey]:value}))} onRecordAgain={toggleRecord} onCompare={video && cameraTakes[0] ? ()=>setGuidedReviewOpen(false) : undefined} recordDisabled={false}/>}
+          {video&&widgets.cards&&(!guidedScreen||!capturing)&&<div className="app-pip-row-wrap app-pip-row-wrap--camera app-pip-row-wrap--compact"><PipCompareRow compact boundaryRef={boundary} benchmarkTake={guidedReviewPreview&&guidedReviewOpen&&guidedVideoBoxesRaised?null:params.get('emptyBest')==='1'?null:cameraTakes[0]?fakeVideo(cameraTakes[0]):null} challengerTake={cameraTakes[1]?fakeVideo(cameraTakes[1]):null} libraryBenchmarkPlayback={null} youtubeEmbedUrl={null} suspendPipPlayback={!guidedReviewPreview} benchmarkPipVideoRef={media1} challengerPipVideoRef={media2} deleteDropRef={drop} onPinBenchmark={noop} onMoveBenchmarkToCurrent={noop} onDeleteTake={noop} onUnpinBenchmark={noop} onUnpinChallenger={noop} onUploadBenchmark={noop} onSubmitYoutube={noop} onClearYoutube={noop} onToggleSplitView={noop} onExpandBenchmark={()=>note('Camera take preview · illustrated sample')} onExpandChallenger={()=>note('Camera take preview · illustrated sample')} hapticFeedback={false}/></div>}
           {screen==='tuner'&&<div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 flex-col"><TunerPreview/></div>}
-          {screen==='metronome'&&<AudioPracticeMetronomeView onOpenProgram={()=>note('Program editor retained; this review focuses on the main screens.')}/>}
+          {screen==='metronome'&&<><AudioPracticeMetronomeView onOpenProgram={()=>note('Program editor retained; this review focuses on the main screens.')}/>{subdivisionConcept&&<MetronomeSubdivisionConcept/>}</>}
           {screen==='games'&&<LabsMenu hapticFeedback={false} tunerInstrument="winds" tunerTransposition="concert" onBack={()=>go('audio')} onOpenStaffJumper={()=>note('Staff Jumper · existing game retained')} onOpenBalance={()=>note('Balance · existing game retained')} onOpenLearnInstrument={()=>note('Learn your instrument · existing game retained')}/>}
         </div>
-        {!(screen==='music'&&musicChromeHidden) && screen!=='games' && (originalElectric || screen!=='metronome')&&<div ref={anchor} className="lens-dock-container"><ControlDeck workspaceSections={!originalSurface} onToggleExpandView={!originalSurface?()=>note('Expanded view · opens the existing comparison screen in the app'):undefined} onOpenMultitrack={!originalSurface?()=>note('Multitrack · opens the existing studio in the app'):undefined} openLens={!originalSurface} libraryAboveRecord={!originalSurface} toolsActive={tools} onOpenAudioRecorder={!originalSurface ? ()=>go('audio') : undefined} ready isRecording={capturing} elapsed={capturing?12:0} recordingMode={video?'video':'audio'} onRecordingModeChange={m=>go(m==='video'?'camera':'audio')} onToggleRecord={tools?()=>go('audio'):toggleRecord} onOpenHome={()=>go('home')} onOpenSettings={()=>go('settings')} onOpenTools={()=>go('tuner')} onOpenVault={()=>go('library')} onOpenReferences={openReferences} autoSoundRecording={widgets.hands} onAutoSoundRecordingChange={v=>setWidgets(w=>({...w,hands:v}))} showMusic={widgets.music} musicToggleVisible onShowMusicChange={v=>setWidgets(w=>({...w,music:v}))} onPitchTrackerChange={v=>setWidgets(w=>({...w,pitch:v}))} onShowMetronomeChange={v=>setWidgets(w=>({...w,met:v}))} onShowDroneChange={v=>setWidgets(w=>({...w,drone:v}))} onShowTakeCardsChange={v=>setWidgets(w=>({...w,cards:v}))} onAudioEnhancerChange={v=>setWidgets(w=>({...w,enhance:v}))} pitchTrackerEnabled={widgets.pitch} showMetronome={widgets.met} showDrone={widgets.drone} showTakeCards={widgets.cards} audioEnhancerEnabled={widgets.enhance} hapticFeedback={false}/></div>}
+        {!(screen==='music'&&musicChromeHidden) && screen!=='games' && (originalElectric || screen!=='metronome')&&<div ref={anchor} className="lens-dock-container"><ControlDeck workspaceSections={!originalSurface} onToggleExpandView={!originalSurface?()=>note('Expanded view · opens the existing comparison screen in the app'):undefined} onOpenMultitrack={!originalSurface?()=>note('Multitrack · opens the existing studio in the app'):undefined} openLens={!originalSurface} libraryAboveRecord={!originalSurface} toolsActive={tools} onOpenAudioRecorder={!originalSurface ? ()=>go('audio') : undefined} ready isRecording={capturing} elapsed={capturing?(guidedReviewPreview?previewElapsed:12):0} recordingMode={video?'video':'audio'} onRecordingModeChange={m=>go(m==='video'?'camera':'audio')} onToggleRecord={tools?()=>go('audio'):toggleRecord} onOpenHome={()=>go('home')} onOpenSettings={()=>go('settings')} onOpenTools={()=>go('tuner')} onOpenVault={()=>go('library')} onOpenReferences={openReferences} autoSoundRecording={widgets.hands} onAutoSoundRecordingChange={v=>setWidgets(w=>({...w,hands:v}))} showMusic={widgets.music} musicToggleVisible onShowMusicChange={v=>setWidgets(w=>({...w,music:v}))} onPitchTrackerChange={v=>setWidgets(w=>({...w,pitch:v}))} onShowMetronomeChange={v=>setWidgets(w=>({...w,met:v}))} onShowDroneChange={v=>setWidgets(w=>({...w,drone:v}))} onShowTakeCardsChange={v=>setWidgets(w=>({...w,cards:v}))} onAudioEnhancerChange={v=>setWidgets(w=>({...w,enhance:v}))} pitchTrackerEnabled={widgets.pitch} showMetronome={widgets.met} showDrone={widgets.drone} showTakeCards={widgets.cards} audioEnhancerEnabled={widgets.enhance} hapticFeedback={false}/></div>}
       </main>
+      {guidedScreen&&goalPickerOpen&&<GuidedGoalPicker goals={practiceGoals} onSave={goals=>{setPracticeGoals(goals);setGoalPickerOpen(false)}} onClose={()=>setGoalPickerOpen(false)}/>}
       <div className="lens-widget-layer" hidden={!widgetsVisible}>
         {widgets.pitch&&<DraggablePitchWidget visible={widgetsVisible} boundaryRef={boundary} positionId={`review-${originalElectric?'old':'new'}-pitch`} mediaRef={media1} isPlaying={false} mediaKey="review-pitch" enabled={false} liveMicEnabled={false} onClose={()=>setWidgets(w=>({...w,pitch:false}))}><TunerPreview widget/></DraggablePitchWidget>}
         {widgets.met&&<DraggableMetronomeWidget visible={widgetsVisible} boundaryRef={boundary} positionId={`review-${originalElectric?'old':'new'}-met`} defaultTopOffset={155} onClose={()=>setWidgets(w=>({...w,met:false}))}/>}

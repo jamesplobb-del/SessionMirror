@@ -25,6 +25,7 @@ import { Headphones, Maximize2, X } from 'lucide-react'
 import LiveCameraBackground from './components/LiveCameraBackground'
 import CameraPermissionPrompt from './components/CameraPermissionPrompt'
 import PipCompareRow from './components/PipCompareRow'
+import GuidedTakeReview, { GuidedRecordingCue } from './components/GuidedTakeReview'
 import SplitCompareLayout from './components/SplitCompareLayout'
 import YoutubeBenchmarkPlayer from './components/YoutubeBenchmarkPlayer'
 import type { PipDragUiState } from './hooks/useDragToPin'
@@ -349,7 +350,6 @@ interface MainAudioPitchSource {
 const ReviewModeOverlay = lazy(() => import('./components/ReviewModeOverlay'))
 const PracticeChartLayer = lazy(() => import('./components/PracticeChartLayer'))
 const DraggablePitchWidget = lazy(() => import('./components/DraggablePitchWidget'))
-const DraggableTakesWidget = lazy(() => import('./components/DraggableTakesWidget'))
 /** Minimum gap between unforced tuner capture-session rebuilds. */
 const TUNER_MIC_REBUILD_FLOOR_MS = 1500
 
@@ -565,6 +565,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [guidedTakeId, setGuidedTakeId] = useState<string | null>(null)
+  const [guidedAudioBothTakeId, setGuidedAudioBothTakeId] = useState<string | null>(null)
+  const [guidedVideoRaisedTakeId, setGuidedVideoRaisedTakeId] = useState<string | null>(null)
+  const [guidedNextFocus, setGuidedNextFocus] = useState<string | null>(null)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
   const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
   const [referenceExpanded, setReferenceExpanded] = useState(false)
@@ -1824,7 +1827,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         challengerUserDismissedRef.current = false
         pendingChallengerIdRef.current = takeId
         setChallengerId(takeId)
-        if (!shouldAutoPlay && !multitrackRecordingActiveRef.current) setGuidedTakeId(takeId)
+        if (!multitrackRecordingActiveRef.current) {
+          setGuidedNextFocus(null)
+          setGuidedAudioBothTakeId(null)
+          setGuidedVideoRaisedTakeId(mediaType === 'video' ? takeId : null)
+          if (!shouldAutoPlay) setGuidedTakeId(takeId)
+        }
       }
 
       setTakes((prev) => {
@@ -4336,6 +4344,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   // Keep audio owners mounted even when folded or visiting a full tool tab.
   // Visibility is independent of sound; the full tool's own widget steps aside.
   const onRecordSurface = recordingMode === 'video' || audioPracticeTab === 'audio'
+  const guidedReviewVisible = Boolean(
+    guidedTakeId && challengerTake?.id === guidedTakeId && onRecordSurface &&
+    settings.showTakeCards && !isRecording && !isStopping && !isSplitView &&
+    !multitrackOpen && !settings.autoSoundRecording && !practiceSessionActive &&
+    !musicPageVisible && !isLabsOpen && !isPracticeHubOpen && !isReviewOpen &&
+    !isVaultOpen && !isSettingsOpen && !showOnboardingTutorial
+  )
+  const guidedAudioShowBoth = guidedReviewVisible && guidedAudioBothTakeId === guidedTakeId
   // Tools always runs in audio mode. Remember which recorder the player left so
   // the dock's Compare button (and its icon) takes them back to that one.
   const [toolsReturnMode, setToolsReturnMode] = useState<RecordingMode>(recordingMode)
@@ -6428,29 +6444,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               </div>
 
-              {musicRoomActive && settings.showTakeCards && (
-                <Suspense fallback={null}>
-                  <DraggableTakesWidget
-                    boundaryRef={appShellRef}
-                    collapseResetKey={routineActiveStep?.id}
-                    benchmarkTake={benchmarkTake}
-                    libraryBenchmarkPlayback={libraryBenchmarkPlayback}
-                    challengerTake={challengerTake}
-                    onExpandBenchmark={handleExpandBenchmark}
-                    onExpandChallenger={handleExpandChallenger}
-                    onPinCurrentAsBest={handlePinCurrentAsBest}
-                    onClearBenchmark={handleClearAudioBenchmark}
-                    onClearChallenger={handleClearAudioChallenger}
-                    takeReadiness={audioTakeReadiness}
-                    onRetryTakePreparation={handleRetryAudioTakePreparation}
-                    onShareBenchmark={benchmarkTake ? () => handleShareTake(benchmarkTake) : undefined}
-                    onShareChallenger={challengerTake ? () => handleShareTake(challengerTake) : undefined}
-                    isRecording={isRecording}
-                    visible={musicRoomActive}
-                  />
-                </Suspense>
-              )}
-
               {!onRecordSurface && !metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
                 <PracticeToolStrip
                   reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
@@ -6671,7 +6664,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         active={audioPracticeTab === 'audio' && !isSplitView}
                         className="audio-mode-home-layer min-h-0 flex-1"
                       >
-                        <div data-tutorial="audio-take-cards">
+                        <div data-tutorial="audio-take-cards" className={guidedReviewVisible && !guidedAudioShowBoth ? 'guided-audio-stage' : undefined}>
                           <AudioModeHome
                             onRecord={handleToggleRecord}
                             recordDisabled={isStopping || practiceTransitionBusy || pendingTakeSaves > 0}
@@ -6698,6 +6691,23 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             }
                             hapticFeedback={settings.hapticFeedback}
                           />
+                          {guidedReviewVisible && challengerTake && (
+                            <GuidedTakeReview
+                              key={challengerTake.id}
+                              takeId={challengerTake.id}
+                              initialNote={challengerTake.notes}
+                              focus={guidedNextFocus}
+                              mode="audio"
+                              playbackActive={takePlaybackActive}
+                              audioShowBoth={guidedAudioShowBoth}
+                              onToggleAudioView={() => setGuidedAudioBothTakeId(current => current === challengerTake.id ? null : challengerTake.id)}
+                              onFocusChange={setGuidedNextFocus}
+                              onSaveNote={(id, notes) => handleUpdateTake(id, { notes })}
+                              onRecordAgain={handleToggleRecord}
+                              recordDisabled={isStopping || practiceTransitionBusy || pendingTakeSaves > 0}
+                            />
+                          )}
+                          {isRecording && <GuidedRecordingCue focus={guidedNextFocus} />}
                         </div>
                       </AnimatedTabPanel>
                     </div>
@@ -6809,7 +6819,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         </motion.div>
                       )}
 
-                    {settings.showTakeCards &&
+                      {settings.showTakeCards &&
                       !isSplitView &&
                       recordingMode !== 'audio' && (
                         <motion.div
@@ -6866,6 +6876,25 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           />
                         </motion.div>
                       )}
+
+                    {recordingMode === 'video' && guidedReviewVisible && challengerTake && (
+                      <GuidedTakeReview
+                        key={challengerTake.id}
+                        takeId={challengerTake.id}
+                        initialNote={challengerTake.notes}
+                        focus={guidedNextFocus}
+                        mode="video"
+                        playbackActive={takePlaybackActive}
+                        videoBoxesRaised={guidedVideoRaisedTakeId === challengerTake.id}
+                        onReleaseVideoBoxes={() => setGuidedVideoRaisedTakeId(null)}
+                        onFocusChange={setGuidedNextFocus}
+                        onSaveNote={(id, notes) => handleUpdateTake(id, { notes })}
+                        onRecordAgain={handleToggleRecord}
+                        onCompare={benchmarkTake || libraryBenchmarkPlayback ? handleToggleSplitView : undefined}
+                        recordDisabled={isStopping || practiceTransitionBusy || pendingTakeSaves > 0}
+                      />
+                    )}
+                    {recordingMode === 'video' && isRecording && <GuidedRecordingCue focus={guidedNextFocus} />}
 
                     {!isAudioPracticeMetronomeTab && !isLabsOpen && !isAudioPracticeGamesTab &&
                       !musicChromeHidden &&
@@ -7166,6 +7195,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           setShowOnboardingTutorial(false)
                           setTutorialTourEnabled(false)
                           handlePauseRoutine()
+                          handleRecordingModeChange('audio')
                           handleOpenQuickPractice()
                         }}
                         onSelectInstrument={handleSelectInstrument}

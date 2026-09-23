@@ -3,6 +3,8 @@
 Run Vite on **127.0.0.1:5195** and open `/scripts/fixtures/app-design/`.
 The separate origin keeps sample Library data, routine choices, and metronome preferences away from the live app on 5194. The frame refuses to mount its storage-owning components on any other port.
 
+The guided-take preview is `/scripts/fixtures/app-design/guided-take.html`. It switches between audio and camera and reuses the current recording header, take player/cards, dock, and production reflection component. Tap the small prompt to open the note and next-take focus sheet. Recording creates local sample takes; voice input is disabled in the preview, and no microphone or camera capture occurs.
+
 ## What is real
 
 The review imports production `PracticeHub`, `AudioModeHome`, `PipCompareRow`, `ControlDeck`, `RecordingHeader`, `AudioPracticeTopTabs`, `LiveAudioTunerPane`, `AudioPracticeMetronomeView`, `SettingsBranchWheel`, `SettingsDrawer`, `TakeVaultDrawer`, and `LabsMenu`.

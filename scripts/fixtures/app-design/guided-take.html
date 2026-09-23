@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BestTake · Guided take review</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #152536; color: #edf5fc; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+    main { width: min(100%, 1000px); margin: auto; padding: 24px 20px 40px; }
+    h1 { margin: 6px 0 7px; font-size: 22px; font-weight: 600; letter-spacing: -.4px; }
+    .eyebrow { color: #8dd6ff; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+    .intro { max-width: 660px; margin: 0; color: #b8cddd; font-size: 13px; line-height: 1.55; }
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 18px 0 24px; }
+    .controls button { min-height: 40px; padding: 8px 13px; border: 1px solid #45627a; border-radius: 12px; background: #243c52; color: #edf5fc; font: inherit; font-size: 12px; }
+    .controls button[aria-pressed="true"] { border-color: #8dd6ff; color: #8dd6ff; }
+    .controls button:focus-visible, a:focus-visible { outline: 2px solid #8dd6ff; outline-offset: 3px; }
+    .screens { display: grid; grid-template-columns: repeat(2, minmax(0, 390px)); justify-content: center; gap: 22px; }
+    article { min-width: 0; }
+    article header { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 9px; }
+    article h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    article a { color: #8dd6ff; font-size: 12px; text-decoration: none; }
+    .device { width: 100%; overflow: hidden; border: 4px solid #45627a; border-radius: 30px; background: #182b3e; box-shadow: 0 18px 34px #06111c70; }
+    iframe { width: 390px; height: 800px; display: block; border: 0; transform-origin: 0 0; }
+    article p { color: #b8cddd; font-size: 12px; line-height: 1.5; margin: 11px 2px 0; }
+    .note { max-width: 802px; margin: 22px auto 0; color: #b8cddd; font-size: 12px; line-height: 1.5; }
+    body.light { background: #edf2f7; color: #142b43; }
+    body.light .eyebrow, body.light article a { color: #0075dc; }
+    body.light .intro, body.light article p, body.light .note { color: #49647d; }
+    body.light .controls button { background: #fff; color: #142b43; border-color: #d8e6f2; }
+    body.light .controls button[aria-pressed="true"] { border-color: #0075dc; color: #0075dc; }
+    body.light .device { border-color: #fff; box-shadow: 0 18px 34px #14304b18; }
+    @media (max-width: 720px) { .screens { grid-template-columns: minmax(0, 390px); gap: 26px; } main { padding-inline: 14px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>BestTake · Take review</h1>
+    <p class="intro">Compare the original two-card layout with the updated guided flow. Reflection stays out of the player until you open it. Recording is simulated and voice input is disabled here.</p>
+    <div class="controls">
+      <button type="button" data-mode="audio" aria-pressed="true">Audio</button>
+      <button type="button" data-mode="camera" aria-pressed="false">Camera</button>
+      <button type="button" data-theme="dark" aria-pressed="true">Dark</button>
+      <button type="button" data-theme="light" aria-pressed="false">Light</button>
+      <button type="button" id="reset">Reset sample takes</button>
+    </div>
+    <div class="screens">
+      <article>
+        <header><h2>Original two-card flow</h2><a id="current-link" target="_blank" rel="noopener">Open full size ↗</a></header>
+        <div class="device"><iframe id="current" title="Current BestTake recording screen"></iframe></div>
+        <p>The current two-card Best Take / Current Take comparison.</p>
+      </article>
+      <article>
+        <header><h2>Updated guided flow</h2><a id="guided-link" target="_blank" rel="noopener">Open full size ↗</a></header>
+        <div class="device"><iframe id="guided" title="Interactive guided take review in BestTake"></iframe></div>
+        <p>The take player, app header, and record dock are real app components. Recording is simulated; each stop adds a sample take.</p>
+      </article>
+    </div>
+    <p class="note">This preview uses sample recordings and does not ask for microphone or camera access. The guided flow is now wired into the app; this page remains a safe place to explore its states.</p>
+  </main>
+  <script>
+    let dark = true;
+    let mode = 'audio';
+    const current = document.getElementById('current');
+    const guided = document.getElementById('guided');
+    function render() {
+      const base = `./frame.html?screen=${mode}&finish=glass&dark=${dark ? '1' : '0'}`;
+      const proposed = `${base}&guidedReview=1`;
+      current.src = base;
+      guided.src = proposed;
+      document.getElementById('current-link').href = base;
+      document.getElementById('guided-link').href = proposed;
+      document.body.classList.toggle('light', !dark);
+      document.querySelectorAll('[data-theme]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.theme === (dark ? 'dark' : 'light'))));
+      document.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === mode)));
+    }
+    function resize() {
+      document.querySelectorAll('.device').forEach(device => {
+        const scale = device.clientWidth / 390;
+        device.querySelector('iframe').style.transform = `scale(${scale})`;
+        device.style.height = `${800 * scale + 8}px`;
+      });
+    }
+    document.querySelectorAll('[data-theme]').forEach(button => button.addEventListener('click', () => { dark = button.dataset.theme === 'dark'; render(); }));
+    document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => { mode = button.dataset.mode; render(); }));
+    document.getElementById('reset').addEventListener('click', render);
+    new ResizeObserver(resize).observe(document.querySelector('.screens'));
+    render();
+    resize();
+  </script>
+</body>
+</html>

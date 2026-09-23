@@ -40,7 +40,7 @@ import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
 import { Capacitor } from '@capacitor/core'
-import { panelOffsetMs, panelEndSec, sourceWindow, playbackCountOffSec, playbackStartPosition, withOverlayLeadIn, overlayLeadInSec } from '../synchronization/projectTiming'
+import { panelOffsetMs, panelEndSec, sourceWindow, playbackCountOffSec, playbackStartPosition, recordingStartAtPlayhead, withOverlayLeadIn, overlayLeadInSec } from '../synchronization/projectTiming'
 import { multitrackTransport } from '../synchronization/multitrackTransport'
 import MultitrackProjectPanel from './MultitrackProjectPanel'
 import { readMultitrackFile, shareMultitrackFile } from '../state/multitrackFile'
@@ -1093,6 +1093,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         startSec,
         takeDuration > 0 ? startSec + Math.max(.05, takeDuration - capturedOffsetMs / 1000) : undefined,
       )
+      const newEnd = startSec + Math.max(.05, takeDuration - capturedOffsetMs / 1000)
+      if (session.endSec !== undefined && newEnd > session.endSec) {
+        updateProject({ endSec: newEnd })
+      }
     } else {
       assignTakeToPanel(pendingReview.panelId, pendingReview.take)
       updatePanel(pendingReview.panelId, { mirrored: pendingReview.mirrored })
@@ -1123,9 +1127,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     recording,
     restoreRecordingReadiness,
     session.practice.bpm,
+    session.endSec,
     setPanelSection,
     showAlert,
     sync,
+    updateProject,
   ])
 
   const handleRetryTake = useCallback(() => {
@@ -1228,10 +1234,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
    * recorded, so the click would fight the track instead of leading into it.
    */
   const snapToDownbeat = useCallback(
-    (atSec: number) => {
+    (atSec: number, forward = false) => {
       const { barSec } = resolveRecordingGrid()
-      if (!Number.isFinite(barSec) || barSec <= 0) return Math.max(0, atSec)
-      return Math.max(0, Math.round(Math.max(0, atSec) / barSec) * barSec)
+      return recordingStartAtPlayhead(atSec, barSec, forward)
     },
     [resolveRecordingGrid],
   )
@@ -1256,7 +1261,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       pauseAllPlayback()
       const duration = session.endSec ?? Math.max(sync.state.duration,
         ...session.panels.map(p => p.kind === 'performance' && !p.hidden ? panelEndSec(p, session.practice.bpm) : 0))
-      const startSec = snapToDownbeat(playbackStartPosition(atSec, duration))
+      const startSec = snapToDownbeat(atSec, duration > 0 && atSec >= duration - 0.05)
       // Park the playhead on the bar we snapped to so the timeline shows exactly
       // where the new part will come in.
       if (startSec !== atSec) sync.seek(startSec)
@@ -1269,12 +1274,28 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   /** Timeline lane "Record here": overdub into an existing empty box. */
   const handleRecordBoxAt = useCallback(
     (panelId: string, atSec: number) => {
-      const startSec = snapToDownbeat(atSec)
+      const duration = session.endSec ?? sync.state.duration
+      const startSec = snapToDownbeat(atSec, duration > 0 && atSec >= duration - 0.05)
       if (startSec !== atSec) sync.seek(startSec)
       openRecordingForPanel(panelId, startSec)
     },
-    [openRecordingForPanel, snapToDownbeat, sync],
+    [openRecordingForPanel, session.endSec, snapToDownbeat, sync],
   )
+
+  const handleRecordAtPlayhead = useCallback((atSec: number, atEnd: boolean) => {
+    pauseAllPlayback()
+    const vacant = session.panels.find(panel =>
+      panel.kind === 'performance' && !panel.hidden && !panel.take && !panel.missingTakeId,
+    )
+    const panelId = vacant?.id ?? addPerformanceBox(false) ?? addPerformanceBox(true)
+    if (!panelId) {
+      void showAlert({ message: 'All twelve parts and four extra boxes are filled. Choose a box to replace its take.' })
+      return
+    }
+    const startSec = snapToDownbeat(atSec, atEnd)
+    sync.seek(startSec)
+    openRecordingForPanel(panelId, startSec)
+  }, [addPerformanceBox, openRecordingForPanel, pauseAllPlayback, session.panels, showAlert, snapToDownbeat, sync])
 
   /** Timeline "+ image": pick a screenshot that cuts in at the playhead. */
   const handleAddImageAt = useCallback((atSec: number) => {
@@ -1627,6 +1648,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
                 onEditStart={pauseAllPlayback}
                 onAddBox={handleAddBoxAt}
                 onRecordBox={handleRecordBoxAt}
+                onRecordAt={handleRecordAtPlayhead}
                 onAddImage={handleAddImageAt}
                 onAddPage={handleAddPageAt}
                 onMoveImage={moveSheetCue}

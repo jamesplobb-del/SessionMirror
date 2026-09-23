@@ -9,7 +9,7 @@ import RoutineDeskSetup from './RoutineDeskSetup'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
 import RoutineMusicSetup from './RoutineMusicSetup'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
-import { buildPresetRoutine, getRoutinePresets, getStepTemplates, stepFromTemplate } from '../utils/routinePresets'
+import { buildPresetRoutine, getRoutinePresets, getStepTemplates, presetMinutes, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
 import { hasPracticeChart } from '../utils/practiceChartStorage'
@@ -129,7 +129,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     routines: 'Create a new plan or open one you’ve already built.', goals: 'Choose what you want to practice. You can change the exercises later.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions for ${instrumentName.toLowerCase()}.`, lineup: 'Review your exercises and their order.',
     'custom-settings': setupTitle, 'custom-reference': musicSetup ? `A PDF or photo · ${setupTitle}` : `Optional · ${setupTitle}`, 'custom-items': 'Type every item in the order you want to practice it.',
     'custom-tool': editingStepId || customItems.length <= 1 ? 'What should open with it?' : `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`,
-    library: 'Build your own plan or start with a suggestion.',
+    library: 'Start with a suggestion, then make it yours.',
   }
   const move = (next: Screen, backwards = false) => { setDirection(backwards ? -1 : 1); setError(''); setScreen(next) }
   useEffect(() => { scrollRef.current?.scrollTo(0, 0) }, [screen])
@@ -516,9 +516,9 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
               videoId={customReferenceVideo} onVideoIdChange={setCustomReferenceVideo} />
           )}
           {screen === 'library' && <>
-            <button type="button" className="routine-guide-own routine-guide-own--hero" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items, order them, then choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
+            <section className="routine-guide-library"><h3>Suggested for {instrumentName.toLowerCase()}</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); clearItemSetup(); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb} · About {presetMinutes(preset, instrument)} min</small></span><ChevronRight aria-hidden /></button>)}</section>
             <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>Choose what you want to work on</small></span><ArrowRight aria-hidden /></button>
-            <section className="routine-guide-library"><h3>Suggested routines</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); clearItemSetup(); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb}</small></span><ChevronRight aria-hidden /></button>)}</section>
+            <button type="button" className="routine-guide-own" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items and choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
           </>}
         </motion.div>
     </div>

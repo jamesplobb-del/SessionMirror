@@ -25,6 +25,9 @@ try {
   check(m.playbackStartPosition(25,20),0,'shortened project replays from stale playhead')
   check(m.playbackStartPosition(8,20),8,'pause/resume preserves middle of song')
   check(m.playbackStartPosition(8,0),8,'unknown duration does not force restart')
+  check(m.recordingStartAtPlayhead(8,2,true),8,'recording at the end stays at the end rather than replaying from zero')
+  check(m.recordingStartAtPlayhead(8.1,2,true),10,'appending starts on the next bar, never over the previous take')
+  check(m.recordingStartAtPlayhead(6.8,2,false),6,'ordinary overdub keeps nearest-bar snapping')
   const takes = Array.from({ length: 12 }, (_, i) => ({ id: `take-${i}`, duration: 32, timelineOffsetMs: 2300 + i * 13 }))
   const panels = m.createPanelsForLayout(m.getLayoutPreset('twelve')).map((p,i) => ({ ...p, take: takes[i] }))
   const session = { projectId: 'test-project', name: 'Twelve parts', aspectRatio: '9:16', layoutId: 'twelve', panels, sheetMusic: { kind: 'sheet-music', id: 'music', asset: null }, backing: { kind: 'none', volume: .85 }, practice: { bpm: 120, clickEnabled: true, countInBars: 1 } }

@@ -1,4 +1,4 @@
-export type OnboardingCardId = 'welcome' | 'instrument' | 'tools' | 'record' | 'workspace' | 'routine'
+export type OnboardingCardId = 'welcome' | 'instrument' | 'routine'
 
 export type CoachMarkId =
   | 'record-camera-take'
@@ -121,17 +121,11 @@ export interface HelpTopic {
 
 export const ONBOARDING_CARDS: OnboardingCard[] = [
   { id: 'welcome', title: 'Welcome to BestTake',
-    body: 'A place to practice, record, and hear your progress.', cta: 'Get started' },
+    body: 'Practice with a plan, record what you play, and hear your progress.', cta: 'Get started' },
   { id: 'instrument', title: 'What do you play?',
-    body: 'We’ll set up the tuner for your instrument.', cta: 'Continue' },
-  { id: 'tools', title: 'Your practice tools',
-    body: 'Find these in Tools.', cta: 'Continue' },
-  { id: 'record', title: 'Record a take',
-    body: 'Choose Audio or Video at the top, then tap Record.', cta: 'Continue' },
-  { id: 'workspace', title: 'Set up your space',
-    body: 'Tap Workspace beside Record.', cta: 'Continue' },
+    body: 'We’ll choose practice suggestions that fit your instrument. You can change it anytime.', cta: 'Continue' },
   { id: 'routine', title: 'Ready to play?',
-    body: 'Put your exercises in order. A compact routine widget keeps your current step and timer close.', cta: 'Explore on my own' },
+    body: 'Start with a recording or a suggested routine.', cta: 'Explore on my own' },
 ]
 
 export const COACH_MARKS: CoachMarkContent[] = [

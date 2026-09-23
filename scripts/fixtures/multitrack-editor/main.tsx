@@ -18,12 +18,12 @@ const initialPanels: PerformancePanelState[] = [{kind:'performance',id:'a',timel
 const initialMusic: SheetMusicPanelState = {kind:'sheet-music',id:'score',asset:null,cues:[{id:'cue',startSec:2,asset:{src:'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="20" height="20"%3E%3Crect width="20" height="20" fill="gray"/%3E%3C/svg%3E',mimeType:'image/svg+xml',fileName:'Test score',x:0,y:0,scale:1}}]}
 function Fixture() {
  const [open,setOpen]=useState(true),[fail,setFail]=useState(false),[panels,setPanels]=useState(initialPanels),[music,setMusic]=useState(initialMusic)
- const [offset,setOffset]=useState(0),[trim,setTrim]=useState<[number,number|null]>([0,null]),[time,setTime]=useState(0),[playing,setPlaying]=useState(false),[saved,setSaved]=useState('none')
+ const [offset,setOffset]=useState(0),[trim,setTrim]=useState<[number,number|null]>([0,null]),[time,setTime]=useState(0),[playing,setPlaying]=useState(false),[saved,setSaved]=useState('none'),[recordAt,setRecordAt]=useState<[number,boolean]|null>(null)
  const sync={state:{duration:8,currentTime:time,isPlaying:playing},getPanelMediaDuration:()=>8,setPanelOffset:(_:string,n:number)=>setOffset(n),setPanelTrim:(_:string,a:number,b:number|null)=>setTrim([a,b]),seek:setTime} as unknown as ComponentProps<typeof MultitrackAlignStage>['sync']
  return <div style={{height:'100dvh',display:'flex',flexDirection:'column',background:'#fafaf9',color:'#292524'}}>
  <div style={{padding:12}}><button onClick={()=>setOpen(true)}>Open editor</button> <label><input type="checkbox" checked={fail} onChange={e=>setFail(e.target.checked)}/> Fail save</label>
- <output style={{display:'block',fontSize:12}}>{JSON.stringify({offset,trim,time,playing,open,saved,cues:music.cues?.map(c=>c.startSec)})}</output></div>
- {open && <MultitrackAlignStage isOpen panels={panels} sheetMusic={music} bpm={120} sync={sync} onClose={()=>setOpen(false)} onPreviewToggle={()=>setPlaying(p=>!p)} onEditStart={()=>setPlaying(false)} onAddBox={()=>{}} onRecordBox={()=>{}} onAddImage={()=>{}}
+ <output style={{display:'block',fontSize:12}}>{JSON.stringify({offset,trim,time,playing,open,saved,recordAt,cues:music.cues?.map(c=>c.startSec)})}</output></div>
+ {open && <MultitrackAlignStage isOpen panels={panels} sheetMusic={music} bpm={120} sync={sync} onClose={()=>setOpen(false)} onPreviewToggle={()=>setPlaying(p=>!p)} onEditStart={()=>setPlaying(false)} onAddBox={()=>{}} onRecordBox={()=>{}} onRecordAt={(sec,atEnd)=>setRecordAt([sec,atEnd])} onAddImage={()=>{}}
  onMoveImage={(id,startSec)=>setMusic(m=>({...m,cues:m.cues?.map(c=>c.id===id?{...c,startSec}:c)}))} onRemoveImage={id=>setMusic(m=>({...m,cues:m.cues?.filter(c=>c.id!==id)}))} onRestoreSheetMusic={setMusic}
  onSectionChange={(id,sectionStartSec,sectionEndSec)=>setPanels(ps=>ps.map(p=>p.id===id?{...p,sectionStartSec,sectionEndSec}:p))}
  onDone={async changes=>{if(fail)throw Error('test save rejection');setSaved(JSON.stringify(changes));setPanels(ps=>ps.map(p=>{const c=changes.find(c=>c.panelId===p.id);return c?{...p,timelineOffsetMs:c.offsetMs,trimStartSec:c.trimStart,trimEndSec:c.trimEnd}:p}))}} />}

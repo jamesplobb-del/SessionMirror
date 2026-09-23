@@ -69,6 +69,8 @@ html[data-refinement='depth-electric'] :is(.routine-guide,.routine-program-setup
 html[data-refinement='depth-electric'] .routine-guide :is(h2,h3,strong) { letter-spacing:-.025em; }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise,.practice-menu-section,.routine-guide-item,.routine-guide-summary) { border-radius:22px; background:#ffffffd9; border-color:#fff; box-shadow:0 5px 18px #0053aa08; }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise)[aria-pressed='true'] { background:#e2eeff; border-color:#0066ff; }
+html.app-dark-mode[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise,.practice-menu-section,.routine-guide-item,.routine-guide-summary) { background:var(--guide-panel); border-color:var(--guide-line); box-shadow:0 5px 18px #00112224; }
+html.app-dark-mode[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-choice,.routine-guide-exercise)[aria-pressed='true'] { background:var(--guide-selected); border-color:var(--guide-accent); }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-footer,.routine-guide-nav) { background:#edf5ffeb; backdrop-filter:blur(18px); }
 html[data-refinement='depth-electric'] .routine-guide :is(.routine-guide-primary,.routine-guide-progress i.is-on) { background:linear-gradient(140deg,#0066ff,#00a8ed); }
 html[data-refinement='depth-electric'] .routine-guide :is(input,select,textarea) { font-family:inherit; border-radius:14px; }

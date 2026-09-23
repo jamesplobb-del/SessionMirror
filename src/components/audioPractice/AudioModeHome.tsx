@@ -599,7 +599,7 @@ export function AudioModeTakeCard({
               className="audio-mode-take-card__mini-btn audio-mode-take-card__mini-btn--best"
               aria-label="Pin Current Take as Best Take"
             >
-              <Pin className="h-3.5 w-3.5" aria-hidden /><span>Best Take</span>
+              <Pin className="h-3.5 w-3.5" aria-hidden /><span>Make Best</span>
             </Pressable>
           ) : null}
           {hasMedia && playable && onShare ? (
@@ -800,7 +800,7 @@ function AudioModeHome({
       ) : <>
       <div className="audio-compare-heading">
         <h1>{isRecording ? 'Recording' : (benchmarkTake || libraryBenchmarkPlayback) && challengerTake ? 'Compare takes' : challengerTake ? 'Listen back' : 'Your next take'}</h1>
-        <p>{isRecording ? 'Stop when you’re ready to listen.' : challengerTake ? 'Drag Current Take onto Best Take.' : 'Record again to compare.'}</p>
+        <p>{isRecording ? 'Stop when you’re ready to listen.' : challengerTake ? (benchmarkTake || libraryBenchmarkPlayback ? 'Listen to both. Pick one detail to improve, then try again.' : 'Listen back. Pick one detail to improve, then try again.') : 'Record again to compare.'}</p>
       </div>
       <div className="audio-mode-take-stack">
         <AudioModeTakeCard

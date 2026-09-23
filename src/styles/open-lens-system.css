@@ -81,7 +81,7 @@ html#lens-design-system .practice-menu-layer .practice-menu-card.practice-menu-c
 html#lens-design-system.lens-system .audio-mode-home--inplace { padding:0 20px 4px!important; }
 html#lens-design-system.lens-system .audio-compare-heading { min-height:54px!important; padding:0 2px 13px!important; display:flex; flex-direction:column; justify-content:center; }
 html#lens-design-system.lens-system .audio-compare-heading h1 { font-size:14px!important; font-weight:550; letter-spacing:-.15px; }
-html#lens-design-system.lens-system .audio-compare-heading p { display:none; }
+html#lens-design-system.lens-system .audio-compare-heading p { display:block; font-size:11px; line-height:1.3; }
 html#lens-design-system.lens-system .audio-mode-take-stack { gap:14px!important; }
 html#lens-design-system.lens-system .audio-mode-home--inplace .audio-mode-take-card { border-radius:var(--ls-radius)!important; padding:18px!important; background:var(--ls-panel)!important; box-shadow:var(--ls-shadow)!important; border:1px solid var(--ls-line)!important; }
 html#lens-design-system.lens-system .audio-mode-take-card__pill { font-size:12px; font-weight:550; letter-spacing:0; text-transform:none; padding:0; }
@@ -654,6 +654,12 @@ html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .p
 html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy em { font-size:12px; line-height:1.5; }
 html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-links .practice-home-library { border-radius:16px; }
 html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-instrument { min-height:74px; background:var(--ls-panel)!important; }
+/* A new musician has one clear first action; the ready-made plan stays close by. */
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge.practice-menu-card--first-session .practice-home-launch-actions { grid-template-columns:1fr; grid-template-rows:auto auto; flex:0 0 auto; }
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge.practice-menu-card--first-session .practice-home-launch-button.is-primary { min-height:154px; }
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge.practice-menu-card--first-session .practice-home-launch-button.is-quick { min-height:106px; flex-direction:row; align-items:center; }
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge.practice-menu-card--first-session .practice-home-launch-button.is-quick .open-lens-home-symbol { width:34px; height:34px; padding:7px; margin-bottom:0; }
+html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge.practice-menu-card--first-session .practice-home-launch-button.is-quick .practice-home-launch-copy strong { font-size:19px; }
 @media(max-width:360px), (max-height:740px) {
   html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-button { min-height:190px; padding:18px 12px; }
   html#lens-design-system:is(:not([data-home-design]),[data-home-design='air']) .practice-menu-card.practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:22px; }

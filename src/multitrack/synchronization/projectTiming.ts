@@ -52,3 +52,11 @@ export function playbackStartPosition(requested: number, duration: number): numb
   const position = Number.isFinite(requested) ? Math.max(0, requested) : 0
   return Number.isFinite(duration) && duration > 0 && position >= Math.max(0, duration - 0.05) ? 0 : position
 }
+
+/** Editor overdubs follow the bar grid; appending must never land before the playhead. */
+export function recordingStartAtPlayhead(requested: number, barSec: number, appendAtEnd = false): number {
+  const position = Number.isFinite(requested) ? Math.max(0, requested) : 0
+  if (!Number.isFinite(barSec) || barSec <= 0) return position
+  const bar = position / barSec
+  return Math.max(0, (appendAtEnd ? Math.ceil(bar - 1e-6) : Math.round(bar)) * barSec)
+}

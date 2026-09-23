@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, AudioLines, Timer, Pin, FolderOpen, Layers, ListChecks, Music2, Play, SlidersHorizontal, Gamepad2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ListChecks, Music2, Play } from 'lucide-react'
 import { ONBOARDING_CARDS } from '../utils/tutorialContent'
 import { markOnboardingComplete } from '../utils/onboardingTutorial'
 import type { RoutineBuilderMode } from './RoutineBuilder'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
-import { getTunerTransposition } from '../utils/tunerTransposition'
 import { triggerLightHaptic } from '../utils/haptics'
 import '../styles/practice-introduction.css'
 
@@ -100,34 +99,14 @@ export default function OnboardingTutorial({ onComplete, onSkip, onQuickPlay, on
               </optgroup>)}
             </select>
             <p className="practice-intro__note" aria-live="polite">{profile
-              ? `${profile.label} selected · ${getTunerTransposition(profile.tunerTransposition).shortLabel} written pitch. Change this anytime from Home.`
+              ? `${profile.label} selected. Suggested routines will fit your instrument; the tuner stays in concert pitch. Change your instrument anytime from Home.`
               : 'Choose your main instrument, or set this later.'}</p>
           </div>}
 
-          {card.id === 'tools' && <div className="practice-intro__list">
-            <div><AudioLines /><span><strong>Tuner & Drone</strong><p>Check your pitch. Play against a drone. See your tendencies in Insights.</p></span></div>
-            <div><Timer /><span><strong>Metronome</strong><p>Set the beat. Use Program for tempo changes.</p></span></div>
-            <div><Gamepad2 /><span><strong>Games</strong><p>Practice pitch and sight-reading by playing.</p></span></div>
-          </div>}
-
-          {card.id === 'record' && <div className="practice-intro__list">
-            <div><Play /><span><strong>Listen back</strong><p>Tap Record to start and stop. Tap the saved take to play it.</p></span></div>
-            <div><Pin /><span><strong>Keep your best</strong><p>Pin a Best Take to compare with your next try.</p></span></div>
-            <div><FolderOpen /><span><strong>Library</strong><p>Takes save automatically. Open Library above Record to listen or share.</p></span></div>
-            <p className="practice-intro__tip">Hands-free: hold Record to turn it on. Play to start; pause to stop.</p>
-          </div>}
-
-          {card.id === 'workspace' && <div className="practice-intro__list">
-            <div><Layers /><span><strong>Floating tools</strong><p>Tap a widget’s circle to open it. Drag its header to move it; use the chevron to collapse it.</p></span></div>
-            <div><Music2 /><span><strong>References</strong><p>Add YouTube or audio in References. Use its Resize grip for size, expand button for Expand View, or minus to collapse.</p></span></div>
-            <div><SlidersHorizontal /><span><strong>Audio Enhance & Multitrack</strong><p>Open these from Workspace. Multitrack uses separate parts, a portrait layout, and waveform trimming.</p></span></div>
-          </div>}
-
           {last && <>
-            <p className="practice-intro__note">Your routine stays in a small widget. Tap its title for every step; pause or finish from the widget.</p>
-            <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Record & compare<ArrowRight /></button>
-            <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('presets'))}><ListChecks />Choose a routine<ArrowRight /></button>
-            <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('build'))}>Build my own routine<ArrowRight /></button>
+            <p className="practice-intro__note">Your takes save automatically. Listen after the first one, then decide what to try next.</p>
+            <button className="practice-intro__primary practice-intro__quick-play" onClick={() => finish(onQuickPlay)}><Play />Record my first take<ArrowRight /></button>
+            <button className="practice-intro__secondary" onClick={() => finish(() => onChooseRoutine('presets'))}><ListChecks />Try a suggested routine<ArrowRight /></button>
           </>}
         </motion.main>
         <footer className="practice-intro__footer">
