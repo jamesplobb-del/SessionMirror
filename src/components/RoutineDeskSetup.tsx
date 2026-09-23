@@ -3,7 +3,7 @@ import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getPracticeRhythmOptions, AUDIO_PRACTICE_CLICK_SOUNDS } from './audioPractice/audioPracticeMetronome'
 import { SlidersHorizontal } from 'lucide-react'
 import Pressable from './ui/Pressable'
-import RoutineMetronomeSheet from './RoutineMetronomeSheet'
+import RoutineMetronomeEditor from './RoutineMetronomeEditor'
 import RoutineProgramSetup from './RoutineProgramSetup'
 import { getWrittenPitchLabel, type TunerTranspositionId } from '../utils/tunerTransposition'
 import { homePitchClass } from '../utils/routinePresets'
@@ -13,7 +13,6 @@ import type { DeskSnapshot } from '../utils/workspaceDesks'
 export default function RoutineDeskSetup({
   step,
   instrumentId,
-  tunerTransposition,
   hapticFeedback,
   onChange,
 }: {
@@ -23,12 +22,12 @@ export default function RoutineDeskSetup({
   hapticFeedback: boolean
   onChange: (patch: Partial<RoutineStep>) => void
 }) {
-  const [metronomeSheetOpen, setMetronomeSheetOpen] = useState(false)
+  const [metronomeEditorOpen, setMetronomeEditorOpen] = useState(false)
   const savedDesk = step.desk ?? blankDesk('audio')
   const desk = { ...savedDesk, metronome: normalizeDeskMetronome(savedDesk.metronome) }
   const patchDesk = (patch: Partial<DeskSnapshot>) => onChange({ desk: { ...desk, ...patch } })
   const droneLabel = (pitchClass: number) =>
-    getWrittenPitchLabel(pitchClass, desk.drone.octave, tunerTransposition).label
+    getWrittenPitchLabel(pitchClass, desk.drone.octave, 'concert').label
 
   const metronome = desk.metronome
   const subdivisionLabel = getPracticeRhythmOptions(metronome.meter, metronome.pulseModeId)
@@ -69,7 +68,7 @@ export default function RoutineDeskSetup({
                 haptic="light"
                 hapticFeedback={hapticFeedback}
                 className="routine-metronome-open"
-                onClick={() => setMetronomeSheetOpen(true)}
+                onClick={() => setMetronomeEditorOpen(true)}
               >
                 <SlidersHorizontal aria-hidden />
                 <span>
@@ -95,7 +94,7 @@ export default function RoutineDeskSetup({
                 showDrone: !desk.showDrone,
                 drone: {
                   ...desk.drone,
-                  pitchClass: desk.drone.pitchClass ?? homePitchClass(instrumentId) ?? 9,
+                  pitchClass: desk.drone.pitchClass ?? homePitchClass(instrumentId),
                 },
               })
             }
@@ -103,7 +102,7 @@ export default function RoutineDeskSetup({
             <strong>Drone</strong>
             <i />
           </Pressable>
-          <small className="routine-tool__hint">A reference pitch to play against.</small>
+          <small className="routine-tool__hint">Choose a concert-pitch reference to play against.</small>
           {desk.showDrone && (
             <div className="routine-pitch-row" role="radiogroup" aria-label="Drone note">
               {Array.from({ length: 12 }, (_, pitchClass) => (
@@ -160,11 +159,11 @@ export default function RoutineDeskSetup({
         )}
       </div>
       <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />
-      <RoutineMetronomeSheet
-        isOpen={metronomeSheetOpen}
+      <RoutineMetronomeEditor
+        isOpen={metronomeEditorOpen}
         value={desk.metronome}
         onSave={prefs => patchDesk({ metronome: prefs })}
-        onClose={() => setMetronomeSheetOpen(false)}
+        onClose={() => setMetronomeEditorOpen(false)}
       />
     </section>
   )

@@ -37,6 +37,8 @@ interface DraggableDroneWidgetProps {
   muteDuringPlayback?: boolean
   onClose?: () => void
   collapseResetKey?: string
+  expandRequest?: boolean
+  onExpandRequestConsumed?: () => void
   visible?: boolean
 }
 
@@ -65,6 +67,8 @@ export default function DraggableDroneWidget({
   muteDuringPlayback = true,
   onClose,
   collapseResetKey,
+  expandRequest,
+  onExpandRequestConsumed,
   visible = true,
 }: DraggableDroneWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -193,7 +197,8 @@ export default function DraggableDroneWidget({
 
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
     positionId, label: 'drone', icon: <DroneToolIcon aria-hidden />, detail: `Drone ${written.label}`,
-    active: sounding, resetKey: collapseResetKey, ballSlot: 1, visible })
+    active: sounding, resetKey: collapseResetKey, expandRequest,
+    onExpandRequestConsumed, ballSlot: 1, visible })
 
   return (<>
     {fold.ball}

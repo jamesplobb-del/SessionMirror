@@ -46,7 +46,7 @@ import {
 import {
   type RoutineBuilderMode,
 } from './RoutineBuilder'
-import GuidedRoutineBuilder from './GuidedRoutineBuilder'
+import MusicRoutineBuilder from './MusicRoutineBuilder'
 import RoutineProgressSummary from './RoutineProgressSummary'
 import './practice-home.css'
 
@@ -394,7 +394,7 @@ export default function PracticeHub({
                     animate={{ transform: 'translateX(0px)' }}
                     transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
                   >
-                    <GuidedRoutineBuilder
+                    <MusicRoutineBuilder
                       mode={routineBuilderRequest}
                       routine={routine}
                       instrumentId={instrumentId}
@@ -406,7 +406,7 @@ export default function PracticeHub({
                         onSaveRoutine(next)
                         setPage('home')
                       }}
-                      onSaveAndStart={(next) => void saveAndStartRoutine(next)}
+                      onSaveAndStart={saveAndStartRoutine}
                       onCreatePracticeItem={onCreatePracticeItem}
                       todayStarted={Boolean(routine && routineDay?.routineId === routine.id && routineDay.startedAt)}
                       onDelete={() => {

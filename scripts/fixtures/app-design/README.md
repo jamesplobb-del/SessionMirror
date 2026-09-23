@@ -1,5 +1,17 @@
 # Whole-app appearance review
 
+## Music-first routine concepts
+
+Open `/scripts/fixtures/app-design/routine-music.html` on port 5195. It compares Import & go, Your music shelf, and Quick rehearsal. Import & go puts independent exercise settings first; copying to selected items is optional under More options. Quick rehearsal demonstrates the shared-tools alternative. Each supports selecting example scores, configuring tools, starting a simulated practice session, and advancing through the music. The first two also support item editing and reordering. The preview imports the app's shared palette and routine stylesheet; its proposed layouts are fixture-only.
+
+Use **Load example routine** to see Clarke studies at 100 BPM with the pitch graph, a lyrical study at 72 BPM with a B-flat drone, and an excerpt with no tools. These are example user settings, not inferred from notation. **Import music** selects local PDFs/images for manual setup. Files are held as temporary object URLs in memory. No app routine storage, network upload, score analysis, or microphone is used. Sample notation and recording are simulated. Local document rendering uses the browser's PDF support. Starting remembers each exercise's settings in the preview's in-memory library for the remainder of that page session.
+
+Each exercise's **Open metronome** action mounts the real `RoutineMetronomeEditor` and `MetronomeProvider` in `routine-metronome-frame.html`, inside the phone. It uses production controls and can audition real click audio. The production editor restores the preview origin's previous engine settings on exit. Save sends normalized preferences back only to the selected exercise; cancel returns without changing it. The iframe is restricted to the separate 5195 origin and messages are checked against its source, origin, and request identifier. Production components are imported without modification.
+
+Targeted check: `./node_modules/.bin/tsc --noEmit --target ES2022 --lib ES2022,DOM,DOM.Iterable --module ESNext --moduleResolution bundler --jsx react-jsx --strict --skipLibCheck --noUnusedLocals --noUnusedParameters src/vite-env.d.ts scripts/fixtures/app-design/routine-music-main.tsx scripts/fixtures/app-design/routine-metronome-frame.tsx`.
+
+## Appearance review
+
 Run Vite on **127.0.0.1:5195** and open `/scripts/fixtures/app-design/`.
 The separate origin keeps sample Library data, routine choices, and metronome preferences away from the live app on 5194. The frame refuses to mount its storage-owning components on any other port.
 
@@ -61,3 +73,13 @@ Vault review: `TakeVaultDrawer.simplified` is opt-in. It gives the library more 
 Approved Glass presentation and Pocket Arcade are activated in the live app. The production App opts into simplified Vault, Workspace sections, centered Library/Record controls, bottom Settings, and existing Tools/Record navigation. References is opened from Workspace and its hidden content stays mounted with playback suspended. The shared game stylesheet is now `src/styles/pocket-arcade.css`; the preview imports that same file.
 
 Verified the live Home, Games, tuner, metronome, Workspace and expanded-view return flow at 390px. Existing hands-free replay, playback-route, and live-waveform checks pass. Web build and Capacitor iOS sync completed; local audio plugin registration was reapplied. Phone build and device media checks remain with the user. Sentry source-map upload failed during this build; Vite still completed successfully.
+
+## Music-first routines — September 23
+
+`routine-music.html` starts empty. Import a PDF or photo to explore the concepts; it has no seeded scores or generated sheet-music artwork. Imported files stay in the preview's memory only.
+
+The approved Import & go flow is now implemented in production by `MusicRoutineBuilder`. Practice Home → Your routines opens it. Batch imports use the existing per-project chart storage, with thumbnails rendered from the actual files. Each exercise keeps its own metronome, drone, pitch graph, optional program/reference, and hands-free settings. Open metronome uses the existing full-screen editor; Start and Done & next use the existing full-screen music reader. Presets/goals and the full routine editor remain accessible.
+
+Verified in the actual app on an isolated localhost origin: empty music library; mixed PDF/photo import; partial success with an unreadable PDF; separate 100/72 BPM settings; advanced 7/8 save and cancel; full-screen score launch; next-file/tool transition; saved exercise reuse; 390px phone and 820px tablet layouts. `verify-routine-music.mjs` checks empty storage, settings persistence/isolation, copy behavior, and invalid inputs. Physical iPad/native Files import and recording still need device validation.
+
+References is available in the full-screen music Workspace and as a collapsed draggable widget on entry, in regular music mode and routines. Each music exercise exposes reference selection directly below its tools. Verified a pinned routine reference loads without autoplay, Workspace closes/reopens the widget, and standalone music imports and plays reference audio; collapsing the widget pauses it. Browser reference audio uses session-only object URLs with stable library identities; native audio storage is unchanged. `verify-library-audio-preview.mjs` covers identity, hydration, replacement, deletion, and isolation.

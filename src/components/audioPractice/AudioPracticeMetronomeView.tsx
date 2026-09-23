@@ -77,10 +77,13 @@ function PracticeControlButton({
 interface AudioPracticeMetronomeViewProps {
   /** Opens the practice program. Omitted when there is nowhere to go. */
   onOpenProgram?: () => void
+  /** Routine items save audio settings, not the workspace's visual preference. */
+  showVisualStyle?: boolean
 }
 
 export default function AudioPracticeMetronomeView({
   onOpenProgram,
+  showVisualStyle = true,
 }: AudioPracticeMetronomeViewProps = {}) {
   const notifyTutorial = useTutorialAction()
   const bpmInputId = useId()
@@ -451,11 +454,11 @@ export default function AudioPracticeMetronomeView({
       <div className="audio-practice-metronome__bottom-dock shrink-0">
         <section
           className="audio-practice-metronome__selectors audio-practice-metronome__selectors--dropdown audio-practice-metronome__selectors--under-wheel pointer-events-auto shrink-0"
-          aria-label="Metronome time, rhythm, sound, and view"
+          aria-label={showVisualStyle ? 'Metronome time, rhythm, sound, and view' : 'Metronome time, rhythm, and sound'}
         >
           <div
             className="audio-practice-metronome__select-row audio-practice-metronome__select-row--primary"
-            data-control-count="4"
+            data-control-count={showVisualStyle ? 4 : 3}
           >
             <MetronomeAudioSelect
               label="Time"
@@ -489,7 +492,7 @@ export default function AudioPracticeMetronomeView({
               }))}
               onChange={handleSoundChange}
             />
-            <MetronomeAudioSelect<MetronomeVisualStyle>
+            {showVisualStyle ? <MetronomeAudioSelect<MetronomeVisualStyle>
               label="View"
               ariaLabel="Visual metronome style"
               value={visualStyle}
@@ -499,7 +502,7 @@ export default function AudioPracticeMetronomeView({
                 shortLabel: id === 'horizontal' ? 'Horizontal' : id === 'pulse' ? 'Pulse' : 'Columns',
               }))}
               onChange={setMetronomeVisualStyle}
-            />
+            /> : null}
           </div>
 
           {/*

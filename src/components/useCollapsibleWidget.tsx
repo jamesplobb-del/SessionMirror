@@ -1,6 +1,6 @@
 import { reportFeatureAction } from '../utils/featureGuidance'
 import { ChevronDown } from 'lucide-react'
-import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { animate, motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
 import { iosDragRelease } from '../utils/motionPresets'
@@ -16,17 +16,21 @@ const ballPlacements = new Map<symbol, {
 
 /** Presentation only. The full widget stays mounted and retains its audio owner. */
 export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId, label,
-  icon, detail, active = false, resetKey, onRestore, ballSlot = 0, visible = true,
+  icon, detail, active = false, resetKey, expandRequest = false, onExpandRequestConsumed,
+  onRestore, ballSlot = 0, visible = true,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
   widgetRef: RefObject<HTMLDivElement | null>
   x: MotionValue<number>; y: MotionValue<number>; positionId: string
   label: string; icon: ReactNode; detail?: string; active?: boolean; resetKey?: string
+  /** One-shot request to present the full panel, such as enabling it from Music Workspace. */
+  expandRequest?: boolean
+  onExpandRequestConsumed?: () => void
   onRestore?: (position: WidgetPosition) => void
   ballSlot?: number
   visible?: boolean
 }) {
-  const [collapsed, setCollapsed] = useState(true)
+  const [collapsed, setCollapsed] = useState(() => !expandRequest)
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null)
   const present = useIsPresent()
   useLayoutEffect(() => { setPortalHost(boundaryRef.current) }, [boundaryRef])
@@ -38,6 +42,9 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   const ballGesture = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null)
   const transferFocus = useRef(false)
   const reducedMotion = useReducedMotion()
+  const previousPlacement = useRef({ resetKey, positionId, ballSlot, boundaryRef })
+  const previousExpandRequest = useRef(expandRequest)
+  const expandRequestConsumed = useRef(false)
 
   useLayoutEffect(() => {
     if (!transferFocus.current) return
@@ -64,14 +71,38 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   }
 
   useLayoutEffect(() => {
+    const prior = previousPlacement.current
+    const shouldReset = prior.resetKey !== resetKey || prior.positionId !== positionId ||
+      prior.ballSlot !== ballSlot || prior.boundaryRef !== boundaryRef
+    previousPlacement.current = { resetKey, positionId, ballSlot, boundaryRef }
     const bounds = boundaryRef.current
     const saved = loadPersistentWidgetPosition(`${positionId}-ball`)
     clampBall(saved?.x ?? (bounds?.clientWidth ?? window.innerWidth) - BALL_SIZE - 12,
       saved?.y ?? Math.min(220, (bounds?.clientHeight ?? window.innerHeight) * 0.3) + ballSlot * 68)
-    setCollapsed(true)
-    // New tools and new routine steps arrive as independently accessible balls.
+    if (shouldReset) setCollapsed(true)
+    // Routine changes reset existing tools to independently accessible balls.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey, positionId, ballSlot, boundaryRef])
+
+  useLayoutEffect(() => {
+    if (!expandRequest) {
+      previousExpandRequest.current = false
+      return
+    }
+    if (previousExpandRequest.current) return
+    previousExpandRequest.current = true
+    setCollapsed(false)
+  }, [expandRequest])
+
+  useEffect(() => {
+    if (!expandRequest) {
+      expandRequestConsumed.current = false
+      return
+    }
+    if (expandRequestConsumed.current) return
+    expandRequestConsumed.current = true
+    onExpandRequestConsumed?.()
+  }, [expandRequest, onExpandRequestConsumed])
 
   useLayoutEffect(() => {
     const id = placementId.current

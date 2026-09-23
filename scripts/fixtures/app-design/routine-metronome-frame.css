@@ -1,0 +1,7 @@
+/* Only frame sizing and shared palette; the controls are production UI. */
+html,body,#root{width:100%;height:100%;margin:0;overflow:hidden}
+.routine-metronome-screen{background:var(--ls-bg);color:var(--ls-ink)}
+.routine-metronome-screen__header{min-height:62px;flex-shrink:0}
+.routine-metronome-screen__header button{color:var(--ls-blue)}
+.routine-metronome-screen__title small{color:var(--ls-muted)}
+.routine-metronome-screen__stage{overflow-y:auto;overscroll-behavior:contain}

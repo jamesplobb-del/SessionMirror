@@ -41,6 +41,8 @@ interface PracticeChartLayerProps {
   projectId: string
   workspace: HudQuickSettings
   onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
+  referencesVisible?: boolean
+  onReferencesChange?: (visible: boolean) => void
   /** The Music tool is on and this surface is the practice room. */
   active: boolean
   boundaryRef: RefObject<HTMLElement | null>
@@ -110,6 +112,7 @@ export default function PracticeChartLayer({
   projectId, workspace, onWorkspaceChange, active, boundaryRef, collapseResetKey, onClose, onPaperVisibleChange,
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
+  referencesVisible = false, onReferencesChange,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -579,6 +582,10 @@ export default function PracticeChartLayer({
                 <Icon aria-hidden /><span>{label}</span>
               </button>
             ))}
+            {onReferencesChange && <button type="button" aria-pressed={referencesVisible}
+              onClick={() => onReferencesChange(!referencesVisible)}>
+              <FileMusic aria-hidden /><span>References</span>
+            </button>}
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>

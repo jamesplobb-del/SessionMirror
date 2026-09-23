@@ -67,7 +67,7 @@ export const FEATURE_GUIDES: Record<FeatureGuideId, GuideStep[]> = {
   recording: [{ title: 'One tap to record', body: 'Tap Record to start, then tap again to stop. Your take saves automatically.', selector: '[data-tutorial="record-controls"]' }],
   navigation: [{ title: 'Find your practice tools', body: 'Use these tabs for the metronome, tuner and games. Tap Compare in the bottom controls to get back to your takes.', selector: '[data-tutorial="audio-mode-tabs"]' }],
   'take-library': [{ title: 'Your recordings are here', body: 'Open the Take library to listen, rename or share a recording. Clearing a take from the screen keeps it here.', selector: '[data-guidance="take-library"]', action: 'take-library-opened' }],
-  'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace for Takes, Pitch, Metronome or Drone. The Music widget separates Read from Mark up; More options holds file controls.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]' }],
+  'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace for Takes, References, Pitch, Metronome or Drone. The Music widget separates Read from Mark up; More options holds file controls.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]' }],
   multitrack: [{ title: 'Record a part over another', body: 'Multitrack lets you build a performance one part at a time. Use headphones to hear earlier parts as you record.', selector: '[data-tutorial="multitrack-button"]' }],
   'best-take': [
     { title: 'Keep your best take', body: 'Tap the pin to keep this take beside your next recording.',

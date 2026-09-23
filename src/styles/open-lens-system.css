@@ -709,6 +709,26 @@ html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .open-
 html#lens-design-system.lens-system.app-music-page .app-shell--music-page .app-ui-overlay.app-ui-overlay--audio-mode {
   background:transparent!important; box-shadow:none!important;
 }
+/* Sheet music stays white even when the rest of the app uses a dark finish.
+   Give References its paper-side material here so the old camera fallback
+   never leaves a navy panel or media well floating over the score. */
+html#lens-design-system .app-shell--music-page .reference-widget-live {
+  --widget-surface:#fffffff2;
+  --widget-border:#d8e6f2;
+  --widget-ink:#142b43;
+  --widget-muted:#49647d;
+  --widget-accent:#0075dc;
+  --widget-control:#f5faff;
+  color:var(--widget-ink);
+}
+html#lens-design-system .app-shell--music-page .reference-widget-media :is(.take-audio-surface,.take-media-surface,.pip-empty-state),
+html#lens-design-system .app-shell--music-page .reference-widget-media > .pip-video-container > .ui-orient-spin > .relative {
+  background:transparent!important;
+  box-shadow:none!important;
+}
+html#lens-design-system .app-shell--music-page .reference-widget-media .take-audio-controls-bar {
+  background:var(--widget-control)!important;
+}
 html#lens-design-system .practice-chart-paper { background:var(--ls-bg); color:var(--ls-ink); }
 html#lens-design-system .practice-chart-empty { padding-inline:24px; }
 html#lens-design-system .practice-chart-empty h2 { color:var(--ls-ink); font-weight:600; letter-spacing:-.5px; }

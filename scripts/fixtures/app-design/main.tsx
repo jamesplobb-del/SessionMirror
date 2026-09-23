@@ -313,6 +313,7 @@ function Preview(){
     <div ref={boundary} className={`lens-screen app-shell ${guidanceStage && !guidanceDismissed && !capturing && !guidedReviewPreview ? 'lens-guidance-preview' : ''} ${guidedReviewPreview ? 'lens-guided-app-preview' : ''} ${subdivisionConcept ? 'lens-subdivision-concept' : ''} ${originalSurface ? 'lens-original-electric' : 'open-lens-recording'} ${video?'lens-camera':'app-shell--audio-mode'} ${capturing?'open-lens-capturing':''} ${screen==='music'&&musicVisible?'app-shell--music-page':''} ${musicChromeHidden&&screen==='music'?'app-shell--music-chrome-hidden':''}`} data-screen={screen}>
       {screen==='music'&&<PracticeChartLayer projectId="design-review-music" active boundaryRef={boundary} offerFileOnOpen={false}
         workspace={{pitchTrackerEnabled:widgets.pitch,showMetronome:widgets.met,showDrone:widgets.drone,showTakeCards:widgets.cards,showMusic:true,audioEnhancerEnabled:false}}
+        referencesVisible={references} onReferencesChange={visible=>{setReferences(visible);setReferenceExpanded(visible)}}
         onWorkspaceChange={(key,value)=>{const names={pitchTrackerEnabled:'pitch',showMetronome:'met',showDrone:'drone',showTakeCards:'cards'} as const;setWidgets(w=>({...w,[names[key]]:value}))}}
         onClose={()=>{setMusicChromeHidden(false);go('home')}} onPaperVisibleChange={setMusicVisible} onChromeHiddenChange={setMusicChromeHidden}
         isRecording={capturing} isStopping={false} recordReady recordElapsed={capturing?12:0} onToggleRecord={toggleRecord}

@@ -44,8 +44,11 @@ for (const instrument of [...api.INSTRUMENT_PROFILES.map(item => item.id), null]
   }
   for (const goal of api.PRACTICE_GOALS) {
     const routine = api.buildGoalRoutine(instrument, goal.id, 20)
+    const defaultRoutine = api.buildGoalRoutine(instrument, goal.id)
     assert.ok(routine.steps.length > 0)
     assert.equal(routine.steps.reduce((sum, item) => sum + item.minutes, 0), 20)
+    assert.equal(defaultRoutine.steps.length, routine.steps.length, `${instrument}/${goal.id}: default plan keeps every exercise`)
+    assert.ok(defaultRoutine.steps.every(item => item.minutes >= 1), `${instrument}/${goal.id}: every default exercise has time`)
     for (const item of routine.steps) {
       const template = templates.find(candidate => candidate.title === item.title)
       assert.ok(template, `${instrument}/${goal.id}: exercise belongs to this instrument`)
@@ -94,6 +97,7 @@ for (const instrument of ['flute', 'clarinet', 'soprano-sax', 'alto-sax', 'tenor
 assert.equal(step('voice', 'body').desk.mode, 'video', 'Unpitched breathing uses posture feedback')
 assert.equal(step('voice', 'body').desk.showDrone, false)
 assert.equal(step('voice', 'sirens').desk.showDrone, false, 'A moving siren has no fixed drone target')
+assert.equal(step('voice', 'sustained').desk.drone.pitchClass, null, 'A singer chooses a comfortable concert reference')
 assert.equal(step('trumpet', 'flow').desk.metronome.bpm, 72, 'Flow studies retain their own pacing')
 assert.equal(step('trumpet', 'flow').desk.showDrone, false)
 for (const instrument of ['guitar', 'bass-guitar', 'ukulele']) {
@@ -105,10 +109,37 @@ for (const instrument of ['violin', 'viola', 'cello', 'double-bass']) {
 }
 assert.ok(api.getStepTemplates('piano').every(item => !item.desk('piano')?.showDrone))
 for (const [instrument, expected] of Object.entries({
-  violin: 'Scales & intonation', viola: 'Scales & intonation', cello: 'Scales & intonation', 'double-bass': 'Positions & intonation',
-  guitar: 'Right-hand arpeggios', 'bass-guitar': 'Groove & note length', ukulele: 'Fingerpicking', piano: 'Chords, cadences & voicing',
+  violin: 'Long bows & tone', viola: 'Long bows & tone', cello: 'Long bows & tone', 'double-bass': 'Long bows & tone',
+  guitar: 'Right-hand arpeggios', 'bass-guitar': 'Plucking tone & consistency', ukulele: 'Fingerpicking', piano: 'Chords, cadences & voicing',
 })) {
   assert.ok(api.buildGoalRoutine(instrument, 'sound', 20).steps.some(item => item.title === expected), `${instrument}: sound plan includes instrument-appropriate feedback`)
+}
+for (const instrument of ['violin', 'viola', 'cello', 'double-bass']) {
+  assert.equal(step(instrument, 'bow-tone').desk.mode, 'video', `${instrument}: bow-tone review includes sight and sound`)
+}
+for (const instrument of ['guitar', 'bass-guitar', 'ukulele']) {
+  const piece = step(instrument, 'piece')
+  assert.equal(piece.desk.mode, 'audio', `${instrument}: phrase defaults to audio`)
+  assert.equal(piece.desk.pitchTrackerEnabled, false, `${instrument}: polyphonic phrase does not assume pitch tracking`)
+  assert.doesNotMatch(api.getStepTemplates(instrument).find(item => item.id === 'piece').hint, /bow/i, `${instrument}: no bow-arm instruction`)
+}
+assert.equal(api.buildGoalRoutine('bassoon', 'music').steps[1].title, 'Long tones & response', 'bassoon: broad tone preparation before a piece')
+for (const goal of ['balanced', 'technique']) {
+  assert.ok(api.buildGoalRoutine('french-horn', goal).steps.every(item => item.title !== 'Stopped horn'), `horn/${goal}: specialist drill is optional`)
+}
+assert.ok(api.buildGoalRoutine('bass-guitar', 'balanced').steps.some(item => item.title === 'Groove & note length'), 'bass: daily habit includes groove')
+assert.ok(api.buildGoalRoutine('ukulele', 'balanced').steps.some(item => item.title === 'Strumming patterns'), 'ukulele: daily habit includes strumming')
+assert.ok(api.buildGoalRoutine('voice', 'balanced').steps.some(item => /sirens/i.test(item.title)), 'voice: gentle glides before sustained singing')
+assert.match(api.buildGoalRoutine('voice', 'sound').steps[0].title, /sirens/i, 'voice: sound goal starts with SOVT glides')
+assert.ok(api.buildGoalRoutine('piano', 'technique').steps.some(item => item.title === 'Hand independence'), 'piano: technical goal includes hand coordination')
+for (const instrument of [null, 'other']) {
+  for (const goal of api.PRACTICE_GOALS) {
+    assert.ok(api.buildGoalRoutine(instrument, goal.id).steps.every(item => !item.desk?.pitchTrackerEnabled && !item.desk?.showDrone), `general/${goal.id}: no pitched-instrument assumptions`)
+  }
+}
+for (const instrument of [...api.INSTRUMENT_PROFILES.map(item => item.id), null]) {
+  const sound = api.buildGoalRoutine(instrument, 'sound', 20)
+  assert.ok(sound.steps.at(-2).minutes > sound.steps.at(-1).minutes, `${instrument}: sound goal gives more time to the sound exercise than the phrase`)
 }
 for (const minutes of [3, 4, 5, 10, 20, 90]) {
   for (const instrument of ['voice', 'trumpet', 'piano']) {

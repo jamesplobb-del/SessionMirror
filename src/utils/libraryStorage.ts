@@ -12,6 +12,10 @@ import {
   NATIVE_AUDIO_MIME,
 } from './takeStorage'
 
+// Browser previews keep the audio for this session, just like imported scores.
+// The repository still needs a nonempty file identity when saving its row.
+const browserAudio = new Map<string, string>()
+
 export interface PersistedLibraryAudio {
   filePath: string
   playbackUrl: string
@@ -87,10 +91,12 @@ export async function persistLibraryAudio(
     blob.type === writeMime ? blob : new Blob([blob], { type: writeMime })
 
   if (!Capacitor.isNativePlatform()) {
-    return {
-      filePath: '',
-      playbackUrl: URL.createObjectURL(normalized),
-    }
+    const filePath = `${LIBRARY_DIR}/${encodeURIComponent(itemId)}.${extensionForAudioMime(writeMime)}`
+    const previous = browserAudio.get(filePath)
+    if (previous) URL.revokeObjectURL(previous)
+    const playbackUrl = URL.createObjectURL(normalized)
+    browserAudio.set(filePath, playbackUrl)
+    return { filePath, playbackUrl }
   }
 
   await ensureLibraryDirectory()
@@ -123,7 +129,7 @@ export async function resolveLibraryPlaybackUrl(
   fallbackUrl: string,
 ): Promise<string> {
   if (!Capacitor.isNativePlatform()) {
-    return fallbackUrl
+    return browserAudio.get(filePath) ?? fallbackUrl
   }
 
   if (fallbackUrl && !fallbackUrl.startsWith('file://')) {
@@ -147,5 +153,11 @@ export async function resolveLibraryPlaybackUrl(
 }
 
 export async function deleteLibraryFile(filePath: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) {
+    const url = browserAudio.get(filePath)
+    if (url) URL.revokeObjectURL(url)
+    browserAudio.delete(filePath)
+    return
+  }
   await deleteTakeFile(filePath)
 }

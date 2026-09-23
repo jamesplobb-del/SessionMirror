@@ -6,11 +6,14 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, S
 import { kindNeedsDesk, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
 import RoutineDeskSetup from './RoutineDeskSetup'
+import RoutineMetronomeEditor from './RoutineMetronomeEditor'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
 import RoutineMusicSetup from './RoutineMusicSetup'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, presetMinutes, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
+import { normalizeDeskMetronome } from '../utils/deskMetronome'
+import type { MetronomePrefs } from '../utils/metronomeConfig'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
 import { hasPracticeChart } from '../utils/practiceChartStorage'
 import { importPracticePlanFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
@@ -89,6 +92,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const [customToolKey, setCustomToolKey] = useState<string | null>(null)
   const [customGameRoute, setCustomGameRoute] = useState<LabsRoute>('menu')
   const [customSetup, setCustomSetup] = useState<RoutineStep | null>(null)
+  const [metronomeEditorOpen, setMetronomeEditorOpen] = useState(false)
   const [customReference, setCustomReference] = useState('')
   const [customReferenceVideo, setCustomReferenceVideo] = useState<string | null>(null)
   const [useCurrent, setUseCurrent] = useState(false)
@@ -134,7 +138,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const move = (next: Screen, backwards = false) => { setDirection(backwards ? -1 : 1); setError(''); setScreen(next) }
   useEffect(() => { scrollRef.current?.scrollTo(0, 0) }, [screen])
   const clearItemSetup = () => {
-    setEditingStepId(null); setCustomToolKey(null); setCustomSetup(null); setCustomReference(''); setCustomReferenceVideo(null); setCustomGameRoute('menu'); setUseCurrent(false)
+    setEditingStepId(null); setCustomToolKey(null); setCustomSetup(null); setCustomReference(''); setCustomReferenceVideo(null); setCustomGameRoute('menu'); setUseCurrent(false); setMetronomeEditorOpen(false)
   }
   const back = () => {
     if (screen === 'routines') onCancel()
@@ -204,7 +208,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     setCustomReference(step.referenceQuery)
     setCustomReferenceVideo(step.referenceVideoId)
     setUseCurrent(false)
-    move('custom-tool')
+    if (step.kind === 'metro') setMetronomeEditorOpen(true)
+    else move('custom-tool')
   }
   const addCustomItem = () => {
     const title = customInput.trim().slice(0, MAX_STEP_TITLE)
@@ -216,8 +221,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     if (destination < 0 || destination >= customItems.length) return
     setCustomItems(items => { const next = [...items]; [next[index], next[destination]] = [next[destination], next[index]]; return next })
   }
-  const makeCustomStep = () => {
-    const choice = toolChoices.find(item => item.key === customToolKey)
+  const makeCustomStep = (key = customToolKey) => {
+    const choice = toolChoices.find(item => item.key === key)
     const title = setupTitle
     if (!choice || !title) return null
     const keepDesk = customSetup && toolKeyForStep(customSetup) === choice.key && !useCurrent
@@ -253,10 +258,11 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     const step = makeCustomStep()
     if (!step || !kindNeedsDesk(step.kind)) return
     setCustomSetup(step)
-    move('custom-settings')
+    if (step.kind === 'metro') setMetronomeEditorOpen(true)
+    else move('custom-settings')
   }
-  const saveCustomTool = () => {
-    const base = toolSkipsDesk(customToolKey) ? makeCustomStep() : customSetup
+  const saveCustomTool = (stepOverride?: RoutineStep) => {
+    const base = stepOverride ?? (toolSkipsDesk(customToolKey) ? makeCustomStep() : customSetup)
     if (!base) return
     const step = createStep({
       ...base,
@@ -283,6 +289,12 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       nextSteps.forEach(item => storeLibraryExercise({ instrumentId: instrument, step: item }))
       setConfiguredIds(nextSteps.map(item => item.id)); setExercises(loadExerciseLibrary()); setDraft(current => ({ ...current, steps: nextSteps })); setSelection({}); setLineupReturn('library'); clearItemSetup(); move('lineup')
     } catch { setError('Could not save these exercises on your device. Please try again.') }
+  }
+  const saveMetronomeItem = (prefs: MetronomePrefs) => {
+    const base = customSetup ?? makeCustomStep('metronome')
+    if (!base) return
+    const desk = { ...(base.desk ?? blankDesk('audio')), showMetronome: true, metronome: normalizeDeskMetronome(prefs) }
+    saveCustomTool(createStep({ ...base, kind: 'metro', desk }))
   }
   const customMusicPinned = Boolean(customSetup?.projectId && hasPracticeChart(customSetup.projectId))
   const pendingSetup = draft.steps.filter(step => !configuredIds.includes(step.id))
@@ -341,7 +353,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     : screen === 'custom-settings' ? () => move('custom-reference')
     : screen === 'custom-reference' ? () => { if (!customReferenceVideo) setCustomReference(''); saveCustomTool() }
     : undefined
-  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? 'Done' : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? toolSkipsDesk(customToolKey) ? 'Save item' : 'Continue to tools' : screen === 'custom-settings' ? musicSetup ? 'Continue to music' : 'Continue to reference' : screen === 'custom-reference' ? musicSetup ? customMusicPinned ? 'Save item' : 'Skip music & save item' : customReferenceVideo ? 'Save item' : 'Skip reference & save item' : 'Continue'
+  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? 'Done' : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? toolSkipsDesk(customToolKey) ? 'Save item' : customToolKey === 'metronome' ? 'Set metronome' : 'Continue to tools' : screen === 'custom-settings' ? musicSetup ? 'Continue to music' : 'Continue to reference' : screen === 'custom-reference' ? musicSetup ? customMusicPinned ? 'Save item' : 'Skip music & save item' : customReferenceVideo ? 'Save item' : 'Skip reference & save item' : 'Continue'
   const disabled = screen === 'instrument' ? !instrument : screen === 'choose' || screen === 'lineup' ? !draft.steps.length : screen === 'custom-items' ? !customItems.length : screen === 'custom-tool' ? !customToolKey : false
   const renderTemplate = (template: typeof templates[number]) => <Pressable key={template.id} type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion}
     className="routine-guide-exercise" aria-pressed={isSelected(template.id)} onClick={() => toggle(template.id, () => stepFromTemplate(template, instrument))}>
@@ -494,7 +506,14 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           </div>}
           {screen === 'custom-tool' && <>
             {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}
-            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => { setCustomToolKey(choice.key); if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu') }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
+            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => {
+              setCustomToolKey(choice.key)
+              if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu')
+              if (choice.kind === 'metro') {
+                const step = makeCustomStep(choice.key)
+                if (step) { setCustomSetup(step); setMetronomeEditorOpen(true) }
+              }
+            }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
             {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
             {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
           </>}
@@ -523,6 +542,15 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
         </motion.div>
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
+    <RoutineMetronomeEditor
+      isOpen={metronomeEditorOpen}
+      value={normalizeDeskMetronome(customSetup?.desk?.metronome)}
+      onSave={saveMetronomeItem}
+      onClose={() => {
+        setMetronomeEditorOpen(false)
+        if (screen === 'lineup') clearItemSetup()
+      }}
+    />
     {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">
       {secondaryAction && <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-secondary" disabled={disabled} onClick={secondaryAction.run}>{secondaryAction.label}</Pressable>}
       <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable>

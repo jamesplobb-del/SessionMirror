@@ -50,6 +50,8 @@ export function homePitchClass(instrumentId: string | null): number | null {
       return 4 // E
     case 'recorder':
       return 0 // C
+    case 'voice':
+      return null // A singer's comfortable starting pitch depends on their range.
     case 'piano':
       return null
     default: {
@@ -403,7 +405,7 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       topic: 'long-tones',
       kind: 'tune',
       minutes: 4,
-      hint: 'Comfortable vowel, drone, and slow click; breathe and rest between notes.',
+      hint: 'Choose a comfortable drone note, then sustain an easy vowel with the slow click; breathe and rest between notes.',
       desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
     },
     {
@@ -484,29 +486,29 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
   general: [
     {
       id: 'warmup',
-      title: 'Warm-up',
+      title: 'Easy warm-up',
       topic: 'warmup',
-      kind: 'metro',
+      kind: 'record',
       minutes: 4,
-      hint: 'Slow click, easy range.',
-      desk: (id) => deskFor(id, { bpm: 60 }),
+      hint: 'Begin with a comfortable pattern for your instrument; record it if listening back helps.',
+      desk: (id) => deskFor(id, { mode: 'audio', handsFree: true }),
     },
     {
-      id: 'long-tones',
-      title: 'Long tones',
-      topic: 'long-tones',
-      kind: 'tune',
+      id: 'sound-focus',
+      title: 'Sound & expression',
+      topic: 'other',
+      kind: 'record',
       minutes: 5,
-      hint: 'Tuner, drone, and slow click for sustained notes and rests.',
-      desk: (id) => deskFor(id, { drone: true, pitch: true, bpm: 60 }),
+      hint: 'Record a short sample and listen for the sound you want. No fixed pitch is assumed.',
+      desk: (id) => deskFor(id, { mode: 'audio', handsFree: true }),
     },
     {
       id: 'scales',
-      title: 'Scales',
+      title: 'Patterns & coordination',
       topic: 'scales',
       kind: 'metro',
       minutes: 5,
-      hint: 'Click on.',
+      hint: 'Choose a pattern that fits your instrument and keep it steady.',
       desk: (id) => deskFor(id, { bpm: 76 }),
     },
     {
@@ -519,7 +521,10 @@ const TEMPLATES: Record<PresetFamily, StepTemplate[]> = {
       desk: (id) => deskFor(id, { bpm: 80, handsFree: true }),
     },
     common.etude(6),
-    common.piece(6),
+    {
+      ...common.piece(6),
+      desk: (id) => deskFor(id, { mode: 'audio', handsFree: true }),
+    },
     common.runThrough(),
     common.sightReading(),
     common.balance(),
@@ -624,7 +629,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
     tuned('breathing', 'Mouthpiece pitch & voicing', 'warmup', 'Stabilize the embouchure and hear the pitch center.'),
     tuned('long-tones', 'Long tones & intonation', 'long-tones', 'Balance pitch and tone across the horn.', true, 60),
     tuned('overtones', 'Overtones', 'flexibility', 'Match overtones to fingered notes without biting.'),
-    clicked('technique', 'Palm-key coordination', 'technique', 'Keep upper-register fingers close and even.', 72),
+    clicked('technique', 'Finger coordination', 'technique', 'Keep ordinary patterns and palm-key connections close and even.', 72),
     heard('articulation', 'Articulation & vibrato', 'articulation', 'Record attacks, releases, and an even vibrato.', 76),
   ],
   'alto-sax': [
@@ -657,13 +662,15 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   ],
   bassoon: [
     tuned('breathing', 'Reed response & first notes', 'warmup', 'Check the reed, then assemble the instrument for easy first notes.'),
-    tuned('tenor-register', 'Tenor-register stability', 'long-tones', 'Tune and stabilize the tenor register against a drone.', true, 60),
+    tuned('long-tones', 'Long tones & response', 'long-tones', 'Sustain easy notes in several registers with rests, listening for a stable sound.', true, 60),
+    tuned('tenor-register', 'Tenor-register stability', 'other', 'Tune and stabilize the tenor register against a drone.', true, 60),
     clicked('flicking', 'Flicking & venting', 'technique', 'Coordinate speaker keys on clean register entrances.', 60),
     clicked('technique', 'Finger patterns & half-hole', 'technique', 'Slow patterns for half-hole and thumb coordination.', 66),
     heard('articulation', 'Articulation', 'articulation', 'Record single and double tongue for consistent response.', 72),
   ],
   violin: [
     seen('bow-warmup', 'Open strings & whole bows', 'warmup', 'Use camera to check a straight path and relaxed setup.'),
+    seen('bow-tone', 'Long bows & tone', 'long-tones', 'Record open strings; listen to the sound and watch bow speed and contact point.'),
     tuned('intonation', 'Scales & intonation', 'scales', 'Hear ringing intervals and tune against a drone.', true),
     heard('shifting', 'Shifting & left hand', 'technique', 'Listen for relaxed, accurate arrivals.', 60),
     seen('bowing', 'Bow strokes & crossings', 'articulation', 'Check contact point, level changes, and bow distribution.'),
@@ -671,6 +678,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   ],
   viola: [
     seen('bow-warmup', 'Open strings & whole bows', 'warmup', 'Use camera to check weight, contact point, and a free shoulder.'),
+    seen('bow-tone', 'Long bows & tone', 'long-tones', 'Record a resonant open string; compare bow weight, speed, and contact point.'),
     tuned('intonation', 'Scales & intonation', 'scales', 'Build a ringing C-string-to-A-string frame.', true),
     heard('shifting', 'Shifting & left hand', 'technique', 'Record position changes and listen for clean arrivals.', 58),
     seen('bowing', 'Bow strokes & string crossings', 'articulation', 'Check bow levels and sustained weight.'),
@@ -678,6 +686,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   ],
   cello: [
     seen('bow-warmup', 'Open strings & bow path', 'warmup', 'Check contact point, weight, and level changes.'),
+    seen('bow-tone', 'Long bows & tone', 'long-tones', 'Record open strings; listen for an even sound through bow changes.'),
     tuned('intonation', 'Scales & intonation', 'scales', 'Tune extensions and positions against a drone.', true),
     heard('shifting', 'Shifting & extensions', 'technique', 'Listen for smooth motion and accurate arrival notes.', 58),
     seen('bowing', 'Bow distribution & crossings', 'articulation', 'Match bow speed to the phrase and string level.'),
@@ -685,6 +694,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   ],
   'double-bass': [
     seen('bow-warmup', 'Open strings & bow weight', 'warmup', 'Check contact point and a relaxed right arm.'),
+    seen('bow-tone', 'Long bows & tone', 'long-tones', 'Record a comfortable open string; compare contact, weight, and resonance.'),
     tuned('intonation', 'Positions & intonation', 'scales', 'Map positions slowly against a drone.', true),
     heard('shifting', 'Shifting', 'technique', 'Record position changes and listen for secure arrivals.', 54),
     clicked('bowing', 'Bow strokes & crossings', 'articulation', 'Coordinate large string crossings with the pulse.', 60),
@@ -693,7 +703,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
   guitar: [
     seen('warmup', 'Posture & hand position', 'warmup', 'Use camera to check wrist, thumb, and instrument position.'),
     clicked('scales', 'Scales & position shifts', 'scales', 'Alternate cleanly and connect positions in time.', 72),
-    clicked('right-hand', 'Right-hand arpeggios', 'technique', 'Giuliani-style patterns with even tone.', 66),
+    heard('right-hand', 'Right-hand arpeggios', 'technique', 'Record a short pattern and compare evenness and tone.', 66),
     heard('slurs', 'Slurs & left hand', 'technique', 'Record hammer-ons, pull-offs, and clean releases.', 60),
     clicked('chords', 'Chord changes & rhythm', 'rhythm', 'Change early and keep the pulse continuous.', 76),
   ],
@@ -701,6 +711,7 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
     seen('warmup', 'Posture & muting', 'warmup', 'Check fretting pressure and both-hand muting.'),
     clicked('scales', 'Scales & arpeggios', 'scales', 'Connect shapes to chord tones across the neck.', 72),
     heard('groove', 'Groove & note length', 'rhythm', 'Record with the click and judge placement and space.', 80),
+    heard('tone', 'Plucking tone & consistency', 'other', 'Compare attack and note length with your chosen plucking or picking style.'),
     seen('technique', 'Fingerstyle, pick or slap', 'technique', 'Check motion, string crossing, and consistency.'),
     heard('transcription', 'Transcription & vocabulary', 'ear', 'Learn a short line by ear, then record it with the reference.'),
   ],
@@ -728,12 +739,22 @@ const SPECIALTIES: Record<string, StepTemplate[]> = {
 }
 
 const FRETTED_IDS = new Set(['guitar', 'bass-guitar', 'ukulele'])
+const FRETTED_PIECES: Record<string, { title: string; hint: string }> = {
+  guitar: { title: 'One passage of the piece', hint: 'Record a short passage to hear tone and articulation; add a reference if useful.' },
+  'bass-guitar': { title: 'One phrase of the bass line', hint: 'Record a short line and compare groove and note length; add a reference if useful.' },
+  ukulele: { title: 'One phrase of the song', hint: 'Record a short phrase and check rhythm and clarity; add a reference if useful.' },
+}
 
 export function getStepTemplates(instrumentId: string | null): StepTemplate[] {
   const family = presetFamilyFor(instrumentId)
   let base = TEMPLATES[family]
   if (instrumentId && FRETTED_IDS.has(instrumentId)) {
     base = base.filter(template => !['bow-warmup', 'intonation', 'shifting', 'bowing', 'cooldown'].includes(template.id))
+    const piece = FRETTED_PIECES[instrumentId]
+    base = base.map(template => template.id === 'piece'
+      ? { ...common.piece(template.minutes), title: piece.title, hint: piece.hint,
+        desk: (id) => deskFor(id, { mode: 'audio', handsFree: true }) }
+      : template)
   }
   const specific = instrumentId ? SPECIALTIES[instrumentId] ?? [] : []
   return [...specific, ...base.filter(template => !specific.some(item => item.id === template.id))]
@@ -835,13 +856,13 @@ const PRESETS: Record<PresetFamily, RoutinePreset[]> = {
       id: 'quick',
       name: 'Quick',
       blurb: 'Warm up, tone, one phrase.',
-      templateIds: ['warmup', 'long-tones', 'piece'],
+      templateIds: ['warmup', 'sound-focus', 'piece'],
     },
     {
       id: 'standard',
       name: 'Full',
       blurb: 'Warm-up, tone, scales, technique, music.',
-      templateIds: ['warmup', 'long-tones', 'scales', 'technique', 'etude', 'piece'],
+      templateIds: ['warmup', 'sound-focus', 'scales', 'technique', 'etude', 'piece'],
     },
   ],
 }
@@ -1087,9 +1108,8 @@ const SUGGESTIONS: Record<PresetFamily, Partial<Record<RoutineTopic, Suggestion[
     piece: [S('The piece you are learning — one phrase'), S('Hands separately, then together with the reference')],
   },
   general: {
-    warmup: [S('Slow, easy range, soft')],
-    'long-tones': [S('Long notes against the drone, watching the tuner')],
-    scales: [S('One key per day')],
+    warmup: [S('Something comfortable and familiar')],
+    scales: [S('One short pattern at an even pulse')],
     technique: [S('Whatever your teacher assigned')],
     etude: [S('Your current study')],
     piece: [S('One phrase of your current piece')],

@@ -761,21 +761,37 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 .routine-guide-editor .routine-metronome-open strong { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.015em; overflow-wrap: anywhere; }
 .routine-guide-editor .routine-metronome-open small { display: block; margin-top: 3px; color: var(--guide-muted); font-size: 12px; line-height: 1.45; }
 
-/* Portaled to the body, so nothing here may depend on the editor scope. */
-.routine-metronome-sheet { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 0 16px 16px; }
-.routine-metronome-sheet__header {
-  display: grid;
-  grid-template-columns: minmax(64px, auto) 1fr minmax(64px, auto);
-  align-items: center;
-  gap: 8px;
-  padding: 2px 0 10px;
+/* The routine editor uses the same full-height metronome view as practice mode. */
+.routine-metronome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--audio-bg-base, #f7f8fa);
+  color: var(--audio-text-primary, #1d3049);
 }
-.routine-metronome-sheet__header h2 { margin: 0; text-align: center; font-size: 16px; font-weight: 600; letter-spacing: -.015em; }
-.routine-metronome-sheet__header button { min-height: 44px; padding: 0 4px; background: none; border: 0; color: #0a7cff; font: inherit; font-size: 15px; }
-.routine-metronome-sheet__header button:first-child { justify-self: start; text-align: left; }
-.routine-metronome-sheet__save { justify-self: end; text-align: right; font-weight: 600; }
-.routine-metronome-sheet__hint { margin: 0 0 12px; color: #667; font-size: 12px; line-height: 1.5; }
-/* The metronome view is a flex-1 stage; it needs a bounded box to live in. */
-.routine-metronome-sheet__stage { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow: hidden; border-radius: 20px; }
-html.app-dark-mode .routine-metronome-sheet__header h2 { color: #eef4fb; }
-html.app-dark-mode .routine-metronome-sheet__hint { color: #9fb2c6; }
+.routine-metronome-screen__header {
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  width: min(100%, 48rem);
+  min-height: 72px;
+  margin-inline: auto;
+  padding: 4px 16px;
+}
+.routine-metronome-screen__title { text-align: center; min-width: 0; }
+.routine-metronome-screen__title small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--audio-text-secondary, #65758b); font-size: 10px; font-weight: 700; letter-spacing: .15em; }
+.routine-metronome-screen__title h2 { margin: 3px 0 0; font-size: 19px; font-weight: 700; letter-spacing: -.025em; }
+.routine-metronome-screen__header button { min-height: 44px; border: 0; background: transparent; color: var(--audio-accent, #2873cd); font: inherit; font-size: 15px; font-weight: 650; }
+.routine-metronome-screen__back { display: grid; width: 44px; place-items: center; }
+.routine-metronome-screen__back svg { width: 21px; height: 21px; }
+.routine-metronome-screen__save { justify-self: end; padding-inline: 4px; }
+.routine-metronome-screen__stage { display: flex; width: min(100%, 48rem); min-height: 0; flex: 1; flex-direction: column; margin-inline: auto; padding: 0 12px 10px; }
+.routine-metronome-screen.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .audio-practice-metronome__select-row--primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }

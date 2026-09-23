@@ -572,6 +572,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
   const [referenceExpanded, setReferenceExpanded] = useState(false)
   const [referenceVisible, setReferenceVisible] = useState(false)
+  const [musicWorkspaceExpandRequest, setMusicWorkspaceExpandRequest] = useState<{
+    pitch?: boolean
+    metronome?: boolean
+    drone?: boolean
+  }>({})
   const [referencePlaying, setReferencePlaying] = useState(false)
   const [referenceAudioId, setReferenceAudioId] = useState<string | null>(null)
   const [benchmarkBinding, setBenchmarkBinding] = useState<BenchmarkBinding | null>(
@@ -4534,6 +4539,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !multitrackOpen &&
     !showOnboardingTutorial
 
+  // References belongs on the music stand in both regular practice and routines.
+  // Start collapsed so a recording is one tap away without covering the score.
+  useEffect(() => {
+    if (!settings.showMusic || !activeProjectId) return
+    setReferenceVisible(true)
+    setReferenceExpanded(false)
+  }, [settings.showMusic, activeProjectId])
+
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
   const isAudioPracticeGamesTab = recordingMode === 'audio' && audioPracticeTab === 'games'
@@ -5595,6 +5608,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         routineRef.current = target
         setRoutine(target)
       }
+      if (desk?.showMusic) {
+        // Starting the exercise explicitly puts its score back on the stand,
+        // including a score previously collapsed into the Music widget. Reuse
+        // the current reader so fit, reading position and annotations survive.
+        setChartVisible(project.id, true)
+        musicFilePromptedForRef.current = project.id
+        setMusicChartRevision(value => value + 1)
+      }
       // A reference pinned in the builder is part of the step's setup, like its
       // tempo: select it before the sitting opens so it is already loaded.
       // Storage failure here must never block the practice item from starting.
@@ -6297,11 +6318,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     projectId={activeProjectId}
                     offerFileOnOpen={musicFilePromptedForRef.current !== activeProjectId}
                     workspace={hudQuickSettings}
+                    referencesVisible={referenceVisible}
+                    onReferencesChange={visible => { setReferenceVisible(visible); setReferenceExpanded(visible) }}
                     onWorkspaceChange={(key, enabled) => {
                       switch (key) {
-                        case 'pitchTrackerEnabled': handlePitchTrackerSettingChange(enabled); break
-                        case 'showMetronome': handleShowMetronomeSettingChange(enabled); break
-                        case 'showDrone': handleShowDroneSettingChange(enabled); break
+                        case 'pitchTrackerEnabled':
+                          setMusicWorkspaceExpandRequest(current => ({ ...current, pitch: enabled || undefined }))
+                          handlePitchTrackerSettingChange(enabled)
+                          break
+                        case 'showMetronome':
+                          setMusicWorkspaceExpandRequest(current => ({ ...current, metronome: enabled || undefined }))
+                          handleShowMetronomeSettingChange(enabled)
+                          break
+                        case 'showDrone':
+                          setMusicWorkspaceExpandRequest(current => ({ ...current, drone: enabled || undefined }))
+                          handleShowDroneSettingChange(enabled)
+                          break
                         case 'showTakeCards': handleShowTakeCardsSettingChange(enabled); break
                       }
                     }}
@@ -6378,6 +6410,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           tunerTransposition={settings.tunerTransposition}
                           onClose={handleClosePitch}
                           collapseResetKey={routineActiveStep?.id}
+                          expandRequest={musicWorkspaceExpandRequest.pitch}
+                          onExpandRequestConsumed={() => setMusicWorkspaceExpandRequest(current => ({
+                            ...current, pitch: undefined,
+                          }))}
                           visible={!pitchHudSuspended}
                         />
                       )}
@@ -6409,6 +6445,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseMetronome}
                         collapseResetKey={routineActiveStep?.id}
+                        expandRequest={musicWorkspaceExpandRequest.metronome}
+                        onExpandRequestConsumed={() => setMusicWorkspaceExpandRequest(current => ({
+                          ...current, metronome: undefined,
+                        }))}
                         visible={metronomeWidgetInteractive}
                       />
                     </AnimatePresence>
@@ -6437,6 +6477,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         muteDuringPlayback={settings.muteMetronomeDuringPlayback}
                         onClose={handleCloseDrone}
                         collapseResetKey={routineActiveStep?.id}
+                        expandRequest={musicWorkspaceExpandRequest.drone}
+                        onExpandRequestConsumed={() => setMusicWorkspaceExpandRequest(current => ({
+                          ...current, drone: undefined,
+                        }))}
                         visible={droneWidgetInteractive}
                       />
                     )}
@@ -6484,7 +6528,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onClose={handleCloseHandsFree}
               />
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
-                {onRecordSurface && !isSplitView && !musicPageVisible && !isLabsOpen && !multitrackOpen && (
+                {onRecordSurface && !isSplitView && !isLabsOpen && !multitrackOpen && (
                   <ReferenceWidget onExpandView={() => { handleReferenceBeforePlay(); handleToggleSplitView(); setSplitReferenceActive(true) }} showTrackName visible={referenceVisible} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded}
                     youtubeUrl={youtubeUrl} libraryPlayback={referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null}
                     suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || !referenceExpanded || autoPlaybackPlaying}

@@ -21,7 +21,7 @@ export interface RoutineBuilderProps {
    */
   onCreatePracticeItem: (title: string) => Promise<string>
   /** Saves, then opens the routine's next step straight away. */
-  onSaveAndStart?: (routine: Routine) => void
+  onSaveAndStart?: (routine: Routine) => void | Promise<void>
   /** Today's session of this routine has begun, so Start reads as Continue. */
   todayStarted?: boolean
   onDelete: () => void
