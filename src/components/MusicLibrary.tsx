@@ -1,0 +1,273 @@
+import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { ArrowLeft, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, Pencil, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import type { Project } from '../db'
+import { hasPracticeChart, practiceChartName, savePracticeChart } from '../utils/practiceChartStorage'
+import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
+import { loadMusicOrder, loadMusicOrganization, loadMusicScoreSettings, loadMusicSetup, orderMusic, saveMusicOrder, saveMusicOrganization, saveMusicScoreSettings, saveMusicSetup, type MusicOrganization } from '../utils/musicLibrary'
+import { loadExerciseLibrary } from '../utils/routineLibrary'
+import { blankDesk, type RoutineStep } from '../utils/practiceRoutines'
+import { normalizeDeskMetronome } from '../utils/deskMetronome'
+import { getWrittenPitchLabel } from '../utils/tunerTransposition'
+import MusicToolSetup from './MusicToolSetup'
+import RoutineProgramSetup from './RoutineProgramSetup'
+import ScoreThumbnail from './ScoreThumbnail'
+import '../styles/music-library.css'
+
+interface Props {
+  projects: Project[]
+  activeProjectId: string | null
+  instrumentId: string | null
+  revision: number
+  disabled: boolean
+  onCreateItem: (name: string) => Promise<string>
+  onOpen: (projectId: string) => Promise<void>
+  onImported: () => void
+}
+type DragKind = 'score' | 'folder'
+type DragGesture = { kind: DragKind; id: string; startX: number; startY: number; active: boolean }
+type DragPreview = { kind: DragKind; id: string; x: number; y: number; target: string | null }
+
+function setupLabel(id: string): string {
+  const setup = loadMusicSetup(id)
+  const scoreSettings = loadMusicScoreSettings(id)
+  if (!setup && !scoreSettings) return 'Music only'
+  const parts: string[] = []
+  if (setup?.showMetronome) parts.push(`${normalizeDeskMetronome(setup.metronome).bpm} BPM`)
+  if (setup?.showDrone && setup.drone.pitchClass !== null) parts.push(`${getWrittenPitchLabel(setup.drone.pitchClass, setup.drone.octave, 'concert').label} drone`)
+  if (setup?.pitchTrackerEnabled) parts.push('Pitch')
+  if (setup?.autoSoundRecording) parts.push('Hands-free')
+  if (scoreSettings?.referenceVideoId) parts.push('Reference')
+  if (scoreSettings?.programId) parts.push('Program')
+  return parts.join(' · ') || 'Music only'
+}
+
+/** Folders organize the library; a score's recordings stay in its practice item. */
+export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onImported }: Props) {
+  const input = useRef<HTMLInputElement>(null)
+  const scroll = useRef<HTMLElement>(null)
+  const working = useRef(false)
+  const gesture = useRef<DragGesture | null>(null)
+  const [order, setOrder] = useState(loadMusicOrder)
+  const [organization, setOrganization] = useState(loadMusicOrganization)
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [editingFolder, setEditingFolder] = useState<'new' | 'rename' | null>(null)
+  const [folderName, setFolderName] = useState('')
+  const [removeFolder, setRemoveFolder] = useState(false)
+  const [query, setQuery] = useState('')
+  const [setupId, setSetupId] = useState<string | null>(null)
+  const [, refreshSetup] = useState(0)
+  const [drag, setDrag] = useState<DragPreview | null>(null)
+  const [busy, setBusy] = useState('')
+  const [error, setError] = useState('')
+  const music = useMemo(() => orderMusic(projects.filter(item => hasPracticeChart(item.id)), order), [projects, order, revision])
+  const selectedFolder = organization.folders.find(folder => folder.id === folderId) ?? null
+  const searching = Boolean(query.trim())
+  const visible = music.filter(item => ((selectedFolder ? (organization.placements[item.id] ?? null) === folderId : searching || !organization.placements[item.id]))
+    && `${item.name} ${practiceChartName(item.id) ?? ''}`.toLowerCase().includes(query.toLowerCase().trim()))
+
+  const scoreStep = (item: Project): RoutineStep => {
+    const fromExercise = loadExerciseLibrary().find(entry => entry.step.projectId === item.id)?.step
+    const metadata = loadMusicScoreSettings(item.id)
+    const base = createMusicExercise(practiceChartName(item.id) ?? item.name, item.id)
+    return { ...base, title: item.name, desk: loadMusicSetup(item.id) ?? base.desk,
+      referenceQuery: metadata ? metadata.referenceQuery : fromExercise?.referenceQuery ?? '',
+      referenceVideoId: metadata ? metadata.referenceVideoId : fromExercise?.referenceVideoId ?? null,
+      programId: metadata ? metadata.programId : fromExercise?.programId ?? null }
+  }
+  const updateScoreSetup = (item: Project, patch: Partial<RoutineStep>) => {
+    const next = { ...scoreStep(item), ...patch }
+    try {
+      saveMusicScoreSettings(item.id, { referenceQuery: next.referenceQuery,
+        referenceVideoId: next.referenceVideoId, programId: next.programId })
+      saveMusicSetup(item.id, next.desk ?? blankDesk('audio'))
+      refreshSetup(value => value + 1)
+      setError('')
+    } catch { setError('Could not save these score settings. Please try again.') }
+  }
+
+  const persist = (next: MusicOrganization, nextOrder = order) => {
+    try {
+      saveMusicOrganization(next)
+      saveMusicOrder(nextOrder)
+      setOrganization(next)
+      setOrder(nextOrder)
+      setError('')
+    } catch { setError('Could not save your music layout. Please try again.') }
+  }
+  const importFiles = async (files: File[]) => {
+    if (!files.length || working.current || disabled) return
+    working.current = true
+    setError('')
+    const failures: string[] = []
+    const added: string[] = []
+    try {
+      for (const [index, source] of files.entries()) {
+        setBusy(`Importing ${index + 1} of ${files.length}…`)
+        try {
+          const file = await prepareRoutineMusicFile(source)
+          const id = await onCreateItem(musicExerciseTitle(file.name))
+          await savePracticeChart(id, file)
+          added.push(id)
+        } catch (cause) { failures.push(`${source.name}: ${cause instanceof Error ? cause.message : 'Could not import this file.'}`) }
+      }
+      if (added.length) {
+        const placements = { ...organization.placements }
+        if (selectedFolder) added.forEach(id => { placements[id] = selectedFolder.id })
+        persist({ ...organization, placements }, [...music.map(item => item.id), ...added])
+        setQuery('')
+        onImported()
+      }
+      if (failures.length) setError(failures.join('\n'))
+    } finally { working.current = false; setBusy('') }
+  }
+  const open = async (id: string) => {
+    if (working.current || disabled) return
+    working.current = true; setBusy('Opening music…'); setError('')
+    try { await onOpen(id) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not open this music. Try again.') }
+    finally { working.current = false; setBusy('') }
+  }
+  const saveFolder = (event: FormEvent) => {
+    event.preventDefault()
+    const name = folderName.trim().slice(0, 60)
+    if (!name) return
+    if (editingFolder === 'new') {
+      const id = crypto.randomUUID()
+      persist({ ...organization, folders: [...organization.folders, { id, name }] })
+      setFolderId(id)
+    } else if (selectedFolder) {
+      persist({ ...organization, folders: organization.folders.map(folder => folder.id === selectedFolder.id ? { ...folder, name } : folder) })
+    }
+    setEditingFolder(null)
+    setFolderName('')
+  }
+  const removeCurrentFolder = () => {
+    if (!selectedFolder) return
+    const placements = { ...organization.placements }
+    for (const [scoreId, assigned] of Object.entries(placements)) if (assigned === selectedFolder.id) delete placements[scoreId]
+    persist({ folders: organization.folders.filter(folder => folder.id !== selectedFolder.id), placements })
+    setFolderId(null)
+    setRemoveFolder(false)
+  }
+  const dropItem = (kind: DragKind, id: string, target: string | null, clientX: number, clientY: number) => {
+    if (!target || disabled || busy) return
+    if (kind === 'folder') {
+      if (!target.startsWith('folder:')) return
+      const targetId = target.slice(7)
+      if (id === targetId) return
+      const folders = organization.folders.filter(folder => folder.id !== id)
+      const before = folders.findIndex(folder => folder.id === targetId)
+      const source = organization.folders.find(folder => folder.id === id)
+      if (before < 0 || !source) return
+      folders.splice(before, 0, source)
+      persist({ ...organization, folders })
+      return
+    }
+    if (target === `score:${id}`) return
+    const targetScore = target.startsWith('score:') ? target.slice(6) : null
+    const destination = target.startsWith('folder:') ? target.slice(7)
+      : targetScore ? organization.placements[targetScore] ?? null
+      : target === 'root' ? null : undefined
+    if (destination === undefined) return
+    const placements = { ...organization.placements }
+    if (destination) placements[id] = destination
+    else delete placements[id]
+    const ids = music.map(item => item.id).filter(scoreId => scoreId !== id)
+    const before = targetScore ? ids.indexOf(targetScore) : -1
+    const siblings = ids.filter(scoreId => (placements[scoreId] ?? null) === destination)
+    const lastSibling = siblings.at(-1)
+    const targetRow = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-music-drop]')
+    const after = targetRow ? clientY > targetRow.getBoundingClientRect().top + targetRow.getBoundingClientRect().height / 2 : false
+    const insert = before >= 0 ? before + (after ? 1 : 0) : lastSibling ? ids.indexOf(lastSibling) + 1 : ids.length
+    ids.splice(insert, 0, id)
+    persist({ ...organization, placements }, ids)
+  }
+  const targetAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-music-drop]')?.dataset.musicDrop ?? null
+  const startDrag = (event: PointerEvent<HTMLButtonElement>, kind: DragKind, id: string) => {
+    if (event.button !== 0 || disabled || busy || searching) return
+    event.preventDefault()
+    gesture.current = { kind, id, startX: event.clientX, startY: event.clientY, active: false }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+  const moveDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    const current = gesture.current
+    if (!current) return
+    if (!current.active && Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < 7) return
+    current.active = true
+    event.preventDefault()
+    const bounds = scroll.current?.getBoundingClientRect()
+    if (bounds && event.clientY < bounds.top + 60) scroll.current?.scrollBy(0, -18)
+    else if (bounds && event.clientY > bounds.bottom - 60) scroll.current?.scrollBy(0, 18)
+    setDrag({ kind: current.kind, id: current.id, x: event.clientX, y: event.clientY, target: targetAt(event.clientX, event.clientY) })
+  }
+  const endDrag = (event: PointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const current = gesture.current
+    if (!current) return
+    gesture.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!cancelled && current.active) dropItem(current.kind, current.id, targetAt(event.clientX, event.clientY), event.clientX, event.clientY)
+    setDrag(null)
+  }
+  const dragHandle = (kind: DragKind, id: string, name: string) => <button type="button" className="music-library__drag-handle"
+    aria-label={`Move ${name}`} title="Drag to move; arrow keys to reorder" disabled={disabled || Boolean(busy) || searching}
+    onPointerDown={event => startDrag(event, kind, id)} onPointerMove={moveDrag}
+    onPointerUp={event => endDrag(event)} onPointerCancel={event => endDrag(event, true)}
+    onKeyDown={(event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+      event.preventDefault()
+      const delta = event.key === 'ArrowUp' ? -1 : 1
+      if (kind === 'folder') {
+        const index = organization.folders.findIndex(folder => folder.id === id), next = index + delta
+        if (next < 0 || next >= organization.folders.length) return
+        const folders = [...organization.folders]
+        ;[folders[index], folders[next]] = [folders[next], folders[index]]
+        persist({ ...organization, folders })
+      } else {
+        const siblings = visible.map(score => score.id)
+        const index = siblings.indexOf(id), next = index + delta
+        if (next < 0 || next >= siblings.length) return
+        const ids = music.map(score => score.id)
+        const first = ids.indexOf(id), second = ids.indexOf(siblings[next])
+        ;[ids[first], ids[second]] = [ids[second], ids[first]]
+        persist(organization, ids)
+      }
+    }}><GripVertical aria-hidden /></button>
+
+  return <section ref={scroll} className="music-library" aria-label="Music library">
+    <header className="music-library__header">
+      <div>{selectedFolder && <button type="button" className="music-library__back" data-music-drop="root" onClick={() => { setFolderId(null); setQuery(''); setEditingFolder(null); setRemoveFolder(false) }}><ArrowLeft aria-hidden /> All music</button>}<h1>{selectedFolder?.name ?? 'Music'}</h1><p>{selectedFolder ? 'Scores in this folder' : 'Your scores, ready for practice.'}</p></div>
+      <div className="music-library__header-actions">{!selectedFolder && <button type="button" className="music-library__new-folder" onClick={() => { setEditingFolder('new'); setFolderName('') }}><FolderPlus aria-hidden /> New folder</button>}<button type="button" className="music-library__import" disabled={disabled || Boolean(busy)} onClick={() => input.current?.click()}><Upload aria-hidden />Import music</button></div>
+    </header>
+    {editingFolder && <form className="music-library__folder-form" onSubmit={saveFolder}><input autoFocus aria-label="Folder name" maxLength={60} placeholder="Folder name" value={folderName} onChange={event => setFolderName(event.target.value)} /><button type="submit" disabled={!folderName.trim()}>{editingFolder === 'new' ? 'Create' : 'Save'}</button><button type="button" aria-label="Cancel" onClick={() => setEditingFolder(null)}><X aria-hidden /></button></form>}
+    {selectedFolder && <div className="music-library__folder-actions"><button type="button" onClick={() => { setFolderName(selectedFolder.name); setEditingFolder('rename') }}><Pencil aria-hidden /> Rename</button><button type="button" onClick={() => setRemoveFolder(true)}><Trash2 aria-hidden /> Remove folder</button></div>}
+    {removeFolder && selectedFolder && <div className="music-library__remove-confirm" role="alert"><span>Move this folder’s scores to All music?</span><button type="button" onClick={() => setRemoveFolder(false)}>Cancel</button><button type="button" onClick={removeCurrentFolder}>Remove folder</button></div>}
+    {!selectedFolder && organization.folders.length > 0 && !searching && <div className="music-library__folders" aria-label="Music folders">{organization.folders.map(folder => <div key={folder.id} className={`music-library__folder${drag?.target === `folder:${folder.id}` ? ' music-library__drop-target' : ''}`} data-music-drop={`folder:${folder.id}`}><button type="button" className="music-library__folder-open" onClick={() => { setFolderId(folder.id); setQuery(''); setRemoveFolder(false) }}><Folder aria-hidden /><span><strong>{folder.name}</strong><small>{music.filter(item => organization.placements[item.id] === folder.id).length} scores</small></span><ChevronRight aria-hidden /></button>{dragHandle('folder', folder.id, folder.name)}</div>)}</div>}
+    {music.length > 0 && <div className="music-library__toolbar"><label className="music-library__search"><Search aria-hidden /><input type="search" aria-label="Find music" placeholder="Find music" value={query} onChange={event => setQuery(event.target.value)} /></label></div>}
+    {music.length > 0 && <div className="music-library__count">{visible.length} {visible.length === 1 ? 'score' : 'scores'}<span>Drag scores to reorder or add them to a folder</span></div>}
+    {visible.length > 0 && <ol className="music-library__list">{visible.map(item => <li key={item.id} className={`${drag?.target === `score:${item.id}` ? 'music-library__drop-target ' : ''}${setupId === item.id ? 'music-library__score-open' : ''}`} data-music-drop={`score:${item.id}`}>
+      <div className="music-library__row">
+        <button type="button" className="music-library__score" disabled={disabled || Boolean(busy)} onClick={() => void open(item.id)}><ScoreThumbnail projectId={item.id} revision={revision} /><span className="music-library__copy"><strong>{item.name}</strong><small>{setupLabel(item.id)}</small></span>{item.id === activeProjectId && <span className="music-library__current">On stand</span>}<ChevronRight aria-hidden /></button>
+        <button type="button" className="music-library__setup-toggle" aria-label={`Edit tools for ${item.name}`}
+          aria-expanded={setupId === item.id} aria-controls={`music-score-setup-${item.id}`}
+          disabled={disabled || Boolean(busy)} onClick={() => setSetupId(current => current === item.id ? null : item.id)}>
+          <SlidersHorizontal aria-hidden /><span>Tools</span><ChevronDown aria-hidden />
+        </button>
+        {dragHandle('score', item.id, item.name)}
+      </div>
+      {setupId === item.id && <div className="music-library__setup-panel music-routine-item-settings" id={`music-score-setup-${item.id}`}>
+        <MusicToolSetup step={scoreStep(item)} instrumentId={instrumentId} onChange={patch => updateScoreSetup(item, patch)} />
+        <details className="music-routine-more"><summary>More options</summary>
+          <label className="music-routine-check"><input type="checkbox" checked={Boolean(scoreStep(item).desk?.autoSoundRecording)}
+            onChange={event => updateScoreSetup(item, { desk: { ...(scoreStep(item).desk ?? blankDesk('audio')), autoSoundRecording: event.target.checked } })} /> Hands-free recording</label>
+          <RoutineProgramSetup scope="score" value={scoreStep(item).programId} onChange={programId => updateScoreSetup(item, { programId })} />
+        </details>
+      </div>}
+    </li>)}</ol>}
+    {!visible.length && (music.length || selectedFolder) && <p className="music-library__no-results">{searching ? `No music matches “${query}”.` : 'No scores here yet. Import music or drag a score into this folder.'}</p>}
+    {!music.length && !selectedFolder && <div className="music-library__empty"><File aria-hidden /><h2>Bring your music.</h2><p>Import PDFs or photos. Each score keeps its tempo, tools, and recordings together.</p><span>Select several files to add them at once.</span></div>}
+    {busy && <p className="music-library__status" role="status">{busy}</p>}
+    {error && <p className="music-library__error" role="alert">{error}</p>}
+    {drag && <div className="music-library__drag-preview" style={{ left: drag.x + 12, top: drag.y + 12 }} aria-hidden>{drag.kind === 'score' ? music.find(item => item.id === drag.id)?.name : organization.folders.find(folder => folder.id === drag.id)?.name}</div>}
+    <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.pdf" multiple hidden onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; void importFiles(files) }} />
+  </section>
+}

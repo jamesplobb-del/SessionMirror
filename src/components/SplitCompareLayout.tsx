@@ -8,7 +8,6 @@ import { useDragToPin, type PipDragUiState } from '../hooks/useDragToPin'
 import type { RecordingMode, Take } from '../types'
 import type { LibraryPlaybackReference } from '../types/library'
 import { takeHasPlaybackMedia } from '../utils/takes'
-import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 
 interface SplitCompareLayoutProps {
@@ -45,8 +44,6 @@ interface SplitCompareLayoutProps {
   onSubmitYoutube: (embedUrl: string) => void
   onUploadBenchmark: (file: File) => void
   onToggleSplitView: () => void
-  onExpandBenchmark?: () => void
-  onExpandChallenger?: () => void
   onBenchmarkPlaybackChange?: (playing: boolean) => void
   onChallengerPlaybackChange?: (playing: boolean) => void
   challengerAutoPlayRequestId?: string | null
@@ -97,8 +94,6 @@ export default function SplitCompareLayout({
   onSubmitYoutube,
   onUploadBenchmark,
   onToggleSplitView,
-  onExpandBenchmark,
-  onExpandChallenger,
   onBenchmarkPlaybackChange,
   onChallengerPlaybackChange,
   challengerAutoPlayRequestId = null,
@@ -155,7 +150,6 @@ export default function SplitCompareLayout({
     deleteDropTargetRef: deleteDropRef,
     onPin: onPinBenchmark ?? (() => {}),
     onDelete: onDeleteTake,
-    onTap: onExpandChallenger,
     onDragStateChange,
     enabled: challengerDragEnabled,
     activationMode: 'move',
@@ -172,7 +166,6 @@ export default function SplitCompareLayout({
     sourceTakeId: benchmarkTake?.id ?? null,
     dropTargetRef: challengerDropRef,
     onPin: transferBestToCurrent,
-    onTap: onExpandBenchmark,
     enabled: benchmarkDragEnabled,
     activationMode: 'move',
     dragThresholdPx: 16,
@@ -243,7 +236,6 @@ export default function SplitCompareLayout({
               onUpload={onUploadBenchmark}
               onToggleSplitView={onToggleSplitView}
               splitViewActive
-              onExpand={onExpandBenchmark}
               onPlaybackChange={onBenchmarkPlaybackChange}
               onYoutubeHostChange={onYoutubeHostChange}
               youtubeIframeRef={youtubeIframeRef}
@@ -258,6 +250,7 @@ export default function SplitCompareLayout({
           ratio={splitRatio}
           onChange={onSplitRatioChange}
           layoutRef={layoutRef}
+          ariaLabel={`Resize comparison: drag down for larger ${bestPanelLabel}, up for larger ${currentPanelLabel}`}
           hapticFeedback={hapticFeedback}
         />
 
@@ -290,7 +283,6 @@ export default function SplitCompareLayout({
                 suspendPlayback={suspendPipPlayback}
                 videoRef={challengerPipVideoRef}
                 onUnpin={onUnpinChallenger}
-                onExpand={onExpandChallenger}
                 onPlaybackChange={onChallengerPlaybackChange}
                 autoPlayRequestId={challengerAutoPlayRequestId}
                 takeId={challengerTake.id}
@@ -302,10 +294,7 @@ export default function SplitCompareLayout({
                 dragSourceArming={challengerArming}
                 dragSourceProps={challengerDragEnabled ? challengerDragSourceProps : undefined}
                 splitViewActive
-                posterUrl={
-                  challengerTake.thumbnailUrl ??
-                  (challengerIsAudio ? AUDIO_TAKE_THUMBNAIL : null)
-                }
+                posterUrl={challengerIsAudio ? null : challengerTake.thumbnailUrl ?? null}
               />
             </div>
           ) : (

@@ -22,6 +22,8 @@ interface HandsFreeStageProps {
   /** Null whenever hands-free is off or another surface owns the screen. */
   phase: HandsFreePhase | null
   movable?: boolean
+  dockRight?: boolean
+  collapseResetKey?: string
   notice?: 'sensitive' | 'microphone' | 'start' | null
   /** Seconds elapsed in the current take — shown while recording. */
   elapsed: number
@@ -68,6 +70,8 @@ function formatElapsed(seconds: number): string {
 function HandsFreeStage({
   phase,
   movable = false,
+  dockRight = false,
+  collapseResetKey,
   notice = null,
   elapsed,
   replayCountdown,
@@ -112,7 +116,7 @@ function HandsFreeStage({
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef: panel.panelRef,
     x, y, positionId: 'hands-free-tools', label: `hands-free${phase ? `, ${PHASE_COPY[phase].title}` : ''}`,
     icon: <HandsFreeToolIcon aria-hidden />, detail: ballDetail, active: phase === 'recording',
-    resetKey: `${Boolean(phase)}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase) })
+    resetKey: `${Boolean(phase)}:${collapseResetKey ?? ''}`, onRestore: panel.moveTo, ballSlot: 3, visible: Boolean(phase), dockRight })
   const copy = phase ? PHASE_COPY[phase] : null
 
   return (<>

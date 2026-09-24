@@ -37,7 +37,7 @@ export default function SplitRatioDragHandle({
   hapticFeedback = true,
   minRatio = DEFAULT_MIN_RATIO,
   maxRatio = DEFAULT_MAX_RATIO,
-  ariaLabel = 'Drag up for larger camera, drag down for larger reference',
+  ariaLabel = 'Resize comparison panels',
 }: SplitRatioDragHandleProps) {
   const notifyTutorial = useTutorialAction()
   const [active, setActive] = useState(false)

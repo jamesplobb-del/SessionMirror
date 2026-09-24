@@ -20,6 +20,8 @@ const POSITION_ID = 'desk-music'
 interface MusicWidgetProps {
   boundaryRef: RefObject<HTMLElement | null>
   visible: boolean
+  expandRequest?: boolean
+  onExpandRequestConsumed?: () => void
   collapseResetKey?: string
   hasChart: boolean
   fileName: string | null
@@ -68,6 +70,7 @@ export default function MusicWidget({
   busy, error, fit, spreadAvailable, halfTurn, onAdd, onRemove, onTurn, onFitChange,
   onHalfTurnChange, onPaperVisibleChange, chromeHidden, onChromeHiddenChange,
   marker, inkWidth, markCount, saving, onMarkerChange, onInkWidthChange, onUndoMark, onClearMarks, onSaveMarked,
+  expandRequest, onExpandRequestConsumed,
 }: MusicWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragX = useMotionValue(0)
@@ -114,16 +117,16 @@ export default function MusicWidget({
   const fold = useCollapsibleWidget({
     boundaryRef, widgetRef, x: dragX, y: dragY, positionId: POSITION_ID,
     label: 'music', icon: <FileMusic aria-hidden />, detail: label || 'Music',
-    active: hasChart && paperVisible, resetKey: collapseResetKey, ballSlot: 4, visible,
+    active: hasChart && paperVisible, resetKey: collapseResetKey, visible,
+    expandRequest, onExpandRequestConsumed, showBall: false,
   })
 
   const turnable = hasChart && paperVisible && (pageView?.count ?? 0) > 0
 
   return <>
-    {fold.ball}
     <motion.div
       ref={widgetRef}
-      aria-hidden={fold.collapsed}
+      aria-hidden={!visible || fold.collapsed}
       drag
       dragListener={false}
       dragControls={dragControls}
@@ -136,9 +139,9 @@ export default function MusicWidget({
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
       transition={iosDragRelease}
-      style={{ x: dragX, y: dragY, touchAction: 'pan-y' }}
+      style={{ x: dragX, y: dragY, touchAction: 'pan-y', display: visible ? undefined : 'none' }}
     >
-      {/* One collapse control in the drag header. Exit music stays on the page. */}
+      {/* Page controls close back into the Music header, not into a widget ball. */}
       <div className="music-widget__panel ui-orient-spin">
         {hasChart ? <>
           <div className="music-widget__head" onPointerDown={event => dragControls.start(event)}>
@@ -146,7 +149,7 @@ export default function MusicWidget({
             <button
               type="button"
               className="music-widget__close"
-              aria-label="Collapse music"
+              aria-label="Close page controls"
               onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >
@@ -293,7 +296,7 @@ export default function MusicWidget({
             <button
               type="button"
               className="music-widget__close"
-              aria-label="Collapse music"
+              aria-label="Close page controls"
               onClick={event => { event.stopPropagation(); fold.collapse() }}
               onPointerDown={event => event.stopPropagation()}
             >

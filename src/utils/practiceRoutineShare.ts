@@ -12,18 +12,26 @@ import {
   type Routine,
 } from './practiceRoutines'
 import { storeLibraryRoutine } from './routineLibrary'
+import { hasPracticeChart, practiceChartName } from './practiceChartStorage'
 
 /** Shared practice plans carry their exercise checklist and attached metronome
  * programs. Standalone programs still use their own .btroutine file type. */
 
 export const PRACTICE_PLAN_FORMAT = 'besttake.practice-plan'
-export const PRACTICE_PLAN_VERSION = 1
+export const PRACTICE_PLAN_VERSION = 2
 export const PRACTICE_PLAN_EXTENSION = 'btplan'
 export const PRACTICE_PLAN_UTI = 'com.besttake.app.practice-plan'
 export const PRACTICE_PLAN_MIME = 'application/json'
 
-/** Well past any real routine — a bigger file is a wrong file, not a big one. */
-export const MAX_PRACTICE_PLAN_BYTES = 5_000_000
+const MAX_SETUP_ONLY_BYTES = 5_000_000
+/** Older routine files may contain embedded scores; those bytes are never imported. */
+export const MAX_PRACTICE_PLAN_BYTES = 85_000_000
+
+export interface SharedScore {
+  fileName: string
+  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp'
+  data: string
+}
 
 export interface PracticePlanEnvelope {
   format: typeof PRACTICE_PLAN_FORMAT
@@ -33,6 +41,8 @@ export interface PracticePlanEnvelope {
   exportedAt: number
   routine: Routine
   programs?: Record<string, unknown>
+  /** Keyed by the sender's practice item ID; never imported as that ID. */
+  scores?: Record<string, SharedScore>
 }
 
 export type PracticePlanParseResult =
@@ -58,15 +68,18 @@ export function buildPracticePlanFile(routine: Routine, appVersion?: string): st
   }
   const envelope: PracticePlanEnvelope = {
     format: PRACTICE_PLAN_FORMAT,
-    version: PRACTICE_PLAN_VERSION,
+    version: 1,
     app: 'BestTake',
     appVersion,
     exportedAt: Date.now(),
-    routine,
+    routine: { ...routine, steps: routine.steps.map(step => ({ ...step,
+      sharedScoreName: step.sharedScoreName ?? (step.projectId && step.desk?.showMusic && hasPracticeChart(step.projectId)
+        ? practiceChartName(step.projectId) ?? step.title : null),
+    })) },
     programs,
   }
   const text = JSON.stringify(envelope, null, 2)
-  if (text.length > MAX_PRACTICE_PLAN_BYTES) throw new Error('This routine has too many program details to share in one file.')
+  if (text.length > MAX_SETUP_ONLY_BYTES) throw new Error('This routine has too many program details to share in one file.')
   return text
 }
 
@@ -138,6 +151,11 @@ export function parsePracticePlanFile(text: string): PracticePlanParseResult {
         ...step,
         id: makeId('step'),
         projectId: null,
+        sharedScoreName: step.sharedScoreName ?? (step.projectId && step.desk?.showMusic
+          ? (typeof envelope.scores?.[step.projectId]?.fileName === 'string'
+            ? envelope.scores[step.projectId].fileName.split(/[/\\]/).at(-1)?.trim().slice(0, 180) || step.title
+            : step.title)
+          : null),
         programId: step.programId ? linkedIds.get(step.programId) ?? null : null,
       })),
       createdAt: now,
@@ -163,6 +181,11 @@ export function importPracticePlanFromText(text: string): PracticePlanParseResul
     }
   }
   return result
+}
+
+/** Old packages are accepted as layouts; their embedded score bytes are ignored. */
+export async function importPracticePlanFileFromText(text: string): Promise<PracticePlanParseResult> {
+  return importPracticePlanFromText(text)
 }
 
 export function isPracticePlanFileName(name: string): boolean {
@@ -247,6 +270,7 @@ export async function sharePracticeRoutine(routine: Routine): Promise<SharePract
     /* Dismissing the share sheet rejects the promise — that is not a failure. */
     if (/cancel|dismiss|abort/i.test(message)) return { ok: true }
     console.warn('[PracticeRoutine] share failed', error)
-    return { ok: false, error: 'Could not share that routine.' }
+    return { ok: false, error: /too large|attached metronome program/i.test(message)
+      ? message : 'Could not share that routine.' }
   }
 }

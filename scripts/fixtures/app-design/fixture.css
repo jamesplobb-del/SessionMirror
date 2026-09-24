@@ -6,6 +6,7 @@ html,body,#root { margin:0; width:100%; height:100%; overflow:hidden; }
 .lens-safe-bottom i { width:110px; height:4px; border-radius:4px; background:var(--ls-ink); opacity:.55; }
 .lens-content.app-ui-overlay { position:relative!important; inset:auto!important; display:flex!important; flex-direction:column!important; flex:1!important; min-height:0!important; width:100%!important; height:auto!important; padding:0!important; overflow:visible!important; pointer-events:auto!important; }
 .lens-stage { flex:1; display:flex; flex-direction:column; min-height:0; position:relative; }
+.lens-stage > .pitch-tuner--audio { pointer-events:auto; }
 .lens-stage>.audio-mode-home { height:100%; flex:1; min-height:0; }
 .lens-dock-container { flex-shrink:0; position:relative; z-index:10; }
 .lens-dock-container>.control-deck { position:relative!important; inset:auto!important; }

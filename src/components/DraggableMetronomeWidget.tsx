@@ -59,6 +59,7 @@ interface DraggableMetronomeWidgetProps {
   expandRequest?: boolean
   onExpandRequestConsumed?: () => void
   visible?: boolean
+  dockRight?: boolean
 }
 
 const DEFAULT_WIDGET_SIZE = { width: 288, height: 176 }
@@ -112,6 +113,7 @@ export default function DraggableMetronomeWidget({
   expandRequest,
   onExpandRequestConsumed,
   visible = true,
+  dockRight = false,
 }: DraggableMetronomeWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const bpmInputId = useId()
@@ -474,7 +476,7 @@ export default function DraggableMetronomeWidget({
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
     positionId, label: 'metronome', icon: <MetronomeToolIcon />, detail: `${bpm} BPM`,
     active: playing && !(isTakePlaying && muteDuringPlayback), resetKey: collapseResetKey,
-    expandRequest, onExpandRequestConsumed, visible })
+    expandRequest, onExpandRequestConsumed, visible, dockRight })
 
   return (<>
     {fold.ball}

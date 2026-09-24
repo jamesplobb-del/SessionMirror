@@ -24,11 +24,14 @@ interface DraggableTakesWidgetProps extends PillProps {
   isRecording?: boolean
   visible?: boolean
   collapseResetKey?: string
+  expandRequest?: boolean
+  onExpandRequestConsumed?: () => void
+  dockRight?: boolean
 }
 
 /** Full take controls on the music desk; only the header starts a drag. */
 export default function DraggableTakesWidget({
-  boundaryRef, visible = true, collapseResetKey, ...pills
+  boundaryRef, visible = true, collapseResetKey, expandRequest, onExpandRequestConsumed, dockRight = false, ...pills
 }: DraggableTakesWidgetProps) {
   const dragControls = useDragControls()
   const bestTargetRef = useRef<HTMLElement | null>(null)
@@ -79,6 +82,7 @@ export default function DraggableTakesWidget({
     boundaryRef, widgetRef, x: dragX, y: dragY, positionId: POSITION_ID,
     label: 'takes', icon: <TakesToolIcon aria-hidden />, detail: held > 0 ? `${held}` : 'Takes',
     active: held > 0, resetKey: collapseResetKey, ballSlot: 5, visible,
+    expandRequest, onExpandRequestConsumed, dockRight,
   })
 
   return <>

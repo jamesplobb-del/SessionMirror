@@ -8,7 +8,7 @@ const dir=await mkdtemp(join(tmpdir(),'program-share-'))
 const data=new Map()
 globalThis.localStorage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)}
 try {
- await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage'; export * from './src/practiceTimeline/storage/routineFile';`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
+ await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/utils/practiceChartStorage'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage'; export * from './src/practiceTimeline/storage/routineFile';`,resolveDir:process.cwd()},bundle:true,format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
  const m=await import(pathToFileURL(join(dir,'test.mjs')))
  const program=m.saveTimeline({...m.createEmptyTimeline('Tempo ladder'),sections:[m.createDefaultSection({bpm:92,meter:'6/8',bars:8}),m.createDefaultSection({bpm:112,meter:'4/4',bars:4})]})
  const routine=m.createRoutine('Warm up',[m.createStep({title:'Long tones',kind:'metro',programId:program.id}),m.createStep({title:'Repeat',kind:'metro',programId:program.id})],null)
@@ -27,6 +27,17 @@ try {
  assert.equal(m.parsePracticePlanFile(JSON.stringify(old)).routine.steps[0].programId,null)
  const malformed=JSON.parse(file);malformed.programs[program.id]={bad:true}
  assert.equal(m.parsePracticePlanFile(JSON.stringify(malformed)).ok,false)
+ const scoreId='sender-score'
+ const scoreBytes=new Uint8Array([37,80,68,70,45,49,46,55,10])
+ await m.savePracticeChart(scoreId,new File([scoreBytes],'Etude.pdf',{type:'application/pdf'}))
+ const musicPlan=m.createRoutine('Music practice',[m.createStep({title:'Etude',kind:'record',projectId:scoreId,desk:{...m.blankDesk('audio'),showMusic:true}})],null)
+ const layout=m.buildPracticePlanFile(musicPlan)
+ assert.equal(JSON.parse(layout).scores,undefined,'Layout must not contain music bytes')
+ assert.equal(JSON.parse(layout).routine.steps[0].sharedScoreName,'Etude.pdf')
+ const receivedLayout=m.importPracticePlanFromText(layout)
+ assert.equal(receivedLayout.ok,true)
+ assert.equal(receivedLayout.routine.steps[0].projectId,null)
+ assert.equal(receivedLayout.routine.steps[0].sharedScoreName,'Etude.pdf')
  for (const [patternRepeat, repeatCount, measure] of [
    [{kind:'cycles',cycles:8},1,12],
    [{kind:'cycles',cycles:8},2,28],
@@ -45,5 +56,5 @@ try {
      assert.deepEqual([pin.measure,pin.beat,pin.bpm],[measure,2,132],'Mixed-meter tempo pin must survive standalone and embedded imports')
    }
  }
- console.log('PASS: linked programs share once, import with fresh IDs, retain meter/tempo and mixed-meter pins, preserve active program, handle legacy and malformed files')
+ console.log('PASS: linked programs, score placeholders, fresh IDs, meter/tempo pins, active program, legacy and malformed files')
 }finally{await rm(dir,{recursive:true,force:true})}

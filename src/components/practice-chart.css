@@ -18,18 +18,10 @@
   touch-action: manipulation;
 }
 
-/*
- * The strip starts below the chrome at the top of the room, not behind it.
- *
- * Two things live up there: the status bar (a Dynamic Island through the title
- * and the tempo marking is the same bug as a pill over the staff) and the
- * Record / Tuner / Metronome / Games tabs, which are the only way off this
- * surface — hiding them to win 45px would trap a player on the page. The page
- * is fitted into what is left, and a whole page still fits inside it.
- */
+/* The controls float above the page. They never reduce its reading height. */
 .practice-chart-scroll {
   position: absolute;
-  top: var(--music-page-top, var(--safe-top, env(safe-area-inset-top, 0px)));
+  top: 0;
   right: 0;
   bottom: var(--music-page-bottom, 0px);
   left: 0;
@@ -38,6 +30,59 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-y;
+}
+
+/* Tablet music stand: collapsed tools have one predictable rail. The score
+ * uses the rest of the width, so no floating control can cover a stave. */
+@media (min-width: 700px) {
+  .app-shell--music-page .practice-chart-scroll { right: 72px; }
+  .app-shell--music-page .practice-chart-paper::after {
+    content: '';
+    position: absolute;
+    z-index: 2;
+    top: 72px;
+    bottom: 0;
+    right: 0;
+    width: 72px;
+    border-left: 1px solid #e8eef4;
+    background: #f9fbfd;
+    pointer-events: none;
+  }
+}
+
+/* Collapsed tools share one real home. Flex order closes gaps whenever a tool
+ * opens or disappears; only full panels are free to float over the score. */
+.music-widget-dock { display: none; }
+@media (min-width: 700px) {
+  .app-shell--music-page .music-widget-dock {
+    position: absolute;
+    z-index: 38;
+    top: max(136px, calc(env(safe-area-inset-top, 0px) + 112px));
+    right: 0;
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    width: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    pointer-events: none;
+  }
+  .music-widget-dock::-webkit-scrollbar { display: none; }
+  .music-widget-dock > .widget-ball,
+  .music-widget-dock > .reference-widget-chip {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    flex: none;
+    transform: none !important;
+    pointer-events: auto;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  .music-widget-dock > .reference-widget-chip { width: 56px; height: 56px; }
 }
 
 .practice-chart-scroll::-webkit-scrollbar { display: none; }
@@ -109,6 +154,11 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
+/* The full-screen record control occupies the middle of the left turn zone. */
+.practice-chart-hint--with-record span:first-child {
+  transform: translateY(-96px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .practice-chart-hint { transition: none; }
 }
@@ -159,7 +209,7 @@
  */
 .practice-chart-empty {
   position: absolute;
-  top: var(--music-page-top, var(--safe-top, env(safe-area-inset-top, 0px)));
+  top: 0;
   right: 0;
   bottom: var(--music-page-bottom, 0px);
   left: 0;
@@ -566,11 +616,14 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
  */
 .practice-chart-topbar {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  top: var(--music-controls-top, calc(env(safe-area-inset-top, 0px) + 8px));
   left: 10px;
   right: 10px;
   pointer-events: none;
   z-index: 3;
+}
+.app-shell--music-page:has(.audio-practice-top-tabs):not(.app-shell--music-chrome-hidden) .practice-chart-topbar {
+  top: var(--music-controls-top, calc(env(safe-area-inset-top, 0px) + 78px));
 }
 
 .practice-chart-controls {
@@ -578,12 +631,17 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   justify-content: space-between;
   gap: 6px;
   transition: opacity 0.25s ease;
+  align-items: center;
 }
+.practice-chart-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;font-weight:550;color:#34465a;text-align:center}
 
 .practice-chart-scroll--half-turn { overflow: hidden; touch-action: manipulation; }
 .practice-chart-join--half { background: #4d91bf; height: 2px; }
 
 .practice-chart-workspace {
+  position: absolute;
+  top: 100%;
+  right: 0;
   display: flex;
   justify-content: center;
   gap: 6px;
@@ -595,6 +653,8 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   pointer-events: auto;
   border-radius: 16px;
   background: #f1f3f5;
+  border: 1px solid #dbe2ea;
+  box-shadow: 0 8px 24px #142c4420;
 }
 .practice-chart-workspace button {
   display: flex;
@@ -611,6 +671,7 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 .practice-chart-workspace button[aria-pressed='true'] { background: #fff; color: #235b7e; box-shadow: 0 1px 4px #0001; }
 .practice-chart-workspace svg { width: 17px; height: 17px; flex-shrink: 0; }
 @media (max-width: 540px) {
+  .practice-chart-title{display:none}
   .practice-chart-workspace { width: 100%; justify-content: flex-start; }
   .practice-chart-workspace button { flex-direction: column; gap: 3px; padding: 6px 10px; font-size: 10px; flex: 1; }
   .practice-chart-controls .practice-chart-control { padding: 0 8px; font-size: 10px; min-height: 44px; }

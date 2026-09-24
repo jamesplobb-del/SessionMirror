@@ -1,0 +1,35 @@
+.audio-take-poster {
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 35%, #e8f3ff 0, #f5f9fe 42%, #f8fafc 100%);
+  color: #346a9d;
+}
+
+.audio-take-poster__mark {
+  position: absolute;
+  top: 22%;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translateX(-50%);
+}
+
+.audio-take-poster__name {
+  position: absolute;
+  right: 18px;
+  bottom: 15%;
+  left: 18px;
+  overflow: hidden;
+  color: #34536f;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html.app-dark-mode .audio-take-poster {
+  background: radial-gradient(circle at 50% 35%, #1d3a54 0, #162b3e 45%, #132435 100%);
+  color: #90c3f1;
+}
+
+html.app-dark-mode .audio-take-poster__name { color: #d2e7fa; }

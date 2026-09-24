@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState, type RefObject, type PointerEvent, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject, type PointerEvent, type KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, useDragControls, useMotionValue } from 'framer-motion'
 import { ChevronDown, ChevronUp, FileMusic, GripHorizontal, Grip, Maximize, X } from 'lucide-react'
 import BestTakeBox from './BestTakeBox'
 import type { LibraryPlaybackReference } from '../types/library'
 import { clampWidgetPosition, loadWidgetSize, saveWidgetSize } from '../utils/floatingWidgetLayout'
 
-export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, youtubeUrl, libraryPlayback,
+export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, youtubeUrl, libraryPlayback,
   suspended, onSubmitYoutube, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
@@ -15,6 +16,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   onClose?: () => void
   showTrackName?: boolean
   visible?: boolean
+  dockRight?: boolean
   youtubeUrl: string | null
   libraryPlayback: LibraryPlaybackReference | null
   suspended: boolean
@@ -32,6 +34,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   const chipDragged = useRef(false)
   const [size, setSize] = useState(() => loadWidgetSize('reference') ?? { width: 280, height: 240 })
   const [room, setRoom] = useState({ width: 320, height: 480 })
+  const [dockHost, setDockHost] = useState<HTMLElement | null>(null)
   const resizing = useRef<{ id: number; x: number; y: number; width: number; height: number } | null>(null)
   const clampSize = (width: number, height: number) => ({
     width: Math.max(Math.min(260, room.width), Math.min(room.width, width)),
@@ -66,6 +69,28 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   }
   const x = useMotionValue(16)
   const y = useMotionValue(112)
+  useLayoutEffect(() => {
+    const findDock = () => setDockHost(dockRight && (boundaryRef.current?.clientWidth ?? window.innerWidth) >= 700
+      ? document.getElementById('music-widget-dock') : null)
+    findDock()
+    const observer = new ResizeObserver(findDock)
+    if (boundaryRef.current) observer.observe(boundaryRef.current)
+    window.addEventListener('resize', findDock)
+    return () => { observer.disconnect(); window.removeEventListener('resize', findDock) }
+  }, [boundaryRef, dockRight])
+  const openFromDock = (button: HTMLButtonElement) => {
+    const bounds = boundaryRef.current
+    const widget = node.current
+    if (bounds && widget) {
+      const ball = button.getBoundingClientRect()
+      const frame = bounds.getBoundingClientRect()
+      const next = clampWidgetPosition(bounds.clientWidth, bounds.clientHeight,
+        displayed.width, displayed.height, ball.right - frame.left - displayed.width, ball.top - frame.top)
+      x.set(next.x)
+      y.set(next.y)
+    }
+    onExpandedChange(true)
+  }
   useEffect(() => {
     if (suspended) onPlaybackChange(false)
   }, [suspended, onPlaybackChange])
@@ -76,10 +101,11 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     const observer = new ResizeObserver(fit);observer.observe(bounds);observer.observe(widget);fit()
     return () => observer.disconnect()
   }, [boundaryRef, x, y])
-  return <motion.div ref={node} className={`reference-widget-live ${expanded ? 'is-expanded' : ''}`}
-    style={{ display: visible ? undefined : 'none', width: expanded ? displayed.width : undefined, height: expanded ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
+  return <>
+  <motion.div ref={node} className={`reference-widget-live ${expanded ? 'is-expanded' : ''}`}
+    style={{ display: visible && (expanded || !dockHost) ? undefined : 'none', width: expanded ? displayed.width : undefined, height: expanded ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
     onDragStart={() => { if (!expanded) chipDragged.current = true }}>
-    {!expanded && <button type="button" className="reference-widget-chip"
+    {!expanded && !dockHost && <button type="button" className="reference-widget-chip"
       onPointerDown={event => {
         if (event.button !== 0) return
         chipDragged.current = false
@@ -118,4 +144,11 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
       </footer>
     </div>
   </motion.div>
+  {visible && !expanded && dockHost && createPortal(
+    <button type="button" className="reference-widget-chip reference-widget-chip--docked"
+      aria-label="Open References" title="Open References"
+      style={{ order: 4 }} onClick={event => openFromDock(event.currentTarget)}>
+      <FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden />
+    </button>, dockHost)}
+  </>
 }

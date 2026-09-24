@@ -9,6 +9,7 @@ import RoutineDeskSetup from './RoutineDeskSetup'
 import RoutineMetronomeEditor from './RoutineMetronomeEditor'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
 import RoutineMusicSetup from './RoutineMusicSetup'
+import RoutineShareDialog from './RoutineShareDialog'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, presetMinutes, stepFromTemplate } from '../utils/routinePresets'
 import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
@@ -16,7 +17,7 @@ import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import type { MetronomePrefs } from '../utils/metronomeConfig'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
 import { hasPracticeChart } from '../utils/practiceChartStorage'
-import { importPracticePlanFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION, sharePracticeRoutine } from '../utils/practiceRoutineShare'
+import { importPracticePlanFileFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION } from '../utils/practiceRoutineShare'
 import type { LabsRoute } from './labs/LabsOverlay'
 import '../styles/routine-guide.css'
 
@@ -99,6 +100,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [direction, setDirection] = useState(1)
   const [error, setError] = useState('')
+  const [shareItem, setShareItem] = useState<Routine | null>(null)
   const [instrumentReturn, setInstrumentReturn] = useState<Screen>('library')
   const [changingInstrument, setChangingInstrument] = useState(false)
   const [libraryReturn, setLibraryReturn] = useState<Screen | null>(mode === 'presets' ? null : 'routines')
@@ -193,6 +195,10 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     move(instrument ? 'library' : 'instrument')
   }
   const openSavedRoutine = (item: Routine) => {
+    if (props.onOpenSharedRoutine && item.steps.some(step => step.sharedScoreName)) {
+      props.onOpenSharedRoutine(item)
+      return
+    }
     setDraft(item); setInstrument(item.instrumentId); setSelection(selectionForRoutine(item))
     setConfiguredIds(item.steps.map(step => step.id)); clearItemSetup()
     setLineupReturn('routines'); move('lineup')
@@ -322,19 +328,14 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
    * item. Attached metronome programs travel with the routine, so the
    * recipient can play the same tempo and meter sequence.
    */
-  const shareRoutine = (item: Routine) => {
-    setError('')
-    void sharePracticeRoutine(item).then(result => {
-      if (!result.ok) setError(result.error)
-    })
-  }
+  const shareRoutine = (item: Routine) => { setError(''); setShareItem(item) }
 
   const importInputRef = useRef<HTMLInputElement>(null)
   const importFile = (file: File) => {
     setError('')
     if (file.size > MAX_PRACTICE_PLAN_BYTES) { setError('That file is too large to be a routine.'); return }
-    void file.text().then(text => {
-      const result = importPracticePlanFromText(text)
+    void file.text().then(async text => {
+      const result = await importPracticePlanFileFromText(text)
       if (!result.ok) { setError(result.error); return }
       setLibrary(loadRoutineLibrary())
       openSavedRoutine(result.routine)
@@ -551,6 +552,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
         if (screen === 'lineup') clearItemSetup()
       }}
     />
+    {shareItem && <RoutineShareDialog routine={shareItem} onClose={() => setShareItem(null)} />}
     {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">
       {secondaryAction && <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-secondary" disabled={disabled} onClick={secondaryAction.run}>{secondaryAction.label}</Pressable>}
       <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable>

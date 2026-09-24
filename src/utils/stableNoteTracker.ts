@@ -103,6 +103,11 @@ export class StableNoteTracker {
     this.onObservation = onObservation
   }
 
+  /** Drop an unfinished note when collection is turned off or cancelled. */
+  discard(): void {
+    this.candidate = null
+  }
+
   ingest(frame: StablePitchFrame | null, context: StablePitchContext): void {
     if (!frame || !validFrame(frame)) {
       this.finish()

@@ -1,5 +1,6 @@
 import { blankDesk, createStep, MAX_STEP_TITLE, type RoutineStep } from './practiceRoutines'
 import { normalizeDeskMetronome } from './deskMetronome'
+import { loadMusicScoreSettings, loadMusicSetup } from './musicLibrary'
 
 export function musicExerciseTitle(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, MAX_STEP_TITLE) || 'Music'
@@ -23,10 +24,15 @@ export function copyExerciseTools(source: RoutineStep, target: RoutineStep): Rou
 
 /** Keep the saved setup intact when the same exercise is reused in another plan. */
 export function reuseMusicExercise(step: RoutineStep): RoutineStep {
-  return createStep({ ...step, kind: 'record', desk: step.desk ? {
-    ...step.desk, mode: 'audio', showMusic: true,
-    metronome: normalizeDeskMetronome(step.desk.metronome), drone: { ...step.desk.drone },
-  } : { ...blankDesk('audio'), showMusic: true } })
+  const desk = step.projectId ? loadMusicSetup(step.projectId) ?? step.desk : step.desk
+  const scoreSettings = step.projectId ? loadMusicScoreSettings(step.projectId) : null
+  return createStep({ ...step, kind: 'record', desk: desk ? {
+    ...desk, mode: 'audio', showMusic: true,
+    metronome: normalizeDeskMetronome(desk.metronome), drone: { ...desk.drone },
+  } : { ...blankDesk('audio'), showMusic: true },
+  referenceQuery: scoreSettings ? scoreSettings.referenceQuery : step.referenceQuery,
+  referenceVideoId: scoreSettings ? scoreSettings.referenceVideoId : step.referenceVideoId,
+  programId: scoreSettings ? scoreSettings.programId : step.programId })
 }
 
 /** iOS Files can provide an empty MIME type. Validate before creating a folder. */

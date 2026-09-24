@@ -56,6 +56,7 @@ import { AUDIO_TAKE_THUMBNAIL } from '../utils/mediaType'
 import { isAudioMimeType } from '../utils/mobileVideo'
 import { NATIVE_AUDIO_MIME, NATIVE_VIDEO_MIME } from '../utils/takeStorage'
 import { nativeDataFileExists } from '../utils/filesystemInit'
+import AudioTakePoster from './AudioTakePoster'
 
 const CHROME_BADGE_BTN = `${HUD_GLASS_FLOAT_BADGE} hud-glass-badge--ghost`
 
@@ -66,10 +67,15 @@ const emptyActionClass =
 function PipMediaPoster({
   posterUrl,
   isAudio = false,
+  cleanAudio = false,
+  name,
 }: {
   posterUrl?: string | null
   isAudio?: boolean
+  cleanAudio?: boolean
+  name?: string | null
 }) {
+  if (isAudio && cleanAudio) return <AudioTakePoster name={name} />
   return (
     <div
       className={`absolute inset-0 h-full w-full ${isAudio ? 'take-audio-surface' : 'bg-black'}`}
@@ -786,17 +792,17 @@ function BestTakeBox({
                   audible={playbackAudible}
                 />
               )}
-              {!isPlaying && (
-                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
+              {((isAudioMedia && isFill) || !isPlaying) && (
+                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} cleanAudio={isFill} name={libraryPlayback?.name ?? take?.name} />
               )}
 
-              {!compact && onExpand && (
+              {!compact && (onExpand || dragSourceProps) && (
                 dragSourceProps ? (
                   <div
                     role="button"
                     tabIndex={0}
                     className="pip-drag-layer absolute inset-0 z-[1] cursor-grab touch-none select-none border-0 bg-transparent p-0 active:cursor-grabbing"
-                    aria-label="Drag Best Take to Current Take, or tap to open full screen"
+                    aria-label="Drag Best Take to Current Take"
                     {...dragSourceProps}
                   />
                 ) : (
@@ -807,7 +813,7 @@ function BestTakeBox({
                     haptic="light"
                     className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                     onClick={onExpand}
-                    aria-label="Open Best Take in full screen"
+                    aria-label="Open Expand View with Best Take"
                   />
                 )
               )}

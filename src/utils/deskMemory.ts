@@ -18,7 +18,7 @@ export interface LastSurface {
 const STORAGE_KEY = 'sessionmirror:last-surface'
 
 /** Games are never the first thing a sitting opens on; they wait behind Home. */
-const RESTORABLE_TABS: ReadonlySet<AudioPracticeTab> = new Set(['audio', 'tuner', 'metronome'])
+const RESTORABLE_TABS: ReadonlySet<AudioPracticeTab> = new Set(['audio', 'music', 'tuner', 'metronome'])
 
 function parseTab(value: unknown): AudioPracticeTab {
   if (value === 'practice') return 'metronome'

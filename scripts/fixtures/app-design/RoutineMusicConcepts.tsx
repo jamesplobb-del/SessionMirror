@@ -20,7 +20,7 @@ const defaults: Settings = { tools: [], bpm: 80, drone: 'C' }
 const choices = [
   { key: 'metronome' as const, name: 'Metronome', icon: SlidersHorizontal },
   { key: 'drone' as const, name: 'Drone', icon: Waves },
-  { key: 'pitch' as const, name: 'Pitch graph', icon: AudioLines },
+  { key: 'pitch' as const, name: 'Pitch', icon: AudioLines },
 ]
 const concepts: Record<Concept, { label: string; tagline: string; detail: string; steps: string[]; advantage: string; tradeoff: string }> = {
   import: { label: 'Import & go', tagline: 'Each exercise. Its own setup.', detail: 'Import your music, then set the tools and tempo on each exercise. Everything stays in one list. Saved exercises bring their setup next time.', steps: ['Import your music', 'Set up each exercise', 'Start with its own tools'], advantage: 'Clarke at 100 BPM with pitch. Your next piece with a different setup.', tradeoff: 'Open one exercise at a time. Copy its setup to selected items only when you want to.' },
@@ -47,17 +47,18 @@ function metronomeDescription(value: Settings) {
 function ToolPicker({ value, onChange, onOpenMetronome, detailed = false }: { value: Settings; onChange: (settings: Settings) => void; onOpenMetronome: () => void; detailed?: boolean }) {
   const toggle = (tool: Tool) => onChange({ ...value, tools: value.tools.includes(tool) ? value.tools.filter(t => t !== tool) : [...value.tools, tool] })
   return <div className={`rm-tools ${detailed ? 'rm-tools--detailed' : ''}`}>
-    <div className="rm-tool-choices">{choices.map(({ key, name, icon: Icon }) => <button key={key} type="button" aria-pressed={value.tools.includes(key)} onClick={() => toggle(key)}><Icon /><span>{name}</span>{value.tools.includes(key) && <Check className="rm-tool-check" />}</button>)}</div>
+    <div className="rm-tool-choices">{choices.map(({ key, name, icon: Icon }) => <button key={key} type="button" aria-pressed={value.tools.includes(key)} onClick={() => toggle(key)}><Icon /><span>{name}</span></button>)}</div>
     {value.tools.includes('metronome') && <label className="rm-setting"><span>Tempo</span><span><input aria-label="Tempo in BPM" type="number" min="20" max="300" value={value.bpm} onChange={event => { const bpm = Number(event.target.value); onChange({ ...value, bpm: Math.max(20, Math.min(300, bpm)) }) }} /> <small>BPM</small></span></label>}
-    {value.tools.includes('metronome') && <button type="button" className="rm-open-metronome" onClick={onOpenMetronome}><SlidersHorizontal /><span><strong>Open metronome</strong><small>{metronomeDescription(value)}</small></span><ChevronRight /></button>}
+    {value.tools.includes('metronome') && <button type="button" className="rm-open-metronome" onClick={onOpenMetronome}><SlidersHorizontal /><span><strong>Metronome settings</strong><small>{metronomeDescription(value)}</small></span><ChevronRight /></button>}
     {value.tools.includes('drone') && <label className="rm-setting"><span>Drone note</span><select aria-label="Drone note" value={value.drone} onChange={event => onChange({ ...value, drone: event.target.value })}>{['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'].map(n => <option key={n}>{n}</option>)}</select></label>}
     {detailed && <p className="rm-hint">Optional. You can also add tools while you practice.</p>}
   </div>
 }
-const summary = (settings: Settings) => settings.tools.length ? settings.tools.map(t => t === 'metronome' ? `${settings.bpm} BPM${settings.metronome ? ` · ${settings.metronome.meter}` : ''}` : t === 'drone' ? `${settings.drone} drone` : 'Pitch graph').join(' · ') : 'No tools selected'
+const summary = (settings: Settings) => settings.tools.length ? settings.tools.map(t => t === 'metronome' ? `${settings.bpm} BPM${settings.metronome ? ` · ${settings.metronome.meter}` : ''}` : t === 'drone' ? `${settings.drone} drone` : 'Pitch').join(' · ') : 'Music only'
 
 export default function RoutineMusicConcepts() {
   const [concept, setConcept] = useState<Concept>('import')
+  const [device, setDevice] = useState<'phone' | 'ipad'>('ipad')
   const [stage, setStage] = useState<Stage>('music')
   const [dark, setDark] = useState(false)
   const [scores, setScores] = useState<Score[]>([])
@@ -118,8 +119,7 @@ export default function RoutineMusicConcepts() {
   const selectScore = (score: Score) => setScores(items => items.some(item => item.id === score.id) ? items.filter(item => item.id !== score.id) : [...items, { ...score, settings: concept === 'shelf' ? score.settings : settings }])
   const addScores = (added: Score[]) => {
     setScores(items => [...items, ...added.filter(item => !items.some(existing => existing.id === item.id))].slice(0, 12))
-    if (concept === 'import' && added.length && !scores.length) setExpanded(added[0].id)
-    if (concept !== 'shelf' || stage !== 'music') setStage('setup')
+    if (stage !== 'music') setStage('setup')
   }
   const chooseFiles = (files: FileList | null) => {
     if (!files?.length) return
@@ -153,8 +153,8 @@ export default function RoutineMusicConcepts() {
   const addExercise = () => { if (!exercise.trim()) return; addScores([{ id: `exercise-${Date.now()}`, title: exercise.trim(), subtitle: 'Practice without a score', exercise: true, settings }]); setExercise(''); setShowExercise(false) }
   const back = () => { if (stage === 'practice') { setStage('setup'); setRecording(false); setComplete(false) } else setStage('music') }
 
-  return <main className="rm-review">
-    <header className="rm-review-header"><div><span className="rm-eyebrow">BESTTAKE / ROUTINE DESIGN STUDY</span><h1>Start with the music.</h1><p>Three ways to turn your scores into a practice routine.</p></div><button className="rm-theme" disabled={editor !== null} aria-label={dark ? 'Use light appearance' : 'Use dark appearance'} onClick={() => setDark(value => !value)}>{dark ? <Sun /> : <Moon />}</button></header>
+  return <main className={`rm-review rm-review--${device}`}>
+    <header className="rm-review-header"><div><span className="rm-eyebrow">BESTTAKE / ROUTINE DESIGN STUDY</span><h1>Start with the music.</h1><p>Three ways to turn your scores into a practice routine.</p></div><div className="rm-review-actions"><button className="rm-device-toggle" disabled={editor !== null} onClick={() => setDevice(value => value === 'ipad' ? 'phone' : 'ipad')}>{device === 'ipad' ? 'iPhone view' : 'iPad view'}</button><button className="rm-theme" disabled={editor !== null} aria-label={dark ? 'Use light appearance' : 'Use dark appearance'} onClick={() => setDark(value => !value)}>{dark ? <Sun /> : <Moon />}</button></div></header>
     <nav className="rm-concepts" inert={editor !== null} aria-label="Routine concepts">{(Object.keys(concepts) as Concept[]).map((key, index) => <button key={key} aria-pressed={concept === key} onClick={() => reset(key)}><span>0{index + 1}</span><strong>{concepts[key].label}</strong>{key === 'import' && <small>Recommended</small>}<ArrowRight /></button>)}</nav>
     <div className="rm-review-layout">
       <aside className="rm-explanation" inert={editor !== null}><span className="rm-eyebrow">CONCEPT 0{Object.keys(concepts).indexOf(concept) + 1}</span><h2>{config.tagline}</h2><p>{config.detail}</p>
@@ -170,11 +170,12 @@ export default function RoutineMusicConcepts() {
           {concept === 'guided' && stage !== 'practice' && <div className="rm-step-strip"><span className={stage === 'music' ? 'is-current' : ''}>1 Music</span><i /><span className={stage === 'setup' ? 'is-current' : ''}>2 Tools</span></div>}
           <div className="rm-app-scroll" ref={scroll}>
             {stage === 'music' && concept !== 'shelf' && <>
-              <header className="rm-heading"><span className="rm-overline">NEW ROUTINE</span><h2>Your music.<br />Ready to practice.</h2><p>Add your scores. We’ll put them in order.</p></header>
-              {scores.length > 0 && <div className="rm-selected-music"><div className="rm-section-title"><h3>In this routine</h3><span>{scores.length} selected</span></div>{scores.map(score => <div key={score.id}><FileMusic /><span>{score.title}</span><button aria-label={`Remove ${score.title}`} onClick={() => setScores(items => items.filter(item => item.id !== score.id))}><X /></button></div>)}</div>}
-              <div className="rm-import-hero"><button className="rm-primary" onClick={() => input.current?.click()}><Upload /> Import music</button><p>Choose one or more PDFs or photos.</p></div>
-              {library.length > 0 && <div className="rm-section-title"><h3>Or use recent music</h3><span>Your imports</span></div>}
-              {library.slice(0, 2).map(score => <button key={score.id} className="rm-recent" onClick={() => addScores([{ ...score, settings: concept === 'guided' ? settings : score.settings }])}><div className="rm-thumb"><Sheet score={score} /></div><span><strong>{score.title}</strong><small>{summary(score.settings)}</small></span><Plus /></button>)}
+              <header className="rm-heading"><span className="rm-overline">ROUTINE</span><h2>Choose your music.</h2><p>Select everything you want to practice, then set up each exercise.</p></header>
+              {library.length === 0 && <div className="rm-import-hero"><button className="rm-primary" onClick={() => input.current?.click()}><Upload /> Import music</button><p>Choose one or more PDFs or photos.</p></div>}
+              {library.length > 0 && <><div className="rm-section-title rm-library-head"><div><h3>Music library</h3><span>{scores.length} selected</span></div><button onClick={() => input.current?.click()}><Upload /> Import</button></div><div className="rm-library-list">{library.map(score => {
+                const selected = scores.find(item => item.id === score.id)
+                return <button key={score.id} className="rm-recent" aria-pressed={Boolean(selected)} onClick={() => selectScore(score)}><div className="rm-thumb"><Sheet score={score} /></div><span><strong>{score.title}</strong><small>{summary(selected?.settings ?? score.settings)}</small></span><span className="rm-select-check">{selected ? <Check /> : <Plus />}</span></button>
+              })}</div></>}
               <button className="rm-text-button" onClick={() => { setShowExercise(true); setStage('setup') }}>Add an exercise without music</button>
             </>}
             {stage === 'music' && concept === 'shelf' && <>
@@ -184,16 +185,15 @@ export default function RoutineMusicConcepts() {
               <div className="rm-music-grid">{library.map(score => <button key={score.id} aria-pressed={scores.some(item => item.id === score.id)} onClick={() => selectScore(score)}><div className="rm-grid-cover"><Sheet score={score} /><span className="rm-select-check">{scores.some(item => item.id === score.id) ? <Check /> : <Plus />}</span></div><strong>{score.title}</strong><small>{summary(score.settings)}</small></button>)}</div>
             </>}
             {stage === 'setup' && concept !== 'guided' && <>
-              <header className="rm-heading rm-heading--compact"><span className="rm-overline">{scores.length} {scores.length === 1 ? 'ITEM' : 'ITEMS'} · READY WHEN YOU ARE</span><h2>Your music is<br />the plan.</h2></header>
+              <header className="rm-heading rm-heading--compact"><span className="rm-overline">ROUTINE</span><h2>Exercises</h2></header>
               <label className="rm-routine-name"><span>Routine name</span><input value={name} aria-label="Routine name" onChange={e => setName(e.target.value)} /></label>
               {concept === 'shelf' && <div className="rm-saved-note"><CircleCheck /><span>Each score’s saved tools are ready.<br /><small>Tap a score to adjust them.</small></span></div>}
-              <div className="rm-section-title"><h3>Your exercises</h3><span>Each has its own setup</span></div>
+              <div className="rm-section-title"><h3>Order and setup</h3><span>{scores.length} {scores.length === 1 ? 'exercise' : 'exercises'}</span></div>
               <ol className="rm-score-list">{scores.map((score, index) => <li key={score.id} className={expanded === score.id ? 'is-expanded' : ''}>
                 <button className="rm-score-row" aria-expanded={expanded === score.id} onClick={() => setExpanded(expanded === score.id ? null : score.id)}><span className="rm-order">{index + 1}</span><div className="rm-thumb"><Sheet score={score} /></div><span className="rm-score-copy"><strong>{score.title}</strong><small>{summary(score.settings)}</small></span><ChevronDown /></button>
                 {expanded === score.id && <div className="rm-score-details">
-                  <span className="rm-exercise-tools-label">Tools for this exercise</span>
+                  <span className="rm-exercise-tools-label">Tools</span>
                   <ToolPicker value={score.settings} onChange={next => updateScore(score.id, { settings: next })} onOpenMetronome={() => openMetronome(score)} />
-                  <p className="rm-item-save-hint">Opens with this exercise every time.</p>
                   <details className="rm-item-more"><summary>More options</summary>
                     <label className="rm-item-title">Item name<input aria-label="Item name" value={score.title} onChange={e => updateScore(score.id, { title: e.target.value })} /></label>
                     {scores.length > 1 && <button className="rm-copy-entry" onClick={() => { setCopyFrom(copyFrom === score.id ? null : score.id); setCopyTargets([]) }}>Copy setup to other exercises…</button>}
@@ -202,7 +202,7 @@ export default function RoutineMusicConcepts() {
                   </details>
                 </div>}
               </li>)}</ol>
-              <button className="rm-add-music" onClick={() => input.current?.click()}><Plus /> Add music</button>
+              <button className="rm-add-music" onClick={() => setStage('music')}><Plus /> Choose music</button>
               <button className="rm-text-button" onClick={() => setShowExercise(value => !value)}>Add an exercise without music</button>
               {showExercise && <form className="rm-exercise-entry" onSubmit={event => { event.preventDefault(); addExercise() }}><input autoFocus aria-label="Exercise name" placeholder="Long tones, warm-up…" value={exercise} onChange={e => setExercise(e.target.value)} /><button type="submit" disabled={!exercise.trim()} aria-label="Add exercise"><Plus /></button></form>}
             </>}
@@ -235,7 +235,7 @@ export default function RoutineMusicConcepts() {
           <iframe ref={editorFrame} title={`Full metronome · ${editor.title}`} onLoad={() => editorFrame.current?.focus()} src={`./routine-metronome-frame.html?${new URLSearchParams({ prefs: JSON.stringify(editor.prefs), request: editor.requestId, dark: editor.dark ? '1' : '0' })}`} />
         </div>}
         <div className="rm-home-indicator"><i /></div>
-      </div><p className="rm-phone-caption"><span /> Click through the phone · preview only</p></div>
+      </div><p className="rm-phone-caption"><span /> Click through the {device === 'ipad' ? 'iPad' : 'phone'} · preview only</p></div>
       <aside className="rm-moment-notes"><span className="rm-eyebrow">{stage === 'music' ? 'THE ENTRY' : stage === 'setup' ? 'THE SETUP' : 'THE PAYOFF'}</span><h3>{stage === 'music' ? 'Music gets the first tap.' : stage === 'setup' ? 'A ready-to-play list.' : 'The routine runs the workspace.'}</h3><p>{stage === 'music' ? 'No instrument questionnaire or exercise naming before import. The filename supplies an editable title.' : stage === 'setup' ? concept === 'guided' ? 'Three optional tools. Settings appear only when a tool is selected. Start stays within reach.' : 'Each PDF is already an item. Titles, order and tools can be adjusted without leaving the list.' : 'The score appears with its chosen tools. Done advances to the next score and its setup.'}</p><div className="rm-note-line" /><span className="rm-small-label">TRY THIS</span><p>{stage === 'music' ? concept === 'shelf' ? 'Select two covers, then use the button at the bottom.' : 'Import your PDFs or photos to see each exercise’s setup.' : stage === 'setup' ? concept === 'guided' ? 'Choose shared tools for a quick rehearsal.' : 'Change one exercise’s tempo, then start. The next exercise keeps its own settings.' : 'Tap Record, stop, then Done · next to move through the music.'}</p><div className="rm-no-analysis"><FileMusic /><p>Import supplies the document and its name. Tempo and tools are chosen by the user.</p></div></aside>
     </div>
   </main>

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, Square, Upload, X } from 'lucide-react'
+import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, Square, Upload } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
-  DEFAULT_CHART_VIEW, deletePracticeChart, isChartVisible, loadChartView, loadPracticeChart,
+  DEFAULT_CHART_VIEW, deletePracticeChart, loadChartView, loadPracticeChart,
   savePracticeChart, saveChartView, setChartVisible,
   type ChartView, type PracticeChart,
 } from '../utils/practiceChartStorage'
@@ -39,6 +39,7 @@ const HINT_MS = 2600
 
 interface PracticeChartLayerProps {
   projectId: string
+  revision?: number
   workspace: HudQuickSettings
   onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
   referencesVisible?: boolean
@@ -113,6 +114,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
+  revision = 0,
 }: PracticeChartLayerProps) {
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
@@ -139,6 +141,7 @@ export default function PracticeChartLayer({
    * and no memory of asking for that — which reads as broken, not as a feature.
    */
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const [pageToolsRequested, setPageToolsRequested] = useState(false)
   const [chromeOff, setChromeOff] = useState(false)
   // Full screen is for the page. The tool row waits behind Workspace, closed,
   // every time the player steps in.
@@ -157,7 +160,7 @@ export default function PracticeChartLayer({
     setStrokes(loadInkStrokes(projectId))
     setMarker(null)
     setChromeOff(false)
-    setPaperVisible(isChartVisible(projectId))
+    setPaperVisible(true)
     setLoaded(false)
     void loadPracticeChart(projectId)
       .then(value => { if (!cancelled) setChart(value) })
@@ -169,6 +172,21 @@ export default function PracticeChartLayer({
       })
     return () => { cancelled = true }
   }, [projectId])
+
+  // External imports can replace this file, but opening a toolbar must never
+  // recreate the document or discard its reading position.
+  const lastRefresh = useRef({ projectId, revision })
+  useEffect(() => {
+    const previous = lastRefresh.current
+    lastRefresh.current = { projectId, revision }
+    // The project effect owns the initial disk read (including a new project).
+    if (previous.projectId !== projectId || previous.revision === revision) return
+    let cancelled = false
+    void loadPracticeChart(projectId).then(value => {
+      if (!cancelled) setChart(value)
+    }).catch(() => { if (!cancelled) setError('Could not refresh this music.') })
+    return () => { cancelled = true }
+  }, [projectId, revision])
 
   const paperKey = chart ? `${projectId}:${chart.fileName}:${chart.bytes?.byteLength ?? 0}` : null
   useEffect(() => {
@@ -260,20 +278,18 @@ export default function PracticeChartLayer({
   useEffect(() => {
     const root = document.documentElement
     const clear = () => {
-      root.style.removeProperty('--music-page-top')
       root.style.removeProperty('--music-page-bottom')
+      root.style.removeProperty('--music-controls-top')
     }
     if (!showing) {
       clear()
       return
     }
     const apply = () => {
-      const tabs = document.querySelector(chromeHidden ? '.practice-chart-topbar' : '.audio-practice-top-tabs')
-      const top = tabs ? Math.max(0, Math.round(tabs.getBoundingClientRect().bottom)) : 0
-      if (top > 0) root.style.setProperty('--music-page-top', `${top}px`)
-      else root.style.removeProperty('--music-page-top')
-
-      const deck = document.querySelector('.app-hud-bottom')
+      const tabs = chromeHidden ? null : document.querySelector('.audio-practice-top-tabs')
+      if (tabs) root.style.setProperty('--music-controls-top', `${Math.round(tabs.getBoundingClientRect().bottom) + 8}px`)
+      else root.style.removeProperty('--music-controls-top')
+      const deck = chromeHidden ? null : document.querySelector('.app-hud-bottom')
       const deckTop = deck ? deck.getBoundingClientRect().top : 0
       const height = window.innerHeight
       const bottom = deckTop > 0 ? Math.max(0, Math.round(height - deckTop)) : 0
@@ -306,7 +322,7 @@ export default function PracticeChartLayer({
       window.visualViewport?.removeEventListener('resize', apply)
       clear()
     }
-  }, [showing, chromeHidden, workspaceOpen])
+  }, [showing, chromeHidden])
 
   // The turn zones are invisible on purpose — nothing may sit on the staff —
   // so they announce themselves once when the page comes up, then get out of
@@ -335,9 +351,10 @@ export default function PracticeChartLayer({
   }, [updateView])
 
   const handlePaperVisible = useCallback((next: boolean) => {
+    if (!next) { onClose(); return }
     setChartVisible(projectId, next)
     setPaperVisible(next)
-  }, [projectId])
+  }, [projectId, onClose])
 
   const handleError = useCallback((message: string) => setError(message), [])
 
@@ -550,6 +567,9 @@ export default function PracticeChartLayer({
           */}
         <div className="practice-chart-topbar">
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
+          <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>
+          <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
+          <button type="button" className="practice-chart-control" onClick={() => setPageToolsRequested(true)}><FileMusic aria-hidden /><span>Page</span></button>
           <button
             type="button"
             className="practice-chart-control practice-chart-control--start"
@@ -559,22 +579,12 @@ export default function PracticeChartLayer({
             {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-          {chromeOff && (
-            <button type="button" className="practice-chart-control" aria-expanded={workspaceOpen}
-              data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => setWorkspaceOpen(value => !value)}>
-              <Grid2X2 aria-hidden /><span>Workspace</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="practice-chart-control practice-chart-control--end"
-            onClick={onClose}
-          >
-            <X aria-hidden />
-            <span>Exit music</span>
+          <button type="button" className="practice-chart-control" aria-expanded={workspaceOpen}
+            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => setWorkspaceOpen(value => !value)}>
+            <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
         </div>
-        {chromeOff && workspaceOpen && (
+        {workspaceOpen && (
           <div className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => (
               <button key={key} type="button" aria-pressed={workspace[key]}
@@ -641,7 +651,7 @@ export default function PracticeChartLayer({
             </div>
           </div>
         ) : (
-          <div className={`practice-chart-hint${hint ? ' practice-chart-hint--on' : ''}`} aria-hidden>
+          <div className={`practice-chart-hint${hint ? ' practice-chart-hint--on' : ''}${chromeOff ? ' practice-chart-hint--with-record' : ''}`} aria-hidden>
             <span>Tap to turn back</span>
             <span>Tap to turn</span>
           </div>
@@ -679,6 +689,8 @@ export default function PracticeChartLayer({
     <MusicWidget
       boundaryRef={boundaryRef}
       visible={active}
+      expandRequest={pageToolsRequested}
+      onExpandRequestConsumed={() => setPageToolsRequested(false)}
       collapseResetKey={collapseResetKey}
       hasChart={chart !== null}
       fileName={chart?.fileName ?? null}

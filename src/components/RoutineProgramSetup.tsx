@@ -1,6 +1,6 @@
 import { loadTimelines } from '../practiceTimeline/storage/timelineStorage'
 
-export default function RoutineProgramSetup({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+export default function RoutineProgramSetup({ value, onChange, scope = 'routine' }: { value: string | null; onChange: (id: string | null) => void; scope?: 'routine' | 'score' }) {
   const programs = loadTimelines().filter(program => program.sections.length > 0)
   const selected = programs.find(program => program.id === value)
   const selectedLabel = !value
@@ -22,7 +22,9 @@ export default function RoutineProgramSetup({ value, onChange }: { value: string
       </select>
     </span>
     <small className="routine-tool__hint">{programs.length
-      ? 'A saved sequence of tempo changes. It is included when you share this routine. It loads paused — press Play on the routine bar to start it, and it never starts or stops a recording on its own.'
+      ? scope === 'score'
+        ? 'A saved sequence of tempo changes. It loads paused when you open this score; press Play on the metronome to start it.'
+        : 'A saved sequence of tempo changes. It is included when you share this routine. It loads paused — press Play on the routine bar to start it, and it never starts or stops a recording on its own.'
       : 'A program is a saved sequence of tempo changes. Build one in Metronome → Program, then attach it here.'}</small>
   </label>
 }

@@ -8,6 +8,7 @@ import Pressable from '../ui/Pressable'
  * and Practice is where you go *from* a tempo, not a peer of it.
  */
 const TABS: { id: AudioPracticeTab; label: string }[] = [
+  { id: 'music', label: 'Music' },
   { id: 'tuner', label: 'Tuner' },
   { id: 'metronome', label: 'Metronome' },
   { id: 'games', label: 'Games' },

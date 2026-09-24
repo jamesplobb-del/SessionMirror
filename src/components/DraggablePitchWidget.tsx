@@ -22,6 +22,7 @@ interface DraggablePitchWidgetProps extends TunerProps {
   expandRequest?: boolean
   onExpandRequestConsumed?: () => void
   visible?: boolean
+  dockRight?: boolean
   isAudioMode?: boolean
   liveMicEnabled?: boolean
   micStreamRef?: RefObject<MediaStream | null>
@@ -74,6 +75,7 @@ export default function DraggablePitchWidget({
   expandRequest,
   onExpandRequestConsumed,
   visible = true,
+  dockRight = false,
   isAudioMode = false,
   liveMicEnabled = true,
   micStreamRef,
@@ -200,7 +202,7 @@ export default function DraggablePitchWidget({
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
     positionId: resolvedPositionId, label: 'pitch', icon: <PitchToolIcon aria-hidden />, detail: 'Pitch',
     active: tunerProps.enabled !== false, resetKey: collapseResetKey, expandRequest,
-    onExpandRequestConsumed, ballSlot: 2, visible })
+    onExpandRequestConsumed, ballSlot: 2, visible, dockRight })
 
   const tuner = children ?? (
     <LivePitchTuner

@@ -40,6 +40,7 @@ interface DraggableDroneWidgetProps {
   expandRequest?: boolean
   onExpandRequestConsumed?: () => void
   visible?: boolean
+  dockRight?: boolean
 }
 
 const WIDGET_WIDTH = 268
@@ -70,6 +71,7 @@ export default function DraggableDroneWidget({
   expandRequest,
   onExpandRequestConsumed,
   visible = true,
+  dockRight = false,
 }: DraggableDroneWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragControls = useDragControls()
@@ -198,7 +200,7 @@ export default function DraggableDroneWidget({
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
     positionId, label: 'drone', icon: <DroneToolIcon aria-hidden />, detail: `Drone ${written.label}`,
     active: sounding, resetKey: collapseResetKey, expandRequest,
-    onExpandRequestConsumed, ballSlot: 1, visible })
+    onExpandRequestConsumed, ballSlot: 1, visible, dockRight })
 
   return (<>
     {fold.ball}

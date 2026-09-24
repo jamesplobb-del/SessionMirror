@@ -721,6 +721,27 @@ html#lens-design-system .app-shell--music-page .reference-widget-live {
   --widget-control:#f5faff;
   color:var(--widget-ink);
 }
+html#lens-design-system .app-shell--music-page .reference-widget-panel,
+html#lens-design-system .app-shell--music-page .reference-widget-media,
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-video-container,
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-video-container .ui-orient-spin,
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-video-container .relative,
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-empty-state {
+  background:#fff!important;
+  background-image:none!important;
+  color:#142b43!important;
+}
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-empty-state__body p,
+html#lens-design-system .app-shell--music-page .reference-widget-media .pip-empty-action {
+  color:#142b43!important;
+}
+html#lens-design-system .app-shell--music-page .reference-widget-media .relative:has(> .pip-empty-state) {
+  background:#fff!important;
+  background-image:none!important;
+  border-color:#d8e6f2!important;
+  box-shadow:none!important;
+  opacity:1!important;
+}
 html#lens-design-system .app-shell--music-page .reference-widget-media :is(.take-audio-surface,.take-media-surface,.pip-empty-state),
 html#lens-design-system .app-shell--music-page .reference-widget-media > .pip-video-container > .ui-orient-spin > .relative {
   background:transparent!important;

@@ -54,6 +54,8 @@ export interface RoutineStep {
   desk: DeskSnapshot | null
   /** Practice item for any tool/recording step. Bound on its first start. */
   projectId: string | null
+  /** Name shown in a received routine until the musician attaches their own score. */
+  sharedScoreName: string | null
   /** What to suggest when no reference has been selected yet. */
   referenceQuery: string
   /**
@@ -183,6 +185,7 @@ export function createStep(partial: Partial<RoutineStep> & { title: string }): R
     topic: partial.topic ?? 'other',
     desk: partial.desk ?? null,
     projectId: partial.projectId ?? null,
+    sharedScoreName: (partial.sharedScoreName ?? '').trim().slice(0, 180) || null,
     referenceQuery: (partial.referenceQuery ?? '').trim().slice(0, 80),
     referenceVideoId: /^[\w-]{11}$/.test(partial.referenceVideoId ?? '') ? partial.referenceVideoId! : null,
     programId: partial.programId ?? null,
@@ -255,6 +258,7 @@ export function parseStep(value: unknown): RoutineStep | null {
     topic: TOPICS.includes(raw.topic as RoutineTopic) ? (raw.topic as RoutineTopic) : 'other',
     desk: parseDesk(raw.desk),
     projectId: typeof raw.projectId === 'string' ? raw.projectId : null,
+    sharedScoreName: typeof raw.sharedScoreName === 'string' ? raw.sharedScoreName : null,
     referenceQuery: typeof raw.referenceQuery === 'string' ? raw.referenceQuery : '',
     referenceVideoId: typeof raw.referenceVideoId === 'string' ? raw.referenceVideoId : null,
     programId: typeof raw.programId === 'string' && raw.programId.trim() ? raw.programId : null,

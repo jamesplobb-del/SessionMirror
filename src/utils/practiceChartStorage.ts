@@ -5,10 +5,8 @@ import { CHARTS_DIR, initAppFilesystem, isFilesystemMissingError } from './files
 /**
  * The music for one practice item, kept beside that item's takes.
  *
- * One chart per project, on purpose. A vault project is already "the folder for
- * this excerpt" — Charlier 2 is that PDF, those takes and that best take — so
- * the file belongs to the folder rather than to a library the app would then
- * have to let you browse. Finding all your Mahler is forScore's job.
+ * One score per practice folder keeps the document, takes, and best take
+ * together. The Music library and routines both browse these same folders.
  */
 
 export interface PracticeChart {

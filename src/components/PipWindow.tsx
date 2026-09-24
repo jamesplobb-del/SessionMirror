@@ -30,6 +30,7 @@ import { updateTakePlaybackSpeakerGain } from '../utils/takePlaybackSpeaker'
 import type { RecordingOrientation } from '../utils/physicalOrientation'
 import { HUD_GLASS_FLOAT_BADGE, HUD_GLASS_PIP_PLAY_ICON } from '../utils/interactiveUx'
 import { isAudioMimeType } from '../utils/mobileVideo'
+import AudioTakePoster from './AudioTakePoster'
 
 interface PipWindowProps {
   layout?: 'pip' | 'fill'
@@ -73,10 +74,15 @@ interface PipWindowProps {
 function PipMediaPoster({
   posterUrl,
   isAudio = false,
+  cleanAudio = false,
+  name,
 }: {
   posterUrl?: string | null
   isAudio?: boolean
+  cleanAudio?: boolean
+  name?: string | null
 }) {
+  if (isAudio && cleanAudio) return <AudioTakePoster name={name} />
   return (
     <div
       className={`absolute inset-0 h-full w-full ${
@@ -104,7 +110,7 @@ function PipWindow({
   filePath = '',
   mimeType = 'video/mp4',
   label,
-  takeName: _takeName,
+  takeName,
   variant,
   emptyMessage,
   mirror = true,
@@ -638,17 +644,17 @@ function PipWindow({
                   audible={playbackAudible}
                 />
               )}
-              {(useNativePipPlayback || !isPlaying) && (
-                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} />
+              {((isAudioMedia && isFill) || useNativePipPlayback || !isPlaying) && (
+                <PipMediaPoster posterUrl={posterUrl} isAudio={isAudioMedia} cleanAudio={isFill} name={takeName} />
               )}
 
-            {!compact && onExpand && (
+            {!compact && (onExpand || dragSourceProps) && (
               dragSourceProps ? (
                 <div
                   role="button"
                   tabIndex={0}
                   className="pip-drag-layer absolute inset-0 z-[1] cursor-grab touch-none select-none border-0 bg-transparent p-0 active:cursor-grabbing"
-                  aria-label={`Drag ${label} to Best Take, or tap to open full screen`}
+                  aria-label={`Drag ${label} to Best Take`}
                   {...dragSourceProps}
                 />
               ) : (
@@ -659,7 +665,7 @@ function PipWindow({
                   haptic="light"
                   className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                   onClick={handleVideoAreaClick}
-                  aria-label={`Open ${label} in full screen`}
+                  aria-label={`Open Expand View with ${label}`}
                 />
               )
             )}

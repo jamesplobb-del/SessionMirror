@@ -795,3 +795,24 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 .routine-metronome-screen__save { justify-self: end; padding-inline: 4px; }
 .routine-metronome-screen__stage { display: flex; width: min(100%, 48rem); min-height: 0; flex: 1; flex-direction: column; margin-inline: auto; padding: 0 12px 10px; }
 .routine-metronome-screen.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .audio-practice-metronome__select-row--primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (min-width: 744px) and (min-height: 600px) {
+  .routine-metronome-screen__header {
+    width: min(calc(100% - 64px), 960px);
+    min-height: 84px;
+    padding-inline: 0;
+  }
+  .routine-metronome-screen__stage {
+    width: min(calc(100% - 64px), 960px);
+    padding: 0 0 18px;
+  }
+  .routine-metronome-screen.app-ui-overlay--audio-mode .audio-practice-metronome__body {
+    width: 100%;
+    max-width: 56rem;
+  }
+  .routine-metronome-screen.app-ui-overlay--audio-mode .audio-practice-metronome__tempo-strip,
+  .routine-metronome-screen.app-ui-overlay--audio-mode .audio-practice-metronome__selectors {
+    width: min(100%, 50rem);
+    max-width: 50rem;
+  }
+}

@@ -167,6 +167,14 @@ export function summarizeDesk(
 
 /* ---- Focus sessions remember their own desk ---------------------------- */
 
+export function normalizeDeskSnapshot(value: unknown): DeskSnapshot | null {
+  if (!value || typeof value !== 'object') return null
+  const parsed = parseDesk({ ...value, id: 'snapshot', name: 'Snapshot' })
+  if (!parsed) return null
+  const { id: _id, name: _name, savedAt: _savedAt, ...snapshot } = parsed
+  return snapshot
+}
+
 export function loadFocusDesk(projectId: string): DeskSnapshot | null {
   try {
     const raw = localStorage.getItem(`${FOCUS_DESK_PREFIX}${projectId}`)

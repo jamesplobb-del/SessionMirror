@@ -51,6 +51,8 @@ interface PitchInsightsScreenProps {
   tunerInstrument?: TunerInstrument
   formatNoteName?: (midiNote: number, fallback: string) => string
   hapticFeedback?: boolean
+  ensembleMode?: boolean
+  onEnsembleModeChange?: (enabled: boolean) => void
 }
 
 interface CentsGraphPoint {
@@ -1028,6 +1030,8 @@ export default function PitchInsightsScreen({
   tunerInstrument,
   formatNoteName = (_midiNote, fallback) => fallback,
   hapticFeedback = true,
+  ensembleMode = false,
+  onEnsembleModeChange,
 }: PitchInsightsScreenProps) {
   const { showAlert, showConfirm } = useActionSheet()
   const [observations, setObservations] = useState<PitchObservation[]>([])
@@ -1409,6 +1413,18 @@ export default function PitchInsightsScreen({
         </header>
 
         <div className="pitch-insights-screen__scroll">
+
+          {!selected && !selectedDay && !overviewRoute && onEnsembleModeChange ? (
+            <section className="pitch-insights-ensemble-setting" aria-label="Ensemble mode">
+              <div>
+                <strong>Playing with others?</strong>
+                <p>Ensemble mode pauses automatic Insights. Measure one held note in the tuner, then confirm it before saving. The live tuner still hears the whole room.</p>
+              </div>
+              <button type="button" role="switch" aria-checked={ensembleMode} onClick={() => onEnsembleModeChange(!ensembleMode)}>
+                {ensembleMode ? 'On' : 'Off'}
+              </button>
+            </section>
+          ) : null}
 
           <AnimatePresence mode="wait">
             {selected ? (

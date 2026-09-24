@@ -9,10 +9,11 @@ import {
 import { isRoutineFileName } from './routineFile'
 import { importRoutineFromText } from './timelineStorage'
 import {
-  importPracticePlanFromText,
+  importPracticePlanFileFromText,
   isPracticePlanFileName,
 } from '../../utils/practiceRoutineShare'
 import type { PracticeTimeline } from '../types'
+import type { Routine } from '../../utils/practiceRoutines'
 
 /**
  * Opening a routine someone sent you.
@@ -38,8 +39,10 @@ export type RoutineOpenEvent =
   | { id: string; status: 'failed'; error: string }
 
 let pending: RoutineOpenEvent | null = null
+let pendingPracticePlan: Routine | null = null
 let initialized = false
 const subscribers = new Set<() => void>()
+const practicePlanSubscribers = new Set<() => void>()
 /* iOS can deliver the same launch URL through both getLaunchUrl and the
  * listener; importing twice would leave two copies in the library. */
 const handledUrls = new Set<string>()
@@ -90,6 +93,21 @@ export function clearRoutineOpen(id: string): void {
   if (pending?.id !== id) return
   pending = null
   for (const subscriber of subscribers) subscriber()
+}
+
+/** Keep a file-opened practice plan until the app shell can show its music slots. */
+export function subscribePracticePlanOpen(callback: () => void): () => void {
+  practicePlanSubscribers.add(callback)
+  return () => practicePlanSubscribers.delete(callback)
+}
+
+export function getPendingPracticePlanOpen(): Routine | null {
+  return pendingPracticePlan
+}
+
+export function clearPracticePlanOpen(id: string): void {
+  if (pendingPracticePlan?.id !== id) return
+  pendingPracticePlan = null
 }
 
 function looksLikeFileUrl(url: string): boolean {
@@ -149,13 +167,17 @@ async function handleIncomingUrl(url: string): Promise<void> {
   }
 
   if (isPracticePlan) {
-    const plan = importPracticePlanFromText(text)
+    const plan = await importPracticePlanFileFromText(text)
     void discardInboxCopy(url)
+    if (plan.ok) {
+      pendingPracticePlan = plan.routine
+      for (const subscriber of practicePlanSubscribers) subscriber()
+    }
     announce(
       plan.ok
         ? {
             title: 'Routine Added',
-            message: `"${plan.routine.name}" is in your routines. Open Practice Home to start it.`,
+            message: `"${plan.routine.name}" is ready to set up. Add your music to its score slots, then start practicing.`,
             tone: 'success',
           }
         : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },

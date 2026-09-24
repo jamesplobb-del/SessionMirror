@@ -82,7 +82,7 @@ interface PracticeHubProps {
   onOpenVault: () => void
   onOpenTuner: () => void
   onOpenMetronome: () => void
-  /** Opens Music as its own room, not as a Tools tab. */
+  /** Opens the Music library in the first Tools tab. */
   onOpenMusic?: () => void
 
   /* ---- Daily routine ---- */
@@ -395,6 +395,7 @@ export default function PracticeHub({
                     transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
                   >
                     <MusicRoutineBuilder
+                      key={routine?.id ?? 'new-routine'}
                       mode={routineBuilderRequest}
                       routine={routine}
                       instrumentId={instrumentId}

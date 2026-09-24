@@ -15,6 +15,8 @@ export interface RoutineBuilderProps {
   tunerTransposition: TunerTranspositionId
   hapticFeedback: boolean
   onSave: (routine: Routine) => void
+  /** Show a received music routine in the music-first lineup. */
+  onOpenSharedRoutine?: (routine: Routine) => void
   /**
    * Binds a step to its own practice folder on demand — the moment music is
    * chosen for a step that does not have one yet.
