@@ -38,3 +38,20 @@
   .music-library__score-open>.music-library__setup-panel{grid-column:2;grid-row:1;padding:2px 0 4px 28px;border-left:1px solid var(--ml-line)}
 }
 @media(max-width:600px){.music-library__header{align-items:flex-start;flex-wrap:wrap}.music-library__header-actions{width:100%;justify-content:flex-start}.music-library__count>span{max-width:160px;text-align:right}.music-library__new-folder,.music-library button.music-library__import{min-height:44px}.music-library__folders{grid-template-columns:repeat(2,minmax(0,1fr))}.music-library__folder-open{gap:6px;padding-left:9px}.music-library__folder-open>svg:first-child{width:19px;height:19px}.music-library__folder-open>svg:last-child{display:none}}
+
+.music-library__selection{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:-3px 0 16px;color:var(--ml-muted);font-size:12px}
+.music-library__selection>span{flex:1;min-width:105px}
+.music-library__selection>button{min-height:44px;padding:0 10px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);color:var(--ml-accent);font-weight:600;font-size:12px}
+.music-library__selection>.music-library__delete-selected{display:flex;align-items:center;gap:6px;color:#a23d49}
+.music-library__delete-selected svg,.music-library__remove-score svg{width:16px;height:16px}
+.music-library__list>li.music-library__score-selected{border-color:var(--ml-accent);background:color-mix(in srgb,var(--ml-accent) 6%,var(--ml-panel))}
+.music-library__select-mark{display:grid;place-items:center;width:23px;height:23px;flex:none;border:1.5px solid var(--ml-muted);border-radius:50%;background:var(--ml-panel)}
+.music-library__score[aria-pressed=true] .music-library__select-mark{border-color:var(--ml-accent);background:var(--ml-accent);color:white}
+.music-library__select-mark svg{width:15px;height:15px;stroke-width:2.7}
+.music-library__remove-score{display:flex;align-items:center;gap:7px;min-height:44px;margin-top:12px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#a23d49!important;font-size:12px;font-weight:600}
+.music-library__delete-confirm{margin:0 0 16px;padding:16px;border:1px solid #e7c7cb;border-radius:14px;background:#fff6f7;box-shadow:0 8px 22px #261b2010}
+.music-library__delete-confirm strong{display:block;font-size:15px;color:var(--ml-ink,#1d3049)}
+.music-library__delete-confirm p{margin:8px 0 14px;font-size:12px;line-height:1.5;color:var(--ml-muted)}
+.music-library__delete-confirm>div{display:flex;justify-content:flex-end;gap:8px}
+.music-library__delete-confirm button{min-height:44px;padding:0 14px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);font-size:12px;font-weight:600}
+.music-library__delete-confirm .music-library__delete-confirm-action{border-color:#a23d49;background:#a23d49;color:#fff}

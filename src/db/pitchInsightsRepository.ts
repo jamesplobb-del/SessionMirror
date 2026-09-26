@@ -7,6 +7,7 @@ export type PitchInsightsUpdatedDetail =
   | { kind: 'saved'; observation: PitchObservation }
   | { kind: 'cleared' }
   | { kind: 'range-deleted'; startAt: number; endAt: number }
+  | { kind: 'session-range-deleted'; sessionId: string; startAt: number; endAt: number }
 
 export interface PitchObservation {
   id: string
@@ -168,5 +169,26 @@ export function deletePitchObservationsInRange(
     )
     await persistVaultWebStore()
     dispatchInsightsUpdated({ kind: 'range-deleted', startAt, endAt })
+  })
+}
+
+/** Removes only the readings from this tuner's noisy stretch. */
+export function deletePitchObservationsForSessionRange(
+  sessionId: string,
+  startAt: number,
+  endAt: number,
+): Promise<void> {
+  if (!sessionId || !Number.isFinite(startAt) || !Number.isFinite(endAt) || endAt <= startAt) {
+    return Promise.reject(new Error('Pitch Insights session cleanup range is invalid.'))
+  }
+
+  return enqueueWrite(async () => {
+    const db = await initVaultDatabase()
+    await db.run(
+      'DELETE FROM pitch_observations WHERE session_id = ? AND observed_at >= ? AND observed_at < ?',
+      [sessionId, Math.round(startAt), Math.round(endAt)],
+    )
+    await persistVaultWebStore()
+    dispatchInsightsUpdated({ kind: 'session-range-deleted', sessionId, startAt, endAt })
   })
 }

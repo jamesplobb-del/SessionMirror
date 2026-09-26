@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT_STYLE } from '../layout/quietWorkspaceLayout'
+import { DEFAULT_LAYOUT_STYLE, withPortraitLayout } from '../layout/quietWorkspaceLayout'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { Take } from '../../types'
 import {
@@ -51,6 +51,10 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   const lastEditAt = useRef(0)
   const [canUndo, setCanUndo] = useState(false)
   const [projects, setProjects] = useState(listMultitrackProjects)
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
+  const saveRevision = useRef(0)
+  const switchingRef = useRef(false)
+  const retryingRef = useRef(false)
   const setSession = useCallback((action: SetStateAction<MultitrackSession>) => {
     const prev = sessionRef.current
     const next = typeof action === 'function' ? action(prev) : action
@@ -59,13 +63,19 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     if (now - lastEditAt.current > 350 || !history.current.length) history.current = [...history.current.slice(-39), prev]
     lastEditAt.current = now
     setCanUndo(true)
+    saveRevision.current += 1
+    setSaveStatus('saving')
     sessionRef.current = next
     commitSession(next)
   }, [])
   const undo = useCallback(() => {
     lastEditAt.current = 0
     const prev = history.current.pop()
-    if (prev) { sessionRef.current = prev; commitSession(prev) }
+    if (prev) {
+      saveRevision.current += 1
+      setSaveStatus('saving')
+      sessionRef.current = prev; commitSession(prev)
+    }
     setCanUndo(history.current.length > 0)
   }, [])
   const hydratedRef = useRef(false)
@@ -85,6 +95,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
         commitSession(restored)
         if (restored.projectId) selectMultitrackProject(restored.projectId)
         setPersistenceNotice(restored.recoveryNotice ?? null)
+        setSaveStatus('saved')
       }
       hydratedRef.current = true
       setHydrated(true)
@@ -97,31 +108,52 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   // Serialize snapshots: a slow file import must not overwrite a later edit.
   useEffect(() => {
     if (!hydrated) return
+    const revision = saveRevision.current
     const timer = window.setTimeout(() => {
+      if (switchingRef.current || sessionRef.current !== session) return
       saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
         await saveMultitrackSession(session)
         if (session.projectId && sessionRef.current.projectId === session.projectId) selectMultitrackProject(session.projectId)
         setProjects(listMultitrackProjects())
-        setPersistenceNotice(prev => prev?.startsWith('Workspace could not be saved') ? null : prev)
+        if (revision === saveRevision.current) {
+          setSaveStatus('saved')
+          setPersistenceNotice(prev => prev?.startsWith('Workspace could not be saved') ? null : prev)
+        }
       })
-      void saveQueue.current.catch(() => setPersistenceNotice('Workspace could not be saved. Keep it open and try again.'))
+      void saveQueue.current.catch(() => {
+        if (revision === saveRevision.current) {
+          setSaveStatus('error')
+          setPersistenceNotice('Workspace could not be saved. Keep it open and try again.')
+        }
+      })
     }, 200)
     return () => window.clearTimeout(timer)
   }, [session, hydrated])
 
+  const retrySave = useCallback(async () => {
+    if (switchingRef.current || retryingRef.current || !hydratedRef.current) return
+    retryingRef.current = true
+    const snapshot = sessionRef.current
+    const revision = saveRevision.current
+    setSaveStatus('saving')
+    try {
+      const task = saveQueue.current.catch(() => {}).then(() => saveMultitrackSession(snapshot))
+      saveQueue.current = task
+      await task
+      if (sessionRef.current !== snapshot || saveRevision.current !== revision) return
+      if (snapshot.projectId) selectMultitrackProject(snapshot.projectId)
+      setProjects(listMultitrackProjects())
+      setSaveStatus('saved')
+      setPersistenceNotice(prev => prev?.startsWith('Workspace could not be saved') ? null : prev)
+    } catch {
+      if (sessionRef.current !== snapshot || saveRevision.current !== revision) return
+      setSaveStatus('error')
+      setPersistenceNotice('Workspace could not be saved. Keep it open and try again.')
+    } finally { retryingRef.current = false }
+  }, [])
+
   const setLayout = useCallback((layoutId: string) => {
-    const preset = getLayoutPreset(layoutId)
-    setSession((prev) => ({
-      ...prev,
-      layoutId,
-      panels: (() => {
-        const base = prev.panels.filter(p => p.kind === 'performance' && !p.overlay)
-        const overlays = prev.panels.filter(p => p.kind === 'performance' && p.overlay)
-        const available = MULTITRACK_PANEL_SLOT_IDS.filter(id => !prev.panels.some(p => p.id === id))
-        while (base.length < preset.panelCount && available.length) base.push({ kind: 'performance', id: available.shift()!, take: null })
-        return [...base.map((p, i) => ({ ...p, hidden: i >= preset.panelCount })), ...overlays]
-      })(),
-    }))
+    setSession((prev) => withPortraitLayout(prev, layoutId))
   }, [])
 
   /**
@@ -199,10 +231,16 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
       return { ...prev, panels }
     })
   }, [setSession])
-  const openProject = useCallback(async (id?: string, duplicate = false) => {
+  const openProject = useCallback(async (id?: string, duplicate = false): Promise<boolean> => {
+    if (switchingRef.current) return false
+    switchingRef.current = true
+    saveRevision.current += 1
+    setSaveStatus('saving')
+    let currentSaved = false
     try {
       await saveQueue.current.catch(() => {})
       await saveMultitrackSession(sessionRef.current)
+      currentSaved = true
       const next = id ? await loadMultitrackSession(takes, id) : duplicate
         ? { ...sessionRef.current, projectId: crypto.randomUUID(), name: `${sessionRef.current.name || 'Performance'} copy` }
         : createInitialSession()
@@ -210,27 +248,47 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
       await saveMultitrackSession(next)
       selectMultitrackProject(next.projectId!)
       sessionRef.current = next; commitSession(next); history.current = []; setCanUndo(false)
-      setProjects(listMultitrackProjects()); setPersistenceNotice(null)
-    } catch { setPersistenceNotice('Could not switch projects. Your current performance is still open.') }
+      setProjects(listMultitrackProjects()); setPersistenceNotice(next.recoveryNotice ?? null); setSaveStatus('saved')
+      return true
+    } catch {
+      setSaveStatus(currentSaved ? 'saved' : 'error')
+      setPersistenceNotice(currentSaved
+        ? 'Could not open that project. Your current performance is still open.'
+        : 'Workspace could not be saved. Your current performance is still open.')
+      return false
+    } finally { switchingRef.current = false }
   }, [takes])
 
   const importProject = useCallback(async (next: MultitrackSession) => {
-    await saveQueue.current.catch(() => {})
-    await saveMultitrackSession(sessionRef.current)
-    const keys = [`sm.multitrack.session.v1.${next.projectId}`, 'sm.multitrack.projects.v2', 'sm.multitrack.active.v2']
-    const previous = keys.map(key => localStorage.getItem(key))
+    if (switchingRef.current) throw new Error('Wait for the current project to finish opening.')
+    switchingRef.current = true
+    saveRevision.current += 1
+    setSaveStatus('saving')
+    let currentSaved = false
     try {
-      await saveMultitrackSession(next)
-      selectMultitrackProject(next.projectId!)
+      await saveQueue.current.catch(() => {})
+      await saveMultitrackSession(sessionRef.current)
+      currentSaved = true
+      setSaveStatus('saved')
+      const keys = [`sm.multitrack.session.v1.${next.projectId}`, 'sm.multitrack.projects.v2', 'sm.multitrack.active.v2']
+      const previous = keys.map(key => localStorage.getItem(key))
+      try {
+        await saveMultitrackSession(next)
+        selectMultitrackProject(next.projectId!)
+      } catch (error) {
+        keys.forEach((key, index) => {
+          try { const value = previous[index]; if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) } catch { /* Preserve the original storage error. */ }
+        })
+        throw error
+      }
+      sessionRef.current = next; commitSession(next)
+      history.current = []; setCanUndo(false)
+      setProjects(listMultitrackProjects()); setPersistenceNotice(null); setSaveStatus('saved')
     } catch (error) {
-      keys.forEach((key, index) => {
-        try { const value = previous[index]; if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) } catch { /* Preserve the original storage error. */ }
-      })
+      setSaveStatus(currentSaved ? 'saved' : 'error')
+      if (!currentSaved) setPersistenceNotice('Workspace could not be saved. Keep it open and try again.')
       throw error
-    }
-    sessionRef.current = next; commitSession(next)
-    history.current = []; setCanUndo(false)
-    setProjects(listMultitrackProjects()); setPersistenceNotice(null)
+    } finally { switchingRef.current = false }
   }, [])
 
   const setPanelVolume = useCallback((panelId: string, volume: number) => {
@@ -353,7 +411,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
 
   return {
     session, projects, openProject, importProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
-    persistenceNotice,
+    persistenceNotice, saveStatus, retrySave,
     isRestoring: !hydrated,
     layout,
     setLayout,

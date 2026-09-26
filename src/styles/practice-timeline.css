@@ -2295,3 +2295,374 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Focused program cards: show the next decision clearly and keep depth on demand. */
+.practice-timeline__hero {
+  padding-bottom: 0.65rem;
+}
+
+.practice-timeline__hero-name {
+  flex: 1;
+}
+
+.practice-timeline__saved-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--audio-divider);
+  border-radius: 0.85rem;
+  background: var(--audio-surface);
+  color: var(--audio-text-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.practice-timeline__saved-link:disabled {
+  opacity: 0.45;
+}
+
+.practice-timeline__builder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.practice-timeline__section-card {
+  padding: 0.65rem 0.7rem;
+}
+
+.practice-timeline__section-header {
+  gap: 0.45rem;
+}
+
+.practice-timeline__section-number {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.72rem;
+  background: var(--audio-blue-soft);
+  color: var(--audio-blue);
+  font-size: 0.8rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-timeline__section-title-button {
+  min-height: 3.35rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding: 0.15rem 0;
+}
+
+.practice-timeline__section-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.practice-timeline__section-title {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.2;
+}
+
+.practice-timeline__section-compact-meta,
+.practice-timeline__section-compact-detail {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--audio-text-secondary);
+  font-size: 0.71rem;
+  font-weight: 600;
+  line-height: 1.28;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-timeline__section-compact-detail {
+  color: var(--audio-blue);
+}
+
+.practice-timeline__section-tempo {
+  flex-shrink: 0;
+  color: var(--audio-text-primary);
+  font-size: 1.42rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+}
+
+.practice-timeline__section-tempo small {
+  color: var(--audio-text-secondary);
+  font-size: 0.61rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.practice-timeline__section-more {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.8rem;
+}
+
+.practice-timeline__section-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+}
+
+.practice-timeline__section-action {
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.25rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.practice-timeline__add-btn {
+  min-height: 3.1rem;
+  margin-top: 0.1rem;
+  background: transparent;
+  font-size: 0.88rem;
+}
+
+.practice-timeline__setup {
+  margin-top: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.practice-timeline__setup .practice-timeline__playback-options {
+  margin: 0;
+}
+
+.practice-timeline__playback-options-toggle {
+  min-height: 3.2rem;
+  padding: 0.58rem 0.85rem;
+}
+
+.app-ui-overlay--audio-practice-timeline:not(.app-ui-overlay--practice-session-active)
+  .practice-timeline__track-settings .practice-timeline__record-toggle {
+  min-height: 3.5rem;
+  margin: 0.6rem 0 0;
+  padding: 0.65rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--audio-divider);
+  border-radius: 0;
+  background: transparent;
+}
+
+.practice-timeline__footer-btn--primary {
+  flex: 1;
+}
+
+/* Section editor: essentials first, detail disclosed in one place. */
+.practice-timeline-editor__content {
+  padding-top: 1.15rem;
+}
+
+.practice-timeline-editor__focus {
+  margin-bottom: 0.8rem;
+}
+
+.practice-timeline-editor__name-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.practice-timeline-editor__focus-name {
+  width: 100%;
+  min-height: 3.1rem;
+  margin-bottom: 0.85rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--audio-divider);
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--audio-text-primary);
+  font-size: clamp(1.5rem, 5vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.practice-timeline-editor__focus-name:focus {
+  border-bottom-color: var(--audio-blue);
+}
+
+.practice-timeline-editor__focus-tempo {
+  padding: 1rem;
+  border: 1px solid var(--audio-blue-border);
+  border-radius: var(--audio-radius-card);
+  background: color-mix(in srgb, var(--audio-blue-soft) 50%, var(--audio-surface));
+}
+
+.practice-timeline-editor__focus-tempo-label {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--audio-text-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.practice-timeline-editor__focus-tempo-label small {
+  margin-left: 0.2rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.69rem;
+  font-weight: 600;
+}
+
+.practice-timeline-editor__focus-tempo .practice-timeline-editor__stepper {
+  justify-content: center;
+  gap: 1.1rem;
+}
+
+.practice-timeline-editor__focus-tempo .practice-timeline-editor__stepper-btn {
+  width: 3rem;
+  height: 3rem;
+  border-color: var(--audio-blue-border);
+  background: var(--audio-surface);
+  color: var(--audio-blue);
+  font-size: 1.5rem;
+}
+
+.practice-timeline-editor__focus-tempo .practice-timeline-editor__focus-bpm {
+  flex: 0 1 6.5rem;
+  min-width: 3.5rem;
+  color: var(--audio-text-primary);
+  font-size: clamp(2.55rem, 10vw, 3.3rem);
+  font-weight: 800;
+  letter-spacing: -0.06em;
+}
+
+.practice-timeline-editor__essentials {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.practice-timeline-editor__essential,
+.practice-timeline-editor__pattern-summary {
+  min-width: 0;
+  min-height: 5.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--audio-divider);
+  border-radius: 0.95rem;
+  background: var(--audio-surface);
+}
+
+.practice-timeline-editor__essential > span,
+.practice-timeline-editor__pattern-summary > span {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.practice-timeline-editor__essential .practice-timeline-editor__stepper-value {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0;
+  text-align: left;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.practice-timeline-editor__essential .practice-timeline-editor__stepper-value-suffix {
+  margin-left: 0.18rem;
+  font-size: 0.57em;
+}
+
+.app-ui-overlay--audio-mode .practice-timeline-editor__essential .metronome-audio-select__label {
+  margin-bottom: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.app-ui-overlay--audio-mode .practice-timeline-editor__essential .metronome-audio-select__control {
+  min-height: 2.75rem;
+  padding: 0.35rem 1.25rem 0.35rem 0;
+  border: 0;
+  background: transparent;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+
+.app-ui-overlay--audio-mode .practice-timeline-editor__essential .metronome-audio-select__chevron {
+  right: 0;
+}
+
+.practice-timeline-editor__essential .metronome-audio-select--open {
+  z-index: 12;
+}
+
+.practice-timeline-editor__essentials:has(.practice-timeline-editor__pattern-summary) {
+  grid-template-columns: minmax(0, 2fr) minmax(6rem, 1fr);
+}
+
+.practice-timeline-editor__pattern-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+}
+
+.practice-timeline-editor__pattern-summary strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--audio-text-primary);
+  font-size: 0.85rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.practice-timeline-editor__pattern-summary small {
+  margin-top: 0.15rem;
+  color: var(--audio-text-secondary);
+  font-size: 0.66rem;
+}
+
+.practice-timeline-editor__advanced-toggle {
+  min-height: 3.8rem;
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+}
+
+@media (max-width: 355px) {
+  .practice-timeline-editor__essentials {
+    gap: 0.35rem;
+  }
+
+  .practice-timeline-editor__essential {
+    padding: 0.5rem;
+  }
+
+  .app-ui-overlay--audio-mode .practice-timeline-editor__essential .metronome-audio-select__control {
+    font-size: 0.93rem;
+  }
+}

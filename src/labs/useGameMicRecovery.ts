@@ -34,6 +34,7 @@ import {
   isAppInForeground,
   subscribeAppForeground,
 } from '../utils/appForeground'
+import { isNativeCaptureSessionActive } from '../utils/cameraSessionState'
 
 /**
  * `false` means "not mine yet, ask again" — the shared camera lifecycle owns
@@ -80,6 +81,9 @@ function waitMs(ms: number): Promise<void> {
 
 /** The test the pitch tracker applies before it will listen to a stream. */
 function micStreamIsLive(stream: MediaStream | null | undefined): boolean {
+  // On iOS, Pitch Analysis and the games can listen through AVCapture's PCM
+  // tap. WebKit's stream is often absent while that native mic is healthy.
+  if (isNativeCaptureSessionActive()) return true
   return Boolean(
     stream?.active &&
       stream

@@ -15,15 +15,18 @@
 .music-routine-heading h2{font-size:32px;letter-spacing:-1.2px;font-weight:550;line-height:1.12;margin:10px 0 12px;color:var(--mr-ink)}
 .music-routine-heading p{font-size:12px;line-height:1.6;color:var(--mr-muted);margin:0}
 .music-routine-heading--compact{padding:19px 0 12px}.music-routine-heading--compact h2{font-size:29px;margin-bottom:6px}
-.music-routine-import{text-align:center;padding:0 0 26px;max-width:420px;margin:0 auto}
+.music-routine-start-actions{padding:0 0 22px}
 .music-routine-builder .music-routine-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:49px;padding:12px 18px;width:100%;background:var(--mr-blue);color:white;border-radius:14px;font-size:14px;font-weight:600}
 html.app-dark-mode .music-routine-builder .music-routine-primary{color:#142b43}
 .music-routine-primary svg{width:17px;height:17px}
-.music-routine-import>p{font-size:11px;color:var(--mr-muted);margin:10px 0 0}
+.music-routine-import-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.music-routine-builder .music-routine-import-actions>button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:47px;padding:10px 8px;border:1px solid var(--mr-line);border-radius:13px;background:var(--mr-panel);color:var(--mr-ink);font-size:12px;font-weight:600}
+.music-routine-import-actions svg{width:16px;height:16px;flex:none;color:var(--mr-blue)}
+.music-routine-start-actions>p{font-size:11px;color:var(--mr-muted);margin:10px 0 0;text-align:center}
 .music-routine-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .music-routine-section-title>div{min-width:0}.music-routine-section-title h3{margin:0;font-size:12px!important;font-weight:600!important;color:var(--mr-ink)}
 .music-routine-section-title>span,.music-routine-section-title>div>span{display:block;margin-top:3px;font-size:10px;color:var(--mr-muted)}
-.music-routine-import-more{display:flex;align-items:center;gap:6px;min-height:40px;padding:7px 2px!important;color:var(--mr-blue)!important;font-size:11px;font-weight:600;flex:none}.music-routine-import-more svg{width:15px;height:15px}
+.music-routine-recent{margin:18px 0}
 .music-routine-recent-row{display:flex;align-items:center;gap:12px;text-align:left;min-height:72px;width:100%;padding:10px 0!important;border-bottom:1px solid var(--mr-line)!important}
 .music-routine-recent-row>span:not(.music-routine-thumb):not(.music-routine-select){flex:1;min-width:0}.music-routine-recent-row strong{font-size:13px;font-weight:600;display:block;overflow-wrap:anywhere}.music-routine-recent-row small{display:block;font-size:10px;color:var(--mr-muted);margin-top:4px;line-height:1.5}
 .music-routine-select{display:grid;place-items:center;width:27px;height:27px;flex:none;border:1px solid var(--mr-line);border-radius:50%;color:var(--mr-muted)}.music-routine-select svg{width:14px;height:14px}.music-routine-recent-row[aria-pressed=true] .music-routine-select{border-color:var(--mr-blue);background:var(--mr-blue);color:white}.music-routine-recent-row[aria-pressed=true] strong{color:var(--mr-blue)}
@@ -60,7 +63,7 @@ html.app-dark-mode .music-routine-builder .music-routine-primary{color:#142b43}
   .music-routine-content{width:min(100%,960px)}
   .music-routine-heading{padding:34px 0 26px}.music-routine-heading h2{font-size:44px;letter-spacing:-1.6px;margin-top:12px}.music-routine-heading p{max-width:620px;font-size:15px}
   .music-routine-heading--compact{padding-bottom:18px}.music-routine-heading--compact h2{font-size:38px}
-  .music-routine-import{max-width:520px;padding-top:12px}.music-routine-builder .music-routine-primary{min-height:56px;font-size:15px}
+  .music-routine-start-actions{max-width:520px;padding-top:12px}.music-routine-builder .music-routine-primary{min-height:56px;font-size:15px}
   .music-routine-recent{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
   .music-routine-recent>.music-routine-section-title{grid-column:1/-1;margin-bottom:2px}
   .music-routine-recent-row{min-height:82px;padding:12px 14px!important;border:1px solid var(--mr-line)!important;border-radius:14px;background:var(--mr-panel)!important}

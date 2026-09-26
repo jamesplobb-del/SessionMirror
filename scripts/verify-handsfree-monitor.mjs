@@ -19,7 +19,7 @@ const hooks = {
  useEffect(fn,deps){const i=cursor++;if(!slots[i]||changed(slots[i].deps,deps)){const old=slots[i];slots[i]={deps,cleanup:old?.cleanup};effects.push(()=>{slots[i].cleanup?.();slots[i].cleanup=fn()})}},
 }
 hooks.useLayoutEffect=hooks.useEffect
-globalThis.__handsfreeTest={hooks,context,metrics:()=>({rms,peak:rms})}
+globalThis.__handsfreeTest={hooks,context,metrics:()=>({rms,peak:rms}),metronomePlaying:false,metronomeTick:null}
 const stubs = {
  'react': 'export const {useRef,useState,useCallback,useEffect,useLayoutEffect}=globalThis.__handsfreeTest.hooks',
  'audioLevel': 'export const readAnalyserMetrics=()=>globalThis.__handsfreeTest.metrics(); export const combinedGateLevel=m=>m.rms',
@@ -28,8 +28,8 @@ const stubs = {
  'playbackAudioContext': 'export const getPlaybackAudioContext=async()=>{if(globalThis.__handsfreeTest.failSetup)throw Error("mic unavailable");if(globalThis.__handsfreeTest.setupGate)await globalThis.__handsfreeTest.setupGate;return globalThis.__handsfreeTest.context}; export const isSharedPlaybackContext=()=>true',
  'nativeAudioPitchTap': 'export const acquireNativeAudioTap=async()=>{}; export const releaseNativeAudioTap=async()=>{}; export const subscribeNativeAudioPitchFrames=async(fn)=>{globalThis.__handsfreeTest.nativeListener=fn;return {remove:async()=>{if(globalThis.__handsfreeTest.nativeListener===fn)globalThis.__handsfreeTest.nativeListener=null}}}',
  'cameraSessionState': 'export const isNativeCameraPreviewActive=()=>false; export const isNativeCaptureSessionActive=()=>globalThis.__handsfreeTest.nativeSession?.()??false',
- 'sharedMetronomeEngine': 'export const sharedMetronomeEngine={subscribeTick:()=>()=>{},getSnapshot:()=>({playing:false})}',
- 'autoRecordPlayback': 'export const AUTO_RECORD_MAX_IDLE_PREROLL_MS=20000',
+ 'sharedMetronomeEngine': 'export const sharedMetronomeEngine={subscribeTick:fn=>{globalThis.__handsfreeTest.metronomeTick=fn;return ()=>{if(globalThis.__handsfreeTest.metronomeTick===fn)globalThis.__handsfreeTest.metronomeTick=null}},getSnapshot:()=>({playing:globalThis.__handsfreeTest.metronomePlaying,soundId:"classic"}),holdClickAcrossPlayback(){}}',
+ 'autoRecordPlayback': 'export const AUTO_RECORD_MAX_IDLE_PREROLL_MS=20000; export const AUTO_RECORD_PREROLL_MS=1000',
 }
 const result=await build({entryPoints:['src/hooks/useAutoSoundRecording.ts'],bundle:true,write:false,format:'esm',platform:'node',plugins:[{name:'devices',setup(b){b.onResolve({filter:/.*/},args=>{const key=args.path.split('/').at(-1);if(stubs[key])return {path:key,namespace:'stub'}});b.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:stubs[args.path],loader:'js'}))}}]})
 const {useAutoSoundRecording}=await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
@@ -39,8 +39,19 @@ const options={enabled:true,monitoringAllowed:true,suppressStart:false,ready:tru
  stopRecording(){stops++;options.isRecording=false;dirty=true},warmRecorder(){},disarmRecorder(){},onAutoRecordingFinished(){finished++;options.monitoringPaused=true;dirty=true}}
 async function flush(){for(let n=0;n<10;n++){if(dirty){dirty=false;cursor=0;output=useAutoSoundRecording(options);const pending=effects;effects=[];pending.forEach(f=>f())}await Promise.resolve();if(!dirty&&!effects.length)break}}
 async function advance(ms){const end=now+ms;while(true){await flush();let chosen;for(const [id,t]of timers)if(t.at<=end&&(!chosen||t.at<chosen[1].at))chosen=[id,t];if(!chosen)break;const[id,t]=chosen;now=t.at;if(t.repeat)t.at+=t.ms;else timers.delete(id);t.fn()}now=end;await flush()}
+let preRollActive=false, preRollBeganAt=0
+options.isAutoPreRollCaptureActive=()=>preRollActive
+options.getAutoPreRollAgeMs=()=>preRollActive?Math.min(now-preRollBeganAt,1000):0
 await flush();await advance(1000)
+assert.equal(output.handsFreeListeningReady,false,'Live microphone alone must not claim pre-roll is ready')
+rms=.3;await advance(500)
+assert.equal(starts,0,'An early attack must not cold-start a clipped take')
+rms=0;preRollActive=true;preRollBeganAt=now;await advance(900)
+assert.equal(output.handsFreeListeningReady,false,'The recorder needs its full pre-roll buffer')
+await advance(200)
 assert.equal(output.handsFreeListeningReady,true)
+options.isAutoPreRollCaptureActive=undefined
+options.getAutoPreRollAgeMs=undefined
 rms=.3;await advance(1800)
 assert.equal(starts,1,'Slow recorder startup must not cause repeated starts')
 assert.equal(output.handsFreeRecording,true)
@@ -52,10 +63,49 @@ assert.equal(starts,1,'Playback suppression must prevent another recording')
 options.monitoringPaused=false;rms=0;dirty=true;await advance(1000)
 rms=.3;await advance(1800);rms=0;await advance(1200)
 assert.equal(starts,2);assert.equal(stops,2);assert.equal(finished,2)
+// The app's own click must neither start a take nor keep a finished phrase
+// recording forever. A real sustained phrase still starts between clicks.
+options.monitoringPaused=false;rms=0;dirty=true;await advance(1000)
+globalThis.__handsfreeTest.metronomePlaying=true
+for(let beat=0;beat<5;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ rms=.4;await advance(150);rms=.15;await advance(80);rms=0;await advance(270)
+}
+assert.equal(starts,2,'Metronome clicks alone must never start hands-free')
+rms=.3
+for(let beat=0;beat<4;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ await advance(150);await advance(350)
+}
+assert.equal(starts,3,'A sustained instrument can start while the metronome plays')
+for(let beat=0;beat<5;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ rms=.4;await advance(150);rms=0;await advance(350)
+}
+assert.equal(stops,3,'Known metronome clicks must not indefinitely postpone quiet-stop')
+options.monitoringPaused=false;rms=0;dirty=true;await advance(1000)
+for(let beat=0;beat<8;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ rms=.4;await advance(150);rms=.15;await advance(80);rms=0;await advance(20)
+}
+assert.equal(starts,3,'Fast click subdivisions and their tails must not start a take')
+rms=.3
+for(let beat=0;beat<6;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ await advance(250)
+}
+assert.equal(starts,4,'A sustained phrase remains triggerable between fast clicks')
+await advance(1000)
+for(let beat=0;beat<8;beat++){
+ globalThis.__handsfreeTest.metronomeTick?.({audible:true})
+ rms=.4;await advance(150);rms=0;await advance(100)
+}
+assert.equal(stops,4,'Fast subdivisions cannot hold a finished take open')
+globalThis.__handsfreeTest.metronomePlaying=false
 // A room that never gets below the chosen gate should explain why it cannot arm.
 options.monitoringPaused=false;rms=.3;dirty=true;await advance(7500)
 assert.equal(output.handsFreeNotice,'sensitive')
-assert.equal(starts,2,'Continuous room noise must not arm by timeout')
+assert.equal(starts,4,'Continuous room noise must not arm by timeout')
 console.log('PASS: slow start, one replay per take, speaker suppression, repeated cycles, noisy-room notice')
 rms=0;await advance(1000)
 let mark='pending'
@@ -63,7 +113,7 @@ options.tryMarkAutoPerformance=()=>mark;dirty=true
 rms=.3;await advance(350)
 rms=0;await advance(600)
 mark='started';await advance(1000)
-assert.equal(starts,2,'A pending entrance that went quiet must not trigger late')
+assert.equal(starts,4,'A pending entrance that went quiet must not trigger late')
 options.enabled=false;dirty=true;await flush()
 console.log('PASS: stale pending entrance cancelled and monitor disabled cleanly')
 

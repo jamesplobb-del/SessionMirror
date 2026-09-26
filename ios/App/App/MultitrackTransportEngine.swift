@@ -100,7 +100,9 @@ final class MultitrackTransportEngine {
             var nextSources: [PreparedSource] = []
             nextSources.reserveCapacity(sources.count)
 
-            for source in sources where !source.muted && source.volume > 0.0001 {
+            // Keep muted sources in the graph so the editor can unmute or raise
+            // their level while playback is already running.
+            for source in sources {
                 let monitorFile: (file: AVAudioFile, timelineOriginSec: Double)
                 do {
                     monitorFile = try monitorAudioFile(for: source)
@@ -117,7 +119,7 @@ final class MultitrackTransportEngine {
                 guard monitorFile.file.length > 0 else { continue }
 
                 let node = AVAudioPlayerNode()
-                node.volume = max(0, min(1, source.volume))
+                node.volume = source.muted ? 0 : max(0, min(1, source.volume))
                 engine.attach(node)
                 engine.connect(node, to: engine.mainMixerNode, format: monitorFile.file.processingFormat)
                 nextSources.append(PreparedSource(
@@ -332,6 +334,14 @@ final class MultitrackTransportEngine {
     func setOutputMuted(_ muted: Bool) {
         controlQueue.sync {
             engine.mainMixerNode.outputVolume = muted ? 0 : 1
+        }
+    }
+
+    /// Change one source's level without restarting the shared transport.
+    func setSourceMix(id: String, volume: Float, muted: Bool) {
+        controlQueue.sync {
+            guard let prepared = preparedSources.first(where: { $0.source.id == id }) else { return }
+            prepared.node.volume = muted ? 0 : max(0, min(1, volume))
         }
     }
 

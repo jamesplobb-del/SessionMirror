@@ -54,6 +54,16 @@ export async function setNativeMultitrackOutputMuted(muted: boolean): Promise<vo
   }
 }
 
+/** Adjust a prepared source while the native mix and video keep rolling. */
+export async function setNativeMultitrackSourceMix(id: string, volume: number, muted: boolean): Promise<void> {
+  if (!isNativeMultitrackTransportAvailable()) return
+  try {
+    await enqueueTransport(() => BestTakeAudioPlugin.setMultitrackSourceMix({ id, volume, muted }))
+  } catch (error) {
+    console.warn('[MultitrackTransport] source mix update failed', error)
+  }
+}
+
 export async function stopNativeMultitrackTransport(): Promise<void> {
   if (!isNativeMultitrackTransportAvailable()) return
   try {

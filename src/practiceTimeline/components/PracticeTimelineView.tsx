@@ -1,16 +1,13 @@
 import { BookOpen, Pencil, Play, Plus } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import IOSSwitch from '../../components/ui/IOSSwitch'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import Pressable from '../../components/ui/Pressable'
 import { usePracticeTimeline, useTimelinePlayback } from '../hooks/usePracticeTimeline'
-import { describeSection } from '../naturalLanguage'
 import { stashPendingMarkers } from '../recording/timelineMarkers'
 import {
   clearRoutineOpen,
   getPendingRoutineOpen,
   subscribeRoutineFileOpen,
 } from '../storage/routineFileOpen'
-import { effectiveBars } from '../timeSignatureLogic'
 import TimelineLibrarySheet from './TimelineLibrarySheet'
 import TimelinePracticeSessionView from './TimelinePracticeSessionView'
 import TimelineSectionCard from './TimelineSectionCard'
@@ -117,10 +114,6 @@ export default function PracticeTimelineView({
     loopTrack: timeline.settings?.loopTrack ?? false,
   }
 
-  const maxBars = useMemo(
-    () => Math.max(1, ...timeline.sections.map((s) => effectiveBars(s))),
-    [timeline.sections]
-  )
   const editingSection = timeline.sections.find((s) => s.id === editingSectionId)
 
   const beginSession = (startSectionIndex = 0) => {
@@ -172,15 +165,6 @@ export default function PracticeTimelineView({
 
   const footer = (
     <footer className="practice-timeline__footer practice-timeline__footer--dock">
-      <Pressable
-        type="button"
-        intensity="soft"
-        className="practice-timeline__footer-btn practice-timeline__footer-btn--secondary"
-        disabled={Boolean(linkedProgramId)} onClick={() => setLibraryOpen(true)}
-      >
-        <BookOpen size={18} aria-hidden />
-        Saved Programs
-      </Pressable>
       <Pressable
         type="button"
         intensity="normal"
@@ -243,29 +227,27 @@ export default function PracticeTimelineView({
                     </h1>
                     <Pencil size={15} aria-hidden />
                   </Pressable>
-                  {timeline.sections.length > 0 ? (
-                    <span className="practice-timeline__section-count">
-                      {timeline.sections.length}
-                    </span>
-                  ) : null}
+                  <Pressable
+                    type="button"
+                    intensity="soft"
+                    className="practice-timeline__saved-link"
+                    disabled={Boolean(linkedProgramId)}
+                    onClick={() => setLibraryOpen(true)}
+                  >
+                    <BookOpen size={16} aria-hidden />
+                    Saved
+                  </Pressable>
                 </div>
               )}
               <p className="practice-timeline__hero-sub">
                 {timeline.sections.length === 0
                   ? 'Set tempos and timing, one section at a time.'
-                  : 'Drag to reorder. Tap Edit to change timing.'}
+                  : `${timeline.sections.length} section${timeline.sections.length === 1 ? '' : 's'} · plays in order`}
               </p>
             </header>
 
             <section className="practice-timeline__builder" aria-label="Program sections">
-              {timeline.sections.length > 0 ? (
-                <div className="practice-timeline__builder-heading">
-                  <div>
-                    <h2>Program sections</h2>
-                    <p>They play from top to bottom.</p>
-                  </div>
-                </div>
-              ) : (
+              {timeline.sections.length === 0 ? (
                 <div className="practice-timeline__empty">
                   <span className="practice-timeline__empty-icon" aria-hidden>
                     <Plus size={22} />
@@ -273,14 +255,12 @@ export default function PracticeTimelineView({
                   <h2>Start with a section</h2>
                   <p>Set its bars, tempo, time signature, and repeats.</p>
                 </div>
-              )}
+              ) : null}
 
               {timeline.sections.map((section, index) => (
-                <Fragment key={section.id}>
-                  {index > 0 ? <div className="practice-timeline__connector">↓</div> : null}
-                  <TimelineSectionCard
+                <TimelineSectionCard
+                    key={section.id}
                     section={section}
-                    maxBars={maxBars}
                     index={index}
                     isDragging={dragIndex === index}
                     onPress={() => setEditingSectionId(section.id)}
@@ -295,13 +275,8 @@ export default function PracticeTimelineView({
                       }
                     }}
                     onDragEnd={() => setDragIndex(null)}
-                  />
-                </Fragment>
+                />
               ))}
-
-              {timeline.sections.length > 0 ? (
-                <div className="practice-timeline__connector">↓</div>
-              ) : null}
 
               <Pressable
                 type="button"
@@ -317,59 +292,10 @@ export default function PracticeTimelineView({
             </section>
 
             {timeline.sections.length > 0 ? (
-              <>
-                <section
-                  className="practice-timeline__setup"
-                  aria-labelledby="practice-session-setup"
-                >
-                  <div className="practice-timeline__setup-heading">
-                    <div>
-                      <h2 id="practice-session-setup">Session setup</h2>
-                      <p>Optional settings for this run.</p>
-                    </div>
-                  </div>
-
-                  <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings} />
-
-                  <div className="practice-timeline__record-toggle pointer-events-auto">
-                    <span className="practice-timeline__record-copy">
-                      <strong>Record this practice</strong>
-                      <small>Save one take with markers for each section.</small>
-                    </span>
-                    <IOSSwitch
-                      checked={recordEnabled}
-                      ariaLabel="Record this practice"
-                      onChange={setRecordEnabled}
-                    />
-                  </div>
-                </section>
-
-                <section
-                  className="practice-timeline__summary"
-                  aria-labelledby="practice-ready-heading"
-                >
-                  <div className="practice-timeline__summary-heading">
-                    <div>
-                      <h2 id="practice-ready-heading">Ready to practice</h2>
-                      <p>
-                        {timeline.sections.length} section
-                        {timeline.sections.length === 1 ? '' : 's'} in order
-                      </p>
-                    </div>
-                  </div>
-                  <ol className="practice-timeline__summary-list">
-                    {timeline.sections.map((section, index) => (
-                      <li key={section.id}>
-                        <span>{index + 1}</span>
-                        <div>
-                          <strong>{section.title}</strong>
-                          <p>{describeSection(section)}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              </>
+              <section className="practice-timeline__setup" aria-label="Practice options">
+                <TrackSettingsPanel settings={trackSettings} onChange={updateTrackSettings}
+                  recordEnabled={recordEnabled} onRecordChange={setRecordEnabled} />
+              </section>
             ) : null}
           </div>
 

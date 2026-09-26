@@ -32,6 +32,8 @@ import {
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
+import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
+import { musicDockClearX } from '../utils/musicDockClearance'
 import RoutineProgramControls from './RoutineProgramControls'
 import { triggerLightHaptic } from '../utils/haptics'
 import { iosDragRelease, iosSpringSnappy } from '../utils/motionPresets'
@@ -259,8 +261,17 @@ export default function RoutineBar({
   openRef.current = open
   const [room, setRoom] = useState<Room>({ side: 'above', maxHeight: PANEL_IDEAL })
   const [dragging, setDragging] = useState(false)
+  const [dockHost, setDockHost] = useState<HTMLElement | null>(null)
   const [now, setNow] = useState(Date.now)
   const compact = width < COMPACT_BELOW
+
+  useLayoutEffect(() => {
+    const findDock = () => setDockHost(preferBall && window.innerWidth >= 700
+      ? document.getElementById('music-widget-dock') : null)
+    findDock()
+    window.addEventListener('resize', findDock)
+    return () => window.removeEventListener('resize', findDock)
+  }, [preferBall])
 
   useEffect(() => {
     setNow(Date.now())
@@ -445,7 +456,7 @@ export default function RoutineBar({
   }
 
   /** Back to the bar, opening from the ball's corner wherever the ball was taken. */
-  const unfold = () => {
+  const unfold = (point?: DockDropPoint) => {
     if (draggedRef.current) {
       draggedRef.current = false
       return
@@ -454,9 +465,11 @@ export default function RoutineBar({
     if (!el) return
     triggerLightHaptic(hapticFeedback)
     const barHeight = barHeightRef.current || 104
+    const ball = dockHost ? el.getBoundingClientRect() : null
     const next = clampToViewport(
-      x.get() + el.offsetWidth - width,
-      y.get() + el.offsetHeight - barHeight,
+      dockHost ? musicDockClearX(point ? point.x - width / 2 : ball ? ball.left - width - 12 : x.get(), width)
+        : x.get() + el.offsetWidth - width,
+      point ? point.y - 28 : ball ? ball.top : y.get() + el.offsetHeight - barHeight,
       width,
       barHeight,
       insetsRef.current,
@@ -466,6 +479,7 @@ export default function RoutineBar({
     setFolded(false)
     saveFolded(false)
   }
+  const dockItem = useMusicDockItem(BALL_POSITION_ID, unfold)
 
   // On the music page a step opens as a ball, and the page coming up folds a
   // bar that is already open. The player can still tap the ball open; this
@@ -523,17 +537,23 @@ export default function RoutineBar({
           .filter(Boolean)
           .join(' ')}
         aria-label={`Routine: ${step.title}, step ${index} of ${count}${paused ? ', paused' : ''}. Open the routine bar.`}
-        style={{ x, y }}
-        drag
+        data-music-dock-id={dockHost ? BALL_POSITION_ID : undefined}
+        title={dockHost ? 'Open routine; drag left to place, or up/down to reorder' : undefined}
+        style={{ x, y, order: dockHost ? dockItem.order : undefined, translate: dockHost ? dockItem.translate : undefined }}
+        drag={!dockHost}
         dragControls={dragControls}
         dragListener={false}
         dragMomentum={false}
         dragElastic={0}
-        onPointerDown={startDrag}
+        onPointerDown={dockHost ? dockItem.pointerDown : startDrag}
+        onPointerMove={dockHost ? dockItem.pointerMove : undefined}
+        onPointerUp={dockHost ? event => dockItem.pointerEnd(event) : undefined}
+        onPointerCancel={dockHost ? event => dockItem.pointerEnd(event, true) : undefined}
+        onLostPointerCapture={dockHost ? event => dockItem.pointerEnd(event, true) : undefined}
         onDragStart={onDragStart}
         onDragEnd={endDrag}
-        onClick={unfold}
-        onKeyDown={moveWithKeys}
+        onClick={dockHost ? dockItem.click : () => unfold()}
+        onKeyDown={dockHost ? dockItem.keyDown : moveWithKeys}
         initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.6 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={iosSpringSnappy}
@@ -559,7 +579,7 @@ export default function RoutineBar({
         <span className="routine-ball__time">{paused ? 'Paused' : formatElapsed(elapsed)}</span>
         <ChevronDown className="routine-ball__expand" aria-hidden />
       </motion.button>,
-      document.body,
+      dockHost ?? document.body,
     )
   }
 

@@ -89,6 +89,20 @@ try {
   await m.saveMultitrackSession({ ...session, projectId: 'copy', name: 'Copy' })
   check(m.listMultitrackProjects().length,2,'duplicate is independent project')
   check((await m.loadMultitrackSession(takes,session.projectId)).name,'Twelve parts','original project preserved')
+  m.selectMultitrackProject('copy')
+  check((await m.loadMultitrackSession(takes)).name,'Copy','last selected project reopens on launch')
+  m.selectMultitrackProject(session.projectId)
+  check((await m.loadMultitrackSession(takes)).name,'Twelve parts','switching back restores the original project')
+  const beforeFailedSave = m.listMultitrackProjects()
+  globalThis.localStorage = {
+    getItem: k => storage.get(k) ?? null,
+    setItem: (k,v) => { if (k.endsWith('.failed-project')) throw Error('storage full'); storage.set(k,v) },
+    removeItem: k => storage.delete(k),
+  }
+  await assert.rejects(m.saveMultitrackSession({ ...session, projectId: 'failed-project' }))
+  check(m.listMultitrackProjects(),beforeFailedSave,'failed save does not add an incomplete project')
+  check((await m.loadMultitrackSession(takes)).name,'Twelve parts','failed save does not replace the active project')
+  globalThis.localStorage = { getItem: k => storage.get(k) ?? null, setItem: (k,v) => storage.set(k,v), removeItem: k=>storage.delete(k) }
   const missing = await m.loadMultitrackSession(takes.slice(1), session.projectId)
   check(missing.panels[0].missingTakeId, takes[0].id, 'missing take retains source identity')
   check(missing.panels[0].take, null, 'missing source is not playable')

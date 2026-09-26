@@ -48,6 +48,8 @@ import {
 } from './RoutineBuilder'
 import MusicRoutineBuilder from './MusicRoutineBuilder'
 import RoutineProgressSummary from './RoutineProgressSummary'
+import { hasPracticeChart } from '../utils/practiceChartStorage'
+import type { LastPracticeDestination } from '../utils/lastPracticeDestination'
 import './practice-home.css'
 
 
@@ -84,6 +86,8 @@ interface PracticeHubProps {
   onOpenMetronome: () => void
   /** Opens the Music library in the first Tools tab. */
   onOpenMusic?: () => void
+  lastPracticeDestination?: LastPracticeDestination | null
+  onContinueMusic?: (projectId: string) => Promise<void>
 
   /* ---- Daily routine ---- */
   routine: Routine | null
@@ -147,6 +151,8 @@ export default function PracticeHub({
   onOpenTuner,
   onOpenMetronome,
   onOpenMusic,
+  lastPracticeDestination = null,
+  onContinueMusic,
   onOpenSettings,
   showHomeRoutineSummary = false,
   routine,
@@ -173,6 +179,7 @@ export default function PracticeHub({
   useEffect(() => { saveHubPage(page) }, [page])
   const [launchError, setLaunchError] = useState('')
   const [startingRoutineStepId, setStartingRoutineStepId] = useState<string | null>(null)
+  const [startingMusic, setStartingMusic] = useState(false)
   const [metronomePrefs, setMetronomePrefs] = useState<MetronomePrefs | null>(null)
 
   useEffect(() => {
@@ -214,6 +221,14 @@ export default function PracticeHub({
     } finally {
       setStartingRoutineStepId(null)
     }
+  }
+  const continueMusic = async (projectId: string) => {
+    if (startingMusic || !onContinueMusic) return
+    setStartingMusic(true)
+    setLaunchError('')
+    try { await onContinueMusic(projectId) }
+    catch { setLaunchError('Could not reopen that music. Choose it again from the music library.') }
+    finally { setStartingMusic(false) }
   }
 
   /** Built and ready: save it, then go straight into its first open step. */
@@ -279,6 +294,9 @@ export default function PracticeHub({
   const homeDay = routineDay?.routineId === routine?.id ? routineDay : null
   const homeProgress = routine ? routineProgress(routine, homeDay) : null
   const homeNext = routine ? routine.steps.find(item => item.id === (homeDay?.activeStepId ?? homeDay?.pausedStepId)) ?? nextOpenStep(routine, homeDay) : null
+  const lastMusic = lastPracticeDestination?.kind === 'music' && onContinueMusic
+    ? projects.find(project => project.id === lastPracticeDestination.projectId && hasPracticeChart(project.id))
+    : null
   const firstSession = takes.length === 0 && !routine?.steps.length
   const homeRoutineLabel = !routine?.steps.length ? 'Try a suggested routine'
     : homeProgress?.complete || !homeNext ? 'Routine complete'
@@ -467,11 +485,12 @@ export default function PracticeHub({
                           <span className="practice-home-launch-copy"><CircleDot className="open-lens-home-symbol" aria-hidden /><strong>{takes.length ? 'Record & compare' : 'Record your first take'}</strong><em>Audio or video</em></span><ChevronRight aria-hidden />
                           <svg className="practice-home-signal-detail" viewBox="0 0 180 55" fill="none" aria-hidden><path d="M0 28h20l5-7 6 14 7-25 8 36 8-29 7 20 6-9h23l5-12 6 25 8-34 8 43 8-27 6 12 5-7h39" stroke="currentColor" strokeWidth="1.6" /></svg>
                         </Pressable>
-                        <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-quick practice-home-routine-launch" disabled={startingRoutineStepId !== null} onClick={() => {
-                          if (!routine?.steps.length) onOpenRoutineBuilder('presets')
+                        <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} className="practice-home-launch-button is-quick practice-home-routine-launch" disabled={startingRoutineStepId !== null || startingMusic} onClick={() => {
+                          if (lastMusic) void continueMusic(lastMusic.id)
+                          else if (!routine?.steps.length) onOpenRoutineBuilder('presets')
                           else if (homeNext && !homeProgress?.complete) void startRoutineStep(homeNext.id)
                           else setPage('today')
-                        }}><span className="practice-home-launch-copy"><ListMusic className="open-lens-home-symbol" aria-hidden /><strong>{startingRoutineStepId ? 'Opening…' : homeRoutineLabel}</strong><em>{homeProgress ? `${homeProgress.done} of ${homeProgress.total} exercises completed` : 'Start with a plan you can edit'}</em></span><ChevronRight aria-hidden /></Pressable>
+                        }}><span className="practice-home-launch-copy"><ListMusic className="open-lens-home-symbol" aria-hidden /><strong>{startingRoutineStepId || startingMusic ? 'Opening…' : lastMusic ? 'Continue music' : homeRoutineLabel}</strong><em>{lastMusic ? lastMusic.name : routine?.steps.length ? `${routine.name} · ${homeProgress?.done ?? 0} of ${homeProgress?.total ?? routine.steps.length} exercises completed` : 'Start with a plan you can edit'}</em></span><ChevronRight aria-hidden /></Pressable>
                       </div>
                       <div className="practice-home-links">
                         <button className="practice-home-library" onClick={onOpenVault}><span>Take library<small>Recordings & best takes</small></span><ChevronRight aria-hidden /></button>

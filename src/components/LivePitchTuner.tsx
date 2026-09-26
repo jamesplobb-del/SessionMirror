@@ -37,18 +37,21 @@ import {
   transposePitchReadout,
   type TunerTranspositionId,
 } from '../utils/tunerTransposition'
-import { savePitchObservation, type SavePitchObservationInput } from '../db/pitchInsightsRepository'
+import { deletePitchObservationsForSessionRange, savePitchObservation } from '../db/pitchInsightsRepository'
 import { StableNoteTracker } from '../utils/stableNoteTracker'
-import { loadEnsemblePitchMode, saveEnsemblePitchMode } from '../utils/ensemblePitchMode'
+import {
+  loadPitchInsightsCaptureEnabled,
+  PitchActivityDetector,
+  savePitchInsightsCaptureEnabled,
+  type NoisyPitchWindow,
+} from '../utils/pitchInsightsCapture'
 import { useTutorialAction } from '../context/TutorialContext'
 import { safeRandomUUID } from '../utils/uuid'
 import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
 import { motionExitHide } from '../utils/motionPresets'
-import '../styles/ensemble-pitch-mode.css'
+import '../styles/pitch-insights-capture.css'
 
-type EnsembleCaptureStatus = 'idle' | 'listening' | 'review' | 'saving' | 'saved' | 'failed'
-const ENSEMBLE_CAPTURE_MS = 4000
-const ENSEMBLE_MIN_FRAME_CONFIDENCE = 0.88
+type NoisyActivityPrompt = NoisyPitchWindow & { status: 'suggested' | 'deleting' | 'failed' }
 
 interface LivePitchTunerProps {
   nativePitchProcessing?: boolean
@@ -73,7 +76,7 @@ interface LivePitchTunerProps {
   pitchSource?: 'media' | 'microphone'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
-  /** Audio tuner only: reports whether live PCM is actually arriving. */
+  /** Reports whether a live microphone source is actually arriving. */
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
   /** Audio tuner: show Drone, Transpose, and Pitch Insights controls. */
   audioToolsEnabled?: boolean
@@ -248,15 +251,11 @@ export function LiveAudioTunerPane({
   coachEnabled = false,
   pitchHistory,
   visualTrace,
-  ensembleMode = false,
-  onEnsembleModeChange,
-  ensembleCaptureStatus = 'idle',
-  ensembleCaptureMessage,
-  ensembleCapturePreview,
-  ensembleCaptureAvailable = false,
-  onStartEnsembleCapture,
-  onCancelEnsembleCapture,
-  onConfirmEnsembleCapture,
+  insightsCaptureEnabled = true,
+  onInsightsCaptureChange,
+  noisyActivityPrompt,
+  onKeepInsightsOn,
+  onTurnOffAndClearRecent,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -273,15 +272,11 @@ export function LiveAudioTunerPane({
   coachEnabled?: boolean
   pitchHistory?: RefObject<TunerHistorySample[]>
   visualTrace?: RefObject<TunerTrace>
-  ensembleMode?: boolean
-  onEnsembleModeChange?: (enabled: boolean) => void
-  ensembleCaptureStatus?: EnsembleCaptureStatus
-  ensembleCaptureMessage?: string
-  ensembleCapturePreview?: SavePitchObservationInput | null
-  ensembleCaptureAvailable?: boolean
-  onStartEnsembleCapture?: () => void
-  onCancelEnsembleCapture?: () => void
-  onConfirmEnsembleCapture?: () => void
+  insightsCaptureEnabled?: boolean
+  onInsightsCaptureChange?: (enabled: boolean) => void
+  noisyActivityPrompt?: NoisyActivityPrompt | null
+  onKeepInsightsOn?: () => void
+  onTurnOffAndClearRecent?: () => void
 }) {
   const notifyTutorial = useTutorialAction()
   const stageRef = useRef<HTMLDivElement>(null)
@@ -465,11 +460,12 @@ export function LiveAudioTunerPane({
                   className="pitch-living-drone-trigger pitch-living-insights-trigger"
                   onClick={openInsights}
                   aria-haspopup="dialog"
-                  aria-label="Open Pitch Insights"
-                  title="Pitch Insights"
+                  aria-label={`Open Pitch Insights${insightsCaptureEnabled ? '' : ', saving off'}`}
+                  title={insightsCaptureEnabled ? 'Pitch Insights' : 'Pitch Insights · saving off'}
                 >
                   <BarChart3 aria-hidden />
                   <span>Insights</span>
+                  {!insightsCaptureEnabled ? <small>Off</small> : null}
                 </button>
               ) : null}
 
@@ -495,31 +491,24 @@ export function LiveAudioTunerPane({
               ) : null}
             </div>
 
-            {insightsEnabled && ensembleMode ? (
-              <section className="pitch-ensemble-capture" aria-label="Ensemble Pitch Insights capture" aria-live="polite">
-                <div className="pitch-ensemble-capture__copy">
-                  <strong>{ensembleCaptureStatus === 'review' && ensembleCapturePreview
-                    ? `${ensembleCapturePreview.noteName} ${formatDisplayCents(ensembleCapturePreview.centsOffset)}`
-                    : ensembleCaptureStatus === 'listening' ? 'Hold one note'
-                      : ensembleCaptureStatus === 'saving' ? 'Saving note…'
-                        : ensembleCaptureStatus === 'saved' ? 'Note saved to Insights'
-                          : 'Ensemble mode'}</strong>
-                  <small>{ensembleCaptureStatus === 'review' ? 'Is this your note?'
-                    : ensembleCaptureStatus === 'listening' ? 'Listening for a steady note…'
-                      : ensembleCaptureStatus === 'failed' ? ensembleCaptureMessage
-                        : ensembleCaptureStatus === 'idle' && !ensembleCaptureAvailable ? 'Pause playback and turn off the drone to measure.'
-                          : 'Insights saves only notes you confirm.'}</small>
+            {insightsEnabled && noisyActivityPrompt ? (
+              <section className="pitch-insights-activity-prompt" role="status" aria-label="Pitch Insights activity warning">
+                <strong>{noisyActivityPrompt.status === 'failed' ? 'Recent readings remain' : 'Playing with others?'}</strong>
+                <p>{noisyActivityPrompt.status === 'failed'
+                  ? 'Insights is off, but those recent readings could not be removed. Try again.'
+                  : 'The tuner is hearing rapidly changing pitches. Insights is paused while you decide. Turning it off can keep your history accurate.'}</p>
+                <div className="pitch-insights-activity-prompt__actions">
+                  <button type="button" onClick={onKeepInsightsOn}>
+                    {noisyActivityPrompt.status === 'failed' ? 'Dismiss' : 'Keep on'}
+                  </button>
+                  <button type="button" className="pitch-insights-activity-prompt__primary"
+                    disabled={noisyActivityPrompt.status === 'deleting'} onClick={onTurnOffAndClearRecent}>
+                    {noisyActivityPrompt.status === 'deleting' ? 'Clearing…'
+                      : noisyActivityPrompt.status === 'failed' ? 'Retry clear'
+                        : 'Turn off + clear recent'}
+                  </button>
                 </div>
-                <div className="pitch-ensemble-capture__actions">
-                  {ensembleCaptureStatus === 'review' ? <>
-                    <button type="button" onClick={onCancelEnsembleCapture}>Discard</button>
-                    <button type="button" className="pitch-ensemble-capture__primary" onClick={onConfirmEnsembleCapture}>Keep</button>
-                  </> : ensembleCaptureStatus === 'listening' ? (
-                    <button type="button" onClick={onCancelEnsembleCapture}>Cancel</button>
-                  ) : ensembleCaptureStatus !== 'saving' ? (
-                    <button type="button" className="pitch-ensemble-capture__primary" disabled={!ensembleCaptureAvailable} onClick={onStartEnsembleCapture}>Measure</button>
-                  ) : null}
-                </div>
+                {noisyActivityPrompt.status === 'suggested' ? <small>Only recent readings from this tuner session will be removed.</small> : null}
               </section>
             ) : null}
 
@@ -600,8 +589,8 @@ export function LiveAudioTunerPane({
             )
           }
           hapticFeedback={tunerHapticsEnabled}
-          ensembleMode={ensembleMode}
-          onEnsembleModeChange={onEnsembleModeChange}
+          captureEnabled={insightsCaptureEnabled}
+          onCaptureEnabledChange={onInsightsCaptureChange}
         />
       ) : null}
     </div>
@@ -720,32 +709,17 @@ function LivePitchTunerAudio({
     tunerInstrument,
     transpositionId: tunerTransposition,
   }
-  const [ensembleMode, setEnsembleMode] = useState(loadEnsemblePitchMode)
-  const ensembleModeRef = useRef(ensembleMode)
-  ensembleModeRef.current = ensembleMode
-  const [ensembleCaptureStatus, setEnsembleCaptureStatus] = useState<EnsembleCaptureStatus>('idle')
-  const ensembleCaptureStatusRef = useRef<EnsembleCaptureStatus>('idle')
-  const [ensembleCaptureMessage, setEnsembleCaptureMessage] = useState('')
-  const [ensembleCapturePreview, setEnsembleCapturePreview] = useState<SavePitchObservationInput | null>(null)
-  const ensembleCaptureTimerRef = useRef<number | null>(null)
-  const ensembleCaptureTrackerRef = useRef<StableNoteTracker | null>(null)
-  const ensembleCaptureCandidatesRef = useRef<SavePitchObservationInput[]>([])
-  const updateEnsembleCaptureStatus = useCallback((status: EnsembleCaptureStatus) => {
-    ensembleCaptureStatusRef.current = status
-    setEnsembleCaptureStatus(status)
-  }, [])
-  const clearEnsembleCapture = useCallback(() => {
-    if (ensembleCaptureTimerRef.current != null) window.clearTimeout(ensembleCaptureTimerRef.current)
-    ensembleCaptureTimerRef.current = null
-    ensembleCaptureTrackerRef.current?.discard()
-    ensembleCaptureTrackerRef.current = null
-    ensembleCaptureCandidatesRef.current = []
-  }, [])
+  const [insightsCaptureEnabled, setInsightsCaptureEnabled] = useState(loadPitchInsightsCaptureEnabled)
+  const insightsCaptureEnabledRef = useRef(insightsCaptureEnabled)
+  insightsCaptureEnabledRef.current = insightsCaptureEnabled
+  const [noisyActivityPrompt, setNoisyActivityPrompt] = useState<NoisyActivityPrompt | null>(null)
+  const insightsPausedForPromptRef = useRef(false)
+  const activityDetectorRef = useRef(new PitchActivityDetector())
   const stableNoteTrackerRef = useRef<StableNoteTracker | null>(null)
   if (!stableNoteTrackerRef.current) {
     stableNoteTrackerRef.current = new StableNoteTracker((observation) => {
       if (nativePitchProcessing && isTunerDiagnosticMode('no-insights')) return
-      if (ensembleModeRef.current) return
+      if (!insightsCaptureEnabledRef.current || insightsPausedForPromptRef.current) return
       void savePitchObservation(observation).catch((error: unknown) => {
         console.warn('[PitchInsights] Failed to save stable observation', error)
       })
@@ -764,24 +738,20 @@ function LivePitchTunerAudio({
     if (nativePitchProcessing && isTunerDiagnosticMode('no-insights')) return
     const tracker = stableNoteTrackerRef.current
     if (!tracker) return
-    if (ensembleModeRef.current) {
-      if (ensembleCaptureStatusRef.current === 'listening' && !insightsSuppressedRef.current) {
-        ensembleCaptureTrackerRef.current?.ingest(
-          frame && frame.confidence >= ENSEMBLE_MIN_FRAME_CONFIDENCE ? {
-            midiNote: frame.readout.midi,
-            noteName: frame.readout.noteName,
-            centsOffset: frame.readout.cents,
-            frequencyHz: frame.readout.frequencyHz,
-            confidence: frame.confidence,
-            timestamp: frame.timestamp,
-          } : null,
-          insightsContextRef.current,
-        )
-      }
+    if (!insightsCaptureEnabledRef.current || insightsPausedForPromptRef.current) {
+      tracker.discard()
       return
     }
     if (!frame || insightsSuppressedRef.current) {
       tracker.finish()
+      activityDetectorRef.current.observe(null, frame?.timestamp ?? Date.now())
+      return
+    }
+    const noisyWindow = activityDetectorRef.current.observe(frame.readout.midi, frame.timestamp)
+    if (noisyWindow) {
+      insightsPausedForPromptRef.current = true
+      tracker.discard()
+      setNoisyActivityPrompt({ ...noisyWindow, status: 'suggested' })
       return
     }
     tracker.ingest(
@@ -799,23 +769,21 @@ function LivePitchTunerAudio({
 
   useEffect(() => {
     return () => {
-      if (ensembleModeRef.current) stableNoteTrackerRef.current?.discard()
-      else stableNoteTrackerRef.current?.finish()
-      clearEnsembleCapture()
+      if (insightsCaptureEnabledRef.current && !insightsPausedForPromptRef.current) {
+        stableNoteTrackerRef.current?.finish()
+      } else {
+        stableNoteTrackerRef.current?.discard()
+      }
     }
-  }, [clearEnsembleCapture])
+  }, [])
 
   useEffect(() => {
     if (insightsSuppressed) {
-      if (ensembleMode) stableNoteTrackerRef.current?.discard()
-      else stableNoteTrackerRef.current?.finish()
-      if (ensembleCaptureStatusRef.current === 'listening') {
-        clearEnsembleCapture()
-        setEnsembleCaptureMessage('Turn off the drone, then hold one note close to the phone.')
-        updateEnsembleCaptureStatus('failed')
-      }
+      if (insightsCaptureEnabled && !insightsPausedForPromptRef.current) stableNoteTrackerRef.current?.finish()
+      else stableNoteTrackerRef.current?.discard()
+      activityDetectorRef.current.reset()
     }
-  }, [clearEnsembleCapture, ensembleMode, insightsSuppressed, updateEnsembleCaptureStatus])
+  }, [insightsCaptureEnabled, insightsSuppressed])
 
   const suppressDroneAnalysis = useCallback(() => {
     droneAnalysisSuppressUntilRef.current = performance.now() + DRONE_ANALYSIS_SUPPRESS_MS
@@ -825,78 +793,41 @@ function LivePitchTunerAudio({
   const showLive = liveMicOnly ? enabled : isPlaying || liveMicEnabled || enabled
   const liveTrackerEnabled = enabled && showLive && liveMicEnabled
   const playbackTrackerEnabled = enabled && showPlayback
-  const ensembleCaptureAvailable = liveTrackerEnabled && !showPlayback && !insightsSuppressed
 
-  const finishEnsembleCapture = useCallback(() => {
-    if (ensembleCaptureStatusRef.current !== 'listening') return
-    if (ensembleCaptureTimerRef.current != null) window.clearTimeout(ensembleCaptureTimerRef.current)
-    ensembleCaptureTimerRef.current = null
-    ensembleCaptureTrackerRef.current?.finish()
-    ensembleCaptureTrackerRef.current = null
-    const candidates = ensembleCaptureCandidatesRef.current
-    if (candidates.length === 1) {
-      setEnsembleCapturePreview(candidates[0]!)
-      updateEnsembleCaptureStatus('review')
-      return
-    }
-    setEnsembleCapturePreview(null)
-    setEnsembleCaptureMessage(candidates.length > 1
-      ? 'Several notes were detected. Hold one note closer to the phone and try again.'
-      : 'No clear held note. Move the phone closer to your instrument and try again.')
-    updateEnsembleCaptureStatus('failed')
-  }, [updateEnsembleCaptureStatus])
-
-  const startEnsembleCapture = useCallback(() => {
-    if (!ensembleCaptureAvailable || !ensembleModeRef.current) return
-    clearEnsembleCapture()
-    setEnsembleCapturePreview(null)
-    setEnsembleCaptureMessage('')
-    ensembleCaptureTrackerRef.current = new StableNoteTracker((observation) => {
-      // A mixed or wavering signal is omitted. The player still confirms the
-      // surviving note, because a single microphone cannot identify its owner.
-      if (observation.durationMs >= 1100 && observation.sampleCount >= 10 && observation.variabilityCents <= 9) {
-        ensembleCaptureCandidatesRef.current.push(observation)
-      }
-    })
-    updateEnsembleCaptureStatus('listening')
-    ensembleCaptureTimerRef.current = window.setTimeout(finishEnsembleCapture, ENSEMBLE_CAPTURE_MS)
-  }, [clearEnsembleCapture, ensembleCaptureAvailable, finishEnsembleCapture, updateEnsembleCaptureStatus])
-
-  const cancelEnsembleCapture = useCallback(() => {
-    clearEnsembleCapture()
-    setEnsembleCapturePreview(null)
-    setEnsembleCaptureMessage('')
-    updateEnsembleCaptureStatus('idle')
-  }, [clearEnsembleCapture, updateEnsembleCaptureStatus])
-
-  const changeEnsembleMode = useCallback((next: boolean) => {
+  const changeInsightsCapture = useCallback((next: boolean) => {
     stableNoteTrackerRef.current?.discard()
-    cancelEnsembleCapture()
-    ensembleModeRef.current = next
-    setEnsembleMode(next)
-    saveEnsemblePitchMode(next)
-  }, [cancelEnsembleCapture])
+    insightsCaptureEnabledRef.current = next
+    setInsightsCaptureEnabled(next)
+    savePitchInsightsCaptureEnabled(next)
+    insightsPausedForPromptRef.current = false
+    activityDetectorRef.current.reset(true)
+    setNoisyActivityPrompt(null)
+  }, [])
 
-  const confirmEnsembleCapture = useCallback(() => {
-    if (!ensembleCapturePreview || ensembleCaptureStatusRef.current !== 'review') return
-    updateEnsembleCaptureStatus('saving')
-    void savePitchObservation(ensembleCapturePreview).then(() => {
-      setEnsembleCapturePreview(null)
-      updateEnsembleCaptureStatus('saved')
+  const keepInsightsOn = useCallback(() => {
+    insightsPausedForPromptRef.current = false
+    activityDetectorRef.current.reset()
+    setNoisyActivityPrompt(null)
+  }, [])
+
+  const turnOffAndClearRecent = useCallback(() => {
+    if (!noisyActivityPrompt || noisyActivityPrompt.status === 'deleting') return
+    insightsCaptureEnabledRef.current = false
+    setInsightsCaptureEnabled(false)
+    savePitchInsightsCaptureEnabled(false)
+    stableNoteTrackerRef.current?.discard()
+    setNoisyActivityPrompt({ ...noisyActivityPrompt, status: 'deleting' })
+    void deletePitchObservationsForSessionRange(
+      insightsSessionIdRef.current!, noisyActivityPrompt.startAt, noisyActivityPrompt.endAt,
+    ).then(() => {
+      insightsPausedForPromptRef.current = false
+      activityDetectorRef.current.reset()
+      setNoisyActivityPrompt(null)
     }).catch((error: unknown) => {
-      console.warn('[PitchInsights] Failed to save ensemble observation', error)
-      setEnsembleCaptureMessage('Could not save this note. Please try again.')
-      updateEnsembleCaptureStatus('failed')
+      console.warn('[PitchInsights] Failed to remove noisy-session readings', error)
+      setNoisyActivityPrompt({ ...noisyActivityPrompt, status: 'failed' })
     })
-  }, [ensembleCapturePreview, updateEnsembleCaptureStatus])
-
-  useEffect(() => {
-    if (ensembleCaptureStatus !== 'listening' || ensembleCaptureAvailable) return
-    clearEnsembleCapture()
-    setEnsembleCapturePreview(null)
-    setEnsembleCaptureMessage('The live microphone became unavailable. Try again when it is ready.')
-    updateEnsembleCaptureStatus('failed')
-  }, [clearEnsembleCapture, ensembleCaptureAvailable, ensembleCaptureStatus, updateEnsembleCaptureStatus])
+  }, [noisyActivityPrompt])
 
   const liveTrackerOptions = useMemo(
     () => ({
@@ -1001,15 +932,11 @@ function LivePitchTunerAudio({
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
               inTuneGlow={playbackTracker.inTuneGlow}
-              ensembleMode={ensembleMode}
-              onEnsembleModeChange={changeEnsembleMode}
-              ensembleCaptureStatus={ensembleCaptureStatus}
-              ensembleCaptureMessage={ensembleCaptureMessage}
-              ensembleCapturePreview={ensembleCapturePreview}
-              ensembleCaptureAvailable={ensembleCaptureAvailable}
-              onStartEnsembleCapture={startEnsembleCapture}
-              onCancelEnsembleCapture={cancelEnsembleCapture}
-              onConfirmEnsembleCapture={confirmEnsembleCapture}
+              insightsCaptureEnabled={insightsCaptureEnabled}
+              onInsightsCaptureChange={changeInsightsCapture}
+              noisyActivityPrompt={noisyActivityPrompt}
+              onKeepInsightsOn={keepInsightsOn}
+              onTurnOffAndClearRecent={turnOffAndClearRecent}
             />
           ) : showLive ? (
             <LiveAudioTunerPane
@@ -1025,18 +952,14 @@ function LivePitchTunerAudio({
               insightsEnabled={audioToolsEnabled && liveMicOnly}
               audioToolsEnabled={audioToolsEnabled}
               inTuneGlow={liveTracker.inTuneGlow}
-              coachEnabled={liveMicOnly && !ensembleMode && !(nativePitchProcessing && isTunerDiagnosticMode('no-insights'))}
+              coachEnabled={liveMicOnly && !(nativePitchProcessing && isTunerDiagnosticMode('no-insights'))}
               pitchHistory={liveMicOnly ? pitchHistoryRef : undefined}
               visualTrace={liveMicOnly ? visualTraceRef : undefined}
-              ensembleMode={ensembleMode}
-              onEnsembleModeChange={changeEnsembleMode}
-              ensembleCaptureStatus={ensembleCaptureStatus}
-              ensembleCaptureMessage={ensembleCaptureMessage}
-              ensembleCapturePreview={ensembleCapturePreview}
-              ensembleCaptureAvailable={ensembleCaptureAvailable}
-              onStartEnsembleCapture={startEnsembleCapture}
-              onCancelEnsembleCapture={cancelEnsembleCapture}
-              onConfirmEnsembleCapture={confirmEnsembleCapture}
+              insightsCaptureEnabled={insightsCaptureEnabled}
+              onInsightsCaptureChange={changeInsightsCapture}
+              noisyActivityPrompt={noisyActivityPrompt}
+              onKeepInsightsOn={keepInsightsOn}
+              onTurnOffAndClearRecent={turnOffAndClearRecent}
             />
           ) : (
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -1085,7 +1008,7 @@ export default function LivePitchTuner({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const widgetContinuousScroll = isWidget && persistWhenPaused
   const liveMicWidget = isWidget && pitchSource === 'microphone'
-  const trackerActive = enabled && !isAudio
+  const trackerActive = enabled && !isAudio && (!liveMicWidget || liveMicEnabled)
   const trackerPlaying = liveMicWidget ? trackerActive : isPlaying
   const tracker = useLivePitchTracker(
     mediaRef,
@@ -1105,6 +1028,7 @@ export default function LivePitchTuner({
       nativePitchProcessing: liveMicWidget && nativePitchProcessing,
       allowStandaloneMicFallback: liveMicWidget,
       retryNativeTapOnInteractiveRecovery: liveMicWidget,
+      onSourceHealthChange: liveMicWidget ? onLiveSourceHealthChange : undefined,
     },
   )
   if (isAudio) {

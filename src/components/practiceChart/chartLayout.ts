@@ -77,6 +77,8 @@ export interface ChartRow {
 
 export interface ChartStripLayout {
   scale: number
+  /** Width of the scrollable strip, including pages wider than the screen. */
+  contentWidth: number
   widths: number[]
   /** Each page's own drawn height — never a row's, so nothing is stretched. */
   heights: number[]
@@ -95,7 +97,7 @@ export interface ChartStripLayout {
 }
 
 const EMPTY: ChartStripLayout = {
-  scale: 1, widths: [], heights: [], tops: [], lefts: [], rows: [], rowOfPage: [],
+  scale: 1, contentWidth: 0, widths: [], heights: [], tops: [], lefts: [], rows: [], rowOfPage: [],
   columns: 1, total: 0, maxScroll: 0,
 }
 
@@ -109,15 +111,23 @@ export function layoutChartStrip(
   viewWidth: number,
   viewHeight: number,
   fit: ChartFit,
+  zoom = 1,
 ): ChartStripLayout {
   if (pages.length === 0 || viewWidth <= 0 || viewHeight <= 0) return EMPTY
   const widest = Math.max(...pages.map(page => page.width))
   const tallest = Math.max(...pages.map(page => page.height))
   if (!(widest > 0) || !(tallest > 0)) return EMPTY
   const columns = fit === 'spread' && pages.length > 1 ? 2 : 1
-  const scale = fit === 'width'
+  const baseScale = fit === 'width'
     ? viewWidth / widest
     : Math.min((viewWidth - (columns - 1) * SPREAD_GUTTER) / (widest * columns), viewHeight / tallest)
+  const scale = baseScale * Math.max(1, zoom)
+  const contentWidth = Math.max(viewWidth,
+    ...Array.from({ length: Math.ceil(pages.length / columns) }, (_, rowIndex) => {
+      const row = pages.slice(rowIndex * columns, (rowIndex + 1) * columns)
+      return row.reduce((total, page) => total + page.width * scale, 0)
+        + (row.length - 1) * SPREAD_GUTTER
+    }))
   const widths: number[] = []
   const heights: number[] = []
   const tops: number[] = []
@@ -137,7 +147,7 @@ export function layoutChartStrip(
     const slotHeight = fit === 'width' ? rowHeight : Math.max(rowHeight, viewHeight)
     const rowWidth = row.reduce((total, page) => total + page.width * scale, 0)
       + (row.length - 1) * SPREAD_GUTTER
-    let x = (viewWidth - rowWidth) / 2
+    let x = (contentWidth - rowWidth) / 2
     for (const page of row) {
       const height = page.height * scale
       widths.push(page.width * scale)
@@ -145,7 +155,7 @@ export function layoutChartStrip(
       // Centred in the slot, so a page shorter than the screen has its margin
       // split evenly instead of all of it falling below the last system.
       tops.push(offset + (slotHeight - height) / 2)
-      lefts.push(Math.max(0, x))
+      lefts.push(x)
       rowOfPage.push(rows.length)
       x += page.width * scale + SPREAD_GUTTER
     }
@@ -153,7 +163,7 @@ export function layoutChartStrip(
     offset += slotHeight
   }
   return {
-    scale, widths, heights, tops, lefts, rows, rowOfPage, columns,
+    scale, contentWidth, widths, heights, tops, lefts, rows, rowOfPage, columns,
     total: offset, maxScroll: Math.max(0, offset - viewHeight),
   }
 }

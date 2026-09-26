@@ -176,7 +176,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        // Control Center and the volume overlay make the app inactive without
+        // backgrounding it. Suspending here would tear down the camera/audio
+        // route under a live metronome and can switch the system volume route.
         AudioRouteConfigurator.suspendForAppBackground()
     }
 

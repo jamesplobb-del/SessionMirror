@@ -414,7 +414,11 @@ function LiveCameraBackground({
       const ready = await waitForMediaReadyWithRetry(media)
       if (!isCurrent()) return
       if (!ready) { fail(); return }
-      await applyAutoPlaybackLeadIn(media, undefined, handsFreePlaybackPerformanceStartSeconds)
+      await applyAutoPlaybackLeadIn(
+        media,
+        undefined,
+        handsFreePlaybackPerformanceStartSeconds,
+      )
       if (!isCurrent()) return
 
       stopTailSkip = attachAutoPlaybackTailSkip(media, handsFreePlaybackTailSkipSeconds, finish)

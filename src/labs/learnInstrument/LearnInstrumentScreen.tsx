@@ -92,11 +92,10 @@ export default function LearnInstrumentScreen({
   const previousPhaseRef = useRef(game.state.phase)
   const [showOptions, setShowOptions] = useState(false)
 
-  const sharedMicReady = Boolean(
-    streamRef.current?.getAudioTracks().some((track) => track.readyState === 'live'),
-  )
-  const pitchEnabled =
-    game.state.phase !== 'complete' && (sharedMicReady || micPermissionPending)
+  // The native camera/audio session can deliver pitch even when WebKit has no
+  // live MediaStream. Keep the tracker mounted so it can take that route and
+  // recover an interrupted mic without waiting for a stream-driven render.
+  const pitchEnabled = game.state.phase !== 'complete'
 
   /*
    * Coming back from the background, the stream is usually dead while
@@ -127,6 +126,10 @@ export default function LearnInstrumentScreen({
       tunerInstrument: 'winds',
       realtimeMode: true,
       continuousScroll: false,
+      preferNativeAudioTap: true,
+      nativePitchProcessing: true,
+      retryNativeTapOnInteractiveRecovery: true,
+      allowStandaloneMicFallback: true,
       onSourceHealthChange: setSourceHealth,
       onAcceptedPitchFrame: game.handleAcceptedPitchFrame,
     },

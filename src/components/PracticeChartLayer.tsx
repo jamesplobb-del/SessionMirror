@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, Square, Upload } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
+import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, SlidersHorizontal, Square, Upload } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -22,9 +22,10 @@ import PracticeChartPaper, { type ChartPaperHandle, type ChartPaperView } from '
 import { closeCachedPdfChart } from './practiceChart/chartDocument'
 import './practice-chart.css'
 
-type MusicWorkspaceKey = Exclude<keyof HudQuickSettings, 'showMusic' | 'audioEnhancerEnabled'>
+type MusicWorkspaceKey = Exclude<keyof HudQuickSettings, 'showMusic'>
 const MUSIC_WORKSPACE_TOOLS = [
   { key: 'pitchTrackerEnabled', label: 'Pitch', icon: AudioLines },
+  { key: 'audioEnhancerEnabled', label: 'Audio Enhance', icon: SlidersHorizontal },
   { key: 'showMetronome', label: 'Metronome', icon: MetronomeToolIcon },
   { key: 'showDrone', label: 'Drone', icon: Radio },
   { key: 'showTakeCards', label: 'Takes', icon: TakesToolIcon },
@@ -183,7 +184,11 @@ export default function PracticeChartLayer({
     if (previous.projectId !== projectId || previous.revision === revision) return
     let cancelled = false
     void loadPracticeChart(projectId).then(value => {
-      if (!cancelled) setChart(value)
+      if (!cancelled) {
+        setChart(value)
+        setStrokes(loadInkStrokes(projectId))
+        setView(loadChartView(projectId))
+      }
     }).catch(() => { if (!cancelled) setError('Could not refresh this music.') })
     return () => { cancelled = true }
   }, [projectId, revision])
@@ -213,7 +218,7 @@ export default function PracticeChartLayer({
    */
   const showingEmpty = active && paperVisible && loaded && chart === null
   const showingLoading = active && paperVisible && !loaded
-  useEffect(() => {
+  useLayoutEffect(() => {
     onPaperVisibleChange(showing || showingEmpty || showingLoading)
   }, [onPaperVisibleChange, showing, showingEmpty, showingLoading])
 
@@ -230,7 +235,7 @@ export default function PracticeChartLayer({
    * the page again has said what they want, and it is not this.
    */
   const opened = useRef<string | null>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!showing || !paperKey || opened.current === paperKey) return
     opened.current = paperKey
     setChromeOff(true)
@@ -242,7 +247,7 @@ export default function PracticeChartLayer({
    * out.
    */
   const chromeHidden = showing && chromeOff
-  useEffect(() => { onChromeHiddenChange(chromeHidden) }, [chromeHidden, onChromeHiddenChange])
+  useLayoutEffect(() => { onChromeHiddenChange(chromeHidden) }, [chromeHidden, onChromeHiddenChange])
 
   /*
    * Turning the Music tool off unmounts this layer outright, and the room would
@@ -481,6 +486,7 @@ export default function PracticeChartLayer({
 
   const gesture = useRef<{ id: number; x: number; y: number; at: number } | null>(null)
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary) { gesture.current = null; return }
     gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, at: Date.now() }
   }
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
@@ -538,6 +544,7 @@ export default function PracticeChartLayer({
         data-inactive={showing ? undefined : 'true'}
         aria-hidden={showing ? undefined : true}
         onPointerDown={showing ? onPointerDown : undefined}
+        onTouchStartCapture={event => { if (event.touches.length > 1) gesture.current = null }}
         onPointerUp={showing ? onPointerUp : undefined}
         onPointerCancel={() => { gesture.current = null }}
       >
@@ -715,7 +722,7 @@ export default function PracticeChartLayer({
       onAdd={pick}
       onRemove={() => void remove()}
       onTurn={direction => paper.current?.turn(direction)}
-      onFitChange={fit => updateView({ fit })}
+      onFitChange={fit => { paper.current?.resetZoom(); updateView({ fit }) }}
       onHalfTurnChange={halfTurn => updateView({ halfTurn })}
       onPaperVisibleChange={handlePaperVisible}
     />

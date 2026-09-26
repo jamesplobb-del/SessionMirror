@@ -51,8 +51,8 @@ interface PitchInsightsScreenProps {
   tunerInstrument?: TunerInstrument
   formatNoteName?: (midiNote: number, fallback: string) => string
   hapticFeedback?: boolean
-  ensembleMode?: boolean
-  onEnsembleModeChange?: (enabled: boolean) => void
+  captureEnabled?: boolean
+  onCaptureEnabledChange?: (enabled: boolean) => void
 }
 
 interface CentsGraphPoint {
@@ -1030,8 +1030,8 @@ export default function PitchInsightsScreen({
   tunerInstrument,
   formatNoteName = (_midiNote, fallback) => fallback,
   hapticFeedback = true,
-  ensembleMode = false,
-  onEnsembleModeChange,
+  captureEnabled = true,
+  onCaptureEnabledChange,
 }: PitchInsightsScreenProps) {
   const { showAlert, showConfirm } = useActionSheet()
   const [observations, setObservations] = useState<PitchObservation[]>([])
@@ -1167,6 +1167,15 @@ export default function PitchInsightsScreen({
               observation.observedAt >= detail.endAt,
           ),
         )
+        return
+      }
+      if (detail?.kind === 'session-range-deleted') {
+        const keep = (observation: PitchObservation) =>
+          observation.sessionId !== detail.sessionId ||
+          observation.observedAt < detail.startAt ||
+          observation.observedAt >= detail.endAt
+        pendingSavedRef.current = pendingSavedRef.current.filter(keep)
+        setObservations((current) => current.filter(keep))
         return
       }
 
@@ -1414,14 +1423,16 @@ export default function PitchInsightsScreen({
 
         <div className="pitch-insights-screen__scroll">
 
-          {!selected && !selectedDay && !overviewRoute && onEnsembleModeChange ? (
-            <section className="pitch-insights-ensemble-setting" aria-label="Ensemble mode">
+          {!selected && !selectedDay && !overviewRoute && onCaptureEnabledChange ? (
+            <section className="pitch-insights-capture-setting" aria-label="Save Pitch Insights">
               <div>
-                <strong>Playing with others?</strong>
-                <p>Ensemble mode pauses automatic Insights. Measure one held note in the tuner, then confirm it before saving. The live tuner still hears the whole room.</p>
+                <strong>Save Pitch Insights</strong>
+                <p>{captureEnabled
+                  ? 'Steady notes are added automatically. Turn off when the microphone may hear other players.'
+                  : 'Off stops new readings. The tuner still works, and your saved history stays.'}</p>
               </div>
-              <button type="button" role="switch" aria-checked={ensembleMode} onClick={() => onEnsembleModeChange(!ensembleMode)}>
-                {ensembleMode ? 'On' : 'Off'}
+              <button type="button" role="switch" aria-label="Save Pitch Insights" aria-checked={captureEnabled} onClick={() => onCaptureEnabledChange(!captureEnabled)}>
+                {captureEnabled ? 'On' : 'Off'}
               </button>
             </section>
           ) : null}

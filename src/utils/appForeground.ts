@@ -96,26 +96,6 @@ function markBackground(reason: string): void {
   dispatchBackground(reason)
 }
 
-/**
- * iOS reports "inactive" for Control Center, a pulled-down notification, a
- * system prompt or the volume overlay while the app never leaves the screen.
- * Each of those ran a full background suspend and then a full foreground
- * recovery: microphone and camera torn down and rebuilt, playback routes
- * released, the audio session reconfigured twice under a running metronome —
- * which is how adjusting the volume froze the click and jumped the level. A
- * real background still hides the page and is marked at once; "inactive" on
- * its own now has to outlast this grace.
- */
-const INACTIVE_GRACE_MS = 1500
-let inactiveTimer: number | null = null
-let inactiveSince = 0
-
-function clearInactiveGrace(): void {
-  if (inactiveTimer === null) return
-  window.clearTimeout(inactiveTimer)
-  inactiveTimer = null
-}
-
 export function isAppInForeground(): boolean {
   return appInForeground
 }
@@ -132,28 +112,32 @@ export function registerAppForegroundLifecycle(): void {
   lifecycleRegistered = true
 
   const onVisibilityChange = () => {
+    // WKWebView visibility can change under Control Center without UIKit
+    // entering the background. Native pause is the authoritative event.
+    if (Capacitor.isNativePlatform()) return
     if (document.visibilityState === 'visible') {
       markForeground('visibility-visible')
       return
     }
-    clearInactiveGrace()
     markBackground('visibility-hidden')
   }
 
   const onPageShow = () => {
+    if (Capacitor.isNativePlatform()) return
     if (document.visibilityState === 'visible') {
       markForeground('pageshow')
     }
   }
 
   const onFocus = () => {
+    if (Capacitor.isNativePlatform()) return
     if (document.visibilityState === 'visible') {
       markForeground('window-focus')
     }
   }
 
   const onPageHide = () => {
-    clearInactiveGrace()
+    if (Capacitor.isNativePlatform()) return
     markBackground('pagehide')
   }
 
@@ -164,25 +148,11 @@ export function registerAppForegroundLifecycle(): void {
 
   if (Capacitor.isNativePlatform()) {
     void import('@capacitor/app').then(({ App }) => {
+      // iOS appStateChange(false) is willResignActive, also sent for Control
+      // Center and volume controls. pause is the actual background transition.
+      void App.addListener('pause', () => markBackground('capacitor-pause'))
       void App.addListener('appStateChange', ({ isActive }) => {
-        if (isActive) {
-          if (inactiveTimer !== null) {
-            // A timer still pending after more than twice its delay means
-            // WebKit was suspended and it never got to run: a real absence.
-            const overlayOnly = Date.now() - inactiveSince < INACTIVE_GRACE_MS * 2
-            clearInactiveGrace()
-            if (overlayOnly && appInForeground) return
-            if (appInForeground) markBackground('capacitor-inactive')
-          }
-          markForeground('capacitor-active')
-          return
-        }
-        if (!appInForeground || inactiveTimer !== null) return
-        inactiveSince = Date.now()
-        inactiveTimer = window.setTimeout(() => {
-          inactiveTimer = null
-          markBackground('capacitor-inactive')
-        }, INACTIVE_GRACE_MS)
+        if (isActive && !appInForeground) markForeground('capacitor-active')
       })
     })
     return

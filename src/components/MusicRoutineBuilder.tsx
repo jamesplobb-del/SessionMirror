@@ -12,6 +12,7 @@ import { copyExerciseTools, createMusicExercise, musicExerciseTitle, prepareRout
 import { loadMusicOrder, loadMusicScoreSettings, loadMusicSetup, orderMusic } from '../utils/musicLibrary'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getWrittenPitchLabel } from '../utils/tunerTransposition'
+import { importPracticePlanFileFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION } from '../utils/practiceRoutineShare'
 import type { DeskSnapshot } from '../utils/workspaceDesks'
 import ScoreThumbnail from './ScoreThumbnail'
 import '../styles/routine-guide.css'
@@ -47,6 +48,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const [sharing, setSharing] = useState(false)
   const [chooseFromLibraryId, setChooseFromLibraryId] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const routineInput = useRef<HTMLInputElement>(null)
   const replaceId = useRef<string | null>(null)
   const scroll = useRef<HTMLDivElement>(null)
   const alive = useRef(true)
@@ -79,7 +81,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     }
     return [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt)
   }, [routineLibrary, props.routine])
-  const missingMusic = draft.steps.filter(step => step.sharedScoreName && !(step.projectId && hasPracticeChart(step.projectId)))
+  const missingMusic = draft.steps.filter(step => (step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId)))
 
   const openPicker = (id: string | null = null) => {
     replaceId.current = id
@@ -144,11 +146,34 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     setExerciseName(''); setShowExercise(false)
   }
   const openRoutine = (routine: Routine) => { setDraft(routine); setExpanded(null); setScreen('lineup'); setError('') }
+  const startNewRoutine = () => {
+    setDraft(createRoutine('My practice', [], props.instrumentId))
+    setExpanded(null)
+    setShowExercise(false)
+    setScreen('lineup')
+    setError('')
+  }
+  const importRoutine = async (file: File) => {
+    if (busyRef.current) return
+    if (file.size > MAX_PRACTICE_PLAN_BYTES) { setError('That file is too large to be a routine.'); return }
+    busyRef.current = true; setBusy(true); setError(''); setProgress('Importing routine…')
+    try {
+      const result = await importPracticePlanFileFromText(await file.text())
+      if (!alive.current) return
+      if (!result.ok) { setError(result.error); return }
+      setRoutineLibrary(loadRoutineLibrary())
+      openRoutine(result.routine)
+    } catch { if (alive.current) setError('Could not read that routine file. Please try again.') }
+    finally {
+      busyRef.current = false
+      if (alive.current) { setBusy(false); setProgress('') }
+    }
+  }
   const save = async (start: boolean) => {
     if (!draft.steps.length || busyRef.current) return
     if (start && missingMusic.length) {
       setExpanded(missingMusic[0].id)
-      setError(`Import ${missingMusic[0].sharedScoreName} before starting this routine.`)
+      setError(`Import ${missingMusic[0].sharedScoreName ?? missingMusic[0].title} before starting this routine.`)
       return
     }
     busyRef.current = true; setBusy(true); setError('')
@@ -183,14 +208,21 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     <div className="music-routine-scroll" ref={scroll}>
       <fieldset className="music-routine-content" disabled={busy}>
         {screen === 'music' ? <>
-          <header className="music-routine-heading"><span>ROUTINE</span><h2>Choose your music.</h2><p>Select everything you want to practice, then set up each exercise.</p></header>
-          {music.length === 0 && <div className="music-routine-import"><button type="button" className="music-routine-primary" onClick={() => openPicker()}><Upload /> Import music</button><p>Choose one or more PDFs or photos.</p></div>}
-          {music.length > 0 && <section className="music-routine-recent"><div className="music-routine-section-title"><div><h3>Music library</h3><span>{draft.steps.filter(item => item.projectId).length} selected</span></div><button type="button" className="music-routine-import-more" onClick={() => openPicker()}><Upload /> Import</button></div>{music.map(({ step }) => {
+          <header className="music-routine-heading"><span>ROUTINES</span><h2>Your routines.</h2><p>Start a new plan, open a saved routine, or import one you received.</p></header>
+          <div className="music-routine-start-actions">
+            <button type="button" className="music-routine-primary" onClick={startNewRoutine}><Plus /> New routine</button>
+            <div className="music-routine-import-actions">
+              <button type="button" onClick={() => openPicker()}><FileMusic /> Import PDF</button>
+              <button type="button" onClick={() => routineInput.current?.click()}><Upload /> Import routine</button>
+            </div>
+            <p>PDFs or photos for music · .{PRACTICE_PLAN_EXTENSION} for routines</p>
+          </div>
+          {savedRoutines.length > 0 && <section className="music-routine-saved"><div className="music-routine-section-title"><h3>Saved routines</h3></div>{savedRoutines.map(item => <button type="button" key={item.id} onClick={() => openRoutine(item)}><span><strong>{item.name}</strong><small>{item.steps.length} exercises{props.routine?.id === item.id ? ' · Today' : ''}</small></span><ChevronRight /></button>)}</section>}
+          {music.length > 0 && <section className="music-routine-recent"><div className="music-routine-section-title"><div><h3>Music library</h3><span>{draft.steps.filter(item => item.projectId).length} selected</span></div></div>{music.map(({ step }) => {
             const selectedStep = draft.steps.find(item => item.projectId === step.projectId)
             return <button type="button" key={step.projectId ?? step.id} className="music-routine-recent-row" aria-pressed={Boolean(selectedStep)} onClick={() => toggleMusic(step)}><ScoreThumbnail projectId={step.projectId} revision={revision} /><span><strong>{step.title}</strong><small>{exerciseSummary(selectedStep ?? step)}</small></span><span className="music-routine-select" aria-hidden>{selectedStep ? <Check /> : <Plus />}</span></button>
           })}</section>}
           <button type="button" className="music-routine-text" onClick={() => { setShowExercise(true); setScreen('lineup') }}>Add an exercise without music</button>
-          {savedRoutines.length > 0 && <section className="music-routine-saved"><div className="music-routine-section-title"><h3>Saved routines</h3></div>{savedRoutines.map(item => <button type="button" key={item.id} onClick={() => openRoutine(item)}><span><strong>{item.name}</strong><small>{item.steps.length} exercises{props.routine?.id === item.id ? ' · Today' : ''}</small></span><ChevronRight /></button>)}</section>}
           <button type="button" className="music-routine-text" onClick={() => setLegacy('library')}>Presets, goals & shared routines <ChevronRight /></button>
         </> : <>
           <header className="music-routine-heading music-routine-heading--compact"><span>ROUTINE</span><h2>Exercises</h2></header>
@@ -201,10 +233,10 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
             const desk = step.desk ?? blankDesk('audio')
             const toolsAllowed = step.kind !== 'game' && step.kind !== 'free'
             const attached = Boolean(step.projectId && hasPracticeChart(step.projectId))
-            const needsMusic = Boolean(step.sharedScoreName && !attached)
+            const needsMusic = Boolean((step.sharedScoreName || (desk.showMusic && step.projectId)) && !attached)
             return <li key={step.id} className={expanded === step.id ? 'is-expanded' : ''}>
               <button type="button" className="music-routine-item" aria-expanded={expanded === step.id} onClick={() => setExpanded(expanded === step.id ? null : step.id)}><span className="music-routine-order">{index + 1}</span>{attached ? <ScoreThumbnail projectId={step.projectId} revision={revision} /> : <span className="music-routine-thumb"><Music2 /></span>}<span className="music-routine-copy"><strong>{step.title}</strong><small>{needsMusic ? 'Music needed · ' : ''}{exerciseSummary(step)}</small></span><ChevronDown /></button>
-              {needsMusic && <div className="music-routine-missing"><button type="button" onClick={() => openPicker(step.id)}><Plus aria-hidden /> Import {step.sharedScoreName}</button>{music.length > 0 && <button type="button" className="music-routine-use-library" onClick={() => setChooseFromLibraryId(chooseFromLibraryId === step.id ? null : step.id)}>Use from library</button>}</div>}
+              {needsMusic && <div className="music-routine-missing"><button type="button" onClick={() => openPicker(step.id)}><Plus aria-hidden /> Import {step.sharedScoreName ?? step.title}</button>{music.length > 0 && <button type="button" className="music-routine-use-library" onClick={() => setChooseFromLibraryId(chooseFromLibraryId === step.id ? null : step.id)}>Use from library</button>}</div>}
               {needsMusic && chooseFromLibraryId === step.id && <div className="music-routine-choose-library" aria-label={`Choose music for ${step.title}`}>{music.map(item => <button type="button" key={item.step.projectId} onClick={() => { patchStep(step.id, { projectId: item.step.projectId }); setChooseFromLibraryId(null) }}>{item.step.title}</button>)}</div>}
               {expanded === step.id && <div className="music-routine-item-settings">
                 {toolsAllowed && <MusicToolSetup step={step} instrumentId={draft.instrumentId} onChange={patch => patchStep(step.id, patch)} />}
@@ -236,6 +268,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     {screen === 'lineup' && <footer className="music-routine-footer"><button type="button" className="music-routine-save-later" disabled={busy || !draft.steps.length} onClick={() => void save(false)}>Save for later</button><button type="button" className="music-routine-primary" disabled={busy || !draft.steps.length || (Boolean(props.onSaveAndStart) && missingMusic.length > 0)} onClick={() => void save(Boolean(props.onSaveAndStart))}>{props.onSaveAndStart ? missingMusic.length ? 'Import music to start' : props.todayStarted && draft.id === props.routine?.id ? 'Save & continue' : 'Start routine' : 'Save routine'}<ArrowRight /></button></footer>}
     {screen === 'music' && draft.steps.length > 0 && <footer className="music-routine-footer"><button type="button" className="music-routine-primary" disabled={busy} onClick={() => setScreen('lineup')}>Set up {draft.steps.length} {draft.steps.length === 1 ? 'exercise' : 'exercises'} <ArrowRight /></button></footer>}
     <input ref={fileInput} type="file" multiple hidden accept="application/pdf,image/jpeg,image/png,image/webp,.pdf" onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; void importFiles(files) }} />
+    <input ref={routineInput} type="file" hidden accept={`.${PRACTICE_PLAN_EXTENSION},application/json`} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importRoutine(file) }} />
     {sharing && <RoutineShareDialog routine={draft} onClose={() => setSharing(false)} />}
   </section>
 }

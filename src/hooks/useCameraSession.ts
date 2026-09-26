@@ -701,6 +701,13 @@ export function useCameraSession({
    * `acquireNativeVideoBridge`, which handles sharing and retry. */
   const runNativeVideoBridgeAcquire = useCallback(async (): Promise<boolean> => {
     const acquire = (async (): Promise<boolean> => {
+      // Audio can still be discarding a hands-free pre-roll before its bridge
+      // teardown starts. A Camera start must wait for that whole handoff; the
+      // release promise alone does not cover this earlier window.
+      const pendingSurfaceHandoff = nativeSurfaceHandoffRef.current
+      if (pendingSurfaceHandoff) {
+        await pendingSurfaceHandoff
+      }
       const pendingRelease = nativeBridgeReleaseInFlightRef.current
       if (pendingRelease) {
         await pendingRelease

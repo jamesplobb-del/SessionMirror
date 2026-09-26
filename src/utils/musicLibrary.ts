@@ -31,6 +31,11 @@ export function saveMusicScoreSettings(projectId: string, settings: MusicScoreSe
   localStorage.setItem(scoreSettingsKey(projectId), JSON.stringify(settings))
 }
 
+export function clearMusicScoreSettings(projectId: string): void {
+  localStorage.removeItem(scoreSettingsKey(projectId))
+  localStorage.removeItem(setupKey(projectId))
+}
+
 export interface MusicFolder { id: string; name: string }
 export interface MusicOrganization { folders: MusicFolder[]; placements: Record<string, string> }
 

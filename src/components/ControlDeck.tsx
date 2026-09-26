@@ -33,6 +33,8 @@ interface ControlDeckProps {
   onToggleRecord: () => void
   onOpenHome: () => void
   openLens?: boolean
+  /** Keep only the Workspace launcher on a full-screen tool surface. */
+  workspaceOnly?: boolean
   /** Show the return to recording action while viewing full-size tools. */
   toolsActive?: boolean
   /** Alternate reviewed dock: Library above Record, Settings in the last slot. */
@@ -127,6 +129,7 @@ function ControlDeck({
   onToggleRecord,
   onOpenHome,
   openLens = false,
+  workspaceOnly = false,
   toolsActive = false,
   libraryAboveRecord = false,
   workspaceSections = false,
@@ -353,8 +356,10 @@ function ControlDeck({
 
   return (
     <div
-      className={`control-deck ${openLens ? 'open-lens-deck' : ''} pointer-events-auto flex w-full flex-col items-center px-4 ${
-        collapsible ? 'control-deck--collapsible' : ''
+      className={`control-deck ${openLens && !workspaceOnly ? 'open-lens-deck' : ''} ${
+        workspaceOnly ? 'control-deck--workspace-only' : 'pointer-events-auto flex w-full flex-col items-center px-4'
+      } ${
+        collapsible && !workspaceOnly ? 'control-deck--collapsible' : ''
       } ${isCameraPresentation ? 'control-deck--camera' : ''} ${
         // Reserves the strip the elapsed timer now sits in, below the record
         // button. Only while recording, so the deck is not permanently short.
@@ -411,7 +416,21 @@ function ControlDeck({
       />
 
       {referenceControls}
-      {openLens ? (
+      {workspaceOnly ? (
+        <Pressable
+          ref={overlaysButtonRef}
+          className="metronome-workspace-launcher"
+          onClick={() => branchActive ? closeBranch() : openBranch()}
+          disabled={settingsBranchDisabled || isRecording || isStopping}
+          hapticFeedback={hapticFeedback}
+          aria-label={branchActive ? 'Close workspace' : 'Open workspace'}
+          aria-expanded={branchActive}
+          aria-haspopup="menu"
+        >
+          <Grid2X2 aria-hidden />
+          <span>Workspace</span>
+        </Pressable>
+      ) : openLens ? (
         <div className="open-lens-dock">
           <Pressable className="open-lens-dock-action" onClick={onOpenHome} disabled={isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="home-button" aria-label="Open Practice Home"><House aria-hidden /><span>Home</span></Pressable>
           <Pressable ref={overlaysButtonRef} className="open-lens-dock-action" onClick={() => branchActive ? closeBranch() : openBranch()} disabled={settingsBranchDisabled || isRecording || isStopping} hapticFeedback={hapticFeedback} data-tutorial="overlays-button" aria-label={branchActive ? 'Close workspace' : 'Open workspace'} aria-expanded={branchActive}><Grid2X2 aria-hidden /><span>Workspace</span></Pressable>

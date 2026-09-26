@@ -5,8 +5,10 @@ import { ChevronDown, ChevronUp, FileMusic, GripHorizontal, Grip, Maximize, X } 
 import BestTakeBox from './BestTakeBox'
 import type { LibraryPlaybackReference } from '../types/library'
 import { clampWidgetPosition, loadWidgetSize, saveWidgetSize } from '../utils/floatingWidgetLayout'
+import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
+import { musicDockClearX } from '../utils/musicDockClearance'
 
-export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, youtubeUrl, libraryPlayback,
+export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, playing = false, youtubeUrl, libraryPlayback,
   suspended, onSubmitYoutube, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
@@ -17,6 +19,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   showTrackName?: boolean
   visible?: boolean
   dockRight?: boolean
+  playing?: boolean
   youtubeUrl: string | null
   libraryPlayback: LibraryPlaybackReference | null
   suspended: boolean
@@ -32,9 +35,11 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   const node = useRef<HTMLDivElement>(null)
   const drag = useDragControls()
   const chipDragged = useRef(false)
+  const collapseRequested = useRef(false)
   const [size, setSize] = useState(() => loadWidgetSize('reference') ?? { width: 280, height: 240 })
   const [room, setRoom] = useState({ width: 320, height: 480 })
   const [dockHost, setDockHost] = useState<HTMLElement | null>(null)
+  const dockChip = useRef<HTMLButtonElement>(null)
   const resizing = useRef<{ id: number; x: number; y: number; width: number; height: number } | null>(null)
   const clampSize = (width: number, height: number) => ({
     width: Math.max(Math.min(260, room.width), Math.min(room.width, width)),
@@ -78,19 +83,30 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     window.addEventListener('resize', findDock)
     return () => { observer.disconnect(); window.removeEventListener('resize', findDock) }
   }, [boundaryRef, dockRight])
-  const openFromDock = (button: HTMLButtonElement) => {
+  const openFromDock = (point?: DockDropPoint) => {
     const bounds = boundaryRef.current
     const widget = node.current
     if (bounds && widget) {
-      const ball = button.getBoundingClientRect()
+      const ball = dockChip.current?.getBoundingClientRect()
       const frame = bounds.getBoundingClientRect()
+      const fromX = point ? point.x - frame.left - displayed.width / 2
+        : (ball?.left ?? frame.right) - frame.left - displayed.width - 12
       const next = clampWidgetPosition(bounds.clientWidth, bounds.clientHeight,
-        displayed.width, displayed.height, ball.right - frame.left - displayed.width, ball.top - frame.top)
+        displayed.width, displayed.height,
+        musicDockClearX(fromX, displayed.width, frame.left),
+        point ? point.y - frame.top - 28 : (ball?.top ?? frame.top) - frame.top)
       x.set(next.x)
       y.set(next.y)
     }
     onExpandedChange(true)
   }
+  const dockItem = useMusicDockItem('references', openFromDock)
+  useLayoutEffect(() => {
+    if (expanded || !collapseRequested.current) return
+    collapseRequested.current = false
+    const chip = dockHost ? dockChip.current : node.current?.querySelector<HTMLButtonElement>('.reference-widget-chip')
+    chip?.focus({ preventScroll: true })
+  }, [expanded, dockHost])
   useEffect(() => {
     if (suspended) onPlaybackChange(false)
   }, [suspended, onPlaybackChange])
@@ -102,10 +118,10 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     return () => observer.disconnect()
   }, [boundaryRef, x, y])
   return <>
-  <motion.div ref={node} className={`reference-widget-live ${expanded ? 'is-expanded' : ''}`}
-    style={{ display: visible && (expanded || !dockHost) ? undefined : 'none', width: expanded ? displayed.width : undefined, height: expanded ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
+  <motion.div ref={node} className={`reference-widget-live ${expanded ? 'is-expanded' : 'is-collapsed'}`}
+    style={{ display: visible ? undefined : 'none', opacity: !expanded && dockHost ? 0 : undefined, pointerEvents: !expanded && dockHost ? 'none' : undefined, width: expanded || dockHost ? displayed.width : undefined, height: expanded || dockHost ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
     onDragStart={() => { if (!expanded) chipDragged.current = true }}>
-    {!expanded && !dockHost && <button type="button" className="reference-widget-chip"
+    {!expanded && !dockHost && <button type="button" className="reference-widget-chip" data-playing={playing}
       onPointerDown={event => {
         if (event.button !== 0) return
         chipDragged.current = false
@@ -118,21 +134,22 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
         chipDragged.current = false
         onExpandedChange(true)
       }}
-      aria-label="Open References" title="Tap to open; drag to move"><FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden /></button>}
-    <div className={`reference-widget-panel ${showTrackName && libraryPlayback ? 'reference-widget-panel--named-audio' : ''}`} hidden={!expanded}>
+      aria-label={playing ? 'Open References, playing' : 'Open References'} title="Tap to open; drag to move"><FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden /></button>}
+    <div className={`reference-widget-panel ${showTrackName && libraryPlayback ? 'reference-widget-panel--named-audio' : ''}`} aria-hidden={!expanded} inert={!expanded}
+      style={!expanded ? { width: displayed.width, height: displayed.height } : undefined}>
       <header onPointerDown={e => { if (!(e.target as HTMLElement).closest('button')) drag.start(e) }}>
         <span><GripHorizontal aria-hidden />References</span>
-        <button type="button" onClick={onExpandView} disabled={!youtubeUrl && !libraryPlayback} aria-label="Open reference in Expand View" title="Open Expand View"><Maximize aria-hidden /></button>
-        <button onClick={() => onExpandedChange(false)} aria-label="Collapse References" title="Collapse References"><ChevronUp aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
+        <button onClick={() => { collapseRequested.current = true; onExpandedChange(false) }} aria-label="Collapse References" title="Collapse References"><ChevronUp aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
       </header>
       {showTrackName && libraryPlayback && <p className="reference-widget-track-name">{libraryPlayback.name}</p>}
       <div className="reference-widget-media">
-        <BestTakeBox layout={youtubeUrl ? 'pip' : 'fill'} take={null} playbackOwner="reference-widget" displayLabel="" uploadAccept="audio/*,.mp3,.m4a,.wav" youtubeEmbedUrl={youtubeUrl} libraryPlayback={libraryPlayback}
-          suspendPlayback={suspended || !expanded} onBeforePlay={onBeforePlay} onUnpinTake={onClearAudio} onClearLibraryReference={onClearAudio}
+        <BestTakeBox layout="fill" take={null} playbackOwner="reference-widget" displayLabel="" uploadAccept="audio/*,.mp3,.m4a,.wav" youtubeEmbedUrl={youtubeUrl} libraryPlayback={libraryPlayback}
+          suspendPlayback={suspended} onBeforePlay={onBeforePlay} onUnpinTake={onClearAudio} onClearLibraryReference={onClearAudio}
           onClearYoutube={onClearYoutube} onSubmitYoutube={onSubmitYoutube} onUpload={onUpload}
           onYoutubeHostChange={onYoutubeHostChange} youtubeIframeRef={youtubeIframeRef} onPlaybackChange={onPlaybackChange} />
       </div>
       <footer className="reference-widget-size-bar">
+        <button type="button" className="reference-widget-compare" onClick={onExpandView} disabled={!youtubeUrl && !libraryPlayback} aria-label="Open reference comparison" title="Open two-box comparison"><Maximize aria-hidden /> Compare</button>
         <button type="button" className="reference-widget-resize" aria-label="Resize reference. Drag, or use arrow keys."
           onPointerDown={event => {
             if (event.button !== 0) return
@@ -140,14 +157,17 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
             resizing.current = { id: event.pointerId, x: event.clientX, y: event.clientY, width: displayed.width, height: displayed.height }
             event.currentTarget.setPointerCapture(event.pointerId)
           }} onPointerMove={resize} onPointerUp={event => finishResize(event)} onPointerCancel={event => finishResize(event, true)}
-          onLostPointerCapture={event => finishResize(event, true)} onKeyDown={resizeWithKeys}><Grip aria-hidden /></button>
+          onLostPointerCapture={event => finishResize(event, true)} onKeyDown={resizeWithKeys}><span>Resize</span><Grip aria-hidden /></button>
       </footer>
     </div>
   </motion.div>
   {visible && !expanded && dockHost && createPortal(
-    <button type="button" className="reference-widget-chip reference-widget-chip--docked"
-      aria-label="Open References" title="Open References"
-      style={{ order: 4 }} onClick={event => openFromDock(event.currentTarget)}>
+    <button ref={dockChip} type="button" className="reference-widget-chip reference-widget-chip--docked" data-playing={playing}
+      aria-label={playing ? 'Open References, playing' : 'Open References'} title="Open References; drag left to place, or up/down to reorder"
+      data-music-dock-id="references" style={{ order: dockItem.order, translate: dockItem.translate }}
+      onPointerDown={dockItem.pointerDown} onPointerMove={dockItem.pointerMove}
+      onPointerUp={event => dockItem.pointerEnd(event)} onPointerCancel={event => dockItem.pointerEnd(event, true)}
+      onLostPointerCapture={event => dockItem.pointerEnd(event, true)} onClick={dockItem.click} onKeyDown={dockItem.keyDown}>
       <FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden />
     </button>, dockHost)}
   </>

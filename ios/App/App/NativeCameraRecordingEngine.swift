@@ -849,47 +849,52 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
             case .failure(let error):
                 completion(.failure(error))
             case .success:
-                self.sessionQueue.async {
-                    MetronomeEngine.shared.pauseOutputForCaptureHandoff()
-                    do {
-                        let resolvedProfile = CameraSessionGuard.recordingMode == "audio" ? .playAndRecordDefault : audioSessionProfile
-                        try self.configureAudioSessionForRecording(
-                            profile: resolvedProfile,
-                            micInputPreference: micInputPreference
-                        )
-                        // Rebuild the capture session if needed. The explicit
-                        // needsAudioPipelineRebuild flag is set whenever the bridge/
-                        // preview is stopped for app-background. It is more reliable
-                        // than checking !session.isRunning because stopRunning() is
-                        // dispatched asynchronously on sessionQueue — the flag is set
-                        // synchronously on the tear-down path so it is always true by
-                        // the time this start path runs on the same queue.
-                        if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || self.needsAudioPipelineRebuild {
-                            let configuredOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
-                            self.movieOutput = configuredOutput
-                            self.isSessionConfigured = true
-                            self.needsAudioPipelineRebuild = false
-                        }
-                        self.previewUsesFrontCamera = useFrontCamera
-                        if !self.session.isRunning {
-                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.begin")
-                            self.session.startRunning()
-                            AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.end")
-                        }
-                        self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
-                        self.enableFrameBridge()
-                        self.isBridgePreviewActive = true
-                        self.isPreviewActive = false
-                        CameraSessionGuard.setPreviewActive(true)
-                        MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
-                        let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
-                        DispatchQueue.main.async {
-                            completion(.success(sessionInfo))
-                        }
-                    } catch {
-                        MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
-                        DispatchQueue.main.async {
-                            completion(.failure(error))
+                // Starting while iPad is already landscape does not trigger a
+                // layout rotation. Refresh before configuring video outputs.
+                DispatchQueue.main.async {
+                    self.updatePadCaptureOrientation()
+                    self.sessionQueue.async {
+                        MetronomeEngine.shared.pauseOutputForCaptureHandoff()
+                        do {
+                            let resolvedProfile = CameraSessionGuard.recordingMode == "audio" ? .playAndRecordDefault : audioSessionProfile
+                            try self.configureAudioSessionForRecording(
+                                profile: resolvedProfile,
+                                micInputPreference: micInputPreference
+                            )
+                            // Rebuild the capture session if needed. The explicit
+                            // needsAudioPipelineRebuild flag is set whenever the bridge/
+                            // preview is stopped for app-background. It is more reliable
+                            // than checking !session.isRunning because stopRunning() is
+                            // dispatched asynchronously on sessionQueue — the flag is set
+                            // synchronously on the tear-down path so it is always true by
+                            // the time this start path runs on the same queue.
+                            if !self.isSessionConfigured || self.movieOutput == nil || self.previewUsesFrontCamera != useFrontCamera || self.needsAudioPipelineRebuild {
+                                let configuredOutput = try self.configureCaptureSession(useFrontCamera: useFrontCamera)
+                                self.movieOutput = configuredOutput
+                                self.isSessionConfigured = true
+                                self.needsAudioPipelineRebuild = false
+                            }
+                            self.previewUsesFrontCamera = useFrontCamera
+                            if !self.session.isRunning {
+                                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.begin")
+                                self.session.startRunning()
+                                AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.startBridgePreview startRunning.end")
+                            }
+                            self.resetVideoZoomIfNeeded(useFrontCamera: useFrontCamera)
+                            self.enableFrameBridge()
+                            self.isBridgePreviewActive = true
+                            self.isPreviewActive = false
+                            CameraSessionGuard.setPreviewActive(true)
+                            MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
+                            let sessionInfo = NativeCameraTestAudio.sessionDiagnostics(profile: audioSessionProfile)
+                            DispatchQueue.main.async {
+                                completion(.success(sessionInfo))
+                            }
+                        } catch {
+                            MetronomeEngine.shared.resumeOutputAfterCaptureHandoff()
+                            DispatchQueue.main.async {
+                                completion(.failure(error))
+                            }
                         }
                     }
                 }

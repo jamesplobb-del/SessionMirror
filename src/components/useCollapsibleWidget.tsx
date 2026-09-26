@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { animate, motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
 import { iosDragRelease } from '../utils/motionPresets'
 import { findAvailableWidgetBallPosition, clampWidgetPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, type WidgetPosition } from '../utils/floatingWidgetLayout'
+import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
+import { musicDockClearX } from '../utils/musicDockClearance'
 import './widget-ball.css'
 
 const BALL_SIZE = 56
@@ -223,17 +225,19 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     setCollapsed(true)
   }
 
-  const expand = () => {
+  const expand = (point?: DockDropPoint) => {
     if (dragged.current) { dragged.current = false; return }
     const bounds = boundaryRef.current
     const widget = widgetRef.current
     if (!bounds || !widget) return
     const ballRect = docked ? ballRef.current?.getBoundingClientRect() : null
     const boundsRect = bounds.getBoundingClientRect()
-    const fromX = ballRect ? ballRect.right - boundsRect.left - widget.offsetWidth : ballX.get() + BALL_SIZE - widget.offsetWidth
-    const fromY = ballRect ? ballRect.top - boundsRect.top : ballY.get()
+    const fromX = point ? point.x - boundsRect.left - widget.offsetWidth / 2
+      : ballRect ? ballRect.left - boundsRect.left - widget.offsetWidth - 12 : ballX.get() + BALL_SIZE - widget.offsetWidth
+    const fromY = point ? point.y - boundsRect.top - 28
+      : ballRect ? ballRect.top - boundsRect.top : ballY.get()
     const next = clampWidgetPosition(bounds.clientWidth, bounds.clientHeight,
-      widget.offsetWidth, widget.offsetHeight, fromX, fromY)
+      widget.offsetWidth, widget.offsetHeight, docked ? musicDockClearX(fromX, widget.offsetWidth, boundsRect.left) : fromX, fromY)
     x.set(next.x)
     y.set(next.y)
     saveWidgetPosition(positionId, next.x, next.y)
@@ -244,19 +248,23 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     setCollapsed(false)
   }
 
+  const dockItem = useMusicDockItem(positionId, expand)
+
   const ball = collapsed && visible && present && showBall ? <>
     <motion.button
     ref={ballRef} type="button" className={`widget-ball pointer-events-auto${docked ? ' widget-ball--docked' : ''}`}
     aria-label={`Expand ${label}${detail ? `, ${detail}` : ''}`} aria-expanded={false}
-    title={`Open ${label}`} data-active={active}
-    style={{ x: ballX, y: ballY, order: ballSlot }}
-    onPointerDown={docked ? undefined : startBallDrag}
-    onPointerMove={docked ? undefined : moveBall}
-    onPointerUp={docked ? undefined : event => endBallDrag(event)}
-    onPointerCancel={docked ? undefined : event => endBallDrag(event, true)}
-    onLostPointerCapture={docked ? undefined : event => endBallDrag(event, true)}
-    onClick={expand}
+    title={docked ? `Open ${label}; drag left to place, or up/down to reorder` : `Open ${label}`} data-active={active}
+    data-music-dock-id={docked ? positionId : undefined}
+    style={{ x: ballX, y: ballY, order: docked ? dockItem.order : ballSlot, translate: docked ? dockItem.translate : undefined }}
+    onPointerDown={docked ? dockItem.pointerDown : startBallDrag}
+    onPointerMove={docked ? dockItem.pointerMove : moveBall}
+    onPointerUp={docked ? event => dockItem.pointerEnd(event) : event => endBallDrag(event)}
+    onPointerCancel={docked ? event => dockItem.pointerEnd(event, true) : event => endBallDrag(event, true)}
+    onLostPointerCapture={docked ? event => dockItem.pointerEnd(event, true) : event => endBallDrag(event, true)}
+    onClick={docked ? dockItem.click : () => expand()}
     onKeyDown={event => {
+      if (docked) { dockItem.keyDown(event); return }
       const delta: Record<string, [number, number]> = {
         ArrowLeft: [-12, 0], ArrowRight: [12, 0], ArrowUp: [0, -12], ArrowDown: [0, 12],
       }

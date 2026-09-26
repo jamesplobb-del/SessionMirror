@@ -11,6 +11,12 @@ assert.equal(original.panels.filter(p=>p.hidden).length,0)
 assert.equal(draft.panels.filter(p=>p.hidden).length,10)
 assert.equal(draft.panels.filter(p=>p.overlay).length,4,'fifth extra does not get added')
 assert.deepEqual(m.withPortraitLayout(draft,'twelve').panels.slice(0,12).map(p=>p.take),takes,'all parked takes return')
+const moved={...original,layoutId:'two',panels:m.createPanelsForLayout(m.getLayoutPreset('two')).map((p,i)=>({...p,take:takes[i],frame:{xPercent:i*50,yPercent:10,widthPercent:50,heightPercent:80}}))}
+assert.ok(m.withPortraitLayout(moved,'two').panels[0].frame,'reopening the same layout keeps manual placement')
+const relaid=m.withPortraitLayout(moved,'three')
+assert.equal(relaid.panels[0].frame,undefined,'choosing another layout clears the old absolute frame')
+assert.deepEqual(relaid.panels.slice(0,2).map(p=>p.take),takes.slice(0,2),'changing layouts preserves recordings')
+assert.notDeepEqual(m.compositionRects(relaid,m.getLayoutPreset('three'),0).panelRects.a,moved.panels[0].frame,'the new preset controls visible geometry')
 let raw={xPercent:40,yPercent:40,widthPercent:32,heightPercent:28}
 for(let i=0;i<20;i++){raw=m.transformBox(raw,'move',i%2?1:-1,0);const shown=m.spacedLayoutRect(raw,original.layoutStyle);assert.ok(shown.widthPercent<32);assert.equal(raw.widthPercent,32,'repeated dragging does not accumulate spacing shrink')}
 assert.equal(raw.xPercent,40)

@@ -129,7 +129,13 @@ export async function recoverNativeTunerMonitor(
 
 export async function releaseNativeTunerMonitor(): Promise<void> {
   if (!isNativeCameraTestAvailable()) return
-  tunerMonitorRefCount = Math.max(0, tunerMonitorRefCount - 1)
+  // Cleanup can race an explicit playback handoff. An already-released lease
+  // must not stop the capture session again after playback has claimed it.
+  // The last owner's cleanup may already have queued its native stop. A
+  // playback handoff calling release again must wait for that stop to finish
+  // before it claims the speaker, even though there is no lease left to drop.
+  if (tunerMonitorRefCount === 0) return tunerMonitorOperation
+  tunerMonitorRefCount -= 1
   if (tunerMonitorRefCount > 0) return
 
   await enqueueTunerMonitorOperation(async () => {

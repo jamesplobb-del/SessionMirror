@@ -9,20 +9,22 @@ import TimelineEditorSelect from './TimelineEditorSelect'
 interface TrackSettingsPanelProps {
   settings: PracticeTrackSettings
   onChange: (patch: Partial<PracticeTrackSettings>) => void
+  recordEnabled: boolean
+  onRecordChange: (enabled: boolean) => void
 }
 
-function playbackOptionsSummary(settings: PracticeTrackSettings): string {
+function playbackOptionsSummary(settings: PracticeTrackSettings, recordEnabled: boolean): string {
   const countIn =
     settings.countInBars <= 0
       ? 'Count-in off'
       : `${settings.countInBars} bar${settings.countInBars === 1 ? '' : 's'} count-in`
   const loop = settings.loopTrack ? 'Loop on' : 'Loop off'
-  return `${countIn} · ${loop}`
+  return `${countIn} · ${loop} · Record ${recordEnabled ? 'on' : 'off'}`
 }
 
-export default function TrackSettingsPanel({ settings, onChange }: TrackSettingsPanelProps) {
+export default function TrackSettingsPanel({ settings, onChange, recordEnabled, onRecordChange }: TrackSettingsPanelProps) {
   const [open, setOpen] = useState(false)
-  const summary = useMemo(() => playbackOptionsSummary(settings), [settings])
+  const summary = useMemo(() => playbackOptionsSummary(settings, recordEnabled), [settings, recordEnabled])
 
   return (
     <div className="practice-timeline__playback-options pointer-events-auto">
@@ -34,7 +36,7 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
         aria-expanded={open}
       >
         <span className="practice-timeline__playback-options-copy">
-          <span className="practice-timeline__playback-options-title">Count-in &amp; looping</span>
+          <span className="practice-timeline__playback-options-title">Practice options</span>
           {!open ? (
             <span className="practice-timeline__playback-options-summary">{summary}</span>
           ) : null}
@@ -44,9 +46,6 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
 
       {open ? (
         <div className="practice-timeline__track-settings">
-          <p className="practice-timeline__track-settings-intro">
-            Choose how the full routine starts and repeats.
-          </p>
           <div className="practice-timeline__track-settings-row">
             <span className="practice-timeline__track-settings-label">Count-in</span>
             <div className="practice-timeline-editor__stepper practice-timeline__track-settings-stepper">
@@ -54,7 +53,7 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
                 type="button"
                 intensity="icon"
                 className="practice-timeline-editor__stepper-btn"
-                aria-label="Decrease routine count-in"
+                aria-label="Decrease program count-in"
                 onClick={() =>
                   onChange({
                     countInBars: Math.max(0, settings.countInBars - 1),
@@ -72,7 +71,7 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
                 type="button"
                 intensity="icon"
                 className="practice-timeline-editor__stepper-btn"
-                aria-label="Increase routine count-in"
+                aria-label="Increase program count-in"
                 onClick={() =>
                   onChange({
                     countInBars: Math.min(8, settings.countInBars + 1),
@@ -98,14 +97,21 @@ export default function TrackSettingsPanel({ settings, onChange }: TrackSettings
 
           <div className="practice-timeline__track-settings-loop">
             <span className="practice-timeline__track-settings-loop-copy">
-              <strong>Loop routine</strong>
+              <strong>Loop program</strong>
               <small>Start again after the last section</small>
             </span>
             <IOSSwitch
               checked={settings.loopTrack}
-              ariaLabel="Loop routine"
+              ariaLabel="Loop program"
               onChange={(loopTrack) => onChange({ loopTrack })}
             />
+          </div>
+          <div className="practice-timeline__record-toggle pointer-events-auto">
+            <span className="practice-timeline__record-copy">
+              <strong>Record this practice</strong>
+              <small>Save one take with markers for each section.</small>
+            </span>
+            <IOSSwitch checked={recordEnabled} ariaLabel="Record this practice" onChange={onRecordChange} />
           </div>
         </div>
       ) : null}

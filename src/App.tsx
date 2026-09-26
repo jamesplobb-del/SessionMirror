@@ -33,6 +33,7 @@ import ControlDeck from './components/ControlDeck'
 import RecordingHeader from './components/RecordingHeader'
 import ReferenceWidget from './components/ReferenceWidget'
 import MusicLibrary from './components/MusicLibrary'
+import MusicWidgetDrawer from './components/MusicWidgetDrawer'
 import { loadMusicScoreSettings, loadMusicSetup, saveMusicSetup } from './utils/musicLibrary'
 import { blankDesk } from './utils/practiceRoutines'
 import {
@@ -52,6 +53,7 @@ import { useAppShellPolicies } from './hooks/useAppShellPolicies'
 import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
+import { loadLastPracticeDestination, saveLastPracticeDestination, type LastPracticeDestination } from './utils/lastPracticeDestination'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
 import type { DeskSnapshot } from './utils/workspaceDesks'
 import { shareTakeToSystem } from './utils/shareTakeVideo'
@@ -217,8 +219,10 @@ import {
 } from './utils/cameraSessionState'
 import {
   acquireNativeTunerMonitor,
+  recoverNativeTunerMonitor,
   releaseNativeTunerMonitor,
 } from './utils/nativeAudioPitchTap'
+import type { PitchSourceHealth } from './hooks/useLivePitchTracker'
 import { pickHudQuickSettings } from './utils/hudQuickSettings'
 import { initAppFilesystem, nativeDataFileExists } from './utils/filesystemInit'
 import {
@@ -233,12 +237,13 @@ import {
   APP_BACKGROUND_SUSPEND_EVENT,
   APP_FOREGROUND_RECOVERY_EVENT,
   isAppInForeground,
+  subscribeAppForeground,
 } from './utils/appForeground'
 import { loadAppSettingsForSessionStart } from './utils/appSettings'
 import {
   applyAutoPlaybackLeadIn,
   attachAutoPlaybackTailSkip,
-  AUTO_PLAYBACK_LEAD_IN_S,
+  resolveAutoPlaybackStartSeconds,
 } from './utils/autoRecordPlayback'
 import {
   attachPlaybackPipelineInstrumentation,
@@ -626,6 +631,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     overDelete: false,
   })
   const [autoPlaybackTakeId, setAutoPlaybackTakeId] = useState<string | null>(null)
+  const autoPlaybackTakeIdRef = useRef<string | null>(null)
   const [autoPlaybackPlaying, setAutoPlaybackPlaying] = useState(false)
   const [audioModeTakePlaying, setAudioModeTakePlaying] = useState(false)
   const [benchmarkPipPlaying, setBenchmarkPipPlaying] = useState(false)
@@ -640,6 +646,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [quickSettingsOpen, setQuickSettingsOpen] = useState(false)
   /** The part is actually covering the room, so the HUD stops painting over it. */
   const [musicPageVisible, setMusicPageVisible] = useState(false)
+  const [musicWidgetDrawerOpen, setMusicWidgetDrawerOpen] = useState(() => {
+    try { return localStorage.getItem('besttake:music-widget-drawer:v1') !== 'closed' }
+    catch { return true }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('besttake:music-widget-drawer:v1', musicWidgetDrawerOpen ? 'open' : 'closed') }
+    catch { /* Keep the current drawer state if storage is unavailable. */ }
+  }, [musicWidgetDrawerOpen])
   /** Bumped when music is saved or re-shown from outside the page, so it reloads. */
   const [musicChartRevision, setMusicChartRevision] = useState(0)
   useEffect(() => {
@@ -669,6 +683,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [youtubePlayAlongUi, setYoutubePlayAlongUi] = useState(getYoutubePlayAlongUiState)
   const [isSplitView, setIsSplitView] = useState(false)
   const [splitReferenceActive, setSplitReferenceActive] = useState(false)
+  const splitReturnTabRef = useRef<AudioPracticeTab | null>(null)
   const isSplitViewRef = useRef(false)
   const [splitRatio, setSplitRatio] = useState(56)
   // The legacy compact/full card state remains available to the existing
@@ -681,6 +696,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
    * One routine, one card of progress for today. The routine is the checklist;
    * each step carries a desk so starting it is a single tap. */
   const [routine, setRoutine] = useState<Routine | null>(() => loadRoutine())
+  const [lastPracticeDestination, setLastPracticeDestination] = useState(loadLastPracticeDestination)
+  const rememberLastPracticeDestination = useCallback((destination: LastPracticeDestination) => {
+    saveLastPracticeDestination(destination)
+    setLastPracticeDestination(destination)
+  }, [])
   const [routineDay, setRoutineDay] = useState<RoutineDay | null>(() => {
     const stored = loadRoutine()
     return stored ? loadRoutineDay(stored) : null
@@ -766,9 +786,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [handleAudioPracticeTabChange])
   const showTakeCardsRef = useRef(settings.showTakeCards)
   showTakeCardsRef.current = settings.showTakeCards
-  const musicEnhancerBypassed = musicPageVisible && settings.showMusic
   const audioEnhancerEnabledRef = useRef(settings.audioEnhancerEnabled)
-  audioEnhancerEnabledRef.current = settings.audioEnhancerEnabled && !musicEnhancerBypassed
+  audioEnhancerEnabledRef.current = settings.audioEnhancerEnabled
   const audioEnhancerSettingsRef = useRef(settings.audioEnhancerSettings)
   audioEnhancerSettingsRef.current = settings.audioEnhancerSettings
   const pendingChallengerIdRef = useRef<string | null>(null)
@@ -791,13 +810,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const pitchCommitTimerRef = useRef<number | null>(null)
   const autoPlaybackReleaseTimerRef = useRef<number | null>(null)
   const autoPlaybackGenerationRef = useRef(0)
+  const autoPlaybackFinishInFlightRef = useRef<Promise<void> | null>(null)
   const playAutoTakeAudioRef = useRef<
     (
       playbackUrl: string,
       takeId: string,
       performanceStartSeconds?: number,
       filePath?: string,
-      playbackGainDb?: number
+      playbackGainDb?: number,
+      playbackDurationSeconds?: number
     ) => void
   >(() => {})
   const refreshCameraSessionRef = useRef<() => Promise<void>>(async () => {})
@@ -807,15 +828,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
   const autoRecordStartSuppressedRef = useRef(autoRecordStartSuppressed)
   autoRecordStartSuppressedRef.current = autoRecordStartSuppressed
-  /**
-   * True from the moment a hands-free take finishes until its replay has ended.
-   * Read by background work that rewrites the take file on disk (the Audio
-   * Enhancer bake) so it never swaps the file out from under the decoder that
-   * is streaming it.
-   */
-  const handsFreePlaybackBusyRef = useRef(false)
-  handsFreePlaybackBusyRef.current =
-    pendingAutoPlaybackRef.current || handsFreePlaybackPending || autoPlaybackPlaying
   const benchmarkPipVideoRef = useRef<HTMLMediaElement>(null)
   const challengerPipVideoRef = useRef<HTMLMediaElement>(null)
   const splitPreviewRef = useRef<HTMLVideoElement>(null)
@@ -1010,9 +1022,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
     autoPlaybackTailCleanupRef.current?.()
     autoPlaybackTailCleanupRef.current = null
+    let nativeStop: Promise<void> = Promise.resolve()
     if (autoPlaybackUsesNativeRef.current) {
       autoPlaybackUsesNativeRef.current = false
-      audioModePlaybackControlsRef.pause?.()
+      nativeStop = audioModePlaybackControlsRef.pause?.() ?? nativeStop
     }
     const audio = autoPlaybackAudioRef.current
     if (audio) {
@@ -1024,19 +1037,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       audio.load()
     }
     setAutoPlaybackPlaying(false)
+    return nativeStop
   }, [])
 
   const teardownActiveAutoPlayback = useCallback(() => {
     autoPlaybackGenerationRef.current += 1
     queuedAutoPlayRef.current = null
-    teardownAutoPlaybackMedia()
+    const nativeStop = teardownAutoPlaybackMedia()
+    autoPlaybackTakeIdRef.current = null
     setAutoPlaybackTakeId(null)
+    return nativeStop
   }, [teardownAutoPlaybackMedia])
 
   const stopAutoPlaybackAudio = useCallback(() => {
     pendingAutoPlaybackRef.current = false
     setHandsFreePlaybackPending(false)
-    teardownActiveAutoPlayback()
+    void teardownActiveAutoPlayback()
   }, [teardownActiveAutoPlayback])
 
   useEffect(() => {
@@ -1051,7 +1067,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
 
     const onVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') suspendInteractiveAudio()
+      if (!Capacitor.isNativePlatform() && document.visibilityState !== 'visible') suspendInteractiveAudio()
     }
     const onBackgroundSuspend = () => suspendInteractiveAudio()
 
@@ -1065,16 +1081,22 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [pausePipVideos, releaseAutoRecordSuppress, stopAutoPlaybackAudio])
 
   const finishAutoPlayback = useCallback((): Promise<void> => {
-    // Clear the replay UI and invalidate any in-flight native start
-    // immediately. Route/mic cleanup can take a bridge round trip and must not
-    // leave the interface stuck in "Playing your take back…" while it settles.
-    // Keep warmup blocked until the old playback route has fully released.
+    // Tab changes and mode changes can both request this handoff from one tap.
+    // They must share the same player stop and route restore transaction.
+    if (autoPlaybackFinishInFlightRef.current) return autoPlaybackFinishInFlightRef.current
+    // Keep the handoff phase latched until route cleanup finishes. Clearing
+    // pending before the speaker releases briefly painted "Your turn" while
+    // the microphone was still unavailable (especially on the music stand).
     autoRecordStartSuppressedRef.current = true
     setAutoRecordStartSuppressed(true)
-    stopAutoPlaybackAudio()
+    pendingAutoPlaybackRef.current = false
+    const nativeStop = teardownActiveAutoPlayback()
     const completedGeneration = autoPlaybackGenerationRef.current
-    return finalizeTakePlaybackCleanup().finally(() => {
+    const finish = nativeStop.catch((error) => {
+      console.warn('[HandsFree] native playback stop failed during handoff', error)
+    }).then(() => finalizeTakePlaybackCleanup()).finally(() => {
       if (autoPlaybackGenerationRef.current !== completedGeneration) return
+      setHandsFreePlaybackPending(false)
       releaseAutoRecordSuppress(AUTO_PLAYBACK_POST_COOLDOWN_MS)
       if (recordingModeRef.current === 'audio') {
         stabilizeViewportAfterMediaInteraction()
@@ -1096,7 +1118,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         })
       }
     })
-  }, [releaseAutoRecordSuppress, stopAutoPlaybackAudio])
+    autoPlaybackFinishInFlightRef.current = finish
+    void finish.then(
+      () => { if (autoPlaybackFinishInFlightRef.current === finish) autoPlaybackFinishInFlightRef.current = null },
+      () => { if (autoPlaybackFinishInFlightRef.current === finish) autoPlaybackFinishInFlightRef.current = null },
+    )
+    return finish
+  }, [releaseAutoRecordSuppress, teardownActiveAutoPlayback])
 
   const playAutoTakeAudio = useCallback(
     (
@@ -1104,7 +1132,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       takeId: string,
       performanceStartSeconds?: number,
       filePath = '',
-      playbackGainDb?: number
+      playbackGainDb?: number,
+      playbackDurationSeconds?: number
     ) => {
       if (recordingModeRef.current !== 'audio') {
         pendingAutoPlaybackRef.current = false
@@ -1114,7 +1143,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
       if (!playbackUrl) {
         pendingAutoPlaybackRef.current = false
-        setHandsFreePlaybackPending(false)
         finishAutoPlayback()
         return
       }
@@ -1127,7 +1155,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const previousAutoPlaybackTakeId = queuedAutoPlayRef.current?.takeId ?? null
       const newestTakeId = takesRef.current[takesRef.current.length - 1]?.id ?? null
 
-      teardownAutoPlaybackMedia()
+      const previousPlaybackStop = teardownAutoPlaybackMedia()
       queuedAutoPlayRef.current = { url: playbackUrl, takeId }
 
       autoRecordStartSuppressedRef.current = true
@@ -1135,6 +1163,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       sharedMetronomeEngine.holdClickAcrossPlayback()
       setHandsFreePlaybackPending(true)
       setAutoPlaybackPlaying(false)
+      autoPlaybackTakeIdRef.current = takeId
       setAutoPlaybackTakeId(takeId)
 
       const isCurrentPlayback = () => autoPlaybackGenerationRef.current === playbackGeneration
@@ -1154,12 +1183,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       // A lost bridge/media callback must never leave hands-free waiting forever.
       autoPlaybackStartTimerRef.current = window.setTimeout(failPlayback, 15000)
 
+      // Vault can play the same saved take through WebKit on iPad. Prefer that
+      // proven speaker path for the automatic replay; the native player is a
+      // fallback only when this screen has no mounted audio element.
       const useNativeAudioPlayback =
-        Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' && Boolean(filePath)
+        Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' &&
+        Boolean(filePath) && !autoPlaybackAudioRef.current
 
       if (useNativeAudioPlayback) {
         autoPlaybackUsesNativeRef.current = true
         void (async () => {
+          await previousPlaybackStop
           await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
           if (autoPlaybackGenerationRef.current !== playbackGeneration) return
 
@@ -1197,10 +1231,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
             return
           }
 
-          const startTime = Math.max(
-            0,
-            (typeof performanceStartSeconds === 'number' ? performanceStartSeconds : 0) -
-              AUTO_PLAYBACK_LEAD_IN_S
+          const startTime = resolveAutoPlaybackStartSeconds(
+            performanceStartSeconds,
+            playbackDurationSeconds,
           )
           let tailTimer: number | null = null
           const clearTailTimer = () => {
@@ -1244,8 +1277,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   tailTimer = window.setTimeout(() => {
                     tailTimer = null
                     if (autoPlaybackGenerationRef.current !== playbackGeneration) return
-                    audioModePlaybackControlsRef.pause?.()
-                    completeNativeAutoPlayback()
+                    const stopped = audioModePlaybackControlsRef.pause?.()
+                    if (stopped) void stopped.then(completeNativeAutoPlayback, completeNativeAutoPlayback)
+                    else completeNativeAutoPlayback()
                   }, (remainingPlaybackSeconds - tailSkipSeconds) * 1000)
                 }
               },
@@ -1264,7 +1298,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const audio = autoPlaybackAudioRef.current
       if (!audio) {
         pendingAutoPlaybackRef.current = false
-        setHandsFreePlaybackPending(false)
         setActivePlaybackDiagSession(null)
         finishAutoPlayback()
         return
@@ -1293,6 +1326,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       let autoPlaybackComplete = false
 
       void (async () => {
+        await previousPlaybackStop
         if (Capacitor.isNativePlatform()) {
           await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
         }
@@ -1418,6 +1452,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
         const started = await playTakeMediaAudible(audio, {
           skipRoutePrep: true,
+          attachEndedRouteRestore: false,
+          restoreRouteOnFailure: false,
           onFailure: () => { if (isCurrentPlayback()) setAutoPlaybackPlaying(false) },
         })
         if (autoPlaybackGenerationRef.current !== playbackGeneration) {
@@ -1908,6 +1944,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         sharedMetronomeEngine.holdClickAcrossPlayback()
         setHandsFreePlaybackPending(true)
         setAutoPlaybackPlaying(false)
+        autoPlaybackTakeIdRef.current = takeId
         setAutoPlaybackTakeId(takeId)
       } else if (shouldAutoPlay) {
         pendingAutoPlaybackRef.current = false
@@ -2096,7 +2133,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 takeId,
                 autoPerformanceStartSeconds,
                 resolvedFilePath,
-                playbackGainDb
+                playbackGainDb,
+                readiness.durationSeconds
               )
             } else if (replayStillRequested()) {
               console.warn('[TakeReadiness] hands-free playback skipped — take never became ready', {
@@ -2386,6 +2424,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // capture before playback, then refresh after (speaker and headphones).
     console.info('[AudioModePlayback] releasing WebRTC capture before native AVPlayer playback')
     await suspendAudioCaptureForPlayback()
+    // Music's live pitch monitor owns a separate native capture lease. Wait
+    // for it to release before AVAudioEngine takes the speaker route.
+    await releaseNativeTunerMonitor()
     audioModePlaybackSuspendedCaptureRef.current = true
   }, [isRecording, stopRecording, suspendAudioCaptureForPlayback])
 
@@ -2545,11 +2586,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const previousTab = previousAudioPracticeTabRef.current
     previousAudioPracticeTabRef.current = audioPracticeTab
     if (previousTab === audioPracticeTab) return
-    if (
-      !pendingAutoPlaybackRef.current &&
-      !autoPlaybackPlayingRef.current &&
-      autoPlaybackTakeId === null
-    ) {
+    if (!pendingAutoPlaybackRef.current && autoPlaybackTakeIdRef.current === null) {
       return
     }
 
@@ -2568,9 +2605,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       suspend: () => {
         return suspendCameraForBackground()
       },
-      resume: () => {
-        void refreshCameraSession()
-      },
+      // Route restoration must wait for camera recovery before a pending
+      // Camera → Tools switch claims the microphone for audio pre-roll.
+      resume: () => refreshCameraSession(),
       hasLivePreview: () => cameraReadyRef.current && recordingModeRef.current === 'video',
     })
     installPlaybackRouteEndedListener(() => {
@@ -2616,7 +2653,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
    * with `!important`, so standing them down has to happen at the same level.
    * While the part is up the room paints nothing across it.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle('app-music-page', musicPageVisible)
     return () => {
       document.documentElement.classList.remove('app-music-page')
@@ -2857,20 +2894,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
 
     if (Capacitor.isNativePlatform()) {
-      let removeListener: (() => void) | undefined
-      void import('@capacitor/app').then(({ App }) => {
-        void App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) recoverAfterForeground()
-        }).then((sub) => {
-          removeListener = () => {
-            void sub.remove()
-          }
-        })
+      return subscribeAppForeground((foreground) => {
+        if (foreground) recoverAfterForeground()
       })
-
-      return () => {
-        removeListener?.()
-      }
     }
 
     const onVisibilityChange = () => {
@@ -3071,7 +3097,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         // mode change against a clean capture session.
         if (
           mode === 'audio' &&
-          (handsFreePlaybackBusyRef.current || autoPlaybackTakeId !== null)
+          (
+            autoPlaybackFinishInFlightRef.current !== null ||
+            pendingAutoPlaybackRef.current ||
+            autoPlaybackTakeIdRef.current !== null
+          )
         ) {
           void finishAutoPlayback().finally(() => {
             if (recordingModeRef.current !== mode) {
@@ -3140,7 +3170,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               for (const delay of [350, 900, 1800]) {
                 window.setTimeout(() => {
                   if (recordingModeRef.current === 'audio' && !isRecording) {
-                    restartHandsFreeMonitorRef.current({ force: true })
+                    // The first warm can exit while replay cooldown still
+                    // holds the mic. Retry the recorder as well as its level
+                    // monitor after that hold clears.
+                    void warmAutoRecording().finally(() => {
+                      if (recordingModeRef.current === 'audio' && autoSoundRecordingEnabledRef.current) {
+                        restartHandsFreeMonitorRef.current({ force: true })
+                      }
+                    })
                   }
                 }, delay)
               }
@@ -3163,7 +3200,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [
       changeRecordingMode,
       isRecording,
-      autoPlaybackTakeId,
       finishAutoPlayback,
       requestCameraAccess,
       requestCameraPreviewResume,
@@ -3682,10 +3718,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleOpenFullPracticeTool = useCallback(
     (tab: 'music' | 'metronome' | 'tuner') => {
-      if (tab === 'music' && recordingModeRef.current !== 'audio') {
-        openMusicAfterCrossingRef.current = true
-        setMusicLibraryOpen(true)
-      }
       triggerLightHaptic(settings.hapticFeedback)
       dismissPracticeHub()
       setIsSettingsOpen(false)
@@ -3693,13 +3725,30 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setQuickSettingsOpen(false)
       setShowPitch(false)
       setLabsRoute(null)
-      handleRecordingModeChange('audio')
-      handleAudioPracticeTabChange(tab)
-      deferHudMediaPause()
+      const openTool = () => {
+        if (tab === 'music' && recordingModeRef.current !== 'audio') {
+          openMusicAfterCrossingRef.current = true
+          setMusicLibraryOpen(true)
+        }
+        handleRecordingModeChange('audio')
+        handleAudioPracticeTabChange(tab)
+        deferHudMediaPause()
+      }
+      if (
+        recordingModeRef.current === 'video' &&
+        (autoPlaybackFinishInFlightRef.current || pendingAutoPlaybackRef.current || autoPlaybackTakeIdRef.current)
+      ) {
+        // Keep the Music tab from mounting while Camera's replay is still
+        // restoring its audio route. Opening it early starts a second cleanup.
+        void finishAutoPlayback().then(openTool, openTool)
+        return
+      }
+      openTool()
     },
     [
       deferHudMediaPause,
       dismissPracticeHub,
+      finishAutoPlayback,
       handleAudioPracticeTabChange,
       handleRecordingModeChange,
       settings.hapticFeedback,
@@ -4288,7 +4337,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const mainAudioPitchSource = useMemo((): MainAudioPitchSource | null => {
-    if (!pitchTrackerActive || recordingMode !== 'audio' || (audioPracticeTab !== 'audio' && audioPracticeTab !== 'music')) return null
+    if (
+      !pitchTrackerActive || recordingMode !== 'audio' ||
+      (audioPracticeTab !== 'audio' && audioPracticeTab !== 'music' && audioPracticeTab !== 'metronome')
+    ) return null
     return { mediaRef: liveMicPlaceholderRef, take: null, isPlaying: true,
       mediaKey: 'main-audio-live', liveMicOnly: true }
   }, [pitchTrackerActive, recordingMode, audioPracticeTab])
@@ -4365,7 +4417,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const metronomeWidgetInteractive = showFloatingMetronomeWidget && !metronomeHudSuspended && !musicLibrarySurface && !(recordingMode === 'audio' && audioPracticeTab === 'metronome')
 
   const showFloatingDroneWidget = settings.showDrone
-  const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended && !musicLibrarySurface && !(recordingMode === 'audio' && audioPracticeTab === 'tuner')
+  const droneWidgetInteractive = showFloatingDroneWidget && !metronomeHudSuspended && !musicLibrarySurface
 
   /*
    * First-run placement for the desk widgets. Camera keeps the take tiles
@@ -4487,11 +4539,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   useEffect(() => {
     setTakePlaybackEnhancerState(
-      settings.audioEnhancerEnabled && !musicEnhancerBypassed,
+      settings.audioEnhancerEnabled,
       settings.audioEnhancerSettings,
       takes.filter(take => take.enhancerBaked).flatMap(take => [take.filePath ?? '', take.videoUrl ?? '']),
     )
-  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings, takes, musicEnhancerBypassed])
+  }, [settings.audioEnhancerEnabled, settings.audioEnhancerSettings, takes])
 
   useEffect(() => {
     setActiveCaptureProfile('natural')
@@ -4537,13 +4589,34 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     !multitrackOpen &&
     !showOnboardingTutorial
 
-  // References belongs on the music stand in both regular practice and routines.
-  // Start collapsed so a recording is one tap away without covering the score.
+  const [musicPitchMonitorEpoch, setMusicPitchMonitorEpoch] = useState(0)
+  const musicPitchRecoveryRef = useRef({ attempts: 0, running: false })
   useEffect(() => {
-    if (!settings.showMusic || !activeProjectId) return
-    setReferenceVisible(true)
-    setReferenceExpanded(false)
-  }, [settings.showMusic, activeProjectId, routineDay?.activeStepId])
+    if (musicRoomActive) musicPitchRecoveryRef.current.attempts = 0
+  }, [musicRoomActive])
+
+  const handleMusicPitchSourceHealthChange = useCallback((health: PitchSourceHealth) => {
+    if (health === 'healthy') {
+      musicPitchRecoveryRef.current.attempts = 0
+      return
+    }
+    if (
+      health !== 'stalled' || !musicRoomActive || isRecording ||
+      handsFreePlaybackPending || autoPlaybackPlaying ||
+      !isNativeCameraPlatform || musicPitchRecoveryRef.current.running ||
+      musicPitchRecoveryRef.current.attempts >= 2
+    ) return
+
+    musicPitchRecoveryRef.current.attempts += 1
+    musicPitchRecoveryRef.current.running = true
+    void recoverNativeTunerMonitor(settings.micInputPreference).then((active) => {
+      if (active) setMusicPitchMonitorEpoch(epoch => epoch + 1)
+    }).catch((error) => {
+      console.warn('[MusicPitch] native microphone recovery failed', error)
+    }).finally(() => {
+      musicPitchRecoveryRef.current.running = false
+    })
+  }, [autoPlaybackPlaying, handsFreePlaybackPending, isNativeCameraPlatform, isRecording, musicRoomActive, settings.micInputPreference])
 
   const isAudioPracticeTimelineTab = recordingMode === 'audio' && audioPracticeTab === 'practice'
 
@@ -4610,7 +4683,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     showPitch && mainAudioPitchSource !== null && !isAudioPracticeTunerTab && !musicLibrarySurface
 
   useEffect(() => {
-    if (!pitchTrackerActive || recordingMode !== 'audio' || isRecording) return
+    // A Music pitch widget must relinquish the native input for a hands-free
+    // replay. Reacquiring it at recording-stop steals the output route from
+    // the native audio player, leaving a moving but silent "Listen back" UI.
+    if (!pitchTrackerActive || recordingMode !== 'audio' || isRecording ||
+        handsFreePlaybackPending || autoPlaybackPlaying || audioModeTakePlaying ||
+        autoRecordStartSuppressed) return
     let cancelled = false
     void acquireNativeTunerMonitor(settings.micInputPreference).then((active) => {
       if (cancelled && active) void releaseNativeTunerMonitor()
@@ -4624,6 +4702,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     pitchTrackerActive,
     recordingMode,
     settings.micInputPreference,
+    handsFreePlaybackPending,
+    autoPlaybackPlaying,
+    audioModeTakePlaying,
+    autoRecordStartSuppressed,
   ])
 
   useEffect(() => {
@@ -4723,7 +4805,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     updateSettings({ showMusic: true })
     setMusicLibraryOpen(false)
     handleAudioPracticeTabChange('music')
-  }), [runPracticeTransition, handleSelectProject, applyDeskSnapshot, commitRoutineDay, handleAudioPracticeTabChange, updateSettings])
+    rememberLastPracticeDestination({ kind: 'music', projectId })
+  }), [runPracticeTransition, handleSelectProject, applyDeskSnapshot, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
+
+  const handleContinueMusic = useCallback(async (projectId: string) => {
+    await handleOpenMusicScore(projectId)
+    dismissPracticeHub()
+  }, [dismissPracticeHub, handleOpenMusicScore])
 
   // Save the setup that belongs to this score. Routine desks remain owned by
   // their individual exercises and are never overwritten by library browsing.
@@ -5000,6 +5088,36 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     } catch { setTakeDeleteError('Reference selection could not be remembered on this device.') }
   }, [])
   const referenceAudio = libraryItems.find(item => item.id === referenceAudioId && item.projectId === activeProjectId) ?? null
+  const hasSelectedReference = Boolean(youtubeUrl || referenceAudio)
+  const referenceSurfaceKey = `${activeProjectId ?? ''}:${recordingMode}:${audioPracticeTab}`
+  const previousReferenceSurfaceKeyRef = useRef(referenceSurfaceKey)
+  const previouslyHadReferenceRef = useRef(hasSelectedReference)
+
+  useEffect(() => {
+    const surfaceChanged = previousReferenceSurfaceKeyRef.current !== referenceSurfaceKey
+    previousReferenceSurfaceKeyRef.current = referenceSurfaceKey
+    const referenceWasCleared = previouslyHadReferenceRef.current && !hasSelectedReference
+    previouslyHadReferenceRef.current = hasSelectedReference
+    if (referenceWasCleared || (surfaceChanged && !hasSelectedReference)) {
+      setReferenceVisible(false)
+      setReferenceExpanded(false)
+    }
+  }, [hasSelectedReference, referenceSurfaceKey])
+
+  // An empty References panel is available when the user opens it, but its
+  // collapsed chip should not linger in a workspace with no selected media.
+  useEffect(() => {
+    if (!hasSelectedReference && !referenceExpanded) setReferenceVisible(false)
+  }, [hasSelectedReference, referenceExpanded])
+
+  // A selected reference belongs on the music stand in regular practice and
+  // routines. Never auto-show an empty widget when a score is opened.
+  useEffect(() => {
+    if (!settings.showMusic || !activeProjectId || !hasSelectedReference) return
+    setReferenceVisible(true)
+    setReferenceExpanded(false)
+  }, [settings.showMusic, activeProjectId, routineDay?.activeStepId, hasSelectedReference])
+
   const handleReferenceBeforePlay = useCallback(() => {
       stopAutoPlaybackAudio()
       audioModePlaybackControlsRef.pause?.()
@@ -5612,9 +5730,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     let target = routineRef.current
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
-    if (step.sharedScoreName && !(step.projectId && hasPracticeChart(step.projectId))) {
+    if ((step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId))) {
       handleOpenRoutineBuilder('edit')
-      setTakeDeleteError(`Import ${step.sharedScoreName} in this routine before starting the exercise.`)
+      setTakeDeleteError(`Import ${step.sharedScoreName ?? step.title} in this routine before starting the exercise.`)
       return
     }
     const surfaceBefore = recordingModeRef.current
@@ -5702,6 +5820,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (programStatus === 'missing') setTakeDeleteError('This item’s metronome program is unavailable. You can practice normally or choose another program in the routine editor.')
     // Commit running only after the item and durable sitting are ready.
     commitRoutineDay(startRoutineDayStep(routineDayRef.current ?? day, step.id, sessionId, Date.now(), { title: step.title, projectId: itemProjectId }))
+    rememberLastPracticeDestination({ kind: 'routine', routineId: target.id })
     if (programStatus !== 'ready' && desk?.showMetronome && step.kind !== 'game' && step.kind !== 'free') {
       const surfaceAfter = step.kind === 'tune' || step.kind === 'metro' ? 'audio' : desk.mode
       scheduleRoutineClick(step.id, surfaceAfter !== surfaceBefore)
@@ -5711,7 +5830,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Preparing a step must never open a browser or cover the practice surface.
   }, [commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleOpenRoutineBuilder, handleRecordingModeChange,
-    openRoutinePracticeSession, rememberCurrentPracticeDesk, scheduleRoutineClick, settings.hapticFeedback])
+    openRoutinePracticeSession, rememberCurrentPracticeDesk, rememberLastPracticeDestination, scheduleRoutineClick, settings.hapticFeedback])
 
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
@@ -5921,7 +6040,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       applyDroneFromDesk(null, 4)
       setIsPracticeHubOpen(true)
     }
-    const visibility = () => { if (document.visibilityState === 'hidden') suspend() }
+    const visibility = () => {
+      if (!Capacitor.isNativePlatform() && document.visibilityState === 'hidden') suspend()
+    }
     const timer = window.setInterval(checkpoint, 15_000)
     document.addEventListener('visibilitychange', visibility)
     window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, suspend)
@@ -5956,42 +6077,38 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }).catch(() => setTakeDeleteError('Could not import reference audio. Please try another file.'))
   }
 
+  const leaveSplitView = useCallback((reason: 'split-close' | 'split-exit') => {
+    setIsSplitView(false)
+    setSplitReferenceActive(false)
+    const returnTab = splitReturnTabRef.current
+    splitReturnTabRef.current = null
+    if (returnTab && recordingModeRef.current === 'audio') handleAudioPracticeTabChange(returnTab)
+    window.requestAnimationFrame(() => recoverCameraAfterSurfaceDismiss(reason))
+  }, [handleAudioPracticeTabChange, recoverCameraAfterSurfaceDismiss])
+
   const handleToggleSplitView = useCallback(() => {
+    if (isSplitView) { leaveSplitView('split-close'); return }
+    // A reference can be opened from the music stand. The comparison needs
+    // Record's layout while open, then must return to that same stand.
+    splitReturnTabRef.current = recordingModeRef.current === 'audio' && audioPracticeTab !== 'audio'
+      ? audioPracticeTab : null
     setSplitReferenceActive(false)
     setQuickSettingsOpen(false)
     // Expanded takes must remain available even when their floating cards are hidden.
-    if (!isSplitView) {
-      updateSettings({ showTakeCards: true })
-      if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
+    updateSettings({ showTakeCards: true })
+    if (recordingModeRef.current === 'audio') handleAudioPracticeTabChange('audio')
+    setIsSplitView(true)
+    if (youtubeUrlRef.current) {
+      window.requestAnimationFrame(() => {
+        wakeYoutubeReference(youtubeIframeRef.current, { attemptPlay: false, uiVolume: 1 })
+      })
     }
-    setIsSplitView((current) => {
-      const next = !current
-      if (next && youtubeUrlRef.current) {
-        window.requestAnimationFrame(() => {
-          wakeYoutubeReference(youtubeIframeRef.current, {
-            attemptPlay: false,
-            uiVolume: 1,
-          })
-        })
-      }
-      if (next && isNativeCameraPlatform && recordingModeRef.current === 'video') {
-        void acquireNativeVideoBridge()
-      }
-      if (!next) {
-        window.requestAnimationFrame(() => {
-          recoverCameraAfterSurfaceDismiss('split-close')
-        })
-      }
-      return next
-    })
-  }, [acquireNativeVideoBridge, isNativeCameraPlatform, recoverCameraAfterSurfaceDismiss, isSplitView, updateSettings, handleAudioPracticeTabChange])
+    if (isNativeCameraPlatform && recordingModeRef.current === 'video') void acquireNativeVideoBridge()
+  }, [acquireNativeVideoBridge, audioPracticeTab, handleAudioPracticeTabChange, isNativeCameraPlatform, isSplitView, leaveSplitView, updateSettings])
 
   const handleExitSplitView = useCallback(() => {
-    setIsSplitView(false)
-    window.requestAnimationFrame(() => {
-      recoverCameraAfterSurfaceDismiss('split-exit')
-    })
-  }, [recoverCameraAfterSurfaceDismiss])
+    leaveSplitView('split-exit')
+  }, [leaveSplitView])
 
   // Every take-box expansion now enters the same stacked comparison as Workspace.
   // Once there, tapping a box cannot open the older single-take review.
@@ -6093,7 +6210,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
               ref={appShellRef}
               className={`app-shell lens-screen${recordingMode === 'video' ? ' lens-camera' : ''}${!isLabsOpen && !multitrackOpen ? ' open-lens-recording' : ''}${recordingMode === 'video' && isRecording ? ' open-lens-capturing' : ''}${recordingMode === 'audio' ? ' app-shell--audio-mode' : ''}${
                 isSplitView ? ' app-shell--split-open' : ''
-              }${musicPageVisible ? ' app-shell--music-page' : ''}${
+              }${musicPageVisible ? ' app-shell--music-page' : ''}${musicPageVisible && !musicWidgetDrawerOpen ? ' app-shell--music-dock-closed' : ''}${
                 musicChromeHidden ? ' app-shell--music-chrome-hidden' : ''
               }`}
             >
@@ -6124,6 +6241,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onOpenTuner={handleOpenFullTunerFromPracticeHub}
                 onOpenMetronome={handleOpenFullMetronomeFromPracticeHub}
                 onOpenMusic={handleOpenMusicFromPracticeHub}
+                lastPracticeDestination={lastPracticeDestination}
+                onContinueMusic={handleContinueMusic}
                 routine={incomingRoutine ?? routine}
                 routineDay={routineDay}
                 routineBuilderRequest={routineBuilderRequest}
@@ -6356,9 +6475,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 nativeLivePreviewSeedUrl={nativeLivePreviewSeedUrl}
                 handsFreePlaybackTakeId={handsFreeBackgroundTake?.id ?? null}
                 handsFreePlaybackSrc={handsFreeBackgroundPlaybackSrc}
-                handsFreePlaybackPerformanceStartSeconds={
-                  handsFreeBackgroundTake?.performanceStartSeconds
-                }
+                handsFreePlaybackPerformanceStartSeconds={handsFreeBackgroundTake?.performanceStartSeconds}
                 handsFreePlaybackTailSkipSeconds={settings.soundSilenceSeconds}
                 onHandsFreePlaybackPlayingChange={handleHandsFreeBackgroundPlaybackChange}
                 onHandsFreePlaybackComplete={handleChallengerAutoPlayComplete}
@@ -6392,6 +6509,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           setMusicTakesVisible(enabled)
                           setMusicWorkspaceExpandRequest(current => ({ ...current, takes: enabled || undefined }))
                           break
+                        case 'audioEnhancerEnabled':
+                          handleAudioEnhancerSettingChange(enabled)
+                          break
                       }
                     }}
                     active={musicRoomActive}
@@ -6419,7 +6539,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               )}
 
-              {musicRoomActive && <div id="music-widget-dock" className="music-widget-dock" role="toolbar" aria-label="Music tools" />}
+              {musicRoomActive && <MusicWidgetDrawer open={musicWidgetDrawerOpen} onOpenChange={setMusicWidgetDrawerOpen} />}
 
               {cameraNeedsPermission && !SKIP_MEDIA_PERMISSION_GATE && (
                 <CameraPermissionPrompt
@@ -6450,11 +6570,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           mediaRef={mainAudioPitchSource.mediaRef}
                           enabled={pitchTrackerActive && !pitchHudSuspended}
                           isPlaying={mainAudioPitchSource.isPlaying}
-                          mediaKey={mainAudioPitchSource.mediaKey}
+                          mediaKey={`${mainAudioPitchSource.mediaKey}-${streamGeneration}-${musicPitchMonitorEpoch}`}
                           takeName={mainAudioPitchSource.take?.name}
                           label={mainAudioPitchSource.liveMicOnly ? 'Live Tuner' : 'Live Pitch'}
                           pitchSource="microphone"
                           nativePitchProcessing
+                          onLiveSourceHealthChange={musicRoomActive ? handleMusicPitchSourceHealthChange : undefined}
                           positionId="main-pitch-audio"
                           liveMicEnabled={
                             (settings.liveMicTunerEnabled ||
@@ -6617,10 +6738,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 onClose={handleCloseHandsFree}
               />
               <div id={PHYSICAL_UI_ROOT_ID} className="app-ui-rotator">
-                {(onRecordSurface || musicRoomActive) && !isSplitView && !isLabsOpen && !multitrackOpen && (
-                  <ReferenceWidget onExpandView={() => { handleReferenceBeforePlay(); handleToggleSplitView(); setSplitReferenceActive(true) }} showTrackName visible={referenceVisible} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded} dockRight={musicRoomActive}
+                {(recordingMode === 'video' || (recordingMode === 'audio' && !isAudioPracticeGamesTab)) && !isSplitView && !isLabsOpen && !multitrackOpen && (
+                  <ReferenceWidget onExpandView={() => { handleReferenceBeforePlay(); handleToggleSplitView(); setSplitReferenceActive(true) }} showTrackName visible={referenceVisible} playing={referencePlaying} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded} dockRight={musicRoomActive}
                     youtubeUrl={youtubeUrl} libraryPlayback={referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null}
-                    suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || !referenceExpanded || autoPlaybackPlaying}
+                    suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || autoPlaybackPlaying}
                     onSubmitYoutube={(url) => { selectReferenceAudio(null); handleSubmitYoutube(url); setYoutubeAutoPlayOnLoad(false); setShowYoutubeExpandTip(false); setReferenceExpanded(true) }}
                     onUpload={handleReferenceUpload}
                     onClearAudio={() => selectReferenceAudio(null)} onClearYoutube={handleClearYoutube}
@@ -6665,7 +6786,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                 <motion.div
                   className={`app-ui-overlay ${
-                    recordingMode === 'audio' ? 'app-ui-overlay--audio-mode' : ''
+                    recordingMode === 'audio' && !isSplitView ? 'app-ui-overlay--audio-mode' : ''
                   } ${pitchAudioHudLock ? 'app-ui-overlay--pitch-hud-lock' : ''} ${
                     metronomeAudioHudLock ? 'app-ui-overlay--metronome-hud-lock' : ''
                   } ${audioToolHudLock ? 'app-ui-overlay--audio-tool-hud-lock' : ''} ${
@@ -7033,7 +7154,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     )}
                     {recordingMode === 'video' && isRecording && <GuidedRecordingCue focus={guidedNextFocus} />}
 
-                    {!isAudioPracticeMetronomeTab && !isLabsOpen && !isAudioPracticeGamesTab &&
+                    {!isLabsOpen && !isAudioPracticeGamesTab &&
                       !musicChromeHidden &&
                       !(
                         isAudioPracticeTimelineTab &&
@@ -7041,7 +7162,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         !quickSettingsOpen
                       ) && (
                       <ControlDeck
-                        onOpenReferences={onRecordSurface && !isSplitView ? () => { setQuickSettingsOpen(false); setReferenceVisible(true); setReferenceExpanded(true) } : undefined}
+                        workspaceOnly={isAudioPracticeMetronomeTab}
+                        onOpenReferences={!isSplitView ? () => { setQuickSettingsOpen(false); setReferenceVisible(true); setReferenceExpanded(true) } : undefined}
                         openLens
                         libraryAboveRecord
                         workspaceSections
@@ -7080,21 +7202,21 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         dragDeleteActive={pipDragState.isDragging}
                         dragOverDelete={pipDragState.overDelete}
                         pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
-                        pitchToggleVisible={onRecordSurface || musicRoomActive}
+                        pitchToggleVisible={!isAudioPracticeTunerTab}
                         showTakeCards={hudQuickSettings.showTakeCards}
                         onPitchTrackerChange={handlePitchTrackerSettingChange}
                         onShowTakeCardsChange={handleShowTakeCardsSettingChange}
                         showMetronome={hudQuickSettings.showMetronome}
-                        metronomeToggleVisible={onRecordSurface || musicRoomActive}
+                        metronomeToggleVisible={!isAudioPracticeMetronomeTab}
                         onShowMetronomeChange={handleShowMetronomeSettingChange}
                         showDrone={hudQuickSettings.showDrone}
-                        droneToggleVisible={onRecordSurface || musicRoomActive}
+                        droneToggleVisible
                         onShowDroneChange={handleShowDroneSettingChange}
                         showMusic={hudQuickSettings.showMusic}
                         musicToggleVisible={false}
                         onShowMusicChange={handleShowMusicSettingChange}
                         againPulse={againPulse}
-                        audioEnhancerToggleVisible={!musicRoomActive}
+                        audioEnhancerToggleVisible
                         audioEnhancerEnabled={hudQuickSettings.audioEnhancerEnabled}
                         onAudioEnhancerChange={handleAudioEnhancerSettingChange}
                         settingsLayoutMode={

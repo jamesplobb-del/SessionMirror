@@ -36,6 +36,7 @@
  * uses the rest of the width, so no floating control can cover a stave. */
 @media (min-width: 700px) {
   .app-shell--music-page .practice-chart-scroll { right: 72px; }
+  .app-shell--music-page.app-shell--music-dock-closed .practice-chart-scroll { right: 0; }
   .app-shell--music-page .practice-chart-paper::after {
     content: '';
     position: absolute;
@@ -47,45 +48,88 @@
     border-left: 1px solid #e8eef4;
     background: #f9fbfd;
     pointer-events: none;
+    transition: transform .24s ease;
   }
+  .app-shell--music-page.app-shell--music-dock-closed .practice-chart-paper::after { transform: translateX(100%); }
 }
 
 /* Collapsed tools share one real home. Flex order closes gaps whenever a tool
  * opens or disappears; only full panels are free to float over the score. */
-.music-widget-dock { display: none; }
+.music-widget-drawer { display: none; }
 @media (min-width: 700px) {
-  .app-shell--music-page .music-widget-dock {
+  .app-shell--music-page .music-widget-drawer {
     position: absolute;
     z-index: 38;
-    top: max(136px, calc(env(safe-area-inset-top, 0px) + 112px));
+    top: max(72px, env(safe-area-inset-top, 0px));
     right: 0;
     bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    width: 72px;
+    display: block;
+    transition: transform .24s ease;
+  }
+  .app-shell--music-page .music-widget-drawer--closed { transform: translateX(72px); }
+  .music-widget-drawer__handle {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: -22px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 68px;
+    padding: 0;
+    border: 1px solid #dbe5ef;
+    border-right: 0;
+    border-radius: 12px 0 0 12px;
+    background: #f9fbfd;
+    color: #2873cd;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    touch-action: none;
+    cursor: pointer;
+  }
+  .music-widget-drawer__handle svg { width: 16px; height: 16px; }
+  .music-widget-drawer__handle:focus-visible { outline: 2px solid #2873cd; outline-offset: 2px; }
+  .app-shell--music-page .music-widget-dock {
+    position: absolute;
+    top: 64px;
+    right: 0;
+    bottom: 64px;
     width: 72px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: none;
-    pointer-events: none;
+    overflow: visible;
+    pointer-events: auto;
+    touch-action: pan-y;
   }
-  .music-widget-dock::-webkit-scrollbar { display: none; }
   .music-widget-dock > .widget-ball,
-  .music-widget-dock > .reference-widget-chip {
+  .music-widget-dock > .reference-widget-chip,
+  .music-widget-dock > .routine-ball {
     position: relative !important;
     top: auto !important;
     left: auto !important;
     flex: none;
     transform: none !important;
     pointer-events: auto;
-    touch-action: manipulation;
-    cursor: pointer;
+    touch-action: none;
+    cursor: grab;
   }
+  .music-widget-dock > :is(.widget-ball, .reference-widget-chip, .routine-ball):active { cursor: grabbing; }
   .music-widget-dock > .reference-widget-chip { width: 56px; height: 56px; }
+  .music-widget-dock > .routine-ball { width: 56px; height: 56px; }
+}
+@media (min-width: 700px) and (max-height: 650px) {
+  .app-shell--music-page .music-widget-dock { top: 32px; bottom: 32px; gap: 4px; }
 }
 
 .practice-chart-scroll::-webkit-scrollbar { display: none; }
+.practice-chart-scroll--zoomed {
+  overflow-x: auto;
+  touch-action: pan-x pan-y;
+}
 
 .practice-chart-strip {
   position: relative;
@@ -635,7 +679,7 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 }
 .practice-chart-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;font-weight:550;color:#34465a;text-align:center}
 
-.practice-chart-scroll--half-turn { overflow: hidden; touch-action: manipulation; }
+.practice-chart-scroll--half-turn { overflow: hidden; touch-action: pan-y; }
 .practice-chart-join--half { background: #4d91bf; height: 2px; }
 
 .practice-chart-workspace {
@@ -672,8 +716,14 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 .practice-chart-workspace svg { width: 17px; height: 17px; flex-shrink: 0; }
 @media (max-width: 540px) {
   .practice-chart-title{display:none}
-  .practice-chart-workspace { width: 100%; justify-content: flex-start; }
-  .practice-chart-workspace button { flex-direction: column; gap: 3px; padding: 6px 10px; font-size: 10px; flex: 1; }
+  .practice-chart-workspace {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    gap: 4px;
+    overflow-x: hidden;
+  }
+  .practice-chart-workspace button { min-width: 0; flex-direction: column; gap: 3px; padding: 6px 3px; font-size: 10px; }
   .practice-chart-controls .practice-chart-control { padding: 0 8px; font-size: 10px; min-height: 44px; }
 }
 

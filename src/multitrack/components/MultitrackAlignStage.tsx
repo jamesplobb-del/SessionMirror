@@ -62,6 +62,7 @@ interface MultitrackAlignStageProps {
   /** Each track carries its own level here — the project has no separate mixer. */
   onPanelVolumeChange: (panelId: string, volume: number) => void
   onPanelMuteToggle: (panelId: string, muted: boolean) => void
+  isPreviewPlaying: boolean
   onRestoreSheetMusic: (sheetMusic: SheetMusicPanelState) => void
   onDone: (
     changes: Array<{ panelId: string; takeId: string; offsetMs: number; trimStart: number; trimEnd: number | undefined }>,
@@ -337,6 +338,7 @@ function ClipTrack({
 export default function MultitrackAlignStage({
   onPanelVolumeChange,
   onPanelMuteToggle,
+  isPreviewPlaying,
   isOpen,
   panels,
   sheetMusic,
@@ -763,6 +765,8 @@ export default function MultitrackAlignStage({
       ? imageWindows.find((window) => window.id === selection.id) ?? null
       : null
   const playheadSec = Math.max(0, sync.state.currentTime)
+  const hasClips = Object.keys(clips).length > 0
+  const mixPanels = panels.filter(panel => panel.take && !panel.hidden)
 
   /*
    * The page a "Page" tap would turn to: one on from whichever image the
@@ -837,12 +841,12 @@ export default function MultitrackAlignStage({
           <X className="h-5 w-5" />
         </Pressable>
         <div className="multitrack-align-stage__titles">
-          <p className="multitrack-align-stage__title">Editor</p>
+          <p className="multitrack-align-stage__title">Edit performance</p>
           <span className="multitrack-align-stage__clock">
             {formatClock(playheadSec)} / {formatClock(maxDurationSec)}
           </span>
         </div>
-        <button type="button" className="multitrack-editor-preview-button" onClick={onPreviewToggle} aria-label={sync.state.isPlaying ? 'Pause preview' : 'Play preview'}>{sync.state.isPlaying ? <Pause size={15} /> : <Play size={15} />}<span>Preview</span></button>
+        <button type="button" className="multitrack-editor-preview-button" onClick={onPreviewToggle} aria-label={isPreviewPlaying ? 'Pause video and mix' : 'Play video and mix'}>{isPreviewPlaying ? <Pause size={15} /> : <Play size={15} />}<span>{isPreviewPlaying ? 'Pause' : 'Play'}</span></button>
         <Pressable
           type="button"
           intensity="normal"
@@ -855,9 +859,18 @@ export default function MultitrackAlignStage({
         </Pressable>
       </header>
 
-      <div className="multitrack-editor-tabs" role="tablist" aria-label="Editor tools"><button type="button" role="tab" aria-selected={editorTab === 'timing'} onClick={() => setEditorTab('timing')}>Timing</button><button type="button" role="tab" aria-selected={editorTab === 'mix'} onClick={() => setEditorTab('mix')}>Mix</button></div>
-      {editorTab === 'mix' ? <div className="multitrack-editor-mix" role="tabpanel" aria-label="Mix">{panels.filter(p => p.take).map((p, i) => <div key={p.id}><header><span>{p.label || `Part ${i + 1}`}</span><button type="button" aria-label={`Mute ${p.label || `Part ${i + 1}`}`} aria-pressed={p.muted === true} onClick={() => onPanelMuteToggle(p.id, !p.muted)}>{p.muted ? <VolumeX size={15} /> : <Volume2 size={15} />}Mute</button></header><label><input type="range" aria-label={`${p.label || `Part ${i + 1}`} volume`} min={0} max={1} step={.01} value={p.volume ?? 1} onChange={e => onPanelVolumeChange(p.id, Number(e.target.value))} /><output>{Math.round((p.volume ?? 1) * 100)}%</output></label></div>)}</div> : <>
-      <p className="multitrack-waveform-help">Select a waveform. Drag its edges to trim, or its middle to move.</p>
+      <div className="multitrack-editor-tabs" role="tablist" aria-label="Editor tools"><button type="button" role="tab" aria-selected={editorTab === 'timing'} onClick={() => setEditorTab('timing')}>Timeline</button><button type="button" role="tab" aria-selected={editorTab === 'mix'} onClick={() => setEditorTab('mix')}>Mixer</button></div>
+      {editorTab === 'mix' ? <div className="multitrack-editor-mix" role="tabpanel" aria-label="Mixer">
+        <p className="multitrack-editor-guidance">{mixPanels.length ? 'Press Play and adjust levels while the video runs.' : 'Record a part to start mixing.'}</p>
+        {mixPanels.map((p, i) => {
+          const label = p.label || `Part ${i + 1}`
+          return <div className="multitrack-editor-mix__channel" key={p.id}>
+            <header><strong>{label}</strong><button type="button" aria-label={`${p.muted ? 'Unmute' : 'Mute'} ${label}`} aria-pressed={p.muted === true} onClick={() => onPanelMuteToggle(p.id, !p.muted)}>{p.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}{p.muted ? 'Unmute' : 'Mute'}</button></header>
+            <label><span className="sr-only">{label} volume</span><input type="range" aria-label={`${label} volume`} min={0} max={1} step={.01} value={p.volume ?? 1} onChange={e => onPanelVolumeChange(p.id, Number(e.target.value))} /><output>{Math.round((p.volume ?? 1) * 100)}%</output></label>
+          </div>
+        })}
+      </div> : <>
+      <p className="multitrack-editor-guidance">{hasClips ? 'Drag a recording to move it. Drag an end to trim it.' : 'Tap Record on a box below to add your first part.'}</p>
       <div className="multitrack-align-stage__actions">
         {lastTakeEndSec > 0 && <Pressable type="button" intensity="soft"
           className="multitrack-align-stage__action" disabled={busy || saving}
@@ -865,12 +878,12 @@ export default function MultitrackAlignStage({
           aria-label="Move playhead to end of last take">
           <SkipForward className="h-4 w-4" /> To end
         </Pressable>}
-        <Pressable type="button" intensity="normal" haptic="medium"
+        {hasClips && <Pressable type="button" intensity="normal" haptic="medium"
           className="multitrack-align-stage__action multitrack-align-stage__action--primary"
           disabled={busy || saving} onClick={() => void handleRecordAtLine()}
           aria-label="Record a part from the playhead">
-          <Video className="h-4 w-4" /> Record here
-        </Pressable>
+          <Video className="h-4 w-4" /> Record at playhead
+        </Pressable>}
         <Pressable
           type="button"
           intensity="normal"
@@ -881,7 +894,7 @@ export default function MultitrackAlignStage({
           aria-label="Add extra box here"
         >
           <Plus className="h-4 w-4" />
-          Extra box
+          Add box
         </Pressable>
         <Pressable
           type="button"
@@ -892,7 +905,7 @@ export default function MultitrackAlignStage({
           aria-label="Add image here"
         >
           <ImagePlus className="h-4 w-4" />
-          Image
+          Add image
         </Pressable>
         {/* The turn a player actually wants: the same part, one page on, at the
             bar they were looking at when they pressed it. */}
@@ -1100,7 +1113,7 @@ export default function MultitrackAlignStage({
                         onClick={() => onRecordBox(panel.id, playheadSec)}
                       >
                         <Video className="h-3.5 w-3.5" />
-                        Record here
+                        Record {label}
                       </Pressable>
                     )}
                   </div>
@@ -1112,7 +1125,7 @@ export default function MultitrackAlignStage({
       </div>
 
       <footer className="multitrack-align-stage__transport">
-        <Pressable
+        {hasClips && <Pressable
           type="button"
           intensity="soft"
           className="multitrack-align-stage__transport-btn"
@@ -1122,9 +1135,9 @@ export default function MultitrackAlignStage({
         >
           <RotateCcw className="h-4 w-4" />
           Reset all
-        </Pressable>
+        </Pressable>}
         <p className="multitrack-align-stage__hint">
-          Drag the handle above to give your tracks more room.
+          Tap the ruler to move the playhead.
         </p>
       </footer>
       </>}

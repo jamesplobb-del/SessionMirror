@@ -38,7 +38,6 @@ html .open-lens-recording .audio-compare-heading p { font-size:10px; color:var(-
 html .open-lens-recording .app-pip-row--compact > .compact-take-slot { background:#19324966!important; border:1px solid #d7eafa45!important; border-radius:16px!important; box-shadow:none!important; backdrop-filter:blur(8px); }
 html .open-lens-recording .compact-take-slot--best .compact-take-caption__name { color:#e4edf4!important; font-weight:500; }
 html .open-lens-recording .app-pip-row-wrap--camera { padding-bottom:12px; }
-html .open-lens-recording .app-ui-overlay .app-pip-row-wrap--camera.app-pip-row-wrap--compact { top:auto; bottom:calc(env(safe-area-inset-bottom,0px) + 112px); }
 html .open-lens-recording .app-ui-overlay .app-pip-row--compact { max-width:520px; }
 html .open-lens-recording .app-ui-overlay .app-pip-row--compact > .compact-take-slot { height:140px; grid-template-columns:1fr; grid-template-rows:20px 64px 27px; gap:5px; padding:9px 10px; }
 html .open-lens-recording .compact-take-slot::before { content:none; }
@@ -58,9 +57,10 @@ html .open-lens-recording .compact-take-caption__source { font-size:8px; }
 .open-lens-capturing :is(.pitch-widget-draggable,.pitch-widget-audio,.widget-ball) { visibility:hidden!important; pointer-events:none!important; }
 .reference-widget-live { position:absolute; top:0; left:0; z-index:45; pointer-events:auto; color:#edf6ff; max-width:calc(100% - 24px); }
 .reference-widget-chip { display:flex; align-items:center; gap:6px; min-height:36px; padding:7px 12px; border:1px solid #d7eafa44; border-radius:24px; background:#19324966; color:inherit; font-size:11px; }
+.reference-widget-chip[data-playing=true] { position:relative; }
+.reference-widget-chip[data-playing=true]::after { content:''; position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:#44ba83; box-shadow:0 0 0 2px var(--widget-surface,#193249); }
 .reference-widget-chip svg { width:14px; height:14px; }
 .reference-widget-panel { width:250px; max-width:calc(100vw - 24px); border:1px solid #d7eafa55; background:#193249e8; border-radius:17px; overflow:hidden; box-shadow:0 8px 24px #00172820; }
-.reference-widget-panel[hidden] { display:none; }
 .reference-widget-panel header { display:flex; align-items:center; justify-content:space-between; padding:5px 9px; touch-action:none; cursor:grab; }
 .reference-widget-panel header span { display:flex; align-items:center; gap:7px; font-size:12px; }
 .reference-widget-panel header svg { width:17px; height:17px; }
@@ -106,14 +106,18 @@ html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-car
 html[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#237fbe!important; }
 html.app-dark-mode[data-refinement] .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge .practice-menu-shortcut svg { color:#87c9f6!important; }
 
-/* Resizing keeps the same media host mounted, including an active YouTube iframe. */
+/* Keep the player laid out while collapsed so audio and the YouTube iframe continue. */
 .reference-widget-live.is-expanded .reference-widget-panel { width:100%; height:100%; display:flex; flex-direction:column; }
-.reference-widget-live .reference-widget-panel[hidden] { display:none; }
+.reference-widget-live.is-collapsed .reference-widget-panel { position:absolute; top:0; left:0; display:flex; flex-direction:column; opacity:0; pointer-events:none; clip-path:inset(100%); }
+.reference-widget-live.is-collapsed .reference-widget-media { flex:1; min-height:0; height:auto; }
 .reference-widget-live .reference-widget-panel header { flex-shrink:0; }
 .reference-widget-live .reference-widget-media { flex:1; min-height:0; height:auto; }
-.reference-widget-size-bar { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex-shrink:0; height:44px; padding:0 4px 0 12px; }
+.reference-widget-size-bar { display:flex; align-items:center; justify-content:space-between; gap:6px; flex-shrink:0; height:44px; padding:0 4px 0 12px; }
 .reference-widget-size-bar span { font-size:10px; opacity:.65; }
-.reference-widget-resize { display:grid; place-items:center; width:44px; height:44px; border:0; background:transparent; color:inherit; touch-action:none; cursor:nwse-resize; }
+.reference-widget-compare { display:flex; align-items:center; gap:6px; min-height:44px; padding:0 5px; border:0; background:transparent; color:inherit; font-size:11px; }
+.reference-widget-compare:disabled { opacity:.45; }
+.reference-widget-compare svg { width:15px; height:15px; }
+.reference-widget-resize { display:flex; align-items:center; justify-content:center; gap:4px; min-width:82px; height:44px; border:0; background:transparent; color:inherit; touch-action:none; cursor:nwse-resize; }
 .reference-widget-resize svg { width:17px; height:17px; stroke-width:1.6; }
 
 .reference-widget-chip { touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }

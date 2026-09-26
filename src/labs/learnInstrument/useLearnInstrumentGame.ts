@@ -34,7 +34,10 @@ export const SUCCESS_DWELL_MS = 600
  * Accepted pitch frames normally arrive every animation frame. A longer gap is
  * treated as a fresh attempt so two short sounds cannot add up to one hold.
  */
-export const MAX_FRAME_GAP_MS = 80
+// Native PCM arrives about every 43 ms; one or two skipped bridge frames on a
+// busy iPad should not erase an otherwise continuous note. A reported silence
+// or wrong pitch still resets the hold immediately.
+export const MAX_FRAME_GAP_MS = 140
 
 export const LESSON_STORAGE_KEY = 'session-mirror.learn-instrument.v1'
 

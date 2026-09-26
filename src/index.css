@@ -1499,6 +1499,38 @@ body.settings-branch-open * {
   padding-top: clamp(0.2rem, 1vh, 0.55rem);
 }
 
+.app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .control-deck.control-deck--workspace-only {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 42;
+  width: 74px !important;
+  pointer-events: auto;
+}
+
+.metronome-workspace-launcher {
+  display: flex;
+  min-width: 74px;
+  min-height: 58px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(157, 198, 229, 0.28);
+  border-radius: 15px;
+  background: rgba(20, 43, 65, 0.82);
+  color: #e8f5ff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+  font-size: 10px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+.metronome-workspace-launcher svg {
+  width: 21px;
+  height: 21px;
+}
+
 .animated-bottom-sheet--elevated,
 .tutorial-sheet-backdrop--elevated {
   pointer-events: auto !important;
@@ -9596,6 +9628,12 @@ html.app-dark-mode
   pointer-events: auto;
 }
 
+/* The stage normally passes touches through to the score. Its open setting
+ * steppers are controls, so they must opt back into pointer input too. */
+.hands-free-stage:not([aria-hidden='true']) .hands-free-settings button {
+  pointer-events: auto;
+}
+
 .hands-free-stage__settings:active {
   opacity: 1;
   transform: scale(0.96);
@@ -10032,3 +10070,23 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--chip .han
 }
 .camera-background { touch-action: manipulation; }
 .camera-background--pinch-zoom { touch-action: none; }
+
+.split-compare-layout--edge .split-compare-empty-audio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 2rem;
+  background: #000;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+html#lens-design-system .app-shell--audio-mode.app-shell--split-open .open-lens-dock-action,
+html#lens-design-system .app-shell--audio-mode.app-shell--split-open .open-lens-dock-action span {
+  color: rgba(255, 255, 255, 0.88) !important;
+  text-shadow: none;
+}

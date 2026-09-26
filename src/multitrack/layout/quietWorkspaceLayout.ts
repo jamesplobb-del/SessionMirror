@@ -10,11 +10,14 @@ export function normalizeLayoutStyle(style?: Partial<MultitrackLayoutStyle>): Mu
 /** Pure draft update: changing the visible grid never discards a take or extra box. */
 export function withPortraitLayout(session: MultitrackSession, layoutId: string): MultitrackSession {
   const preset = getLayoutPreset(layoutId)
+  const changingPreset = session.layoutId !== preset.id
   const base = session.panels.filter((p): p is PerformancePanelState => p.kind === 'performance' && !p.overlay)
   const extras = session.panels.filter(p => p.kind === 'performance' && p.overlay)
   const available = MULTITRACK_PANEL_SLOT_IDS.filter(id => !session.panels.some(p => p.id === id))
   while (base.length < preset.panelCount && available.length) base.push({ kind: 'performance', id: available.shift()!, take: null })
-  return { ...session, aspectRatio: '9:16', layoutId: preset.id, panels: [...base.map((p, i) => ({ ...p, hidden: i >= preset.panelCount })), ...extras] }
+  // A moved/resized base box has an absolute frame that overrides every preset.
+  // Keep it while reopening the same layout, but let a new preset place the box.
+  return { ...session, aspectRatio: '9:16', layoutId: preset.id, panels: [...base.map((p, i) => ({ ...p, hidden: i >= preset.panelCount, frame: changingPreset ? undefined : p.frame })), ...extras] }
 }
 export function withExtraBox(session: MultitrackSession, id: string): MultitrackSession {
   if (session.panels.filter(p => p.kind === 'performance' && p.overlay).length >= 4 || session.panels.some(p => p.id === id)) return session

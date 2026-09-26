@@ -1312,7 +1312,8 @@
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode)
     .app-pip-row-wrap--camera.app-pip-row-wrap--compact {
-    top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 1.5rem);
+    /* The mode switch occupies the first 62px below the safe area. */
+    top: max(calc(env(safe-area-inset-top, 0px) + 4.75rem), 4.75rem);
   }
 
   .app-ui-overlay:not(.app-ui-overlay--audio-mode) .app-pip-row--compact {

@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { MetronomeMeter, MetronomeSubdivision } from '../../utils/metronomeConfig'
 import Pressable from '../../components/ui/Pressable'
@@ -9,10 +9,11 @@ import {
   parseGroupingInput,
   validateGroupingForMeter,
 } from '../groupingUtils'
-import { createPatternStep, defaultPatternRepeat, sectionHasMeterPattern } from '../patternLogic'
+import { createPatternStep, defaultPatternRepeat, formatPatternMetersLabel, sectionHasMeterPattern } from '../patternLogic'
 import { repeatLabel } from '../sectionDefaults'
 import {
   applyMeterChange,
+  effectiveBars,
   pulseModeOptionsForSection,
   resolveSectionTiming,
   sectionNeedsFeelPrompt,
@@ -44,6 +45,10 @@ const SUBDIVISION_LABELS: Record<MetronomeSubdivision, string> = {
   septuplets: '7-tuplets',
 }
 
+const REPEAT_OPTIONS = Array.from({ length: 16 }, (_, index) => ({
+  value: String(index + 1), label: repeatLabel(index + 1),
+}))
+
 interface TimelineSectionEditorProps {
   section: TimelineSection
   onChange: (patch: Partial<TimelineSection>) => void
@@ -55,17 +60,7 @@ export default function TimelineSectionEditor({
   onChange,
   onClose,
 }: TimelineSectionEditorProps) {
-  const [showAdvanced, setShowAdvanced] = useState(() => {
-    const advanced = section.advanced
-    return Boolean(
-      advanced?.beatGrouping?.length ||
-        advanced?.customAccents?.length ||
-        advanced?.countInBars ||
-        advanced?.tempoRamp?.enabled ||
-        advanced?.tempoMarkers?.length ||
-        advanced?.markerNotes
-    )
-  })
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [groupingDraft, setGroupingDraft] = useState(() =>
     section.advanced?.beatGrouping?.length ? formatGrouping(section.advanced.beatGrouping) : ''
   )
@@ -107,6 +102,25 @@ export default function TimelineSectionEditor({
     Boolean(groupingDraft.trim()) &&
     (!parsedGrouping || !validateGroupingForMeter(parsedGrouping, section))
   const groupingPlaceholder = groupingExample(section)
+  const repeatOptions = section.repeatCount <= 16
+    ? REPEAT_OPTIONS
+    : Array.from({ length: section.repeatCount }, (_, index) => ({
+        value: String(index + 1), label: repeatLabel(index + 1),
+      }))
+  const activeDetails = [
+    isPatternMode ? 'Meter pattern' : null,
+    section.pulseModeId ? 'Tempo beat' : null,
+    section.feelId ? 'Beat feel' : null,
+    section.subdivision !== 'auto' ? 'Custom clicks' : null,
+    section.advanced?.tempoRamp?.enabled ? 'Tempo ramp' : null,
+    section.advanced?.tempoMarkers?.length ? 'Tempo pins' : null,
+    section.advanced?.customAccents?.length || section.advanced?.beatGrouping?.length ? 'Custom accents' : null,
+    section.advanced?.countInBars ? 'Section count-in' : null,
+    section.advanced?.markerNotes?.trim() ? 'Practice note' : null,
+  ].filter((detail): detail is string => Boolean(detail))
+  const moreSummary = activeDetails.length > 0
+    ? activeDetails.slice(0, 2).join(' · ') + (activeDetails.length > 2 ? ` · +${activeDetails.length - 2}` : '')
+    : 'Meter patterns · click rhythm · tempo changes'
 
   const applyCustomGrouping = (text: string) => {
     setGroupingDraft(text)
@@ -144,13 +158,12 @@ export default function TimelineSectionEditor({
           intensity="icon"
           className="practice-timeline-editor__back"
           onClick={onClose}
-          aria-label="Back to routine"
+          aria-label="Back to program"
         >
           <ArrowLeft size={21} />
         </Pressable>
         <span className="practice-timeline-editor__title">
-          <small>Edit section</small>
-          <strong>{section.title.trim() || 'Untitled section'}</strong>
+          <strong>Edit section</strong>
         </span>
         <Pressable
           type="button"
@@ -166,215 +179,67 @@ export default function TimelineSectionEditor({
 
       <div className="practice-timeline-editor__body">
         <div className="practice-timeline-editor__content">
-          <section
-            className="practice-timeline-editor__group"
-            aria-labelledby="section-basics-heading"
-          >
-            <div className="practice-timeline-editor__group-heading">
-              <div>
-                <h2 id="section-basics-heading">Basics</h2>
-                <p>Name the section and choose how its meter behaves.</p>
-              </div>
-            </div>
+          <section className="practice-timeline-editor__focus" aria-label="Section essentials">
+            <label className="practice-timeline-editor__name-label" htmlFor="section-title">Section name</label>
+            <input
+              id="section-title"
+              className="practice-timeline-editor__focus-name"
+              value={section.title}
+              onChange={(event) => onChange({ title: event.target.value })}
+              placeholder="New Section"
+            />
 
-            <div className="practice-timeline-editor__field">
-              <label className="practice-timeline-editor__label" htmlFor="section-title">
-                Section name
-              </label>
-              <input
-                id="section-title"
-                className="practice-timeline-editor__input"
-                value={section.title}
-                onChange={(e) => onChange({ title: e.target.value })}
-                placeholder="Warm Up"
-              />
-            </div>
-
-            <div className="practice-timeline-editor__select-grid">
-              <TimelineEditorSelect
-                label="Section format"
-                ariaLabel="Section format"
-                value={isPatternMode ? 'pattern' : 'single'}
-                options={SECTION_TYPE_OPTIONS}
-                onChange={handleSectionTypeChange}
-              />
-            </div>
-          </section>
-
-          <section
-            className="practice-timeline-editor__group"
-            aria-labelledby="section-timing-heading"
-          >
-            <div className="practice-timeline-editor__group-heading">
-              <div>
-                <h2 id="section-timing-heading">{isPatternMode ? 'Meter pattern' : 'Timing'}</h2>
-                <p>
-                  {isPatternMode
-                    ? 'Build the sequence of time signatures.'
-                    : 'Set the section length, tempo, and time signature.'}
-                </p>
-              </div>
-            </div>
-
-            {isPatternMode ? (
-              <MeterPatternEditor section={section} onChange={onChange} />
-            ) : (
+            {!isPatternMode ? (
               <>
-                <div className="practice-timeline-editor__field practice-timeline-editor__field--control">
-                  <span className="practice-timeline-editor__label">Bars</span>
+                <div className="practice-timeline-editor__focus-tempo">
+                  <span className="practice-timeline-editor__focus-tempo-label">Tempo <small>{timing.bpmSymbol} / minute</small></span>
                   <div className="practice-timeline-editor__stepper">
-                    <Pressable
-                      type="button"
-                      intensity="icon"
-                      className="practice-timeline-editor__stepper-btn"
-                      aria-label="Decrease bars"
-                      onClick={() => onChange({ bars: Math.max(1, section.bars - 1) })}
-                    >
-                      −
-                    </Pressable>
-                    <span className="practice-timeline-editor__stepper-value">
-                      {section.bars}
-                      <span className="practice-timeline-editor__stepper-value-suffix">
-                        {section.bars === 1 ? 'bar' : 'bars'}
-                      </span>
-                    </span>
-                    <Pressable
-                      type="button"
-                      intensity="icon"
-                      className="practice-timeline-editor__stepper-btn"
-                      aria-label="Increase bars"
-                      onClick={() => onChange({ bars: Math.min(128, section.bars + 1) })}
-                    >
-                      +
-                    </Pressable>
+                    <Pressable type="button" intensity="icon" className="practice-timeline-editor__stepper-btn"
+                      aria-label="Decrease tempo" onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}>−</Pressable>
+                    <EditableNumberValue value={section.bpm} min={40} max={300}
+                      ariaLabel="Type tempo" onCommit={(bpm) => onChange({ bpm })}
+                      className="practice-timeline-editor__focus-bpm" />
+                    <Pressable type="button" intensity="icon" className="practice-timeline-editor__stepper-btn"
+                      aria-label="Increase tempo" onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}>+</Pressable>
                   </div>
                 </div>
-
-                <div className="practice-timeline-editor__field practice-timeline-editor__field--control">
-                  <span className="practice-timeline-editor__label">
-                    Tempo ({timing.bpmSymbol})
-                  </span>
-                  <div className="practice-timeline-editor__stepper">
-                    <Pressable
-                      type="button"
-                      intensity="icon"
-                      className="practice-timeline-editor__stepper-btn"
-                      aria-label="Decrease tempo"
-                      onClick={() => onChange({ bpm: Math.max(40, section.bpm - 1) })}
-                    >
-                      −
-                    </Pressable>
-                    <EditableNumberValue
-                      value={section.bpm}
-                      min={40}
-                      max={300}
-                      suffix="BPM"
-                      ariaLabel="Type tempo"
-                      onCommit={(bpm) => onChange({ bpm })}
-                    />
-                    <Pressable
-                      type="button"
-                      intensity="icon"
-                      className="practice-timeline-editor__stepper-btn"
-                      aria-label="Increase tempo"
-                      onClick={() => onChange({ bpm: Math.min(300, section.bpm + 1) })}
-                    >
-                      +
-                    </Pressable>
+                <div className="practice-timeline-editor__essentials">
+                  <div className="practice-timeline-editor__essential">
+                    <span>Length</span>
+                    <EditableNumberValue value={section.bars} min={1} max={128}
+                      suffix={section.bars === 1 ? 'bar' : 'bars'} ariaLabel="Type section length in bars"
+                      onCommit={(bars) => onChange({ bars })} />
                   </div>
-                </div>
-
-                <div className="practice-timeline-editor__select-grid">
-                  <TimelineEditorSelect
-                    label="Time signature"
-                    ariaLabel="Time signature"
-                    value={section.meter}
-                    options={meterSelectOptions()}
-                    onChange={(meter) => {
-                      setGroupingDraft('')
-                      onChange(applyMeterChange(section, meter as MetronomeMeter))
-                    }}
-                  />
-
-                  {sectionNeedsPulseModeChoice(section) ? (
-                    <TimelineEditorSelect
-                      label="Tempo counts"
-                      ariaLabel="Which note value the tempo refers to"
-                      value={section.pulseModeId ?? timing.pulseModeId}
-                      options={pulseSelectOptions(pulseModes)}
-                      onChange={(pulseModeId) => {
+                  <div className="practice-timeline-editor__essential">
+                    <TimelineEditorSelect label="Time" ariaLabel="Time signature" value={section.meter}
+                      options={meterSelectOptions()}
+                      onChange={(meter) => {
                         setGroupingDraft('')
-                        onChange({
-                          pulseModeId,
-                          feelId: undefined,
-                          subdivision: 'auto',
-                          advanced: {
-                            ...section.advanced,
-                            beatGrouping: undefined,
-                            customAccents: undefined,
-                          },
-                        })
-                      }}
-                    />
-                  ) : null}
-
-                  {sectionNeedsFeelPrompt(section) && timing.feelOptions.length > 0 ? (
-                    <TimelineEditorSelect
-                      label="Beat feel"
-                      ariaLabel="Beat grouping"
-                      value={activeFeelId || timing.feelOptions[0]?.id}
-                      options={feelSelectOptions(timing.feelOptions)}
-                      onChange={(feelId) => {
-                        setGroupingDraft('')
-                        onChange({
-                          feelId,
-                          advanced: {
-                            ...section.advanced,
-                            beatGrouping: undefined,
-                            customAccents: undefined,
-                          },
-                        })
-                      }}
-                    />
-                  ) : null}
+                        onChange(applyMeterChange(section, meter as MetronomeMeter))
+                      }} />
+                  </div>
+                  <div className="practice-timeline-editor__essential">
+                    <TimelineEditorSelect label="Repeat" ariaLabel="Repeat this section"
+                      value={String(section.repeatCount)} options={repeatOptions}
+                      onChange={(repeat) => onChange({ repeatCount: Number(repeat) })} />
+                  </div>
                 </div>
               </>
-            )}
-
-            <div className="practice-timeline-editor__field practice-timeline-editor__field--control practice-timeline-editor__field--last">
-              <span className="practice-timeline-editor__label">Repeat this section</span>
-              <div className="practice-timeline-editor__stepper">
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  className="practice-timeline-editor__stepper-btn"
-                  aria-label="Decrease repeats"
-                  onClick={() =>
-                    onChange({
-                      repeatCount: Math.max(1, section.repeatCount - 1),
-                    })
-                  }
-                >
-                  −
+            ) : (
+              <div className="practice-timeline-editor__essentials">
+                <Pressable type="button" intensity="soft" className="practice-timeline-editor__pattern-summary"
+                  onClick={() => setShowAdvanced(true)}>
+                  <span>Meter pattern</span>
+                  <strong>{formatPatternMetersLabel(section.patternSteps ?? [])}</strong>
+                  <small>{effectiveBars(section)} bars · Edit in More settings</small>
                 </Pressable>
-                <span className="practice-timeline-editor__stepper-value">
-                  {repeatLabel(section.repeatCount)}
-                </span>
-                <Pressable
-                  type="button"
-                  intensity="icon"
-                  className="practice-timeline-editor__stepper-btn"
-                  aria-label="Increase repeats"
-                  onClick={() =>
-                    onChange({
-                      repeatCount: Math.min(16, section.repeatCount + 1),
-                    })
-                  }
-                >
-                  +
-                </Pressable>
+                <div className="practice-timeline-editor__essential">
+                  <TimelineEditorSelect label="Repeat" ariaLabel="Repeat this section"
+                    value={String(section.repeatCount)} options={repeatOptions}
+                    onChange={(repeat) => onChange({ repeatCount: Number(repeat) })} />
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           <Pressable
@@ -384,12 +249,9 @@ export default function TimelineSectionEditor({
             aria-expanded={showAdvanced}
             onClick={() => setShowAdvanced((visible) => !visible)}
           >
-            <span className="practice-timeline-editor__advanced-icon" aria-hidden>
-              <SlidersHorizontal size={18} />
-            </span>
             <span className="practice-timeline-editor__advanced-copy">
-              <strong>Advanced timing</strong>
-              <small>Clicks, accents, count-in, tempo changes, and notes</small>
+              <strong>More settings</strong>
+              <small>{moreSummary}</small>
             </span>
             {showAdvanced ? (
               <ChevronUp size={18} aria-hidden />
@@ -400,6 +262,40 @@ export default function TimelineSectionEditor({
 
           {showAdvanced ? (
             <div className="practice-timeline-editor__advanced">
+              <section className="practice-timeline-editor__group" aria-labelledby="section-format-heading">
+                <div className="practice-timeline-editor__group-heading">
+                  <div><h2 id="section-format-heading">Section format</h2></div>
+                </div>
+                <div className="practice-timeline-editor__select-grid">
+                  <TimelineEditorSelect label="Format" ariaLabel="Section format"
+                    value={isPatternMode ? 'pattern' : 'single'} options={SECTION_TYPE_OPTIONS}
+                    onChange={handleSectionTypeChange} />
+                </div>
+                {isPatternMode ? <MeterPatternEditor section={section} onChange={onChange} /> : null}
+                {!isPatternMode && (sectionNeedsPulseModeChoice(section) || sectionNeedsFeelPrompt(section)) ? (
+                  <div className="practice-timeline-editor__select-grid">
+                    {sectionNeedsPulseModeChoice(section) ? (
+                      <TimelineEditorSelect label="Tempo counts" ariaLabel="Which note value the tempo refers to"
+                        value={section.pulseModeId ?? timing.pulseModeId} options={pulseSelectOptions(pulseModes)}
+                        onChange={(pulseModeId) => {
+                          setGroupingDraft('')
+                          onChange({ pulseModeId, feelId: undefined, subdivision: 'auto',
+                            advanced: { ...section.advanced, beatGrouping: undefined, customAccents: undefined } })
+                        }} />
+                    ) : null}
+                    {sectionNeedsFeelPrompt(section) && timing.feelOptions.length > 0 ? (
+                      <TimelineEditorSelect label="Beat feel" ariaLabel="Beat grouping"
+                        value={activeFeelId || timing.feelOptions[0]?.id}
+                        options={feelSelectOptions(timing.feelOptions)}
+                        onChange={(feelId) => {
+                          setGroupingDraft('')
+                          onChange({ feelId, advanced: { ...section.advanced,
+                            beatGrouping: undefined, customAccents: undefined } })
+                        }} />
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
               <section
                 className="practice-timeline-editor__group"
                 aria-labelledby="section-rhythm-detail-heading"

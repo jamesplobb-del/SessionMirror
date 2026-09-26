@@ -22,15 +22,21 @@ study.desk.metronome = { ...study.desk.metronome, bpm: 100, meter: '7/8' }
 study.desk.pitchTrackerEnabled = true
 api.storeLibraryExercise({ instrumentId: 'trumpet', step: study })
 assert.equal(api.loadMusicSetup('a').metronome.bpm, 100, 'Library opens with the exercise setup saved in routines')
-const saved = { ...study.desk, metronome: { ...study.desk.metronome, bpm: 112 }, autoSoundRecording: true }
+const saved = { ...study.desk, metronome: { ...study.desk.metronome, bpm: 112 }, autoSoundRecording: true, audioEnhancerEnabled: true }
 api.saveMusicSetup('a', saved)
 assert.equal(api.loadMusicSetup('a').metronome.bpm, 112)
 assert.equal(api.loadMusicSetup('a').autoSoundRecording, true, 'Explicit hands-free selection stays with the score')
+assert.equal(api.loadMusicSetup('a').audioEnhancerEnabled, true, 'Audio Enhance selection stays with the score')
 assert.equal(api.loadMusicSetup('b'), null, 'Scores do not inherit each other’s tools')
 assert.equal(api.loadMusicScoreSettings('a'), null)
 api.saveMusicScoreSettings('a', { referenceQuery: '', referenceVideoId: 'abc123DEF45', programId: 'program-one' })
 assert.deepEqual(api.loadMusicScoreSettings('a'), { referenceQuery: '', referenceVideoId: 'abc123DEF45', programId: 'program-one' })
 assert.equal(api.loadMusicScoreSettings('b'), null, 'References and programs stay with the selected score')
+api.clearMusicScoreSettings('a')
+assert.equal(api.loadMusicScoreSettings('a'), null, 'Deleting a score clears its library settings')
+assert.equal(api.loadMusicSetup('a').metronome.bpm, 100, 'Routine-owned setup remains available after score deletion')
+api.saveMusicScoreSettings('a', { referenceQuery: '', referenceVideoId: 'abc123DEF45', programId: 'program-one' })
+api.saveMusicSetup('a', saved)
 assert.equal(api.reuseMusicExercise(study).desk.metronome.bpm, 112, 'New routine selections use the score’s latest setup')
 assert.equal(api.reuseMusicExercise(study).referenceVideoId, 'abc123DEF45')
 assert.equal(api.reuseMusicExercise(study).programId, 'program-one')

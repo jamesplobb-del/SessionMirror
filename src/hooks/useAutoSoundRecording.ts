@@ -5,7 +5,7 @@ import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
 import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
-import { AUTO_RECORD_MAX_IDLE_PREROLL_MS } from '../utils/autoRecordPlayback'
+import { AUTO_RECORD_MAX_IDLE_PREROLL_MS, AUTO_RECORD_PREROLL_MS } from '../utils/autoRecordPlayback'
 import { isAppInForeground, subscribeAppForeground } from '../utils/appForeground'
 import { getPlaybackAudioContext, isSharedPlaybackContext } from '../utils/playbackAudioContext'
 import {
@@ -40,12 +40,16 @@ const HEALTH_CHECK_MS = 2500
 const STALL_RECOVERY_MS = 2200
 const START_FAILURE_CLEAR_MS = 3000
 const QUIET_EMA_ALPHA = 0.03
-const METRONOME_START_HOLD_MS = 180
+const METRONOME_START_HOLD_MS = 300
+const METRONOME_TAIL_MS = 90
+const METRONOME_CLEAN_START_FRAMES = 4
 
 function metronomeClickGuardMs(soundId: string): number {
-  if (soundId === 'soft') return 145
-  if (soundId === 'classic') return 110
-  return 90
+  // The oscillator itself is short, but the speaker, room, and iPad mic keep
+  // hearing its tail after the scheduled tick. Mask that tail as well.
+  if (soundId === 'soft') return 185
+  if (soundId === 'classic') return 155
+  return 140
 }
 
 interface UseAutoSoundRecordingOptions {
@@ -215,6 +219,12 @@ export function useAutoSoundRecording({
   const prevSuppressStartRef = useRef(suppressStart)
   const prevMonitoringPausedRef = useRef(monitoringPaused)
   const metronomeClickGuardUntilRef = useRef(0)
+  const metronomeClickPeakRef = useRef(0)
+  const metronomeCleanStartFramesRef = useRef(0)
+  const resetStartCandidate = () => {
+    loudSinceRef.current = null
+    metronomeCleanStartFramesRef.current = 0
+  }
 
   isRecordingRef.current = isRecording
   suppressStartRef.current = suppressStart
@@ -251,11 +261,14 @@ export function useAutoSoundRecording({
   useEffect(() => {
     if (!shouldMonitor) {
       metronomeClickGuardUntilRef.current = 0
+      metronomeClickPeakRef.current = 0
+      metronomeCleanStartFramesRef.current = 0
       return
     }
     return sharedMetronomeEngine.subscribeTick((event) => {
       if (!event.audible) return
       const metronome = sharedMetronomeEngine.getSnapshot()
+      metronomeClickPeakRef.current = 0
       metronomeClickGuardUntilRef.current =
         performance.now() + metronomeClickGuardMs(metronome.soundId)
     })
@@ -294,7 +307,7 @@ export function useAutoSoundRecording({
       if (!isRecordingRef.current) {
         autoTriggeredRef.current = false
         pendingPerformanceGateRef.current = false
-        loudSinceRef.current = null
+        resetStartCandidate()
         setHandsFreeRecording(false)
         setHandsFreeNotice('start')
         clearStartLatch()
@@ -324,7 +337,7 @@ export function useAutoSoundRecording({
       recordingStartedAtRef.current = performance.now()
       silenceSinceRef.current = null
       setHandsFreeRecording(true)
-      loudSinceRef.current = null
+      resetStartCandidate()
       attackSinceRef.current = null
       armStartLatch()
       scheduleStartFailureRecovery()
@@ -348,7 +361,7 @@ export function useAutoSoundRecording({
     recordingStartedAtRef.current = performance.now()
     silenceSinceRef.current = null
     setHandsFreeRecording(true)
-    loudSinceRef.current = null
+    resetStartCandidate()
     attackSinceRef.current = null
     armStartLatch()
     scheduleStartFailureRecovery()
@@ -420,8 +433,15 @@ export function useAutoSoundRecording({
     if (now - recordingStartedAtRef.current < MIN_RECORDING_MS) return false
     const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
     const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
-    // A masked click is unknown audio, not evidence that the musician stopped.
-    if (metronomeTransient) { silenceGateRef.current.pause(); return false }
+    // A click must not reset the quiet countdown. Treat its known output as
+    // quiet; real sustained playing in the spaces between clicks resets it.
+    // Pausing the clock here made a fast click postpone replay indefinitely.
+    if (metronomeTransient) {
+      const decision = silenceGateRef.current.sample(now, false, silenceMsRef.current, frameMs)
+      setReplayCountdown(decision.remainingSeconds)
+      if (decision.stop) finishHandsFreeTake()
+      return decision.stop
+    }
     const loud = metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate
     const decision = silenceGateRef.current.sample(now, loud, silenceMsRef.current, frameMs)
     setReplayCountdown(decision.remainingSeconds)
@@ -476,7 +496,7 @@ export function useAutoSoundRecording({
     }
 
     silenceSinceRef.current = null
-    loudSinceRef.current = null
+    resetStartCandidate()
     attackSinceRef.current = null
     if (!preserve) {
       silenceGateRef.current.reset()
@@ -519,7 +539,7 @@ export function useAutoSoundRecording({
     }
 
     if (wasRecordingRef.current && shouldMonitor) {
-      loudSinceRef.current = null
+      resetStartCandidate()
       attackSinceRef.current = null
       cooldownUntilRef.current = performance.now() + COOLDOWN_MS
       const warmTimer = window.setTimeout(() => {
@@ -751,7 +771,7 @@ export function useAutoSoundRecording({
             else void ctx.resume().catch(() => {})
             setMonitorReady(false)
             silenceGateRef.current.pause()
-            loudSinceRef.current = null
+            resetStartCandidate()
             return
           }
         }
@@ -799,7 +819,7 @@ export function useAutoSoundRecording({
           const freshness = readFrameFreshness(frame?.timestamp, now)
           if (freshness === 'stale' || freshness === 'gap') {
             // Missing audio is neither sustained playing nor sustained silence.
-            loudSinceRef.current = null
+            resetStartCandidate()
             attackSinceRef.current = null
             quietFramesSeen = 0
           }
@@ -835,7 +855,7 @@ export function useAutoSoundRecording({
           // while still adapting when the room is louder than the saved gate.
           calibrationSamples.push(metrics.rms)
           quietFramesSeen = metrics.rms < profile.gate * 0.9 ? quietFramesSeen + 1 : 0
-          loudSinceRef.current = null
+          resetStartCandidate()
           attackSinceRef.current = null
           return
         }
@@ -857,11 +877,26 @@ export function useAutoSoundRecording({
             setHandsFreeNotice('sensitive')
           }
           if (quietFramesSeen < ARM_QUIET_FRAMES) {
-            loudSinceRef.current = null
+            resetStartCandidate()
             attackSinceRef.current = null
             return
           }
           armed = true
+        }
+
+        // A live level meter is not proof that the hidden recorder is ready.
+        // Wait until it has actually retained the promised pre-roll before
+        // inviting a sound-triggered take; cold-starting at the gate drops the
+        // beginning of a phrase. Older callers without pre-roll hooks retain
+        // their existing behavior.
+        if (!isRecordingRef.current && isAutoPreRollCaptureActiveRef.current && getAutoPreRollAgeMsRef.current) {
+          const preRollActive = isAutoPreRollCaptureActiveRef.current()
+          if (!preRollActive || getAutoPreRollAgeMsRef.current() < AUTO_RECORD_PREROLL_MS) {
+            setMonitorReady(false)
+            resetStartCandidate()
+            attackSinceRef.current = null
+            return
+          }
         }
 
         setMonitorReady(true)
@@ -874,7 +909,7 @@ export function useAutoSoundRecording({
           if (pendingPerformanceGateRef.current && metrics.rms < effectiveGateRef.current) {
             pendingPerformanceGateRef.current = false
             clearStartLatch()
-            loudSinceRef.current = null
+            resetStartCandidate()
           } else {
             tryCommitPendingPerformanceStart()
           }
@@ -883,7 +918,7 @@ export function useAutoSoundRecording({
             const preRollAge = getAutoPreRollAgeMsRef.current?.() ?? 0
             if (preRollAge > AUTO_RECORD_MAX_IDLE_PREROLL_MS) {
               restartAutoPreRollCaptureRef.current?.()
-              loudSinceRef.current = null
+              resetStartCandidate()
               attackSinceRef.current = null
               pendingPerformanceGateRef.current = false
             }
@@ -898,7 +933,7 @@ export function useAutoSoundRecording({
           }
 
           if (suppressStartRef.current) {
-            loudSinceRef.current = null
+            resetStartCandidate()
             attackSinceRef.current = null
             armed = false
             quietFramesSeen = 0
@@ -910,22 +945,33 @@ export function useAutoSoundRecording({
           const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
 
           if (metronomeTransient) {
-            loudSinceRef.current = null
+            // Keep a genuine phrase candidate across the known click. Only
+            // clean frames can confirm it, so a click cannot advance a start.
+            metronomeClickPeakRef.current = Math.max(metronomeClickPeakRef.current, metrics.rms)
             attackSinceRef.current = null
             return
           }
 
           // Require sustained energy, not a peak from a tap, click, or mic bump.
           attackSinceRef.current = null
-          const decision = advanceAutoStart(loudSinceRef.current, now, metrics.rms, currentGate,
+          const inClickTail = metronomeActive && now <= metronomeClickGuardUntilRef.current + METRONOME_TAIL_MS
+          const tailGate = inClickTail
+            ? Math.max(currentGate, metronomeClickPeakRef.current * 0.45)
+            : currentGate
+          if (inClickTail && metrics.rms < tailGate) return
+          const decision = advanceAutoStart(loudSinceRef.current, now, metrics.rms, tailGate,
             Math.max(profile.holdMs, metronomeActive ? METRONOME_START_HOLD_MS : 0))
           loudSinceRef.current = decision.since
-          if (decision.start && !startLatchRef.current) triggerAutoStart()
+          metronomeCleanStartFramesRef.current = decision.since === null
+            ? 0 : metronomeCleanStartFramesRef.current + 1
+          if (decision.start &&
+              (!metronomeActive || metronomeCleanStartFramesRef.current >= METRONOME_CLEAN_START_FRAMES) &&
+              !startLatchRef.current) triggerAutoStart()
 
           return
         }
 
-        loudSinceRef.current = null
+        resetStartCandidate()
         attackSinceRef.current = null
 
         if (!autoTriggeredRef.current) return
@@ -1038,7 +1084,7 @@ export function useAutoSoundRecording({
       profileRef.current = getAutoRecordProfile(volumeThreshold)
       quietRmsEmaRef.current = 0
       effectiveGateRef.current = profileRef.current.gate
-      loudSinceRef.current = null
+      resetStartCandidate()
       attackSinceRef.current = null
       clearStartLatch()
       bumpMonitorEpoch()
@@ -1070,7 +1116,7 @@ export function useAutoSoundRecording({
 
     if (!shouldMonitor || !wasSuppressed || suppressStart) return
 
-    loudSinceRef.current = null
+    resetStartCandidate()
     attackSinceRef.current = null
     silenceSinceRef.current = null
     quietRmsEmaRef.current = 0
@@ -1087,7 +1133,7 @@ export function useAutoSoundRecording({
 
     if (!shouldMonitor || !wasPaused || monitoringPaused) return
 
-    loudSinceRef.current = null
+    resetStartCandidate()
     attackSinceRef.current = null
     silenceSinceRef.current = null
     quietRmsEmaRef.current = 0

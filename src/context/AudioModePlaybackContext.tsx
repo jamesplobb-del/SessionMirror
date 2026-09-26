@@ -78,7 +78,7 @@ interface AudioModePlaybackContextValue {
     },
   ) => void
   toggle: (item: AudioModePlaybackItem) => void
-  pause: () => void
+  pause: () => Promise<void>
   seek: (time: number) => void
   openFullscreen: (item: AudioModePlaybackItem) => void
   closeFullscreen: () => void
@@ -88,7 +88,7 @@ interface AudioModePlaybackContextValue {
 const AudioModePlaybackContext = createContext<AudioModePlaybackContextValue | null>(null)
 /** App-level hook for pausing inline audio-mode take playback (vault, settings, review). */
 export const audioModePlaybackControlsRef: {
-  pause: (() => void) | null
+  pause: (() => Promise<void>) | null
   play: AudioModePlaybackContextValue['play'] | null
 } = { pause: null, play: null }
 
@@ -750,7 +750,7 @@ export function AudioModePlaybackProvider({
     [startProgressLoop, state.currentItem],
   )
 
-  const pause = useCallback(() => {
+  const pause = useCallback(async () => {
     playbackRequestIdRef.current += 1
     if (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) {
       const wasActive = nativePlaybackActiveRef.current
@@ -771,26 +771,24 @@ export function AudioModePlaybackProvider({
       externalNativePlaybackEndedRef.current = null
       externalNativePlaybackFailedRef.current = null
       clearResumeTimer()
+      await stopAudioModeNativePlayback()
+      nativePlaybackActiveRef.current = false
+      onPlaybackActiveChangeRef.current?.(false)
+      updateSessionPrepared(false)
+      stopProgressLoop()
+      logPlayback('Paused', {
+        takeId: state.currentItem?.takeId ?? state.currentItem?.id,
+        position: nativePlaybackOffsetRef.current,
+        playerExists: false,
+        sessionPrepared: false,
+        path: 'native-avplayer',
+      })
+      setState((prev) => ({
+        ...prev,
+        isPlaying: false,
+        currentTime: nativePlaybackOffsetRef.current,
+      }))
       onFailed?.()
-      void (async () => {
-        await stopAudioModeNativePlayback()
-        nativePlaybackActiveRef.current = false
-        onPlaybackActiveChangeRef.current?.(false)
-        updateSessionPrepared(false)
-        stopProgressLoop()
-        logPlayback('Paused', {
-          takeId: state.currentItem?.takeId ?? state.currentItem?.id,
-          position: nativePlaybackOffsetRef.current,
-          playerExists: false,
-          sessionPrepared: false,
-          path: 'native-avplayer',
-        })
-        setState((prev) => ({
-          ...prev,
-          isPlaying: false,
-          currentTime: nativePlaybackOffsetRef.current,
-        }))
-      })()
       return
     }
 

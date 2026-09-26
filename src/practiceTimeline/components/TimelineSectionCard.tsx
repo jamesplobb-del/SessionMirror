@@ -1,20 +1,14 @@
-import { Copy, GripVertical, MoreHorizontal, Pencil, Play, Trash2 } from 'lucide-react'
+import { Copy, MoreHorizontal, Play, Trash2 } from 'lucide-react'
 import { useRef, useState, type PointerEvent } from 'react'
 import Pressable from '../../components/ui/Pressable'
 import { triggerLightHaptic, triggerWarningHaptic } from '../../utils/haptics'
-import { patternSectionSummary, sectionHasMeterPattern } from '../patternLogic'
-import {
-  effectiveBars,
-  sectionBarWidth,
-  subdivisionLabel,
-  tempoRampLabel,
-} from '../timeSignatureLogic'
+import { formatPatternMetersLabel, sectionHasMeterPattern } from '../patternLogic'
+import { effectiveBars, subdivisionLabel, tempoRampLabel } from '../timeSignatureLogic'
 import { repeatLabel } from '../sectionDefaults'
 import type { TimelineSection } from '../types'
 
 interface TimelineSectionCardProps {
   section: TimelineSection
-  maxBars: number
   index: number
   onPress: () => void
   onPlayFrom: () => void
@@ -32,7 +26,6 @@ const SWIPE_REVEAL_THRESHOLD = 38
 
 export default function TimelineSectionCard({
   section,
-  maxBars,
   index,
   onPress,
   onPlayFrom,
@@ -54,10 +47,13 @@ export default function TimelineSectionCard({
   } | null>(null)
   const swipeOffsetRef = useRef(0)
   const swipeConsumedRef = useRef(false)
-  const barWidth = sectionBarWidth(section, maxBars)
   const ramp = tempoRampLabel(section)
   const isPattern = sectionHasMeterPattern(section)
-  const patternSummary = isPattern ? patternSectionSummary(section) : null
+  const patternSummary = isPattern ? formatPatternMetersLabel(section.patternSteps ?? []) : null
+  const details = isPattern
+    ? `${effectiveBars(section)} bars · ${patternSummary}`
+    : `${section.bars} bars · ${section.meter}${section.repeatCount > 1 ? ` · ${repeatLabel(section.repeatCount)}` : ''}`
+  const clickDetail = section.subdivision !== 'auto' ? subdivisionLabel(section) : null
 
   const closeDelete = () => {
     setDeleteRevealed(false)
@@ -161,20 +157,23 @@ export default function TimelineSectionCard({
         }}
       >
         <div className="practice-timeline__section-header">
-          <div className="practice-timeline__drag-handle" aria-hidden>
-            <GripVertical size={20} />
-          </div>
+          <span className="practice-timeline__section-number" aria-hidden>{index + 1}</span>
           <Pressable
             type="button"
             intensity="soft"
             className="practice-timeline__section-title-button"
+            aria-label={`Edit section ${index + 1}: ${section.title}`}
             onClick={(event) => {
               event.stopPropagation()
               onPress()
             }}
           >
-            <span className="practice-timeline__section-order">Section {index + 1}</span>
-            <h3 className="practice-timeline__section-title">{section.title}</h3>
+            <span className="practice-timeline__section-copy">
+              <strong className="practice-timeline__section-title">{section.title}</strong>
+              <small className="practice-timeline__section-compact-meta">{details}</small>
+              {(ramp || clickDetail) && <small className="practice-timeline__section-compact-detail">{[ramp, clickDetail].filter(Boolean).join(' · ')}</small>}
+            </span>
+            {!isPattern && <span className="practice-timeline__section-tempo">{section.bpm}<small> BPM</small></span>}
           </Pressable>
           <Pressable
             type="button"
@@ -191,76 +190,20 @@ export default function TimelineSectionCard({
           </Pressable>
         </div>
 
-        <div className="practice-timeline__section-bar" aria-hidden>
-          <div
-            className="practice-timeline__section-bar-fill"
-            style={{ width: `${barWidth * 100}%` }}
-          />
-        </div>
-
-        <div className="practice-timeline__section-meta">
-          <span>
-            <small>Length</small>
-            <strong>{effectiveBars(section)} bars</strong>
-          </span>
-          {isPattern ? (
-            <span className="practice-timeline__section-meta-pattern">
-              <small>Pattern</small>
-              <strong>{patternSummary}</strong>
-            </span>
-          ) : (
-            <>
-              <span>
-                <small>Meter</small>
-                <strong>{section.meter}</strong>
-              </span>
-              <span>
-                <small>Tempo</small>
-                <strong>{section.bpm} BPM</strong>
-              </span>
-              <span>
-                <small>Clicks</small>
-                <strong>{subdivisionLabel(section)}</strong>
-              </span>
-            </>
-          )}
-          <span>
-            <small>Repeat</small>
-            <strong>{repeatLabel(section.repeatCount)}</strong>
-          </span>
-        </div>
-
-        {ramp ? <p className="practice-timeline__section-detail">{ramp}</p> : null}
-
-        <div
-          className="practice-timeline__section-primary-actions"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <Pressable
-            type="button"
-            intensity="soft"
-            className="practice-timeline__section-action practice-timeline__section-action--edit"
-            onClick={onPress}
-          >
-            <Pencil size={15} aria-hidden />
-            Edit
-          </Pressable>
-          <Pressable
-            type="button"
-            intensity="soft"
-            className="practice-timeline__section-action practice-timeline__section-action--play"
-            onClick={onPlayFrom}
-          >
-            <Play size={15} fill="currentColor" aria-hidden />
-            Start here
-          </Pressable>
-        </div>
-
         {showMoreActions ? (
           <div
             className="practice-timeline__section-actions"
             onClick={(event) => event.stopPropagation()}
           >
+            <Pressable
+              type="button"
+              intensity="soft"
+              className="practice-timeline__section-action practice-timeline__section-action--play"
+              onClick={() => { onPlayFrom(); setShowMoreActions(false) }}
+            >
+              <Play size={14} fill="currentColor" aria-hidden />
+              Start here
+            </Pressable>
             <Pressable
               type="button"
               intensity="soft"

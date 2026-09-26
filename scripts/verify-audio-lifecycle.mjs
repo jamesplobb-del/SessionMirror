@@ -59,13 +59,14 @@ assert.equal(freshRead(550, 620), 'stale', 'Out-of-order frames cannot count as 
 const registration = deferred()
 let receive, registrations = 0, removals = 0, startsNative = 0, stopsNative = 0
 let startResult = Promise.resolve({ active: true })
+let stopResult = null
 const tapChanges = []
 const deliveryModes = []
 globalThis.window = new EventTarget()
 globalThis.__audioLifecycleMock = {
   addListener: (_event, callback) => { registrations++; receive = callback; return registration.promise },
   startNativeTunerMonitor: () => { startsNative++; return startResult },
-  stopNativeTunerMonitor: async () => { stopsNative++; return { active: false } },
+  stopNativeTunerMonitor: async () => { stopsNative++; return stopResult?.promise ?? { active: false } },
   setNativeAudioTapEnabled: async ({ enabled, completionDelivery }) => { tapChanges.push(enabled); deliveryModes.push(completionDelivery) },
 }
 const boundary = { name: 'native-boundary', setup(builder) {
@@ -117,4 +118,16 @@ nativeRecovery.resolve({ active: true })
 assert.ok((await Promise.all(repairs)).every(active => !active), 'Abandoned recovery cannot report a live tuner')
 await release
 assert.equal(stopsNative, 1, 'Leaving during repair must restore the native route only once')
+await tap.releaseNativeTunerMonitor()
+assert.equal(stopsNative, 1, 'A duplicate cleanup after playback takes the route must not stop it again')
+await tap.acquireNativeTunerMonitor()
+stopResult = deferred()
+const screenCleanup = tap.releaseNativeTunerMonitor()
+let playbackHandoffFinished = false
+const playbackHandoff = tap.releaseNativeTunerMonitor().then(() => { playbackHandoffFinished = true })
+await new Promise(resolve => setImmediate(resolve))
+assert.equal(playbackHandoffFinished, false, 'Playback must wait for a screen cleanup already stopping the tuner route')
+stopResult.resolve({ active: false })
+await Promise.all([screenCleanup, playbackHandoff])
+assert.equal(stopsNative, 2, 'The shared cleanup stops native capture exactly once')
 console.log('Audio lifecycle passed: cancelled startup, shared recovery, fresh-frame triggering, rapid tool switches, and shared tap ownership.')

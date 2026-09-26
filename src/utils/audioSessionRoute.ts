@@ -347,6 +347,7 @@ export interface BestTakeAudioPluginType {
   stopMultitrackTransport(): Promise<{ stopped: boolean }>
   /** Silence the multitrack mix (click, parts, backing) without stopping its clock. */
   setMultitrackOutputMuted(options: { muted: boolean }): Promise<{ muted: boolean }>
+  setMultitrackSourceMix(options: { id: string; volume: number; muted: boolean }): Promise<void>
   setNativeExperimentalAudioMode(options: {
     enabled: boolean
     selectedAudioEngine: string

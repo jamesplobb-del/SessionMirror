@@ -42,6 +42,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startMultitrackTransport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopMultitrackTransport", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setMultitrackOutputMuted", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setMultitrackSourceMix", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setNativeExperimentalAudioMode", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startNativeCameraBridge", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopNativeCameraBridge", returnType: CAPPluginReturnPromise),
@@ -1168,6 +1169,19 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             DispatchQueue.main.async {
                 call.resolve(["muted": muted])
             }
+        }
+    }
+
+    @objc func setMultitrackSourceMix(_ call: CAPPluginCall) {
+        guard let id = call.getString("id") else {
+            call.reject("A multitrack source ID is required")
+            return
+        }
+        let volume = Float(call.getDouble("volume") ?? 1)
+        let muted = call.getBool("muted") ?? false
+        DispatchQueue.global(qos: .userInitiated).async {
+            MultitrackTransportEngine.shared.setSourceMix(id: id, volume: volume, muted: muted)
+            DispatchQueue.main.async { call.resolve() }
         }
     }
 

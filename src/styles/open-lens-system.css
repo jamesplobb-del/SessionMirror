@@ -395,7 +395,6 @@ html#lens-design-system .lens-camera .open-lens-dock-action span { color:#eff8ff
 html#lens-design-system .lens-camera .open-lens-modes { background:#17374955!important; border-color:#ffffff40!important; color:#eff8ff!important; }
 html#lens-design-system .lens-camera .open-lens-modes button[aria-pressed=true] { background:#ffffffdf!important; color:#244b69!important; }
 html#lens-design-system .lens-camera .app-pip-row--compact { gap:12px; }
-html#lens-design-system .app-ui-overlay .app-pip-row-wrap--camera.app-pip-row-wrap--compact { bottom:calc(env(safe-area-inset-bottom,0px) + 144px); }
 
 /* Shared surfaces also reach sheets rendered outside the recording shell. */
 html#lens-design-system {

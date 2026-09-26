@@ -1,16 +1,11 @@
-import ProjectFileActions from './ProjectFileActions'
 import type { MultitrackSession, PerformancePanelState } from '../types'
-import type { MultitrackProjectSummary } from '../state/multitrackPersistence'
 import { compositionRects } from '../layout/composition'
 import { getLayoutPreset } from '../layout/layoutPresets'
 
-export default function MultitrackProjectPanel({ session, projects, onProject, onUpdate, onPanel, onReorder, onUndo, canUndo, onRecord, time, onShare, onImport, fileBusy }: {
-  onShare: () => void; onImport: (file: File) => void; fileBusy: boolean
-  session: MultitrackSession; projects: MultitrackProjectSummary[]
-  onProject: (id?: string, duplicate?: boolean) => void
+export default function MultitrackProjectPanel({ session, onUpdate, onPanel, onReorder, onUndo, canUndo, onRecord, time }: {
+  session: MultitrackSession
   onUpdate: (patch: Partial<MultitrackSession>) => void
   onPanel: (id: string, patch: Partial<PerformancePanelState>) => void
-  onLayout: (id: string) => void
   onReorder: (id: string, beforeId: string) => void
   onUndo: () => void; canUndo: boolean
   onRecord: (id: string, time: number) => void; time: number
@@ -18,18 +13,7 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
   const rects = compositionRects(session, getLayoutPreset(session.layoutId), time).panelRects
   const boxName = (panel: PerformancePanelState) => panel.label || panel.take?.name || `${panel.overlay ? 'Extra' : 'Box'} ${session.panels.filter(p => p.kind === 'performance' && !!p.overlay === !!panel.overlay).findIndex(p => p.id === panel.id) + 1}`
   return <div className="multitrack-project-panel">
-    <div className="multitrack-settings-heading"><h2>Project</h2></div>
-    <label>Performance name<input aria-label="Performance name" value={session.name ?? ''} maxLength={80} onChange={e => onUpdate({ name: e.target.value })} /></label>
-    <div className="multitrack-studio-actions">
-      <button onClick={() => onProject()}>New project</button>
-      <button onClick={() => onProject(undefined, true)}>Duplicate</button>
-      <button disabled={!canUndo} onClick={onUndo}>Undo</button>
-    </div>
-    <label>Open saved project<select value={session.projectId ?? ''} onChange={e => onProject(e.target.value)}>
-      {!projects.some(p => p.id === session.projectId) && <option value={session.projectId}>Current performance</option>}
-      {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-    </select></label>
-    <div className="multitrack-settings-heading"><h2>Parts</h2></div>
+    <div className="multitrack-settings-heading multitrack-parts-heading"><h2>Parts</h2><button disabled={!canUndo} onClick={onUndo}>Undo</button></div>
     {session.panels.map((p, i) => p.kind !== 'performance' ? null : <details key={p.id} className="multitrack-part-settings"
       draggable onDragStart={e => e.dataTransfer.setData('text/plain', p.id)} onDragOver={e => e.preventDefault()}
       onDrop={e => { e.preventDefault(); onReorder(e.dataTransfer.getData('text/plain'), p.id) }}>
@@ -75,10 +59,5 @@ export default function MultitrackProjectPanel({ session, projects, onProject, o
       {p.overlay && <button onClick={() => onUpdate({ panels: session.panels.filter(other => other.id !== p.id) })}>Delete extra box</button>}
       </details>
     </details>)}
-    <details className="multitrack-advanced"><summary>Share or import project</summary>
-    <div className="multitrack-settings-heading"><h2>Collaborate</h2><p>Send your parts. Your friend adds theirs and sends the project back.</p></div>
-    <ProjectFileActions busy={fileBusy} onShare={onShare} onImport={onImport} />
-    <p className="multitrack-file-note">Includes recordings and layout, up to 512 MB. Opens as a new project.{session.backing.kind === 'youtube' ? ' YouTube references need internet.' : ''}</p>
-    </details>
   </div>
 }

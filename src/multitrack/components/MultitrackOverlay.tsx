@@ -53,6 +53,7 @@ import {
   isNativeMultitrackTransportAvailable,
   prepareNativeMultitrackMonitor,
   setNativeMultitrackOutputMuted,
+  setNativeMultitrackSourceMix,
   startNativeMultitrackTransport,
   stopNativeMultitrackTransport,
   type MultitrackMonitorSource,
@@ -68,7 +69,7 @@ import MultitrackBackingTrackPanel, { MultitrackBackingMediaHost } from '../back
 import MultitrackTakePicker from '../takeVault/MultitrackTakePicker'
 import MultitrackRecordingStage from './MultitrackRecordingStage'
 import MultitrackAlignStage from './MultitrackAlignStage'
-import ProjectFileActions from './ProjectFileActions'
+import MultitrackProjectsPanel from './MultitrackProjectsPanel'
 import MultitrackWorkspaceTools, { type MultitrackRoutine } from './MultitrackWorkspaceTools'
 import MultitrackLayoutSheet from './MultitrackLayoutSheet'
 import MultitrackCountInControls from './MultitrackCountInControls'
@@ -183,7 +184,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const [pendingReview, setPendingReview] = useState<{ panelId: string; take: Take; mirrored: boolean } | null>(null)
   const discardNextRecordingRef = useRef(false)
   /** Bottom sheets: backing source, export, visual or a tile's action sheet. */
-  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'project' | 'tools' | 'layout' | 'click' | null>(null)
+  const [activeSourceSheet, setActiveSourceSheet] = useState<'backing' | 'export' | 'visual' | 'projects' | 'tools' | 'layout' | 'click' | null>(null)
+  const [projectView, setProjectView] = useState<'library' | 'parts'>('library')
   const [tileSheetPanelId, setTileSheetPanelId] = useState<string | null>(null)
   const [alignStageOpen, setAlignStageOpen] = useState(false)
   const [layoutEditing, setLayoutEditing] = useState(false)
@@ -202,7 +204,6 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const {
     session, projects, openProject, importProject, updateProject, updatePanel, reorderPanel, undo, canUndo,
     layout,
-    setLayout,
     addPerformanceBox,
     assignTakeToPanel,
     setPanelVolume,
@@ -216,7 +217,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     removeSheetCue,
     updatePractice,
     updateBacking,
-    persistenceNotice,
+    persistenceNotice, saveStatus, retrySave,
     isRestoring,
   } = useMultitrackSession({ takes, isOpen, takesLoaded: props.takesLoaded })
   useEffect(() => { setRenderedVideo(null) }, [session])
@@ -224,8 +225,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const { showAlert, showConfirm } = useActionSheet()
   const [projectFileBusy, setProjectFileBusy] = useState(false)
   const projectFileBusyRef = useRef(false)
+  const [projectSwitching, setProjectSwitching] = useState(false)
+  const projectSwitchingRef = useRef(false)
   const handleProjectFile = async (file?: File | string) => {
-    if (projectFileBusyRef.current || isRestoring || recording.phase !== 'idle' || isExporting) return
+    if (projectFileBusyRef.current || projectSwitchingRef.current || isRestoring || recording.phase !== 'idle' || isExporting) return
     projectFileBusyRef.current = true; setProjectFileBusy(true)
     pauseAllPlayback()
     let imported: Awaited<ReturnType<typeof readMultitrackFile>> | undefined
@@ -237,6 +240,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         } else source = file
         imported = await readMultitrackFile(source)
         await importProject(imported.session)
+        sync.seek(0)
         setRenderedVideo(null); setAlignStageOpen(false); setActiveSourceSheet(null)
         void showAlert({ title: 'Project opened', message: 'Your friend’s parts are ready. Record in an empty box, then share the project file back.', tone: 'success' })
       } else await shareMultitrackFile(session)
@@ -251,6 +255,24 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const nativeGridPlaybackGenerationRef = useRef(0)
   const playAllFromBeginningAfterRecordRef = useRef(false)
   const [isNativeGridPlaybackPreparing, setIsNativeGridPlaybackPreparing] = useState(false)
+
+  const handlePanelVolumeChange = useCallback((panelId: string, volume: number) => {
+    setPanelVolume(panelId, volume)
+    sync.setPanelVolume(panelId, volume)
+    if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
+      const panel = session.panels.find(p => p.id === panelId)
+      void setNativeMultitrackSourceMix(panelId, volume, panel?.kind === 'performance' && panel.muted === true)
+    }
+  }, [session.panels, setPanelVolume, sync])
+
+  const handlePanelMuteToggle = useCallback((panelId: string, muted: boolean) => {
+    setPanelMuted(panelId, muted)
+    sync.setPanelMuted(panelId, muted)
+    if (nativeGridPlaybackActiveRef.current || nativeGridPlaybackPreparingRef.current) {
+      const panel = session.panels.find(p => p.id === panelId)
+      void setNativeMultitrackSourceMix(panelId, panel?.kind === 'performance' ? panel.volume ?? 1 : 1, muted)
+    }
+  }, [session.panels, setPanelMuted, sync])
 
   const stopNativeGridPlayback = useCallback(async () => {
     nativeGridPlaybackGenerationRef.current += 1
@@ -528,7 +550,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         panel.kind !== 'performance' || panel.hidden ||
         (targetPanelId !== null && panel.id === targetPanelId) ||
         !panel.take ||
-        panel.muted ||
+        (targetPanelId !== null && panel.muted) ||
         (respectRecordingMonitorMutes && monitorMutesRef.current.has(panel.id))
       ) continue
 
@@ -560,6 +582,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         sourceOutSec: window.sourceOutSec,
         ...(timelineDelaySec > 0 ? { timelineDelaySec } : null),
         volume: panel.volume ?? 1,
+        muted: panel.muted === true,
       })
     }
 
@@ -718,6 +741,25 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     pauseBacking()
     void stopNativeGridPlayback()
   }, [pauseBacking, stopNativeGridPlayback, sync])
+
+  const handleSwitchProject = async (id?: string, duplicate = false) => {
+    if (projectSwitchingRef.current || projectFileBusyRef.current) return
+    projectSwitchingRef.current = true
+    setProjectSwitching(true)
+    pauseAllPlayback()
+    try {
+      if (await openProject(id, duplicate)) {
+        sync.seek(0)
+        setAlignStageOpen(false)
+        setLayoutEditing(false)
+        setRenderedVideo(null)
+        setActiveSourceSheet(null)
+      }
+    } finally {
+      projectSwitchingRef.current = false
+      setProjectSwitching(false)
+    }
+  }
 
   // Keep/Retry and opening another box may happen before native recovery
   // finishes. Arming must await that same handoff, never race it.
@@ -1157,18 +1199,21 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   useEffect(() => { incomingProjectHandler.current() }, [isOpen, isRestoring, projectFileBusy, recording.phase, isExporting])
 
   useEffect(() => {
-    // While the timeline editor is open it owns the live offsets and trims —
-    // it writes every drag straight into sync. Re-deriving them from the saved
-    // session here would snap a clip back mid-gesture, so stand down until the
-    // editor closes and this effect reconciles against the saved values again.
-    if (alignStageOpen) return
     for (const panel of session.panels) {
       if (panel.kind !== 'performance') continue
       sync.setPanelVolume(panel.id, panel.volume ?? 1)
       sync.setPanelMuted(panel.id, panel.muted === true || panel.hidden === true)
+    }
+  }, [session.panels, sync])
+
+  useEffect(() => {
+    // The editor owns live offsets and trims during a drag. Saved values only
+    // reconcile after it closes; mix levels above keep updating while it plays.
+    if (alignStageOpen) return
+    for (const panel of session.panels) {
+      if (panel.kind !== 'performance') continue
       sync.setPanelTrim(panel.id, panel.trimStartSec ?? 0, panel.trimEndSec ?? null)
       sync.setPanelOffset(panel.id, panelOffsetMs(panel, session.practice.bpm))
-
     }
   }, [alignStageOpen, session.panels, session.practice.bpm, sync])
 
@@ -1481,15 +1526,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               <Pressable type="button" intensity="soft" disabled={isExporting || isRecording || isStopping || alignStageOpen} onClick={activePanel ? closeRecorder : onClose} aria-label={activePanel ? "Back to workspace" : "Return to Camera Mode"} className="multitrack-camera-back">
                 <ChevronLeft className="h-6 w-6" />
               </Pressable>
-              <button type="button" className="multitrack-camera-title multitrack-project-trigger" aria-label="Open project and parts" disabled={isRestoring || isExporting || !!activePanel || alignStageOpen} onClick={() => { pauseAllPlayback(); setActiveSourceSheet('project') }}>
-                <h1>{activePanel ? recording.phase === 'review' ? 'Review take' : 'Record a part' : 'Multitrack'}</h1>
-                <span>{session.name || 'My performance'}</span>
+              <button type="button" className="multitrack-camera-title multitrack-project-trigger" aria-label={activePanel ? 'Project controls unavailable while recording a part' : `Projects. Current project: ${session.name || 'My performance'}`} disabled={isRestoring || isExporting || projectSwitching || !!activePanel || alignStageOpen} onClick={() => { pauseAllPlayback(); setProjectView('library'); setActiveSourceSheet('projects') }}>
+                <h1>{activePanel ? recording.phase === 'review' ? 'Review take' : 'Record a part' : <><FolderOpen aria-hidden /> Projects <ChevronRight aria-hidden /></>}</h1>
+                <span><span className="multitrack-current-project-name">{session.name || 'My performance'}</span><span className={`multitrack-header-save multitrack-header-save--${saveStatus}`} role="status">{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Couldn’t save' : 'Saved'}</span></span>
               </button>
               <Pressable
                 type="button"
                 intensity="normal"
                 onClick={() => { if (alignStageOpen) { void showAlert({ message: 'Tap Done in the editor to apply your timing changes before exporting.' }); return } pauseAllPlayback(); setActiveSourceSheet('export') }}
-                disabled={isRestoring || isExporting || !!activePanel || recording.phase !== 'idle'}
+                disabled={isRestoring || isExporting || projectSwitching || !!activePanel || recording.phase !== 'idle'}
                 className="multitrack-share-btn"
               >
                 <Share2 className="h-4 w-4" />
@@ -1622,8 +1667,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       </AnimatePresence>
             ) : alignStageOpen ? (
               <MultitrackAlignStage
-                onPanelVolumeChange={setPanelVolume}
-                onPanelMuteToggle={setPanelMuted}
+                onPanelVolumeChange={handlePanelVolumeChange}
+                onPanelMuteToggle={handlePanelMuteToggle}
+                isPreviewPlaying={sync.state.isPlaying || backingPlaying || isNativeGridPlaybackPreparing}
                 isOpen={alignStageOpen}
                 panels={session.panels.filter(
                   (panel): panel is PerformancePanelState => panel.kind === 'performance',
@@ -2179,22 +2225,21 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         </div>
       </AnimatedBottomSheet>
 
-      <AnimatedBottomSheet isOpen={activeSourceSheet === 'project' && isOpen} onClose={() => setActiveSourceSheet(null)} ariaLabel="Project and parts" elevated elevatedLight zClass={MULTITRACK_SHEET_Z} maxHeightClass="max-h-[85vh]">
-        <div className="multitrack-sheet multitrack-project-tools">
-          <p className="multitrack-sheet__title">Project & parts</p>
-
-        </div>
-        <MultitrackProjectPanel session={session} projects={projects}
-          onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} fileBusy={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
-          onProject={(id, duplicate) => { pauseAllPlayback(); setAlignStageOpen(false); setRenderedVideo(null); void openProject(id, duplicate) }}
-          onUpdate={updateProject} onPanel={updatePanel} onLayout={setLayout} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}
+      <AnimatedBottomSheet isOpen={activeSourceSheet === 'projects' && isOpen} onClose={() => { if (!projectSwitching && !projectFileBusy) setActiveSourceSheet(current => current === 'projects' ? null : current) }} ariaLabel={projectView === 'parts' ? 'Parts' : 'Projects'} elevated elevatedLight zClass={MULTITRACK_SHEET_Z} maxHeightClass="max-h-[85vh]">
+        <div className="multitrack-sheet multitrack-project-tools"><p className="multitrack-sheet__title">{projectView === 'parts' ? <><button type="button" className="multitrack-projects-back" onClick={() => setProjectView('library')}><ChevronLeft aria-hidden /> Projects</button><span>Parts</span></> : 'Projects'}</p></div>
+        {projectView === 'library' ? <MultitrackProjectsPanel session={session} projects={projects} saveStatus={saveStatus}
+          busy={projectSwitching || projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
+          onProject={(id, duplicate) => { void handleSwitchProject(id, duplicate) }} onUpdate={updateProject} onRetrySave={() => void retrySave()}
+          onOpenParts={() => setProjectView('parts')}
+          onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} /> : <><MultitrackProjectPanel session={session}
+          onUpdate={updateProject} onPanel={updatePanel} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}
           onRecord={(id, time) => { setActiveSourceSheet(null); handleRecordBoxAt(id, time) }} time={sync.state.currentTime} />
           <details className="multitrack-advanced"><summary>Advanced composition</summary>
           <div className="multitrack-studio-actions">
             <button disabled={isExporting} onClick={() => { pauseAllPlayback(); setActiveSourceSheet(null); setAlignStageOpen(false); setLayoutEditing(true) }}>Arrange boxes</button>
             <button disabled={isExporting} onClick={() => { setActiveSourceSheet(null); handleAddBoxAt(sync.state.currentTime) }}>+ Extra box</button>
           </div>
-          </details>
+          </details></>}
       </AnimatedBottomSheet>
       <AnimatedBottomSheet
         isOpen={activeSourceSheet === 'export' && isOpen}
@@ -2206,12 +2251,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         maxHeightClass="max-h-[85vh]"
       >
         <div className="multitrack-sheet">
-          <p className="multitrack-sheet__title">Finish & share</p>
-          <div className="multitrack-project-panel">
-            <ProjectFileActions busy={projectFileBusy || isRestoring || isExporting || recording.phase !== 'idle'}
-              onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} />
-            <p>Send your parts. Your friend adds theirs and sends the project back.</p>
-          </div>
+          <p className="multitrack-sheet__title">Export video</p>
           <div className="multitrack-project-panel">
             <p>Portrait video · 9:16</p>
             <label>End at (seconds)<input disabled={isExporting} type="number" min={.1} step={.1} placeholder={`Auto · ${sync.state.duration.toFixed(1)} seconds`} value={session.endSec ?? ''} onChange={e => updateProject({ endSec: e.target.value === '' ? undefined : Math.max(.1, Number(e.target.value)) })} /></label>

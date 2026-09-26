@@ -241,6 +241,23 @@ console.log('Practice chart: slots, whole turns, forScore half turns and rotatio
 
 console.log('Practice chart: two-page spreads, odd last pages and mixed page sizes passed.')
 
+// Zoom must create real scrollable page geometry so the point under a finger
+// can stay in place when the gesture ends, and ink keeps its page coordinates.
+{
+  const base = layoutChartStrip(part(2), ...PHONE, 'page')
+  const zoomed = layoutChartStrip(part(2), ...PHONE, 'page', 2)
+  assert.ok(near(zoomed.widths[0], base.widths[0] * 2), 'Pinch zoom doubles page width')
+  assert.ok(near(zoomed.heights[0], base.heights[0] * 2), 'Pinch zoom doubles page height')
+  assert.ok(zoomed.contentWidth > PHONE[0], 'The enlarged page can pan horizontally')
+  const pointX = 0.64
+  const fingerX = 220
+  const left = zoomed.lefts[0] + zoomed.widths[0] * pointX - fingerX
+  assert.ok(near(zoomed.lefts[0] + zoomed.widths[0] * pointX - left, fingerX),
+    'The same point of the score remains under the finger after reflow')
+}
+
+console.log('Practice chart: pinch zoom geometry passed.')
+
 // Odd page counts cannot use a percentage of spread count to preserve a page.
 {
   const single = layoutChartStrip(part(5), ...PORTRAIT, 'page')

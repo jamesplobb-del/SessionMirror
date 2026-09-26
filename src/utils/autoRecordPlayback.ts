@@ -9,6 +9,21 @@ export const AUTO_RECORD_MAX_IDLE_PREROLL_MS = 20_000
 /** Auto-playback: begin this many seconds before the first detected attack. */
 export const AUTO_PLAYBACK_LEAD_IN_S = 1
 
+/** Seek near the actual take, while leaving its first quiet attack intact. */
+export function resolveAutoPlaybackStartSeconds(
+  performanceStartSeconds?: number,
+  durationSeconds?: number,
+  leadInSeconds = AUTO_PLAYBACK_LEAD_IN_S,
+): number {
+  if (typeof performanceStartSeconds !== 'number' || !Number.isFinite(performanceStartSeconds)) return 0
+  const start = Math.max(0, performanceStartSeconds - Math.max(0, leadInSeconds))
+  // Wall-clock onset metadata can outlive a restarted or truncated pre-roll
+  // file. In that case, replay from the head rather than its silent tail.
+  if (typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) &&
+      durationSeconds > 0 && start >= durationSeconds - 0.5) return 0
+  return start
+}
+
 const AUTO_PLAYBACK_TAIL_SKIP_POLL_MS = 50
 const MIN_AUTO_PLAYBACK_AUDIBLE_S = 0.25
 const ANALYSIS_WINDOW_S = 0.02
@@ -174,22 +189,13 @@ export async function applyAutoPlaybackLeadIn(
   leadInSeconds = AUTO_PLAYBACK_LEAD_IN_S,
   performanceStartSeconds?: number,
 ): Promise<void> {
-  const metadataStart =
-    typeof performanceStartSeconds === 'number' &&
-    Number.isFinite(performanceStartSeconds)
-      ? Math.max(0, performanceStartSeconds - leadInSeconds)
-      : 0
-
-  // Saved onset metadata already determines the earliest safe start. Scanning
-  // the whole recording when metadataStart is zero cannot improve it:
-  // min(0, waveformStart) is always zero, but decoding blocks camera replay.
-  const start = metadataStart
-
-  if (start <= 0.01) return
-
   const apply = () => {
     if (!Number.isFinite(media.duration) || media.duration <= 0) return
-    media.currentTime = Math.min(start, Math.max(0, media.duration - 0.05))
+    media.currentTime = resolveAutoPlaybackStartSeconds(
+      performanceStartSeconds,
+      media.duration,
+      leadInSeconds,
+    )
   }
 
   if (media.readyState >= HTMLMediaElement.HAVE_METADATA) {

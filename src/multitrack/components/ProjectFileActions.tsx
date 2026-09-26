@@ -13,7 +13,7 @@ export default function ProjectFileActions({ busy, onShare, onImport }: {
       <Share2 aria-hidden />{busy ? 'Working…' : 'Share project'}
     </Pressable>
     <Pressable type="button" intensity="soft" className="multitrack-toolbar__chip" disabled={busy} onClick={() => input.current?.click()}>
-      <FolderOpen aria-hidden />Open project
+      <FolderOpen aria-hidden />Import shared project
     </Pressable>
     <input ref={input} hidden type="file" accept=".btmulti,application/octet-stream" disabled={busy}
       aria-label="Open multitrack project file" onChange={event => {

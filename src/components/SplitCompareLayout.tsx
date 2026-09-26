@@ -113,8 +113,7 @@ export default function SplitCompareLayout({
   const benchmarkDropRef = useRef<HTMLDivElement>(null)
   const challengerDropRef = useRef<HTMLDivElement>(null)
   const bottomHeight = 100 - splitRatio
-  const cameraPanelHeight = (ratio: number) =>
-    recordingMode === 'video' ? `calc(${ratio}% - 0.4375rem)` : `${ratio}%`
+  const panelHeight = (ratio: number) => `calc(${ratio}% - 0.4375rem)`
   const showCurrentTake = takeHasPlaybackMedia(challengerTake) && !isRecording
   const benchmarkAcceptsTakeTransfer = !referenceMode && !libraryBenchmarkPlayback && !youtubeEmbedUrl
   const benchmarkTransferLabel =
@@ -173,21 +172,12 @@ export default function SplitCompareLayout({
     hapticFeedback,
   })
 
-  const edgeChrome = recordingMode === 'video'
-  const bestPanelLabel = referenceMode ? 'Reference' : edgeChrome ? 'Best' : 'Best Take'
+  const bestPanelLabel = referenceMode ? 'Reference' : 'Best'
   const currentPanelLabel = isRecording
-    ? edgeChrome
-      ? 'Live'
-      : 'Recording…'
+    ? 'Recording'
     : showCurrentTake
-      ? edgeChrome
-        ? 'Current'
-        : 'Current Take'
-      : recordingMode === 'audio'
-        ? 'Audio Recording'
-        : edgeChrome
-          ? 'Live'
-          : 'Current Camera'
+      ? 'Current'
+      : 'Live'
 
   const benchmarkIsAudio =
     libraryBenchmarkPlayback != null ||
@@ -202,13 +192,11 @@ export default function SplitCompareLayout({
     <>
       <div
         ref={layoutRef}
-        className={`split-compare-layout flex h-full w-full min-h-0 flex-col${
-          edgeChrome ? ' split-compare-layout--edge' : ''
-        }`}
+        className="split-compare-layout split-compare-layout--edge flex h-full w-full min-h-0 flex-col"
       >
         <div
           className="split-compare-layout__top relative min-h-0 w-full shrink-0"
-          style={{ height: cameraPanelHeight(splitRatio) }}
+          style={{ height: panelHeight(splitRatio) }}
         >
           <div
             ref={benchmarkDropRef}
@@ -256,7 +244,7 @@ export default function SplitCompareLayout({
 
         <div
           className="split-compare-layout__bottom relative flex min-h-0 w-full shrink-0 flex-col"
-          style={{ height: cameraPanelHeight(bottomHeight) }}
+          style={{ height: panelHeight(bottomHeight) }}
         >
           {showCurrentTake && challengerTake ? (
             <div ref={challengerDropRef} className={`split-compare-panel split-compare-panel--current split-compare-layout__bottom-inner h-full w-full min-h-0${
@@ -308,7 +296,11 @@ export default function SplitCompareLayout({
                 {currentPanelLabel}
               </span>
               <div className="relative h-full w-full min-h-0 overflow-hidden">
-                <LiveCameraBackground
+                {recordingMode === 'audio' ? (
+                  <div className="split-compare-empty-audio" role="status">
+                    {isRecording ? 'Recording audio…' : 'Record a take to compare'}
+                  </div>
+                ) : <LiveCameraBackground
                   variant="embedded"
                   previewRef={splitPreviewRef}
                   streamRef={streamRef}
@@ -325,7 +317,7 @@ export default function SplitCompareLayout({
                   holdPreviewForTakePlayback={holdPreviewForTakePlayback}
                   pitchStageActive={pitchStageActive}
                   metronomeStageActive={metronomeStageActive}
-                />
+                />}
               </div>
             </div>
           )}

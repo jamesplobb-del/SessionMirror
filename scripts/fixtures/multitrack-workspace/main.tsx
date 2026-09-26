@@ -10,6 +10,7 @@ import '../../../src/index.css'
 import '../../../src/styles/multitrack.css'
 import '../../../src/styles/electric-refinement.css'
 import '../../../src/styles/open-lens.css'
+import '../../../src/styles/tablet.css'
 import '../../../src/styles/multitrack-quiet.css'
 
 if (location.port !== '5197') throw new Error('Run this sample only on the isolated 5197 origin.')

@@ -2346,14 +2346,14 @@ button.compact-take-caption:active {
 }
 
 /*
- * Camera expand — Edge split.
+ * Expand view — Edge split.
  * Full-bleed Best / Live panes over black. No light sheet, no nested cards,
  * no gold/blue outlines. Captions + 6px dots. Hairline grabber capsule.
  * Must win over earlier glass and elevated-light split rules, including
  * html.app-dark-mode variants (equal specificity, later source order).
  */
-.app-shell--split-open:not(.app-shell--audio-mode),
-html.app-dark-mode .app-shell--split-open:not(.app-shell--audio-mode) {
+.app-shell--split-open,
+html.app-dark-mode .app-shell--split-open {
   background-color: #000000 !important;
 }
 

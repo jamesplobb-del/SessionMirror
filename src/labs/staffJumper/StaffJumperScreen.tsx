@@ -406,6 +406,9 @@ export default function StaffJumperScreen({
       tunerInstrument: trackerTunerInstrument,
       realtimeMode: true,
       continuousScroll: false,
+      preferNativeAudioTap: true,
+      nativePitchProcessing: true,
+      retryNativeTapOnInteractiveRecovery: true,
       allowStandaloneMicFallback: true,
     },
   )
