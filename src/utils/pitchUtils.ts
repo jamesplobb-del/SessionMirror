@@ -86,26 +86,18 @@ function bestMidiForFrequency(
   return { midi: bestMidi, cents: bestCents }
 }
 
+/**
+ * Keep a pitch only when it already sits in the instrument's range.
+ * Doubling or halving it used to turn room noise into a low note and
+ * a real high note into the octave below.
+ */
 export function normalizeInstrumentFrequency(
   frequencyHz: number,
   minHz = MIN_INSTRUMENT_HZ,
   maxHz = MAX_INSTRUMENT_HZ,
 ): number {
-  if (!Number.isFinite(frequencyHz) || frequencyHz <= 0) return 0
-
-  let normalized = frequencyHz
-  let guard = 0
-  while (normalized < minHz && guard < 4) {
-    normalized *= 2
-    guard += 1
-  }
-  guard = 0
-  while (normalized > maxHz && guard < 4) {
-    normalized /= 2
-    guard += 1
-  }
-
-  return normalized
+  if (!isFrequencyInInstrumentRange(frequencyHz, minHz, maxHz)) return 0
+  return frequencyHz
 }
 
 export function frequencyToCentsOffset(frequencyHz: number): number {

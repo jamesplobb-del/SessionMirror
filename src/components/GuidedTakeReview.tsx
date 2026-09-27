@@ -1,3 +1,7 @@
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
+import { PremiumMotionDiv, PremiumMotionSection } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
+import '../styles/premium-recording.css'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronRight, Mic, Square, X } from 'lucide-react'
@@ -32,6 +36,7 @@ export default function GuidedTakeReview({
 }: GuidedTakeReviewProps) {
   const [open, setOpen] = useState(false)
   const [heard, setHeard] = useState(false)
+  const reduced = useReducedMotion()
   const [localPlaying, setLocalPlaying] = useState(false)
   const [note, setNote] = useState(initialNote)
   const [listening, setListening] = useState(false)
@@ -123,10 +128,14 @@ export default function GuidedTakeReview({
     if (!open) return
     const oldOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    const siblings = Array.from(document.body.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node !== sheetRef.current?.parentElement)
+    const inert = siblings.map(node => node.inert)
+    siblings.forEach(node => { node.inert = true })
     headingRef.current?.focus({ preventScroll: true })
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        event.stopPropagation()
         close()
       }
       if (event.key !== 'Tab') return
@@ -142,6 +151,7 @@ export default function GuidedTakeReview({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.body.style.overflow = oldOverflow
+      siblings.forEach((node, index) => { node.inert = inert[index] })
       document.removeEventListener('keydown', onKeyDown)
       triggerRef.current?.focus({ preventScroll: true })
     }
@@ -187,9 +197,9 @@ export default function GuidedTakeReview({
       {mode === 'audio' && onToggleAudioView && <button type="button" className="guided-reflection-entry__view" onClick={onToggleAudioView}
         aria-label={audioShowBoth ? 'Focus on current take' : 'Show both takes'}>{audioShowBoth ? 'Focus take' : 'Both takes'}</button>}
     </div>
-    {open && createPortal(<div className="guided-reflection-modal" role="presentation">
+    {createPortal(<AnimatePresence>{open && <PremiumMotionDiv className="guided-reflection-modal" role="presentation" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={premiumMotion({duration:.1}, 'backdrop')}>
       <button type="button" className="guided-reflection-modal__scrim" aria-label="Close reflection" onClick={close} />
-      <section ref={sheetRef} className="guided-reflection-sheet" role="dialog" aria-modal="true" aria-labelledby={`guided-title-${takeId}`}>
+      <PremiumMotionSection initial={{y:reduced?0:42,scale:reduced?1:.98}} animate={{y:0,scale:1}} exit={{y:reduced?0:24,scale:reduced?1:.985}} transition={premiumMotion({duration:.1}, 'panel')} ref={sheetRef} className="guided-reflection-sheet" role="dialog" aria-modal="true" aria-labelledby={`guided-title-${takeId}`}>
         <div className="guided-reflection-sheet__handle" aria-hidden="true" />
         <header className="guided-reflection-sheet__header">
           <div><span className="guided-reflection-sheet__eyebrow">AFTER THE TAKE</span><h2 id={`guided-title-${takeId}`} ref={headingRef} tabIndex={-1}>What stood out?</h2></div>
@@ -219,8 +229,8 @@ export default function GuidedTakeReview({
           {onCompare && <button type="button" className="guided-reflection-sheet__compare" onClick={() => { close(); onCompare() }}>Compare takes</button>}
           <button type="button" className="guided-reflection-sheet__record" disabled={recordDisabled} onClick={beginRecording}><span aria-hidden="true" />Record again</button>
         </div>
-      </section>
-    </div>, document.body)}
+      </PremiumMotionSection>
+    </PremiumMotionDiv>}</AnimatePresence>, document.body)}
   </>
 }
 

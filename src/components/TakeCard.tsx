@@ -182,6 +182,8 @@ function TakeCard({
   }
 
   const handleKeyActivate = (event: KeyboardEvent<HTMLElement>) => {
+    const target = event.target
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     handlePrimaryOpen()
@@ -314,8 +316,13 @@ function TakeCard({
                   onBlur={commitName}
                   onClick={stopNestedClick}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') commitName()
+                    event.stopPropagation()
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      commitName()
+                    }
                     if (event.key === 'Escape') {
+                      event.preventDefault()
                       setNameDraft(take.name)
                       setIsEditingName(false)
                     }

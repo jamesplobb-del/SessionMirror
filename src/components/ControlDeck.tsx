@@ -2,6 +2,7 @@ import { reportFeatureAction } from '../utils/featureGuidance'
 import VaultCount from './VaultCount'
 import {
   Camera,
+  ChevronRight,
   ChevronDown,
   House,
   Layers3,
@@ -12,9 +13,10 @@ import {
   Library,
   Wrench,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type RefObject, type ReactNode, memo } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject, type ReactNode, memo } from 'react'
 import SettingsBranchWheel from './SettingsBranchWheel'
 import RecordingModeCarousel from './RecordingModeCarousel'
+import { PremiumActivity } from './ui/PremiumRecordingFeedback'
 import Pressable from './ui/Pressable'
 import type { RecordingMode } from '../types'
 import { resolveHandsFreePhase } from '../utils/handsFreePhase'
@@ -190,7 +192,7 @@ function ControlDeck({
   onExpandedChange,
 }: ControlDeckProps) {
   const showDeleteDrop = dragDeleteActive && !isRecording
-  const showFinishingTake = isStopping && recordingMode === 'video' && !showDeleteDrop
+  const showFinishingTake = isStopping && !showDeleteDrop
   const handsFreePhase = resolveHandsFreePhase({
     autoSoundRecording,
     isRecording,
@@ -202,9 +204,12 @@ function ControlDeck({
     finishingTake: showFinishingTake,
   })
   const overlaysButtonRef = useRef<HTMLButtonElement>(null)
+  const workspaceSwipeStart = useRef<{ id: number; x: number } | null>(null)
+  const skipWorkspaceClick = useRef(false)
   const notifyTutorial = useTutorialAction()
   const [branchOpen, setBranchOpen] = useState(false)
   const [branchActive, setBranchActive] = useState(false)
+  const [branchSideDrawer, setBranchSideDrawer] = useState(false)
   const [deckExpanded, setDeckExpanded] = useState(!collapsible)
   const isCameraPresentation = recordingMode === 'video'
 
@@ -220,6 +225,7 @@ function ControlDeck({
   }
 
   const openBranch = () => {
+    setBranchSideDrawer(workspaceOnly)
     setBranchOpen(true)
     setBranchActive(true)
     onBranchOpenChange?.(true)
@@ -241,6 +247,22 @@ function ControlDeck({
       setBranchOpen(false)
     }
   }, [branchOpen, settingsBranchDisabled])
+
+  // A tray belongs to its current tool surface. Crossing tabs must not carry
+  // an open metronome drawer into Tuner, Music, or the recording dock.
+  useLayoutEffect(() => {
+    setBranchOpen(false)
+  }, [collapseKey, recordingMode])
+
+  const finishWorkspaceSwipe = (event: PointerEvent<HTMLButtonElement>) => {
+    const start = workspaceSwipeStart.current
+    if (!start || start.id !== event.pointerId) return
+    workspaceSwipeStart.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (event.clientX - start.x < 36) return
+    skipWorkspaceClick.current = true
+    openBranch()
+  }
 
   const settingsButton = (
     <Pressable
@@ -305,16 +327,10 @@ function ControlDeck({
         ) : showFinishingTake ? (
           <div
             className="record-carousel-viewport flex items-center justify-center pointer-events-none"
-            role="status"
-            aria-live="polite"
-            aria-label="Finishing take"
+            role="img"
+            aria-label="Saving take"
           >
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/16 bg-black/45 shadow-[0_0_24px_rgba(255,255,255,0.16)] backdrop-blur-xl">
-              <span
-                className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-white"
-                aria-hidden
-              />
-            </div>
+            <div className="premium-record-finishing"><PremiumActivity /></div>
           </div>
         ) : (
           <RecordingModeCarousel
@@ -333,12 +349,6 @@ function ControlDeck({
           />
         )}
       </div>
-
-      {showFinishingTake && (
-        <p className="auto-sound-hint auto-sound-hint--finishing max-w-[14rem] text-center text-[11px] font-medium leading-snug tracking-wide text-white/90">
-          Finishing your take… longer videos can take a moment
-        </p>
-      )}
 
       {/* Status copy now lives in the full-screen HandsFreeStage overlay, so the
           deck keeps only the record control itself. */}
@@ -371,6 +381,7 @@ function ControlDeck({
       )}
       <SettingsBranchWheel
         open={branchOpen}
+        sideDrawer={branchSideDrawer}
         onClose={closeBranch}
         onExitComplete={handleBranchExitComplete}
         anchorRef={overlaysButtonRef}
@@ -420,14 +431,24 @@ function ControlDeck({
         <Pressable
           ref={overlaysButtonRef}
           className="metronome-workspace-launcher"
-          onClick={() => branchActive ? closeBranch() : openBranch()}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return
+            workspaceSwipeStart.current = { id: event.pointerId, x: event.clientX }
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }}
+          onPointerUp={finishWorkspaceSwipe}
+          onPointerCancel={() => { workspaceSwipeStart.current = null }}
+          onClick={(event) => {
+            if (skipWorkspaceClick.current && event.detail !== 0) { skipWorkspaceClick.current = false; return }
+            branchActive ? closeBranch() : openBranch()
+          }}
           disabled={settingsBranchDisabled || isRecording || isStopping}
           hapticFeedback={hapticFeedback}
           aria-label={branchActive ? 'Close workspace' : 'Open workspace'}
           aria-expanded={branchActive}
           aria-haspopup="menu"
         >
-          <Grid2X2 aria-hidden />
+          <ChevronRight aria-hidden />
           <span>Workspace</span>
         </Pressable>
       ) : openLens ? (

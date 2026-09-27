@@ -13,6 +13,7 @@ try {
  const program=m.saveTimeline({...m.createEmptyTimeline('Tempo ladder'),sections:[m.createDefaultSection({bpm:92,meter:'6/8',bars:8}),m.createDefaultSection({bpm:112,meter:'4/4',bars:4})]})
  const routine=m.createRoutine('Warm up',[m.createStep({title:'Long tones',kind:'metro',programId:program.id}),m.createStep({title:'Repeat',kind:'metro',programId:program.id})],null)
  const file=m.buildPracticePlanFile(routine)
+ assert.equal(JSON.parse(file).version, m.PRACTICE_PLAN_VERSION)
  assert.equal(Object.keys(JSON.parse(file).programs).length,1)
  data.clear()
  const existing=m.saveTimeline(m.createEmptyTimeline('My existing program'))

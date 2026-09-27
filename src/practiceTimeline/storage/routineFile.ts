@@ -41,7 +41,7 @@ export const ROUTINE_FILE_FORMAT = 'besttake.practice-routine'
 export const ROUTINE_FILE_VERSION = 1
 export const ROUTINE_FILE_EXTENSION = 'btroutine'
 export const ROUTINE_FILE_UTI = 'com.besttake.app.routine'
-export const ROUTINE_FILE_MIME = 'application/json'
+export const ROUTINE_FILE_MIME = 'application/vnd.besttake.metronome-program'
 
 /** Well past any real routine — a bigger file is a wrong file, not a big one. */
 export const MAX_ROUTINE_FILE_BYTES = 1_000_000

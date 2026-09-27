@@ -1,4 +1,6 @@
 import type { TunerInstrument } from './pitchConfig'
+import { getInstrumentProfile } from './instrumentProfiles'
+import { loadPreferredInstrumentId } from './practiceRoutines'
 import {
   DEFAULT_TUNER_TRANSPOSITION,
   isTunerTranspositionId,
@@ -131,8 +133,30 @@ function clamp(value: number, min: number, max: number): number {
  * haptics module. Every screen that reads settings goes through here, so the
  * preference cannot be missed by a caller that forgets to thread it through.
  */
+const WRITTEN_PITCH_MIGRATION_KEY = 'besttake.tuner-written-pitch.v1'
+
+/**
+ * The tuner used to ignore the instrument and stay in concert pitch. Players
+ * who already picked a horn get that horn's written part once. A later choice
+ * in Tuner settings is left alone.
+ */
+function migrateWrittenPitch(settings: AppSettings): AppSettings {
+  try {
+    if (localStorage.getItem(WRITTEN_PITCH_MIGRATION_KEY)) return settings
+    localStorage.setItem(WRITTEN_PITCH_MIGRATION_KEY, '1')
+  } catch {
+    return settings
+  }
+  if (settings.tunerTransposition !== 'concert') return settings
+  const profile = getInstrumentProfile(loadPreferredInstrumentId() ?? '')
+  if (!profile || profile.tunerTransposition === 'concert') return settings
+  const next = { ...settings, tunerTransposition: profile.tunerTransposition }
+  saveAppSettings(next)
+  return next
+}
+
 export function loadAppSettings(): AppSettings {
-  const settings = readStoredSettings()
+  const settings = migrateWrittenPitch(readStoredSettings())
   setHapticsEnabled(settings.hapticFeedback)
   return settings
 }

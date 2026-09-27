@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BestTake QA media baseline</title>
+<style>body{font:16px system-ui;background:#111827;color:#fff;margin:32px;max-width:900px}button{padding:12px;margin:8px}video{display:block;width:480px;max-width:100%}pre{white-space:pre-wrap}</style>
+<h1>Synthetic media baseline</h1><p>Test-only origin. No physical microphone or camera. This validates browser media support, not the app’s recording workflow.</p>
+<button id="capture">Generate and save 3-second sample</button><button id="reopen">Reopen saved sample</button><button id="validate">Validate playback and audio</button>
+<video id="player" controls playsinline></video><pre id="result" role="status">Ready</pre>
+<script type="module" src="./media.ts"></script></html>

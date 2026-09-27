@@ -1,4 +1,6 @@
 import WidgetCollapseButton from './WidgetCollapseButton'
+import { PremiumActivity } from './ui/PremiumRecordingFeedback'
+import PremiumReveal from './ui/PremiumReveal'
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMotionValue } from 'framer-motion'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
@@ -49,7 +51,7 @@ interface HandsFreeStageProps {
 const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
   recording: { title: 'Recording', detail: 'Pause your playing to hear this take' },
   countdown: { title: 'Ready to listen', detail: 'Keep playing to continue the take' },
-  saving: { title: 'Preparing your take', detail: 'Playback starts when your take is ready' },
+  saving: { title: 'Preparing take', detail: 'Playback will start automatically' },
   playback: { title: 'Listen back', detail: 'We’ll listen for your next take afterward' },
   preparing: { title: 'Getting ready', detail: 'Give the microphone a quiet moment' },
   listening: { title: 'Your turn', detail: 'Start playing — recording begins automatically' },
@@ -172,7 +174,7 @@ function HandsFreeStage({
           </button>
         )}
         {movable && <button type="button" className="hands-free-panel__move" aria-label="Move hands-free controls" {...panel.controls(false)}><span aria-hidden /></button>}
-        <span className="hands-free-stage__pulse" aria-hidden />
+        {phase === 'saving' || phase === 'preparing' ? <PremiumActivity /> : <span className="hands-free-stage__pulse" aria-hidden />}
         <strong className="hands-free-stage__title">{phase === 'countdown' ? `Listen back in ${replayCountdown ?? 0}s` : copy?.title ?? ''}</strong>
         <small className="hands-free-stage__detail">{copy?.detail ?? ''}</small>
         {(phase === 'recording' || phase === 'countdown') && (
@@ -205,7 +207,7 @@ function HandsFreeStage({
             <span>{settingsOpen ? 'Done' : 'Settings'}</span>
           </button>
         )}
-        {settingsTappable && settingsOpen && (
+        <PremiumReveal open={settingsTappable && settingsOpen}>
           <HandsFreeSettingsRows
             silenceSeconds={silenceSeconds}
             volumeThreshold={volumeThreshold}
@@ -213,7 +215,7 @@ function HandsFreeStage({
             onSilenceSecondsChange={onSilenceSecondsChange}
             onVolumeThresholdChange={onVolumeThresholdChange}
           />
-        )}
+        </PremiumReveal>
       </div>
     </div></>
   )

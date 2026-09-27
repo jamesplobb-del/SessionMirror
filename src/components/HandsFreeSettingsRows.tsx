@@ -1,4 +1,5 @@
 import { Minus, Plus } from 'lucide-react'
+import { describeHandsFreeGate } from '../utils/instrumentProfiles'
 import Pressable from './ui/Pressable'
 
 interface HandsFreeSettingsRowsProps {
@@ -16,12 +17,6 @@ const SILENCE_MAX = 6
 const THRESHOLD_MIN = 1
 const THRESHOLD_MAX = 100
 const THRESHOLD_STEP = 10
-
-function describeThreshold(value: number): string {
-  if (value >= 70) return 'Loud only'
-  if (value >= 40) return 'Medium'
-  return 'Sensitive'
-}
 
 /**
  * The two hands-free values a player changes mid-sitting, inside the widget
@@ -75,7 +70,7 @@ export default function HandsFreeSettingsRows({
       <div className="hands-free-settings__row">
         <div className="hands-free-settings__label">
           <strong>Starts at</strong>
-          <small>{describeThreshold(threshold)} · louder waits for a real entrance</small>
+          <small>{describeHandsFreeGate(threshold)} · louder waits for a real entrance</small>
         </div>
         <div className="hands-free-settings__stepper" role="group" aria-label="Start level">
           <Pressable

@@ -22,6 +22,8 @@ export interface RoutineBuilderProps {
    * chosen for a step that does not have one yet.
    */
   onCreatePracticeItem: (title: string) => Promise<string>
+  /** Opens the existing Music Library from the routines landing page. */
+  onOpenMusicLibrary?: () => void
   /** Saves, then opens the routine's next step straight away. */
   onSaveAndStart?: (routine: Routine) => void | Promise<void>
   /** Today's session of this routine has begun, so Start reads as Continue. */

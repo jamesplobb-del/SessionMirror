@@ -1,0 +1,30 @@
+/* Touch feedback is fast on contact, with a generous release. Never tween
+   beat timing, draggable coordinates, or the opacity of animated scrims. */
+@media(prefers-reduced-motion:no-preference) {
+  html#lens-design-system.premium-app:not([data-game-concept]) :is(button,[role='tab'],[role='menuitem'],[role='menuitemcheckbox'],[role='option'],summary):not(:is(.practice-menu-backdrop,.native-sheet-backdrop,.settings-branch-backdrop,.action-sheet-backdrop,.tutorial-sheet-backdrop,.metronome-beat-marker,.widget-ball)) {
+    transition-property:scale,background-color,color,border-color,box-shadow;
+    transition-duration:0.432s;
+    transition-timing-function:cubic-bezier(.16,1,.3,1);
+  }
+  html#lens-design-system.premium-app:not([data-game-concept]) :is(button,[role='tab'],[role='menuitem'],[role='menuitemcheckbox'],[role='option'],summary):not(:is(.practice-menu-backdrop,.native-sheet-backdrop,.settings-branch-backdrop,.action-sheet-backdrop,.tutorial-sheet-backdrop,.metronome-beat-marker,.widget-ball)):active:not(:disabled) {
+    scale:.973;opacity:.92;transition-duration:65ms;
+  }
+  html#lens-design-system.premium-app:not([data-game-concept]) .audio-practice-top-tabs::after {transition:transform 0.594s cubic-bezier(.16,1,.3,1);}
+  html#lens-design-system.premium-app:not([data-game-concept]) :is(.audio-practice-metronome__play-btn,.audio-mode-take-card__play)>svg {animation:premium-control-arrive 0.432s cubic-bezier(.16,1,.3,1) both;}
+  html#lens-design-system.premium-app:not([data-game-concept]) :is(.vault-take-row__detail,.feature-guidance-card,.music-widget__more[open]>.music-widget__actions,.music-widget__more[open]>.music-widget__row,.lens-notice) {animation:premium-panel-content 0.504s cubic-bezier(.16,1,.3,1) both;}
+  html#lens-design-system.premium-app:not([data-game-concept]) :is(input,textarea,select) {transition:border-color 0.36s,box-shadow 0.36s,background-color 0.36s;}
+  @keyframes premium-control-arrive {from{opacity:.3;scale:.78;}to{opacity:1;scale:1;}}
+  @keyframes premium-panel-content {from{opacity:0;translate:0 8px;}to{opacity:1;translate:0 0;}}
+}
+
+/* Only the active media panel is mounted/visible. Enter immediately, then
+   settle gently; there is never an outgoing readout behind the new one. */
+@media(prefers-reduced-motion:no-preference) {
+  html#lens-design-system.premium-app:not([data-game-concept]) .premium-tab-panel--active {
+    animation:premium-tab-arrive 0.684s cubic-bezier(.16,1,.3,1) backwards;
+  }
+  @keyframes premium-tab-arrive {
+    from {opacity:0;transform:translateY(22px) scale(.965);}
+    to {opacity:1;transform:none;}
+  }
+}

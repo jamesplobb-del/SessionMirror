@@ -23,8 +23,9 @@ globalThis.localStorage = {
 
 const instruments = await load('src/utils/instrumentProfiles.ts')
 assert.equal(instruments.instrumentHeading('trumpet'), 'Trumpet')
-assert.equal(instruments.describeHandsFreeGate(34), 'Loud gate')
-assert.equal(instruments.describeHandsFreeGate(16), 'Quiet gate')
+assert.equal(instruments.describeHandsFreeGate(34), 'Balanced')
+assert.equal(instruments.describeHandsFreeGate(16), 'Sensitive')
+assert.equal(instruments.describeHandsFreeGate(70), 'Loud only')
 
 const routines = await load('src/utils/practiceRoutines.ts')
 const { normalizeDeskMetronome } = await load('src/utils/deskMetronome.ts')
@@ -175,8 +176,9 @@ expandedDesk.metronome.accentLevels[0] = 'silent'
 const expandedRoutine = routines.createRoutine('Expanded click', [routines.createStep({ title: 'Seven', kind: 'metro', desk: expandedDesk })], null)
 routines.saveRoutine(expandedRoutine)
 assert.deepEqual(routines.loadRoutine().steps[0].desk.metronome, expandedDesk.metronome, 'Full metronome settings survive save and reload')
-assert.equal(instruments.getInstrumentSettings('trumpet').tunerTransposition, 'concert')
-assert.equal(instruments.getInstrumentSettings('alto-sax')?.tunerTransposition ?? 'concert', 'concert')
+assert.equal(instruments.getInstrumentSettings('trumpet').tunerTransposition, 'bb')
+assert.equal(instruments.getInstrumentSettings('alto-sax').tunerTransposition, 'eb')
+assert.equal(instruments.getInstrumentSettings('flute').tunerTransposition, 'concert')
 assert.equal(normalizeDeskMetronome({ meter: 'invalid', accentLevels: ['invalid'], bpm: -2 }).meter, '4/4')
 assert.equal(normalizeDeskMetronome({ accentLevels: ['invalid'] }).accentLevels[0], 'strong')
 console.log('PASS: expanded routine metronome roundtrip, migration, and concert instrument defaults')

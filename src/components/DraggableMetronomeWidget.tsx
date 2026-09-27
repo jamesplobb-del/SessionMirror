@@ -1,5 +1,7 @@
+import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import WidgetCollapseButton from './WidgetCollapseButton'
-import { motion, useDragControls, useMotionValue } from 'framer-motion'
+import { useDragControls, useMotionValue } from 'framer-motion'
 import { Check, Pause, Play } from 'lucide-react'
 import { MetronomeToolIcon } from './icons/toolIcons'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
@@ -480,7 +482,7 @@ export default function DraggableMetronomeWidget({
 
   return (<>
     {fold.ball}
-    <motion.div
+    <PremiumMotionDiv
       ref={widgetRef}
       aria-hidden={fold.collapsed}
       drag={canShellDrag}
@@ -498,7 +500,7 @@ export default function DraggableMetronomeWidget({
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
-      transition={iosDragRelease}
+      transition={premiumMotion(iosDragRelease, 'widget')}
       style={{
         x: dragX,
         y: dragY,
@@ -684,6 +686,6 @@ export default function DraggableMetronomeWidget({
         </div>
         </fieldset>
       </div>
-    </motion.div></>
+    </PremiumMotionDiv></>
   )
 }

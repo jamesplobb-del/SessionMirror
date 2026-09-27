@@ -1,0 +1,7 @@
+/* Device fixture only; shared onboarding, Home, cards, tools and popup styling stay intact. */
+.concept-screen {color:var(--ls-ink)}
+.concept-screen .electric-vault-count {display:none}
+.concept-routine {position:fixed;inset:0;z-index:180;background:var(--ls-bg);overflow-y:auto;padding:18px 14px}
+.concept-routine>.routine-guide {min-height:100%;max-width:none}
+.concept-tool-back {align-self:flex-start;min-height:40px;margin:0 15px;color:var(--ls-blue);font-size:13px}
+.concept-screen .lens-stage {overflow:hidden}

@@ -1,8 +1,10 @@
+import { PremiumMotionButton } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import { reportFeatureAction } from '../utils/featureGuidance'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { animate, motion, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
+import { animate, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
 import { iosDragRelease } from '../utils/motionPresets'
 import { findAvailableWidgetBallPosition, clampWidgetPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, type WidgetPosition } from '../utils/floatingWidgetLayout'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
@@ -251,7 +253,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   const dockItem = useMusicDockItem(positionId, expand)
 
   const ball = collapsed && visible && present && showBall ? <>
-    <motion.button
+    <PremiumMotionButton
     ref={ballRef} type="button" className={`widget-ball pointer-events-auto${docked ? ' widget-ball--docked' : ''}`}
     aria-label={`Expand ${label}${detail ? `, ${detail}` : ''}`} aria-expanded={false}
     title={docked ? `Open ${label}; drag left to place, or up/down to reorder` : `Open ${label}`} data-active={active}
@@ -274,10 +276,10 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     }}
     initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.75 }}
     animate={{ opacity: 1, scale: 1 }}
-    transition={{ duration: reducedMotion ? 0 : 0.18 }}
+    transition={premiumMotion({duration:reducedMotion ? 0 : .18}, 'widget')}
   >
     {icon}<span>{detail ?? label}</span><ChevronDown className="widget-ball__expand" aria-hidden /><i aria-hidden />
-    </motion.button>
+    </PremiumMotionButton>
   </> : null
 
   return { collapsed, collapse, ball: ball && portalHost ? createPortal(ball, portalHost) : ball,

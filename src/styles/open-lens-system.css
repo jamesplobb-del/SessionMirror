@@ -141,6 +141,7 @@ html#lens-design-system.lens-system .metronome-audio-stage__btn { background:var
 
 /* Menus use the same surfaces and icon treatment as the screens behind them. */
 html#lens-design-system.lens-system .settings-branch-tray { background:var(--ls-glass)!important; border:1px solid var(--ls-line)!important; border-radius:24px!important; box-shadow:0 18px 50px #19324920!important; color:var(--ls-ink)!important; }
+html#lens-design-system.lens-system .settings-branch-tray--side { border-radius:0 24px 24px 0!important; }
 html#lens-design-system.lens-system .settings-branch-tray::before,html#lens-design-system.lens-system .settings-branch-tray::after { content:none!important; }
 html#lens-design-system.lens-system .settings-branch-tray__title { color:var(--ls-ink)!important; font-size:19px; font-weight:550; letter-spacing:-.4px; }
 html#lens-design-system.lens-system .settings-branch-tray__item { border:1px solid var(--ls-line)!important; background:var(--ls-panel)!important; border-radius:15px!important; box-shadow:none!important; color:var(--ls-ink)!important; }
@@ -479,6 +480,18 @@ html#lens-design-system .practice-menu-card.practice-menu-card--electric-edge .p
   flex-shrink:0;
 }
 /* Camera cards: explicit title, preview, and two-line caption tracks. */
+/* Keep the camera take row in the bottom HUD flow, immediately above Record.
+   The older camera stylesheet still anchors it to the safe-area top. */
+html#lens-design-system .app-ui-overlay:not(.app-ui-overlay--audio-mode):not(.app-ui-overlay--split-open) .app-hud-bottom {
+  flex-direction:column;
+}
+html#lens-design-system .app-ui-overlay:not(.app-ui-overlay--audio-mode):not(.app-ui-overlay--split-open) .app-pip-row-wrap--camera.app-pip-row-wrap--compact {
+  position:relative;
+  inset:auto;
+  width:100%!important;
+  margin:0 auto;
+  padding:0 0 6px!important;
+}
 html#lens-design-system .open-lens-recording .app-ui-overlay .app-pip-row--compact > .compact-take-slot {
   height:112px; padding:8px 10px!important; gap:4px;
   grid-template-columns:minmax(0,1fr); grid-template-rows:16px minmax(0,1fr) 28px;
@@ -495,6 +508,18 @@ html#lens-design-system .compact-take-slot .compact-take-card__empty {
 }
 html#lens-design-system .compact-take-slot .compact-take-caption {
   height:auto; min-height:0; gap:3px; justify-content:center; padding:0;
+}
+/* The pin belongs in the caption row, away from the preview's expand corner. */
+html#lens-design-system .compact-take-slot--current > .compact-take-card__pin {
+  right:auto;
+  left:10px;
+  bottom:8px;
+}
+html#lens-design-system .compact-take-slot--has-pin .compact-take-caption {
+  padding-left:28px;
+}
+html#lens-design-system .compact-take-slot--has-pin .compact-take-caption__detail {
+  padding-right:0;
 }
 html#lens-design-system .compact-take-slot .compact-take-caption__name {
   font-size:11px; font-weight:550; line-height:14px; color:#f1f8ff!important; text-shadow:0 1px 3px #122a3b80;

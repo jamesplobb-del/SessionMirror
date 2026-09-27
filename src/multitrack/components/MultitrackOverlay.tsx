@@ -1,3 +1,4 @@
+import PremiumDisclosure from '../../components/ui/PremiumDisclosure'
 import { nativeTakePlaybackEnhancerParams } from '../../utils/takePlaybackSpeaker'
 import { readMultitrackAsset } from '../state/readMultitrackAsset'
 import { hasSectionWindow } from '../layout/sectionVisibility'
@@ -2234,12 +2235,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           onShare={() => void handleProjectFile()} onImport={file => void handleProjectFile(file)} /> : <><MultitrackProjectPanel session={session}
           onUpdate={updateProject} onPanel={updatePanel} onReorder={reorderPanel} onUndo={undo} canUndo={canUndo}
           onRecord={(id, time) => { setActiveSourceSheet(null); handleRecordBoxAt(id, time) }} time={sync.state.currentTime} />
-          <details className="multitrack-advanced"><summary>Advanced composition</summary>
+          <PremiumDisclosure className="multitrack-advanced"><summary>Advanced composition</summary>
           <div className="multitrack-studio-actions">
             <button disabled={isExporting} onClick={() => { pauseAllPlayback(); setActiveSourceSheet(null); setAlignStageOpen(false); setLayoutEditing(true) }}>Arrange boxes</button>
             <button disabled={isExporting} onClick={() => { setActiveSourceSheet(null); handleAddBoxAt(sync.state.currentTime) }}>+ Extra box</button>
           </div>
-          </details></>}
+          </PremiumDisclosure></>}
       </AnimatedBottomSheet>
       <AnimatedBottomSheet
         isOpen={activeSourceSheet === 'export' && isOpen}

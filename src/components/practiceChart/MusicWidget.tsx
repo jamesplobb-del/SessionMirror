@@ -1,4 +1,7 @@
-import { motion, useMotionValue, useDragControls } from 'framer-motion'
+import PremiumDisclosure from '../ui/PremiumDisclosure'
+import { PremiumMotionDiv } from '../ui/PremiumMotionSurface'
+import { premiumMotion } from '../../utils/premiumMotion'
+import { useMotionValue, useDragControls } from 'framer-motion'
 import {
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Eraser, Eye, EyeOff, FileMusic, Maximize2, Pen, Plus, RefreshCw,
   Share, SquareSplitVertical, Trash2, Undo2,
@@ -124,7 +127,7 @@ export default function MusicWidget({
   const turnable = hasChart && paperVisible && (pageView?.count ?? 0) > 0
 
   return <>
-    <motion.div
+    <PremiumMotionDiv
       ref={widgetRef}
       aria-hidden={!visible || fold.collapsed}
       drag
@@ -138,7 +141,7 @@ export default function MusicWidget({
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.94, transitionEnd: motionExitHide }}
-      transition={iosDragRelease}
+      transition={premiumMotion(iosDragRelease, 'widget')}
       style={{ x: dragX, y: dragY, touchAction: 'pan-y', display: visible ? undefined : 'none' }}
     >
       {/* Page controls close back into the Music header, not into a widget ball. */}
@@ -270,7 +273,7 @@ export default function MusicWidget({
           )}
 
           </>}
-          <details className="music-widget__more">
+          <PremiumDisclosure className="music-widget__more">
           <summary>More options <ChevronDown size={15} aria-hidden /></summary>
           <button
             type="button"
@@ -289,7 +292,7 @@ export default function MusicWidget({
             <button type="button" disabled={busy} onClick={onAdd}><RefreshCw aria-hidden />Replace</button>
             <button type="button" disabled={busy} onClick={onRemove}><Trash2 aria-hidden />Remove</button>
           </div>
-          </details>
+          </PremiumDisclosure>
         </> : <>
           <div className="music-widget__head" onPointerDown={event => dragControls.start(event)}>
             <p className="music-widget__file">No music on this item</p>
@@ -314,6 +317,6 @@ export default function MusicWidget({
 
         {error && <p className="music-widget__error" role="alert">{error}</p>}
       </div>
-    </motion.div>
+    </PremiumMotionDiv>
   </>
 }

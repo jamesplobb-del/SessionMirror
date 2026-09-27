@@ -1,5 +1,5 @@
 import { Pause, Play } from 'lucide-react'
-import { useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { formatTime } from '../hooks/useVideoPlayback'
 import { useMediaWaveform } from '../hooks/useMediaWaveform'
 import Pressable from './ui/Pressable'
@@ -16,6 +16,7 @@ interface ReviewTimelineProps {
   onPlayPause: () => void
   mediaFilePath?: string
   mediaUrl?: string
+  mediaRef?: RefObject<HTMLMediaElement | null>
   trimAvailable?: boolean
   trimActive?: boolean
   trimStart?: number
@@ -41,6 +42,7 @@ export default function ReviewTimeline({
   onPlayPause,
   mediaFilePath = '',
   mediaUrl = '',
+  mediaRef,
   trimAvailable = false,
   trimActive = false,
   trimStart = 0,
@@ -66,6 +68,9 @@ export default function ReviewTimeline({
   const trimSelectionPercent = Math.max(0, trimEndPercent - trimStartPercent)
   const pointerModeRef = useRef<'scrub' | 'start' | 'end' | null>(null)
   const pointerOrigin = useRef<{ x: number; y: number; moved: boolean } | null>(null)
+  const playheadRef = useRef<HTMLDivElement>(null)
+  const currentTimeRef = useRef(safeCurrentTime)
+  currentTimeRef.current = safeCurrentTime
   const [trimHandle, setTrimHandle] = useState<'start' | 'end' | null>(null)
   const peaks = useMediaWaveform({
     filePath: mediaFilePath,
@@ -80,6 +85,34 @@ export default function ReviewTimeline({
     if (rect.width <= 0) return 0
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
   }
+
+  useLayoutEffect(() => {
+    if (isPlaying || isScrubbing) return
+    const mediaTime = mediaRef?.current?.currentTime
+    const time = typeof mediaTime === 'number' && Number.isFinite(mediaTime)
+      ? mediaTime
+      : safeCurrentTime
+    const progress = safeDuration > 0 ? Math.max(0, Math.min(1, time / safeDuration)) : 0
+    if (playheadRef.current) playheadRef.current.style.left = `${progress * 100}%`
+  }, [isPlaying, isScrubbing, mediaRef, safeCurrentTime, safeDuration])
+
+  useEffect(() => {
+    if (!isPlaying || isScrubbing) return
+    // Follow the media clock each frame; React's throttled time label trails playback.
+    let frame = 0
+    const tick = () => {
+      const media = mediaRef?.current
+      const playableDuration = safeDuration > 0 ? safeDuration : media?.duration ?? 0
+      if (Number.isFinite(playableDuration) && playableDuration > 0 && playheadRef.current) {
+        const time = media?.currentTime ?? currentTimeRef.current
+        const progress = Math.max(0, Math.min(1, time / playableDuration))
+        playheadRef.current.style.left = `${progress * 100}%`
+      }
+      frame = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => cancelAnimationFrame(frame)
+  }, [isPlaying, isScrubbing, mediaRef, safeDuration])
 
   const releasePointer = (e: React.PointerEvent<HTMLDivElement>) => {
     if (trackRef.current?.hasPointerCapture(e.pointerId)) {
@@ -128,6 +161,7 @@ export default function ReviewTimeline({
     pointerModeRef.current = 'scrub'
     onScrubStart()
     onScrub(e.clientX)
+    if (playheadRef.current) playheadRef.current.style.left = `${progressForClientX(e.clientX) * 100}%`
     trackRef.current?.setPointerCapture(e.pointerId)
   }
 
@@ -151,6 +185,7 @@ export default function ReviewTimeline({
     }
 
     onScrub(e.clientX)
+    if (playheadRef.current) playheadRef.current.style.left = `${progressForClientX(e.clientX) * 100}%`
   }
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -267,10 +302,10 @@ export default function ReviewTimeline({
               </>
             )}
             <div
+              ref={playheadRef}
               className={`review-timeline-waveform__playhead pointer-events-none absolute top-1/2 z-10 h-full w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#171a22] shadow-[0_1px_10px_rgba(23,26,34,0.2)] ${
-                isScrubbing ? 'scale-125' : 'transition-[left] duration-100 ease-linear'
+                isScrubbing ? 'scale-125' : ''
               }`}
-              style={{ left: `${percent}%` }}
             >
               <span className="absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-[#171a22]" />
             </div>

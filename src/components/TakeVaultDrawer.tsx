@@ -1,3 +1,4 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import VaultPracticeOverview from './VaultPracticeOverview'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { CheckSquare, Download, Search, Star, Trash2, X } from 'lucide-react'
@@ -463,14 +464,14 @@ export default function TakeVaultDrawer({
             libraryCount={libraryItems.length}
           />
           {vaultSection !== 'practice' && (
-          simplified ? <details className="vault-folder-disclosure"><summary>Folder · {activeProject?.name ?? 'Current session'}</summary>          <ProjectSessionBar
+          simplified ? <PremiumDisclosure className="vault-folder-disclosure"><summary>Folder · {activeProject?.name ?? 'Current session'}</summary>          <ProjectSessionBar
             className="vault-session-bar"
             projects={projects}
             activeProjectId={activeProject?.id ?? null}
             onSelectProject={onSelectProject}
             onCreateProject={onCreateProject}
             onDeleteProject={onDeleteProject}
-          /></details> : (          <ProjectSessionBar
+          /></PremiumDisclosure> : (          <ProjectSessionBar
             className="vault-session-bar"
             projects={projects}
             activeProjectId={activeProject?.id ?? null}

@@ -1192,6 +1192,88 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    /// A short solid tile used as the picture for an audio-only panel.
+    /// The export is still a video, so each box needs a frame to place.
+    private func makeAudioPanelPlate(seconds: Double) throws -> (asset: AVURLAsset, track: AVAssetTrack, url: URL) {
+        let width = 48
+        let height = 48
+        let fps: Int32 = 15
+        let frameCount = max(1, Int(ceil(max(seconds, 0.1) * Double(fps))))
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("besttake-audio-plate-\(UUID().uuidString).mov")
+        try? FileManager.default.removeItem(at: url)
+        let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height,
+        ])
+        input.expectsMediaDataInRealTime = false
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: input,
+            sourcePixelBufferAttributes: [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                kCVPixelBufferWidthKey as String: width,
+                kCVPixelBufferHeightKey as String: height,
+            ]
+        )
+        guard writer.canAdd(input) else {
+            throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        writer.add(input)
+        guard writer.startWriting() else {
+            throw writer.error ?? NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        writer.startSession(atSourceTime: .zero)
+        guard let pool = adaptor.pixelBufferPool else {
+            throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        var pixelBuffer: CVPixelBuffer?
+        CVPixelBufferPoolCreatePixelBuffer(nil, pool, &pixelBuffer)
+        guard let pixelBuffer else {
+            throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        CVPixelBufferLockBaseAddress(pixelBuffer, [])
+        if let base = CVPixelBufferGetBaseAddress(pixelBuffer) {
+            let rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)
+            var pixel: [UInt8] = [0x24, 0x30, 0x44, 0xFF]
+            for row in 0..<height {
+                memset_pattern4(base.advanced(by: row * rowBytes), &pixel, width * 4)
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+        for frame in 0..<frameCount {
+            while !input.isReadyForMoreMediaData {
+                Thread.sleep(forTimeInterval: 0.002)
+            }
+            let time = CMTime(value: CMTimeValue(frame), timescale: fps)
+            if !adaptor.append(pixelBuffer, withPresentationTime: time) {
+                throw writer.error ?? NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+            }
+        }
+        input.markAsFinished()
+        let finished = DispatchSemaphore(value: 0)
+        writer.finishWriting { finished.signal() }
+        finished.wait()
+        guard writer.status == .completed else {
+            throw writer.error ?? NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        let asset = AVURLAsset(url: url)
+        if let track = asset.tracks(withMediaType: .video).first {
+            return (asset, track, url)
+        }
+        let loaded = DispatchSemaphore(value: 0)
+        var tracks: [AVAssetTrack] = []
+        asset.loadTracks(withMediaType: .video) { result, _ in
+            tracks = result ?? []
+            loaded.signal()
+        }
+        if loaded.wait(timeout: .now() + 2) == .timedOut || tracks.isEmpty {
+            throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
+        }
+        return (asset, tracks[0], url)
+    }
+
     @objc func renderMultitrackVideo(_ call: CAPPluginCall) {
         let exportId = call.getString("exportId") ?? UUID().uuidString
         let aspectRatio = call.getString("aspectRatio") ?? "9:16"
@@ -1208,6 +1290,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         var layerInstructions: [AVMutableVideoCompositionLayerInstruction] = []
         var audioParameters: [AVMutableAudioMixInputParameters] = []
         var longestDuration = CMTime.zero
+        var audioPanelPlates: [(asset: AVURLAsset, url: URL)] = []
 
         for sourceAny in sources {
             let source = sourceAny as [String: Any]
@@ -1218,8 +1301,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             else { continue }
 
             let asset = AVURLAsset(url: sourceURL)
-            guard let videoTrack = asset.tracks(withMediaType: .video).first else {
-                call.reject("A panel video could not be read. Relink the missing take and retry.")
+            let sourceVideo = asset.tracks(withMediaType: .video).first
+            let hasAudio = !asset.tracks(withMediaType: .audio).isEmpty
+            guard sourceVideo != nil || hasAudio else {
+                call.reject("A panel recording could not be read. Relink the missing take and retry.")
                 return
             }
 
@@ -1262,13 +1347,23 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 start: CMTime(seconds: clampedStart, preferredTimescale: 600),
                 duration: CMTime(seconds: trimmedSeconds, preferredTimescale: 600)
             )
+            let videoTrack: AVAssetTrack
             do {
-                let videoRange = CMTimeRangeGetIntersection(sourceTimeRange, otherRange: videoTrack.timeRange)
-                if videoRange.duration <= .zero { continue }
-                let videoInsertTime = CMTimeAdd(offsetInsertTime, CMTimeSubtract(videoRange.start, sourceTimeRange.start))
-                try compositionVideo.insertTimeRange(videoRange, of: videoTrack, at: videoInsertTime)
+                if let sourceVideo {
+                    videoTrack = sourceVideo
+                    let videoRange = CMTimeRangeGetIntersection(sourceTimeRange, otherRange: sourceVideo.timeRange)
+                    if videoRange.duration <= .zero { continue }
+                    let videoInsertTime = CMTimeAdd(offsetInsertTime, CMTimeSubtract(videoRange.start, sourceTimeRange.start))
+                    try compositionVideo.insertTimeRange(videoRange, of: sourceVideo, at: videoInsertTime)
+                } else {
+                    let plate = try makeAudioPanelPlate(seconds: trimmedSeconds)
+                    audioPanelPlates.append((plate.asset, plate.url))
+                    videoTrack = plate.track
+                    let plateRange = CMTimeRange(start: .zero, duration: CMTime(seconds: trimmedSeconds, preferredTimescale: 600))
+                    try compositionVideo.insertTimeRange(plateRange, of: plate.track, at: offsetInsertTime)
+                }
             } catch {
-                call.reject("A panel video could not be added to the export", nil, error)
+                call.reject("A panel could not be added to the export", nil, error)
                 return
             }
             
@@ -1625,6 +1720,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             DispatchQueue.main.async {
                 progressTimer.invalidate()
                 self.multitrackExports.removeValue(forKey: exportId)
+                for plate in audioPanelPlates { try? FileManager.default.removeItem(at: plate.url) }
                 if exportSession.status == .completed {
                     self.notifyListeners("multitrackExportProgress", data: ["exportId": exportId, "progress": 1])
                     print("[Multitrack] native render complete path=\(outputURL.path)")
@@ -1675,10 +1771,13 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     return
                 }
 
+                // A second text item lets some extensions choose the title
+                // instead of the movie as their primary payload.
                 let activityViewController = UIActivityViewController(
-                    activityItems: [title, shareURL],
+                    activityItems: [shareURL],
                     applicationActivities: nil
                 )
+                activityViewController.title = title
                 activityViewController.popoverPresentationController?.sourceView = viewController.view
                 activityViewController.popoverPresentationController?.sourceRect = CGRect(
                     x: viewController.view.bounds.midX,
@@ -1686,14 +1785,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                     width: 1,
                     height: 1
                 )
-                activityViewController.completionWithItemsHandler = { _, completed, _, error in
+                activityViewController.completionWithItemsHandler = { activityType, completed, _, error in
                     if let error = error {
                         call.reject("Share failed", error.localizedDescription)
                         return
                     }
                     call.resolve([
                         "success": true,
-                        "completed": completed
+                        "completed": completed,
+                        "savedToPhotos": completed && activityType == .saveToCameraRoll
                     ])
                 }
 

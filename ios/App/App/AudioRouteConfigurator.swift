@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 
 enum AudioRouteConfigurator {
     static let highQualityDefaultsKey = "SessionMirror.useIphoneMicForRecording"
@@ -171,6 +172,29 @@ enum AudioRouteConfigurator {
     /// setCategory/setActive calls are not free: each one can bounce WebKit
     /// (YouTube iframe / take <video>) audio and stall the camera pipeline.
     private(set) static var appSessionActive = false
+    private static let backgroundStateLock = NSLock()
+    private static var backgrounded = false
+
+    static var isAppBackgrounded: Bool {
+        backgroundStateLock.lock()
+        defer { backgroundStateLock.unlock() }
+        return backgrounded
+    }
+
+    static func setAppBackgrounded(_ value: Bool) {
+        backgroundStateLock.lock()
+        backgrounded = value
+        backgroundStateLock.unlock()
+    }
+
+    private static func rejectBackgroundRouteChange(_ caller: String) throws {
+        guard isAppBackgrounded && !MetronomeEngine.shared.isPlaying() else { return }
+        throw NSError(
+            domain: "BestTakeAudioSession",
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "Audio route unavailable while BestTake is backgrounded (\(caller))"]
+        )
+    }
 
     /// Call from the AVAudioSession interruption observer so ensureSessionActive
     /// knows a reactivation is genuinely needed.
@@ -185,6 +209,7 @@ enum AudioRouteConfigurator {
         options: AVAudioSession.CategoryOptions,
         caller: String
     ) throws {
+        try rejectBackgroundRouteChange(caller)
         if session.category == category && session.mode == mode && session.categoryOptions == options {
             print("[AVAudioSessionTrace] setCategory skipped (already applied) caller=\(caller) category=\(category.rawValue) mode=\(mode.rawValue) options=\(optionNames(options))")
             return
@@ -200,6 +225,7 @@ enum AudioRouteConfigurator {
         options: AVAudioSession.SetActiveOptions = [],
         caller: String
     ) throws {
+        if active { try rejectBackgroundRouteChange(caller) }
         print("[AVAudioSessionTrace] setActive caller=\(caller) active=\(active) options=\(options.rawValue) before=\(routeSummary(session)) stack=\(compactStack())")
         try session.setActive(active, options: options)
         appSessionActive = active
@@ -224,6 +250,7 @@ enum AudioRouteConfigurator {
         input: AVAudioSessionPortDescription?,
         caller: String
     ) throws {
+        if isAppBackgrounded { return }
         if session.preferredInput?.portType == input?.portType {
             return
         }
@@ -588,6 +615,10 @@ enum AudioRouteConfigurator {
     }
 
     static func applyRecordingRoute(enableHQ: Bool) throws {
+        if isAppBackgrounded {
+            suspendForAppBackground()
+            return
+        }
         if CameraSessionGuard.shouldBlockRouteChanges() {
             CameraSessionGuard.skipRouteChangeLog()
             return
@@ -844,7 +875,6 @@ enum AudioRouteConfigurator {
 
         let session = AVAudioSession.sharedInstance()
         do {
-            try debugSetPreferredInput(session, input: nil, caller: "suspendForAppBackground.clearPreferredInput")
             try debugSetActive(
                 session,
                 active: false,

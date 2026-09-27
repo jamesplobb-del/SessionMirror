@@ -1,0 +1,107 @@
+{
+  "date": "2026-09-26",
+  "platform": "Physical iPhone 15 Pro, iOS 26.6.2",
+  "app": "BestTake QA / com.besttake.app.practiceqa",
+  "input": "Native hardware paths; VITE_FAKE_MEDIA=0 and VITE_GAME_TEST_INPUT=0",
+  "isolation": "Separate app, app group, library and synthetic fixtures; existing BestTake app preserved",
+  "qaOnlyDifferences": [
+    "Bundle/app-group identifiers",
+    "Display name and URL scheme",
+    "Documents folder exposed in Files for synthetic inputs",
+    "Telemetry disabled"
+  ],
+  "cases": [
+    {
+      "id": "IOS-01",
+      "status": "passed",
+      "steps": "Build current uncommitted web/native app, sign, install, launch separate QA app",
+      "observed": "TypeScript/Vite and signed Debug iPhone build succeeded; separate bundle launched"
+    },
+    {
+      "id": "IOS-02",
+      "status": "passed",
+      "steps": "Onboarding instrument picker \u2192 Trumpet \u2192 Start practicing",
+      "observed": "Home shows Trumpet and empty QA library"
+    },
+    {
+      "id": "IOS-03",
+      "status": "passed",
+      "steps": "Home \u2192 Try a suggested routine",
+      "observed": "Build your routine / Suggested for trumpet appears directly, with Fundamentals and Full practice",
+      "fix": "MusicRoutineBuilder preserves props.mode instead of coercing presets to build"
+    },
+    {
+      "id": "IOS-04",
+      "status": "passed",
+      "steps": "Fundamentals \u2192 name QA \u2192 Save for later \u2192 Start \u2192 Pause",
+      "observed": "Home shows QA 0/4; Tuner opens with configured B-flat drone; routine widget shows 1/4 Paused",
+      "limit": "Mic/pitch detection not certified under Mirroring"
+    },
+    {
+      "id": "IOS-05",
+      "status": "passed",
+      "steps": "Terminate/relaunch QA app; inspect Home and routine widget",
+      "observed": "Trumpet, QA routine and paused state survived; Home Continue your routine"
+    },
+    {
+      "id": "IOS-06",
+      "status": "passed",
+      "steps": "Music \u2192 Import \u2192 Choose Files \u2192 QA-score.pdf \u2192 Open",
+      "observed": "1 score QA score in library; native Filesystem writeFile returned Documents/charts/<project>.pdf"
+    },
+    {
+      "id": "IOS-07",
+      "status": "passed",
+      "steps": "Open imported PDF \u2192 terminate/relaunch app \u2192 Continue music",
+      "observed": "Music layout check / Page 1 rendered before and after full process restart; Home retained QA score",
+      "conclusion": "Browser PDF reload failure did not reproduce on this phone"
+    },
+    {
+      "id": "IOS-08",
+      "status": "blocked",
+      "steps": "Real microphone capture through iPhone Mirroring",
+      "observed": "Mirroring blocks Mac microphone input. User reported silent playback in the test setup, then confirmed the regular app records and plays correctly and requested testing elsewhere. Investigation stopped; candidate playback changes fully reverted and never installed.",
+      "limit": "Not classified as a production recording/playback defect. Further audio testing excluded at user request."
+    },
+    {
+      "id": "IOS-09",
+      "status": "untested",
+      "steps": "Complete native games, camera capture, comparison, Bluetooth/headphones and interruption matrix",
+      "observed": "Not covered by this bounded pass; utility checks do not certify device workflows."
+    },
+    {
+      "id": "IOS-10",
+      "status": "passed",
+      "steps": "Explicitly launch com.besttake.app.practiceqa; import QA-two-part.btmulti from the QA Documents folder; dismiss Project opened",
+      "observed": "QA pulses two part shows two audio parts and 0:04 duration. Native log confirms writing both collab assets to the QA container.",
+      "evidence": "results/native-evidence/multitrack-console.log"
+    },
+    {
+      "id": "IOS-11",
+      "status": "passed",
+      "steps": "After IOS-10 shows Saved, copy QA storage evidence; terminate/relaunch the same bundle; Record & compare \u2192 Workspace \u2192 Multitrack",
+      "observed": "QA pulses two part reopens with both parts and 0:04 duration. Prior apparent project loss did not reproduce under controlled bundle identity; do not label it confirmed data loss.",
+      "evidence": "results/native-evidence/storage-confirmed-import/ and controlled-restart-console.log",
+      "limit": "Edited trim/mixer persistence was not repeated in this controlled run."
+    },
+    {
+      "id": "IOS-12",
+      "status": "blocked",
+      "steps": "Audio-only fixture \u2192 Export \u2192 Render & preview video; retry in explicitly launched QA bundle",
+      "observed": "Earlier phone attempt displayed generic render failure. Source requires a video track in every source. Controlled QA retry reached export sheet, then Mirroring disconnected because the phone was in use.",
+      "limit": "Known audio-only export limitation. renderMultitrackVideo rejects the first source with no video track; the UI shows only the generic retry alert. Exact installed-build reproduction still needs the controlled retry. No renderer changes applied."
+    }
+  ],
+  "additionalAutomatedChecks": {
+    "status": "passed",
+    "files": [
+      "verify-practice-chart-ink.mjs",
+      "verify-metronome-program-review.mjs",
+      "verify-daily-challenges.mjs",
+      "verify-multitrack-native-read.mjs",
+      "verify-multitrack-reference-preview.mjs"
+    ],
+    "limit": "Utility, model and mocked-boundary checks; not device UI certification."
+  },
+  "weeklyRemainingAtLastCheck": 49
+}

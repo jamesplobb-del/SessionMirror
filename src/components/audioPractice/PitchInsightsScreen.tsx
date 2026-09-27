@@ -1,4 +1,7 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import PremiumReveal from '../ui/PremiumReveal'
+import { PremiumMotionDiv } from '../ui/PremiumMotionSurface'
+import { premiumMotion } from '../../utils/premiumMotion'
+import { AnimatePresence } from 'framer-motion'
 import {
   BarChart3,
   ChevronLeft,
@@ -677,12 +680,12 @@ function InsightDetail({
   const hasTendency = insight.confidence !== 'collecting'
 
   return (
-    <motion.div
+    <PremiumMotionDiv
       className="pitch-insights-detail"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      transition={iosSpringSnappy}
+      transition={premiumMotion(iosSpringSnappy, 'screen')}
     >
       <button type="button" className="pitch-insights-back" onClick={onBack}>
         <ChevronLeft aria-hidden />
@@ -721,7 +724,7 @@ function InsightDetail({
           <div className="pitch-insights-trend__empty">Keep playing to see a trend.</div>
         )}
       </section>
-    </motion.div>
+    </PremiumMotionDiv>
   )
 }
 
@@ -753,12 +756,12 @@ function PracticeDayDetail({
   }))
 
   return (
-    <motion.div
+    <PremiumMotionDiv
       className="pitch-insights-detail pitch-insights-day-detail"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      transition={iosSpringSnappy}
+      transition={premiumMotion(iosSpringSnappy, 'screen')}
     >
       <button type="button" className="pitch-insights-back" onClick={onBack}>
         <ChevronLeft aria-hidden />
@@ -854,7 +857,7 @@ function PracticeDayDetail({
           {resetting ? 'Resetting…' : 'Reset day'}
         </Pressable>
       </section>
-    </motion.div>
+    </PremiumMotionDiv>
   )
 }
 
@@ -873,12 +876,12 @@ function AllNotesScreen({
   onSelectNote: (midiNote: number) => void
 }) {
   return (
-    <motion.div
+    <PremiumMotionDiv
       className="pitch-insights-detail"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      transition={iosSpringSnappy}
+      transition={premiumMotion(iosSpringSnappy, 'screen')}
     >
       <button type="button" className="pitch-insights-back" onClick={onBack}>
         <ChevronLeft aria-hidden />
@@ -890,7 +893,7 @@ function AllNotesScreen({
         labelSummary={labelSummary}
         onSelect={onSelectNote}
       />
-    </motion.div>
+    </PremiumMotionDiv>
   )
 }
 
@@ -925,12 +928,12 @@ function PracticeDaysScreen({
   onResetAll: () => void
 }) {
   return (
-    <motion.div
+    <PremiumMotionDiv
       className="pitch-insights-detail"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      transition={iosSpringSnappy}
+      transition={premiumMotion(iosSpringSnappy, 'screen')}
     >
       <button type="button" className="pitch-insights-back" onClick={onBack}>
         <ChevronLeft aria-hidden />
@@ -1019,7 +1022,7 @@ function PracticeDaysScreen({
           </button>
         ) : null}
       </section>
-    </motion.div>
+    </PremiumMotionDiv>
   )
 }
 
@@ -1496,13 +1499,13 @@ export default function PitchInsightsScreen({
                 onResetAll={() => void resetAll()}
               />
             ) : (
-              <motion.div
+              <PremiumMotionDiv
                 key="overview"
                 className="pitch-insights-overview"
                 initial={{ opacity: 0, x: -14 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -14 }}
-                transition={iosSpringSnappy}
+                transition={premiumMotion(iosSpringSnappy, 'screen')}
               >
                 {/* The instrument picker lives above the state switch on
                     purpose: selecting an instrument you have not recorded yet
@@ -1559,7 +1562,7 @@ export default function PitchInsightsScreen({
                         <Plus aria-hidden />
                       </button>
                     </div>
-                    {instrumentPickerOpen ? (
+                    <PremiumReveal open={instrumentPickerOpen}>
                       <div className="pitch-insights-instrument-picker" role="dialog" aria-label="Add an instrument">
                         <header>
                           <strong>Add an instrument</strong>
@@ -1605,7 +1608,7 @@ export default function PitchInsightsScreen({
                           })}
                         </div>
                       </div>
-                    ) : null}
+                    </PremiumReveal>
                   </>
                 ) : null}
 
@@ -1690,7 +1693,7 @@ export default function PitchInsightsScreen({
                     </nav>
                   </>
                 )}
-              </motion.div>
+              </PremiumMotionDiv>
             )}
           </AnimatePresence>
         </div>

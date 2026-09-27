@@ -1,3 +1,6 @@
+import PremiumReveal from './ui/PremiumReveal'
+import PremiumSelect from './ui/PremiumPicker'
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useState } from 'react'
 import { AudioLines, ChevronDown, ChevronRight, FileMusic, SlidersHorizontal, Waves } from 'lucide-react'
 import { blankDesk, type RoutineStep } from '../utils/practiceRoutines'
@@ -37,23 +40,23 @@ export default function MusicToolSetup({ step, instrumentId, onChange }: {
         ? { drone: { ...desk.drone, pitchClass: desk.drone.pitchClass ?? homePitchClass(instrumentId) } } : {}) })}>
       <Icon aria-hidden /><span>{label}</span>
     </button>)}</div>
-    {desk.showMetronome && <>
+    <PremiumReveal open={desk.showMetronome}>
       <label className="music-routine-setting"><span>Tempo</span><span><input type="number" aria-label="Tempo in BPM" min={20} max={300}
         value={metronome.bpm} onChange={event => patchDesk({ metronome: normalizeDeskMetronome({ ...metronome, bpm: event.target.value }) })} /> <small>BPM</small></span></label>
       <button type="button" className="music-routine-open-metronome" onClick={() => setMetronomeOpen(true)}>
         <SlidersHorizontal aria-hidden /><span><strong>Metronome settings</strong><small>{metronomeDetail}</small></span><ChevronRight aria-hidden />
       </button>
-    </>}
-    {desk.showDrone && <label className="music-routine-setting"><span>Drone note</span><select aria-label="Drone note"
-      value={desk.drone.pitchClass ?? ''} onChange={event => patchDesk({ drone: { ...desk.drone, pitchClass: event.target.value === '' ? null : Number(event.target.value) } })}>
-      <option value="">Choose a note</option>
-      {Array.from({ length: 12 }, (_, pitch) => <option key={pitch} value={pitch}>{getWrittenPitchLabel(pitch, desk.drone.octave, 'concert').label}</option>)}
-    </select></label>}
-    <details className="music-routine-reference"><summary><FileMusic aria-hidden /><span>Reference<small>{step.referenceVideoId ? 'Selected' : 'Add a recording'}</small></span><ChevronDown aria-hidden /></summary>
+    </PremiumReveal>
+    <PremiumReveal open={desk.showDrone}><div className="music-routine-setting"><span>Drone note</span>
+      <PremiumSelect title="Drone note" value={desk.drone.pitchClass == null ? '' : String(desk.drone.pitchClass)}
+        options={[{ value: '', label: 'Choose a note' }, ...Array.from({ length: 12 }, (_, pitch) => ({ value: String(pitch), label: getWrittenPitchLabel(pitch, desk.drone.octave, 'concert').label }))]}
+        onChange={value => patchDesk({ drone: { ...desk.drone, pitchClass: value === '' ? null : Number(value) } })} />
+    </div></PremiumReveal>
+    <PremiumDisclosure className="music-routine-reference"><summary><FileMusic aria-hidden /><span>Reference<small>{step.referenceVideoId ? 'Selected' : 'Add a recording'}</small></span><ChevronDown aria-hidden /></summary>
       <RoutineReferenceSetup instrumentId={instrumentId} title={step.title} value={step.referenceQuery}
         onChange={referenceQuery => onChange({ referenceQuery })} videoId={step.referenceVideoId}
         onVideoIdChange={referenceVideoId => onChange({ referenceVideoId })} />
-    </details>
+    </PremiumDisclosure>
     <RoutineMetronomeEditor isOpen={metronomeOpen} itemTitle={step.title} value={metronome}
       onSave={metronome => patchDesk({ metronome })} onClose={() => setMetronomeOpen(false)} />
   </>

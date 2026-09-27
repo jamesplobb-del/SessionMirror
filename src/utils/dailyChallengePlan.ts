@@ -55,8 +55,7 @@ export function getDailyChallengePlan(instrumentId: string | null, routine: Rout
   const step = { ...(source ?? stepFromTemplate(template, id)), minutes: 1 }
   if (!source) { step.id = `daily-item:${date}:${id}`; step.referenceQuery = ''; if (step.desk) step.desk = { ...step.desk, autoSoundRecording: false } }
   const practiceRoutine: Routine = { id: `daily-practice:${date}:${id}`, name: 'Today’s practice challenge', instrumentId: id, steps: [step], createdAt: now.getTime(), updatedAt: now.getTime() }
-  // The games' own row for this horn, so the challenge opens on the instrument
-  // the Games lobby does — Home's euphonium, for one, reads treble clef.
+  // The games' own row for this horn. Home's euphonium is the bass-clef part.
   const gameInstrumentId = practiceGameInstrumentIdForHome(id) ?? id
   const staffInstrument = getStaffJumperInstrument(gameInstrumentId)
   const balanceInstrument = getBalanceInstrument(gameInstrumentId)

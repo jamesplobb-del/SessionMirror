@@ -5,8 +5,11 @@ import { isTabletDevice } from './deviceFormFactor'
 /** Low voice range; instrument-specific bounds are defined below. */
 export const MIN_INSTRUMENT_HZ = 65
 
-/** Upper singing voice / violin upper range. */
-export const MAX_INSTRUMENT_HZ = 1100
+/**
+ * Default ceiling, matching the voice profile.
+ * Strings and winds set their own, high enough for piano C8 and piccolo C8.
+ */
+export const MAX_INSTRUMENT_HZ = 2400
 
 export type TunerInstrument = 'voice' | 'strings' | 'winds'
 
@@ -52,7 +55,9 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Voice',
   description: 'Listens gently and smooths the trace, so vibrato does not read as bad tuning.',
   minHz: 65,
-  maxHz: 1100,
+  // C♯6 is 1109 Hz and flute E6 is 1319 Hz. Both use this profile, and a
+  // lower ceiling used to read them an octave down.
+  maxHz: 2400,
   clarityMin: 0.7,
   clarityMinMic: 0.78,
   frameSize: 4096,
@@ -80,10 +85,10 @@ const VOICE_TUNER_PROFILE: PitchTunerProfile = {
 const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Strings',
   description: 'Reads cents exactly, and eases between notes so slides stay readable.',
-  // Piano A0 is 27.5 Hz; keep the floor below it so the bottom octave is not
-  // octave-shifted up by normalizeInstrumentFrequency.
+  // Piano A0 is 27.5 Hz and C8 is 4186 Hz. A lower ceiling used to read
+  // A6 and above an octave down.
   minHz: 26,
-  maxHz: 1700,
+  maxHz: 4500,
   clarityMin: 0.76,
   clarityMinMic: 0.84,
   frameSize: 8192,
@@ -110,8 +115,9 @@ const STRINGS_TUNER_PROFILE: PitchTunerProfile = {
 const WINDS_TUNER_PROFILE: PitchTunerProfile = {
   label: 'Winds',
   description: 'Reacts fast across a wide range, for anything from piccolo down to horn.',
+  // Piccolo C8 sounds at 4186 Hz. A lower ceiling used to read A7–C8 an octave down.
   minHz: 38,
-  maxHz: 3300,
+  maxHz: 4800,
   clarityMin: 0.68,
   clarityMinMic: 0.72,
   frameSize: 4096,

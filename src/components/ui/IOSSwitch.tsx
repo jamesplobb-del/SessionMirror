@@ -1,3 +1,4 @@
+import { premiumMotion } from '../../utils/premiumMotion'
 import { motion } from 'framer-motion'
 import { iosSpringSnappy } from '../../utils/motionPresets'
 import Pressable from './Pressable'
@@ -35,13 +36,13 @@ export default function IOSSwitch({
       style={{
         backgroundColor: checked ? '#0ea5e9' : '#d6d3d1',
       }}
-      transition={iosSpringSnappy}
+      transition={premiumMotion(iosSpringSnappy, 'control')}
     >
       <motion.span
         className="block h-6 w-6 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.18)]"
         initial={false}
         animate={{ transform: `translateX(${checked ? 22 : 0}px)` }}
-        transition={iosSpringSnappy}
+        transition={premiumMotion(iosSpringSnappy, 'control')}
       />
     </Pressable>
   )

@@ -42,6 +42,10 @@ final class InlineTakeBoxPlaybackController {
         loudnessGainDb: Float = 0
     ) throws -> [String: Any] {
         assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
+        guard !AudioRouteConfigurator.isAppBackgrounded else {
+            throw NSError(domain: "InlineTakeBoxPlayback", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Take playback cannot start in the background"])
+        }
         // Preempting another box's playback: notify so its UI resets.
         stop(notify: true)
 

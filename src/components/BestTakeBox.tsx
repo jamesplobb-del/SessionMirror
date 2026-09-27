@@ -1,3 +1,4 @@
+import { TakePlaybackStatus } from './ui/PremiumRecordingFeedback'
 import { useTakeGuidance } from '../context/TakeGuidanceContext'
 import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import {
@@ -771,11 +772,7 @@ function BestTakeBox({
             </>
           ) : hasTake ? (
             <div ref={playbackStageRef} className={nativePlaybackStageClass}>
-              {useNativeTakePlayback && ((isPlayArmed && !isPlaying) || nativePlaybackError) && (
-                <p role="status" className="absolute inset-x-1 top-1 z-20 rounded bg-black/80 px-2 py-1 text-center text-[10px] text-white">
-                  {isPlayArmed && !isPlaying ? 'Preparing audio…' : 'Could not prepare playback. Try again.'}
-                </p>
-              )}
+              <TakePlaybackStatus active={Boolean(useNativeTakePlayback && ((isPlayArmed && !isPlaying) || nativePlaybackError))} busy={isPlayArmed && !isPlaying} />
               {!useNativeTakePlayback && (
                 <TakeVideoPlayer
                   filePath={playbackFilePath}
@@ -813,7 +810,7 @@ function BestTakeBox({
                     haptic="light"
                     className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                     onClick={onExpand}
-                    aria-label="Open Expand View with Best Take"
+                    aria-label="Open full-screen playback of Best Take"
                   />
                 )
               )}

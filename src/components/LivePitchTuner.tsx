@@ -1,9 +1,11 @@
+import { PremiumMotionDiv, PremiumMotionSection } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import type { TunerInputAdvice } from '../utils/tunerInputAdvice'
 import { reportFeatureAction } from '../utils/featureGuidance'
 import { createTunerTrace, type TunerTrace } from '../utils/tunerTrace'
 import TunerHistory from './audioPractice/TunerHistory'
 import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import { BarChart3, Music2, Settings, SlidersHorizontal } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import {
@@ -522,16 +524,16 @@ export function LiveAudioTunerPane({
               * panel's exit is skipped and the incoming one's enter starts
               * from whatever state the last frame left behind.
               */}
-            <AnimatePresence>
+            <AnimatePresence mode="wait">
               {droneOpen && drone ? (
-                <motion.section
+                <PremiumMotionSection
                   key="drone-panel"
                   id="pitch-living-drone-panel"
                   className="pitch-living-drone-panel"
                   initial={{ y: '105%', opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: '105%', opacity: 0, transitionEnd: motionExitHide }}
-                  transition={{ type: 'spring', stiffness: 390, damping: 36 }}
+                  transition={premiumMotion({type:"spring",stiffness:390,damping:36}, 'panel')}
                   aria-label="Drone widget"
                 >
                   <DroneSoundWheel
@@ -547,28 +549,27 @@ export function LiveAudioTunerPane({
                     hapticsEnabled={drone.hapticsEnabled}
                     tunerTransposition={tunerTransposition}
                   />
-                </motion.section>
+                </PremiumMotionSection>
               ) : null}
 
               {transpositionOpen && onTunerTranspositionChange ? (
-                <motion.section
+                <PremiumMotionSection
                   key="transposition-panel"
                   id="pitch-living-transposition-panel"
                   className="pitch-living-transposition-panel"
                   initial={{ y: '105%', opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: '105%', opacity: 0, transitionEnd: motionExitHide }}
-                  transition={{ type: 'spring', stiffness: 390, damping: 36 }}
+                  transition={premiumMotion({type:"spring",stiffness:390,damping:36}, 'panel')}
                 >
                   <TunerTranspositionMenu
-                    concertOnly
                     value={tunerTransposition}
                     onChange={selectTransposition}
                     onClose={toggleTransposition}
                     instrument={tunerInstrument}
                     onInstrumentChange={onTunerInstrumentChange}
                   />
-                </motion.section>
+                </PremiumMotionSection>
               ) : null}
             </AnimatePresence>
           </>
@@ -910,7 +911,7 @@ function LivePitchTunerAudio({
         </div>
       )}
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div
+        <PremiumMotionDiv
           key={paneKey}
           className={`flex min-h-0 flex-1 flex-col ${showLive || showPlayback ? 'pitch-tuner__live-body' : ''}`}
           initial={{ opacity: 0 }}
@@ -970,7 +971,7 @@ function LivePitchTunerAudio({
               </p>
             </div>
           )}
-        </motion.div>
+        </PremiumMotionDiv>
       </AnimatePresence>
     </div>
   )

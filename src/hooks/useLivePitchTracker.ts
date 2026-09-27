@@ -2920,6 +2920,8 @@ export function useLivePitchTracker(
             active = true
           }
         } else {
+          // Out-of-range pitches stay out. Folding them into range invented
+          // notes from room noise and dropped real high notes an octave.
           const pitch = normalizeInstrumentFrequency(
             rawPitch,
             activeProfile.minHz,

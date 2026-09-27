@@ -1,0 +1,517 @@
+[
+  {
+    "id": "mt-01",
+    "feature": "Multitrack workspace",
+    "control": "Projects title and return to Camera Mode",
+    "states": [
+      "workspace idle",
+      "part recording",
+      "review",
+      "export running"
+    ],
+    "expected": "Projects opens only when allowed; back exits the active stage or workspace without losing saved project state.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:1527",
+    "status": "untested"
+  },
+  {
+    "id": "mt-02",
+    "feature": "Projects",
+    "control": "Project name and save status",
+    "states": [
+      "new project",
+      "renamed",
+      "saving",
+      "saved",
+      "save error and Retry save"
+    ],
+    "expected": "Name persists after reopening; status reflects the real save result and retry recovers.",
+    "source": "src/multitrack/components/MultitrackProjectsPanel.tsx:25",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-14. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-03",
+    "feature": "Projects",
+    "control": "New project, Duplicate, saved project row",
+    "states": [
+      "empty project",
+      "project with parts",
+      "switch away and back",
+      "busy"
+    ],
+    "expected": "Each project stays independent; switching restores its parts and setup; actions are disabled while busy.",
+    "source": "src/multitrack/components/MultitrackProjectsPanel.tsx:38",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-14. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-04",
+    "feature": "Project exchange",
+    "control": "Share project",
+    "states": [
+      "empty project",
+      "project with recorded parts and backing",
+      "busy",
+      "share cancelled"
+    ],
+    "expected": "A .btmulti share contains the current project media and settings; cancellation leaves the project usable.",
+    "source": "src/multitrack/components/ProjectFileActions.tsx:10",
+    "status": "untested"
+  },
+  {
+    "id": "mt-05",
+    "feature": "Project exchange",
+    "control": "Import shared project file",
+    "states": [
+      "valid .btmulti",
+      "invalid file",
+      "duplicate import",
+      "busy"
+    ],
+    "expected": "Valid imports open as separate projects; invalid imports show an error without replacing the active project.",
+    "source": "src/multitrack/components/ProjectFileActions.tsx:14",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-17. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-06",
+    "feature": "Part layout",
+    "control": "Layout preset and Apply layout",
+    "states": [
+      "1 to 12 base boxes",
+      "draft changed then Cancel",
+      "applied and reopened"
+    ],
+    "expected": "Preview reflects draft; Cancel discards it; Apply persists selected portrait layout.",
+    "source": "src/multitrack/components/MultitrackLayoutSheet.tsx:28",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-15. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-07",
+    "feature": "Part layout",
+    "control": "Extra box add, position, size, remove, swap order",
+    "states": [
+      "0 extras",
+      "4 extras maximum",
+      "at bounds",
+      "remove and undo"
+    ],
+    "expected": "Up to four extras stay within frame and preserve intended order; removal and undo behave visibly.",
+    "source": "src/multitrack/components/MultitrackLayoutSheet.tsx:39",
+    "status": "untested"
+  },
+  {
+    "id": "mt-08",
+    "feature": "Parts",
+    "control": "Manage parts disclosure, name, hide/show, reorder",
+    "states": [
+      "empty part",
+      "recorded part",
+      "hidden",
+      "missing Take Vault recording"
+    ],
+    "expected": "Labels and order persist; hidden state changes composition; missing take is reported and replaceable.",
+    "source": "src/multitrack/components/MultitrackProjectPanel.tsx:20",
+    "status": "untested"
+  },
+  {
+    "id": "mt-09",
+    "feature": "Parts",
+    "control": "Advanced composition visibility window and audio checkbox",
+    "states": [
+      "whole song",
+      "start only",
+      "start and end",
+      "audio only while visible"
+    ],
+    "expected": "Part appears at configured times, audio follows selected policy, and Show for whole song resets the window.",
+    "source": "src/multitrack/components/MultitrackProjectPanel.tsx:73",
+    "status": "untested"
+  },
+  {
+    "id": "mt-10",
+    "feature": "Part capture",
+    "control": "Empty tile and tile options",
+    "states": [
+      "empty tile",
+      "occupied tile",
+      "extra box",
+      "existing take removed"
+    ],
+    "expected": "Offers record, Take Vault, and sheet music on empty tile; occupied tile offers replacement, editor, remove, and confirmed delete.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:2070",
+    "status": "untested"
+  },
+  {
+    "id": "mt-11",
+    "feature": "Part capture",
+    "control": "Record, stop, review, use take, retry, discard",
+    "states": [
+      "camera permission denied",
+      "count-in",
+      "recording",
+      "stop settling",
+      "review",
+      "retry"
+    ],
+    "expected": "Recording starts only once, timer and review correspond to captured media, and retry or discard releases the camera and previous take correctly.",
+    "source": "src/multitrack/components/MultitrackRecordingStage.tsx",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "mt-12",
+    "feature": "Part capture",
+    "control": "Monitor source toggles and headphone routing",
+    "states": [
+      "other parts",
+      "backing track",
+      "headphones connected",
+      "headphones disconnected mid-take"
+    ],
+    "expected": "Chosen monitor sources are audible in headphones and do not print into captured audio; disconnection mutes monitoring safely.",
+    "source": "src/multitrack/components/MultitrackRecordingStage.tsx:49",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "mt-13",
+    "feature": "Take Vault",
+    "control": "From Take Vault picker",
+    "states": [
+      "no takes",
+      "audio take",
+      "video take",
+      "replace assigned part"
+    ],
+    "expected": "Selected take fills the chosen box; closing picker leaves assignment unchanged.",
+    "source": "src/multitrack/takeVault/MultitrackTakePicker.tsx:19",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "mt-14",
+    "feature": "Transport",
+    "control": "Play all, Pause, Restart, Seek",
+    "states": [
+      "empty project",
+      "one take",
+      "several offset takes",
+      "near project end"
+    ],
+    "expected": "All visible media stay synchronized at start, after seek, on resume, and at end.",
+    "source": "src/multitrack/components/MultitrackToolbar.tsx:50",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-17/UI-19. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-15",
+    "feature": "Editor",
+    "control": "Timeline and Mixer tabs; preview play/pause; Done/discard",
+    "states": [
+      "single clip",
+      "multiple clips",
+      "unsaved edits",
+      "playback active"
+    ],
+    "expected": "Preview reflects edits; Done applies them; discard restores previous timing and mix.",
+    "source": "src/multitrack/components/MultitrackAlignStage.tsx:819",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-16/UI-18/UI-19. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-16",
+    "feature": "Editor",
+    "control": "Clip trim handles, move, reset, zoom, playhead recording",
+    "states": [
+      "first clip",
+      "later overdub",
+      "clip near bounds",
+      "zoomed timeline"
+    ],
+    "expected": "Visible timing matches playback and exported timing; reset restores recorded position.",
+    "source": "src/multitrack/components/MultitrackAlignStage.tsx:312",
+    "status": "untested"
+  },
+  {
+    "id": "mt-17",
+    "feature": "Mixer",
+    "control": "Per-part mute and volume",
+    "states": [
+      "one part",
+      "multiple parts",
+      "muted",
+      "volume at 0 and 100 percent"
+    ],
+    "expected": "Preview and rendered output use the same mix and persist after reopening.",
+    "source": "src/multitrack/components/MultitrackAlignStage.tsx:863",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-18. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mt-18",
+    "feature": "Backing track",
+    "control": "Import audio, Play/Pause, volume, Clear",
+    "states": [
+      "none",
+      "supported audio",
+      "replacement audio",
+      "cleared"
+    ],
+    "expected": "Audio stays synchronized with recording and playback, volume is audible and exported, and Clear removes it.",
+    "source": "src/multitrack/backing/MultitrackBackingTrackPanel.tsx:287",
+    "status": "untested"
+  },
+  {
+    "id": "mt-19",
+    "feature": "Backing track",
+    "control": "YouTube reference link and Load",
+    "states": [
+      "valid link",
+      "invalid link",
+      "network unavailable",
+      "during export"
+    ],
+    "expected": "Reference playback is marked approximate and excluded from exported audio; invalid links show an error.",
+    "source": "src/multitrack/backing/MultitrackBackingTrackPanel.tsx:307",
+    "status": "untested"
+  },
+  {
+    "id": "mt-20",
+    "feature": "Sheet music in multitrack",
+    "control": "Choose photo or PDF, replace, page navigation, remove",
+    "states": [
+      "no asset",
+      "image",
+      "multipage PDF",
+      "bad file",
+      "removed asset"
+    ],
+    "expected": "Chosen asset renders clearly; pages turn; remove clears it from the workspace and export.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:2050",
+    "status": "untested"
+  },
+  {
+    "id": "mt-21",
+    "feature": "Sheet music in multitrack",
+    "control": "Placement, framing, scale, roll, timed cues",
+    "states": [
+      "static image",
+      "page cue",
+      "rolling image",
+      "overlapping extra box"
+    ],
+    "expected": "Preview and rendered video place and time the image as edited without obscuring intended boxes.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:1874",
+    "status": "untested"
+  },
+  {
+    "id": "mt-22",
+    "feature": "Practice tools",
+    "control": "Tools pin/unpin tuner, Click & tempo, Audio Enhance",
+    "states": [
+      "none pinned",
+      "each pinned",
+      "busy",
+      "after reopening"
+    ],
+    "expected": "Pinned tools display and retain their settings; Audio Enhance affects monitor playback as indicated.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:2182",
+    "status": "untested"
+  },
+  {
+    "id": "mt-23",
+    "feature": "Count-in",
+    "control": "Click during recording, bars, tempo, meter, sound",
+    "states": [
+      "no headphones",
+      "headphones connected",
+      "0 bars",
+      "8 bars",
+      "backing present"
+    ],
+    "expected": "Click requires headphones during recording; count-in works on speaker; selected timing and sound apply to next capture.",
+    "source": "src/multitrack/components/MultitrackCountInControls.tsx:8",
+    "status": "untested"
+  },
+  {
+    "id": "mt-24",
+    "feature": "Video export",
+    "control": "End at, Render & preview video, Cancel",
+    "states": [
+      "auto end",
+      "manual end",
+      "rendering",
+      "cancelled",
+      "preview ready"
+    ],
+    "expected": "Portrait render ends at chosen time, progress and cancellation respond, and preview plays the final mix.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:2246",
+    "status": "untested"
+  },
+  {
+    "id": "mt-25",
+    "feature": "Video export",
+    "control": "Share video and Save to Take Vault",
+    "states": [
+      "empty project",
+      "renderable project",
+      "share cancelled",
+      "saved export"
+    ],
+    "expected": "Disabled when no renderable content; generated video can be shared or opened from Take Vault.",
+    "source": "src/multitrack/components/MultitrackOverlay.tsx:2260",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-16. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mu-01",
+    "feature": "Music library",
+    "control": "Import music file picker",
+    "states": [
+      "empty library",
+      "PDF",
+      "JPEG/PNG/WebP",
+      "multiple files",
+      "invalid or empty file",
+      "after full reload"
+    ],
+    "expected": "Each valid file becomes a score with its own practice item; partial failures are reported without losing successful imports. Imported scores remain available after reload.",
+    "source": "src/components/MusicLibrary.tsx:106",
+    "status": "failed",
+    "evidence": "sessions/2026-09-26.json: UI-23/UI-27; regressions/music-web-reload.mjs. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mu-02",
+    "feature": "Music library",
+    "control": "Open score, search, selection and delete",
+    "states": [
+      "no scores",
+      "several scores",
+      "no search result",
+      "single delete",
+      "bulk delete cancelled or confirmed"
+    ],
+    "expected": "Search filters correctly; delete confirmation matches selection; score file and markings are removed while recordings remain.",
+    "source": "src/components/MusicLibrary.tsx:293",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-23/UI-26/UI-27. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mu-03",
+    "feature": "Music library",
+    "control": "New folder, rename, move, reorder, remove folder",
+    "states": [
+      "empty folder",
+      "folder with scores",
+      "pointer drag",
+      "keyboard arrows",
+      "remove cancelled or confirmed"
+    ],
+    "expected": "Ordering and placement persist; removing a folder returns its scores to All music.",
+    "source": "src/components/MusicLibrary.tsx:280",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-25. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mu-04",
+    "feature": "Music library",
+    "control": "Score Tools and More options",
+    "states": [
+      "default score",
+      "custom tempo/drone/tuner",
+      "hands-free",
+      "reference and program",
+      "reopened"
+    ],
+    "expected": "Each score retains independent practice setup and tool selections.",
+    "source": "src/components/MusicLibrary.tsx:300",
+    "status": "untested"
+  },
+  {
+    "id": "mu-05",
+    "feature": "Music reader",
+    "control": "Page turn, one/two page, fill width, half turn",
+    "states": [
+      "single page",
+      "multipage PDF",
+      "portrait",
+      "landscape"
+    ],
+    "expected": "Navigation and fit keep the correct page visible without clipped or unreadable score content.",
+    "source": "src/components/practiceChart/MusicWidget.tsx:163",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-24. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "mu-06",
+    "feature": "Music reader",
+    "control": "Mark up, marker colors/thickness, eraser, undo, clear, save",
+    "states": [
+      "unmarked",
+      "strokes present",
+      "page changed",
+      "saved marked copy"
+    ],
+    "expected": "Ink follows the right page and survives reopening or exports when saved.",
+    "source": "src/components/practiceChart/MusicWidget.tsx:173",
+    "status": "untested"
+  },
+  {
+    "id": "mu-07",
+    "feature": "Music reader",
+    "control": "Hide controls/paper, Replace, Remove",
+    "states": [
+      "score loaded",
+      "hidden chrome",
+      "replacement",
+      "removed"
+    ],
+    "expected": "Reader state changes visibly and replacement/removal update the associated practice item.",
+    "source": "src/components/practiceChart/MusicWidget.tsx:278",
+    "status": "untested"
+  },
+  {
+    "id": "mu-08",
+    "feature": "Music routine",
+    "control": "Choose existing music, Import PDF, add exercise",
+    "states": [
+      "empty music library",
+      "one score",
+      "multiple scores",
+      "exercise without music"
+    ],
+    "expected": "Chosen scores appear once in the routine; imported score opens the same reader; exercise order and setup persist.",
+    "source": "src/components/MusicRoutineBuilder.tsx:188",
+    "status": "untested"
+  },
+  {
+    "id": "mu-09",
+    "feature": "Music routine",
+    "control": "Attach/change missing score, tools, order, save, start",
+    "states": [
+      "all files present",
+      "shared score missing",
+      "music restored",
+      "today already started"
+    ],
+    "expected": "Start is blocked for a missing required score, replacement repairs the step, and save/continue preserves setup.",
+    "source": "src/components/MusicRoutineBuilder.tsx:211",
+    "status": "untested"
+  },
+  {
+    "id": "mu-10",
+    "feature": "Document import",
+    "control": "Open PDF from iOS Files or share sheet",
+    "states": [
+      "cold launch",
+      "app already running",
+      "same file reopened",
+      "non-PDF document"
+    ],
+    "expected": "PDF handoff reaches the music import flow once and does not disturb other file types.",
+    "source": "src/utils/incomingPdfOpen.ts",
+    "status": "untested"
+  }
+]

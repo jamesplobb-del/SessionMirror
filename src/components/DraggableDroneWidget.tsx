@@ -1,5 +1,7 @@
+import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import WidgetCollapseButton from './WidgetCollapseButton'
-import { motion, useDragControls, useMotionValue, useIsPresent } from 'framer-motion'
+import { useDragControls, useMotionValue, useIsPresent } from 'framer-motion'
 import { Minus, Plus, Square, Play } from 'lucide-react'
 import { DroneToolIcon } from './icons/toolIcons'
 import { useCollapsibleWidget } from './useCollapsibleWidget'
@@ -204,7 +206,7 @@ export default function DraggableDroneWidget({
 
   return (<>
     {fold.ball}
-    <motion.div
+    <PremiumMotionDiv
       ref={widgetRef}
       aria-hidden={fold.collapsed}
       drag
@@ -221,7 +223,7 @@ export default function DraggableDroneWidget({
       initial={{ opacity: 0, scale: 0.96 }}
       animate={fold.panelAnimation}
       exit={{ opacity: 0, scale: 0.96, transitionEnd: motionExitHide }}
-      transition={iosDragRelease}
+      transition={premiumMotion(iosDragRelease, 'widget')}
       style={{ x: dragX, y: dragY, touchAction: 'none', width: WIDGET_WIDTH, pointerEvents: isPresent ? 'auto' : 'none' }}
     >
       <WidgetCollapseButton label="drone" onCollapse={fold.collapse} />
@@ -327,6 +329,6 @@ export default function DraggableDroneWidget({
           />
         </div>
       </div>
-    </motion.div></>
+    </PremiumMotionDiv></>
   )
 }

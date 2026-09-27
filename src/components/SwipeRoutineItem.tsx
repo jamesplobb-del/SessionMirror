@@ -1,3 +1,4 @@
+import { premiumMotion } from '../utils/premiumMotion'
 import { useRef, useState, type ReactNode } from 'react'
 import { motion, useMotionValue, animate } from 'framer-motion'
 import { Trash2 } from 'lucide-react'
@@ -10,13 +11,14 @@ export default function SwipeRoutineItem({ title, onRemove, children }: {
   const [open, setOpen] = useState(false)
   const gesture = useRef<{ x: number; y: number; start: number; horizontal: boolean; vertical: boolean } | null>(null)
   const suppressClick = useRef(false)
-  const reveal = (next: boolean) => { setOpen(next); animate(x, next ? -88 : 0, { duration: .18 }) }
+  const reveal = (next: boolean) => { setOpen(next); animate(x, next ? -88 : 0, premiumMotion({ duration: .18 }, 'control')) }
   return <li className="routine-swipe-row">
     <button type="button" className="routine-swipe-delete" aria-label={`Remove ${title} from this routine`}
       onFocus={() => reveal(true)} onClick={onRemove}><Trash2 aria-hidden /><span>Remove</span></button>
     <motion.div className="routine-swipe-content" style={{ x, touchAction: 'pan-y' }}
       onPointerDownCapture={event => {
         if (!event.isPrimary || event.button !== 0) return
+        x.stop()
         suppressClick.current = false
         gesture.current = { x: event.clientX, y: event.clientY, start: x.get(), horizontal: false, vertical: false }
       }}

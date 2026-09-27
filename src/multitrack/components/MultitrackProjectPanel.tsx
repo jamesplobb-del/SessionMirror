@@ -1,3 +1,4 @@
+import PremiumDisclosure from '../../components/ui/PremiumDisclosure'
 import type { MultitrackSession, PerformancePanelState } from '../types'
 import { compositionRects } from '../layout/composition'
 import { getLayoutPreset } from '../layout/layoutPresets'
@@ -14,7 +15,7 @@ export default function MultitrackProjectPanel({ session, onUpdate, onPanel, onR
   const boxName = (panel: PerformancePanelState) => panel.label || panel.take?.name || `${panel.overlay ? 'Extra' : 'Box'} ${session.panels.filter(p => p.kind === 'performance' && !!p.overlay === !!panel.overlay).findIndex(p => p.id === panel.id) + 1}`
   return <div className="multitrack-project-panel">
     <div className="multitrack-settings-heading multitrack-parts-heading"><h2>Parts</h2><button disabled={!canUndo} onClick={onUndo}>Undo</button></div>
-    {session.panels.map((p, i) => p.kind !== 'performance' ? null : <details key={p.id} className="multitrack-part-settings"
+    {session.panels.map((p, i) => p.kind !== 'performance' ? null : <PremiumDisclosure key={p.id} className="multitrack-part-settings"
       draggable onDragStart={e => e.dataTransfer.setData('text/plain', p.id)} onDragOver={e => e.preventDefault()}
       onDrop={e => { e.preventDefault(); onReorder(e.dataTransfer.getData('text/plain'), p.id) }}>
       <summary>
@@ -32,7 +33,7 @@ export default function MultitrackProjectPanel({ session, onUpdate, onPanel, onR
         {p.missingTakeId && <p role="status">This recording is missing from the Take Vault. Tap its box to choose a replacement or record again.</p>}
         {!p.take && <button onClick={() => onRecord(p.id, time)}>Record here</button>}
       </div>
-      <details className="multitrack-advanced"><summary>Advanced composition</summary>
+      <PremiumDisclosure className="multitrack-advanced"><summary>Advanced composition</summary>
         <button aria-pressed={!!p.overlay} disabled={p.overlay ? session.panels.filter(p => p.kind === 'performance' && !p.overlay).length >= 12 : session.panels.filter(p => p.kind === 'performance' && p.overlay).length >= 4} onClick={() => onPanel(p.id, { overlay: p.overlay ? undefined : { xPercent: 64, yPercent: 64, widthPercent: 32, heightPercent: 28 } })}>{p.overlay ? 'Move into main layout' : 'Make an extra box'}</button>
       {p.overlay && <>
         <div className="multitrack-studio-actions">{['Top left', 'Top right', 'Bottom left', 'Bottom right'].map((label, n) => <button key={label} onClick={() => onPanel(p.id, { overlay: { ...p.overlay!, xPercent: n % 2 ? Math.max(0, 98 - p.overlay!.widthPercent) : Math.min(2, 100 - p.overlay!.widthPercent), yPercent: n >= 2 ? Math.max(0, 98 - p.overlay!.heightPercent) : Math.min(2, 100 - p.overlay!.heightPercent) } })}>{label}</button>)}</div>
@@ -57,7 +58,7 @@ export default function MultitrackProjectPanel({ session, onUpdate, onPanel, onR
       <label className="multitrack-check"><input type="checkbox" checked={p.sectionAudio === true} onChange={e => onPanel(p.id, { sectionAudio: e.target.checked })} /> Play audio only while this box is visible</label>
       <button onClick={() => onPanel(p.id, { sectionStartSec: undefined, sectionEndSec: undefined })}>Show for whole song</button>
       {p.overlay && <button onClick={() => onUpdate({ panels: session.panels.filter(other => other.id !== p.id) })}>Delete extra box</button>}
-      </details>
-    </details>)}
+      </PremiumDisclosure>
+    </PremiumDisclosure>)}
   </div>
 }

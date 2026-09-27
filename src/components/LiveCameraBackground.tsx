@@ -1,3 +1,4 @@
+import { PremiumActivity } from './ui/PremiumRecordingFeedback'
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
 import { createCameraDoubleTapGesture } from '../utils/cameraDoubleTap'
 import AudioModeHeroMic from './audioPractice/AudioModeHeroMic'
@@ -761,7 +762,7 @@ function LiveCameraBackground({
               } ${nativeFrameFresh ? 'camera-preview-priming-veil--fading' : ''}`}
               aria-hidden
             >
-              <div className="camera-preview-resume-spinner" />
+              <PremiumActivity className="premium-camera-activity" />
             </div>
           )}
         </>
@@ -783,7 +784,7 @@ function LiveCameraBackground({
           />
           {showSlowIndicator && (
             <div className="camera-preview-placeholder__indicator" aria-hidden>
-              <div className="camera-preview-resume-spinner" />
+              <PremiumActivity className="premium-camera-activity" />
             </div>
           )}
         </div>

@@ -165,7 +165,7 @@ function CompactTakeCaption({
         tabIndex={0}
         className={captionClassName}
         data-tutorial={dataTutorial}
-        aria-label={`Drag ${label} directly to the other card, or tap to open Expand View. Long press the card to reposition it.`}
+        aria-label={`Drag ${label} directly to the other card, or tap for full-screen playback. Long press the card to reposition it.`}
         onKeyDown={handleKeyDown}
         {...dragSourceProps}
       >
@@ -184,7 +184,7 @@ function CompactTakeCaption({
       className={captionClassName}
       data-tutorial={dataTutorial}
       onClick={onOpen}
-      aria-label={`Open Expand View with ${label}`}
+      aria-label={`Open full-screen playback of ${label}`}
     >
       {content}
     </Pressable>

@@ -1,5 +1,8 @@
+import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import { loadPracticePassage, savePracticePassage } from '../utils/practicePassages'
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
@@ -296,10 +299,17 @@ export default function ReviewModeOverlay({
     initialLoopEndSeconds,
   )
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
+  const [savedToastId, setSavedToastId] = useState(0)
   const [trimMode, setTrimMode] = useState(false)
   const [trimRange, setTrimRange] = useState({ start: 0, end: 0 })
   const [trimApplying, setTrimApplying] = useState(false)
   const [mediaRevision, setMediaRevision] = useState(0)
+
+  useEffect(() => {
+    if (!savedToastId) return
+    const timeout = window.setTimeout(() => setSavedToastId(0), 3200)
+    return () => window.clearTimeout(timeout)
+  }, [savedToastId])
 
   const pointerStart = useRef({ x: 0, y: 0 })
   const isTrackingPointer = useRef(false)
@@ -772,7 +782,10 @@ export default function ReviewModeOverlay({
     setActionMenuOpen(false)
     triggerLightHaptic()
     void shareTakeToSystem(activeTake).catch(() => ({ ok: false, reason: 'share_failed' } as const)).then((result) => {
-      if (result.ok) return
+      if (result.ok) {
+        if (result.savedToPhotos) setSavedToastId((current) => current + 1)
+        return
+      }
       void showAlert({
         title: 'Unable to Share',
         message:
@@ -789,6 +802,10 @@ export default function ReviewModeOverlay({
     setActionMenuOpen(false)
     triggerLightHaptic()
     void shareTakeVideo(activeTake).then((result) => {
+      if (result.ok && Capacitor.getPlatform() === 'ios') {
+        setSavedToastId((current) => current + 1)
+        return
+      }
       const message = describeSaveTakeResult(result)
       if (!message) return
       void showAlert({
@@ -1501,12 +1518,12 @@ export default function ReviewModeOverlay({
 
                 <AnimatePresence>
                   {actionMenuOpen && (
-                    <motion.div
+                    <PremiumMotionDiv
                       className="review-action-menu absolute right-0 top-12 z-50 w-56 overflow-hidden rounded-2xl border border-[rgba(23,26,34,0.08)] bg-white py-1.5 text-[#171a22] shadow-[0_14px_36px_rgba(23,26,34,0.12)]"
                       initial={{ opacity: 0, y: -6, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={iosEaseOut}
+                      transition={premiumMotion(iosEaseOut, 'popover')}
                     >
                       <button type="button" className="review-menu-item" onClick={handleRenameActiveTake} disabled={!activeTake || !onUpdateTake}>
                         <Pencil className="h-4 w-4" />
@@ -1528,7 +1545,7 @@ export default function ReviewModeOverlay({
                         <Trash2 className="h-4 w-4" />
                         Delete
                       </button>
-                    </motion.div>
+                    </PremiumMotionDiv>
                   )}
                 </AnimatePresence>
               </div>
@@ -1544,6 +1561,25 @@ export default function ReviewModeOverlay({
                 </p>
               </div>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isOpen && savedToastId > 0 && (
+          <motion.div
+            key={savedToastId}
+            role="status"
+            aria-live="polite"
+            className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+5.5rem)] z-50 flex justify-center px-4"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={iosEaseOut}
+          >
+            <span className="rounded-full bg-[#171a22] px-4 py-2 text-sm font-medium text-white shadow-lg">
+              Take saved to Camera Roll
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1699,6 +1735,7 @@ export default function ReviewModeOverlay({
                     onPlayPause={togglePlayPause}
                     mediaFilePath={activeTimelineFilePath}
                     mediaUrl={activeTimelineUrl}
+                    mediaRef={activeAudioPlaybackItem ? audioPlayback.playerRef : activePitchMediaRef}
                     trimAvailable={trimAvailable}
                     trimActive={trimMode}
                     trimStart={safeTrimStart}

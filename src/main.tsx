@@ -23,12 +23,13 @@ import { initializeQuickTunerLaunch } from './utils/quickTunerLaunch'
 import { initCrashReporting } from './utils/crashReporting'
 import { initializeRoutineFileOpen } from './practiceTimeline/storage/routineFileOpen'
 import { initializeMultitrackFileOpen } from './multitrack/state/multitrackFileOpen'
+import { initializePdfFileOpen } from './utils/incomingPdfOpen'
 import { installFakeMediaDevices } from './utils/fakeMediaDevices'
 
 document.documentElement.dataset.refinement = 'depth-electric'
 document.documentElement.dataset.arcadeStyle = 'arcade-pop'
 document.documentElement.id = 'lens-design-system'
-document.documentElement.classList.add('lens-system')
+document.documentElement.classList.add('lens-system', 'premium-app')
 document.documentElement.dataset.lensFinish = 'glass'
 
 async function bootstrap() {
@@ -48,6 +49,7 @@ async function bootstrap() {
   // store once ready, and shouldn't hold up first paint.
   void initializeRoutineFileOpen()
   void initializeMultitrackFileOpen().catch(error => console.warn('Project file opening unavailable', error))
+  void initializePdfFileOpen()
 
   createRoot(rootEl).render(
     <StrictMode>
@@ -90,3 +92,9 @@ import './styles/multitrack-quiet.css'
 // Approved shared presentation; capture and playback remain in their existing components.
 import './styles/open-lens-system.css'
 import './styles/pocket-arcade.css'
+
+// Premium finish preserves today's Home layout and the separate game theme.
+import './styles/premium-app.css'
+import './styles/premium-interactions.css'
+
+import './styles/premium-routines.css'

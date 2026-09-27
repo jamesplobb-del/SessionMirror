@@ -1,4 +1,6 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { PremiumMotionDiv, PremiumMotionButton } from './PremiumMotionSurface'
+import { premiumMotion } from '../../utils/premiumMotion'
+import { AnimatePresence } from 'framer-motion'
 import { useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ActionSheetTone } from '../../context/ActionSheetContext'
@@ -65,7 +67,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
     <AnimatePresence>
       {request && (
         <>
-          <motion.button
+          <PremiumMotionButton
             key="action-sheet-backdrop"
             type="button"
             className="action-sheet-backdrop fixed inset-0 z-[620] cursor-default touch-none bg-black/45"
@@ -73,12 +75,12 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transitionEnd: motionExitHide }}
-            transition={iosFade}
+            transition={premiumMotion(iosFade, 'backdrop')}
             style={{ ...motionGpuLayer, opacity: backdropOpacity }}
             onClick={onCancel}
           />
 
-          <motion.div
+          <PremiumMotionDiv
             key="action-sheet-host"
             role="dialog"
             aria-modal="true"
@@ -91,7 +93,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 28, transitionEnd: motionExitHide }}
-            transition={iosSheetPremium}
+            transition={premiumMotion(iosSheetPremium, 'panel')}
             {...sheetDragProps}
           >
             <div
@@ -154,7 +156,7 @@ export default function ActionSheet({ request, onCancel, onConfirm }: ActionShee
                 Cancel
               </button>
             )}
-          </motion.div>
+          </PremiumMotionDiv>
         </>
       )}
     </AnimatePresence>,

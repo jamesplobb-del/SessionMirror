@@ -121,7 +121,8 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'french-horn', name: 'French Horn (F)', shortName: 'Horn', family: 'Brass',
     clef: 'treble', transposition: 'f', homeKey: 'F', homeRootMidi: N.F4,
     range: reads(N.F3, N.C6),
-    fullRange: reads(N.F2, N.C7),
+    // Pedal F2 and written C7 are outside the published horn range.
+    fullRange: reads(N.F3, N.C6),
   },
   {
     id: 'trombone', name: 'Trombone', shortName: 'Trombone', family: 'Brass',
@@ -161,7 +162,8 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'piccolo', name: 'Piccolo', shortName: 'Piccolo', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb4,
     range: reads(N.D4, N.G6),
-    fullRange: reads(N.D4, N.D7),
+    // Written D7 sounds D8, past the piccolo.
+    fullRange: reads(N.D4, N.C7),
   },
   {
     id: 'oboe', name: 'Oboe', shortName: 'Oboe', family: 'Woodwind',
@@ -209,14 +211,16 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
     id: 'bassoon', name: 'Bassoon', shortName: 'Bassoon', family: 'Woodwind',
     clef: 'bass', transposition: 'concert', homeKey: 'Bb', homeRootMidi: N.Bb2,
     range: reads(N.Bb1, N.D5),
-    fullRange: reads(N.Bb1, N.C6),
+    // Published bassoon tops out around F5, not C6.
+    fullRange: reads(N.Bb1, N.F5),
   },
   {
     // Not a band instrument, so it keeps its own home octave of C.
     id: 'recorder', name: 'Soprano Recorder', shortName: 'Recorder', family: 'Woodwind',
     clef: 'treble', transposition: 'concert', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.C4, N.C6),
-    fullRange: reads(N.C4, N.C7),
+    // The soprano's usable top in this notation is C6.
+    fullRange: reads(N.C4, N.C6),
   },
 
   /* ── Strings ── */

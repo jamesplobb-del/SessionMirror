@@ -2,6 +2,7 @@ import { confirmFeatureAction, reportFeatureAction } from '../utils/featureGuida
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AudioLines,
+  ChevronLeft,
   Columns2,
   FileMusic,
   Grid2X2,
@@ -11,7 +12,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react'
-import { Fragment, useEffect, useLayoutEffect, useMemo, useState, type RefObject } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject, type TouchEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useTutorialAction } from '../context/TutorialContext'
 import MetronomeIcon from './icons/MetronomeIcon'
@@ -25,6 +26,7 @@ import Pressable from './ui/Pressable'
 
 interface SettingsBranchWheelProps {
   open: boolean
+  sideDrawer?: boolean
   onClose: () => void
   onExitComplete?: () => void
   anchorRef: RefObject<HTMLElement | null>
@@ -137,6 +139,7 @@ function DeskChip({
 
 export default function SettingsBranchWheel({
   open,
+  sideDrawer = false,
   onClose,
   onExitComplete,
   anchorRef,
@@ -185,6 +188,7 @@ export default function SettingsBranchWheel({
   const { showConfirm } = useActionSheet()
   const [savingDesk, setSavingDesk] = useState(false)
   const [deskNameDraft, setDeskNameDraft] = useState('')
+  const drawerTouchStart = useRef<number | null>(null)
   const [anchor, setAnchor] = useState<{
     rect: DOMRect
     viewportLeft: number
@@ -457,7 +461,7 @@ export default function SettingsBranchWheel({
       {open && anchor && trayGeometry && (
         <motion.div
           key="workspace-tray"
-          className="settings-branch-layer"
+          className={`settings-branch-layer${sideDrawer ? ' settings-branch-layer--side' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transitionEnd: motionExitHide }}
@@ -473,9 +477,13 @@ export default function SettingsBranchWheel({
             onClick={onClose}
           />
 
-          <div
-            className="settings-branch-tray-anchor pointer-events-none"
-            style={{
+          <motion.div
+            className={`settings-branch-tray-anchor pointer-events-none${sideDrawer ? ' settings-branch-tray-anchor--side' : ''}`}
+            initial={sideDrawer ? { x: '-100%' } : false}
+            animate={sideDrawer ? { x: 0 } : undefined}
+            exit={sideDrawer ? { x: '-100%' } : undefined}
+            transition={BRANCH_MOTION}
+            style={sideDrawer ? undefined : {
               left: trayGeometry.centerX,
               top: savingDesk ? `calc(${anchor.viewportTop}px + max(20px, env(safe-area-inset-top)))` : trayGeometry.top,
               width: trayGeometry.width,
@@ -483,13 +491,19 @@ export default function SettingsBranchWheel({
             }}
           >
             <div
-              className={`settings-branch-tray settings-branch-tray--${layoutMode} pointer-events-auto relative`}
+              className={`settings-branch-tray settings-branch-tray--${layoutMode}${sideDrawer ? ' settings-branch-tray--side' : ''} pointer-events-auto relative`}
               role="menu"
               aria-label="Workspace"
-              style={savingDesk ? { maxHeight: Math.max(100, anchor.viewportHeight - 100), overflowY: 'auto' } : undefined}
+              style={!sideDrawer && savingDesk ? { maxHeight: Math.max(100, anchor.viewportHeight - 100), overflowY: 'auto' } : undefined}
             >
-              <div className="settings-branch-tray__header">
+              <div className="settings-branch-tray__header"
+                onTouchStart={sideDrawer ? (event: TouchEvent<HTMLDivElement>) => { drawerTouchStart.current = event.touches[0]?.clientX ?? null } : undefined}
+                onTouchEnd={sideDrawer ? (event: TouchEvent<HTMLDivElement>) => {
+                  if (drawerTouchStart.current !== null && drawerTouchStart.current - (event.changedTouches[0]?.clientX ?? drawerTouchStart.current) > 48) onClose()
+                  drawerTouchStart.current = null
+                } : undefined}>
                 <span className="settings-branch-tray__title">Workspace</span>
+                {sideDrawer && <button type="button" className="settings-branch-tray__close" onClick={onClose} aria-label="Close workspace"><ChevronLeft aria-hidden /></button>}
               </div>
 
               {desksVisible && !savingDesk && (
@@ -651,13 +665,13 @@ export default function SettingsBranchWheel({
                 </button>
               )}
 
-              {!savingDesk && <span
+              {!sideDrawer && !savingDesk && <span
                 className="settings-branch-tray__arrow"
                 style={{ left: trayGeometry.arrowX }}
                 aria-hidden="true"
               />}
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>,

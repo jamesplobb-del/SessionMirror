@@ -1,0 +1,233 @@
+[
+  {
+    "id": "REC-01",
+    "feature": "Recording",
+    "control": "Practice Home: Record your first take / Record & compare",
+    "states": [
+      "no takes",
+      "one or more takes",
+      "recorder open"
+    ],
+    "expected": "The launch label reflects whether takes exist and opens quick practice for audio or video recording.",
+    "source": "src/components/PracticeHub.tsx:494-495; src/App.tsx:6309",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-03. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "REC-02",
+    "feature": "Recording",
+    "control": "Audio / Video mode controls",
+    "states": [
+      "audio selected",
+      "video selected",
+      "recording in progress"
+    ],
+    "expected": "The selected mode is indicated; switching is disabled during recording.",
+    "source": "src/components/RecordingHeader.tsx:13-16; src/components/RecordingModeCarousel.tsx:178-210",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-03. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "REC-03",
+    "feature": "Recording",
+    "control": "Center Record control",
+    "states": [
+      "video preview not ready",
+      "ready",
+      "recording",
+      "saving"
+    ],
+    "expected": "A ready idle control starts recording; tapping during recording stops it; video start waits for preview readiness, and saving shows progress.",
+    "source": "src/components/RecordingModeCarousel.tsx:70-108,181-210; src/components/ControlDeck.tsx:320-350",
+    "status": "failed",
+    "evidence": "sessions/2026-09-26.json: UI-03; regressions/recording-web-writer.mjs. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "REC-04",
+    "feature": "Recording",
+    "control": "Audio first-take Record button and live waveform",
+    "states": [
+      "empty audio session",
+      "recording",
+      "saved current take"
+    ],
+    "expected": "The empty session offers Record; live input animates during capture, then a playable Current take replaces the empty state.",
+    "source": "src/components/audioPractice/AudioModeHome.tsx:792-806,825-853; src/hooks/useLiveRecordingWaveform.ts",
+    "status": "failed",
+    "evidence": "sessions/2026-09-26.json: UI-03; regressions/recording-web-writer.mjs. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "REV-01",
+    "feature": "Guided review",
+    "control": "Listen, then reflect / What stood out?",
+    "states": [
+      "unheard take",
+      "heard take",
+      "focus selected"
+    ],
+    "expected": "Review opens an optional note and next-focus dialog; the entry copy changes after listening or choosing a focus.",
+    "source": "src/components/GuidedTakeReview.tsx:65-94,183-218",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "REV-02",
+    "feature": "Guided review",
+    "control": "Note, focus, Compare takes, Record again",
+    "states": [
+      "note edited",
+      "focus chosen",
+      "benchmark available",
+      "record disabled"
+    ],
+    "expected": "Notes persist on blur/close, focus can be chosen, Compare appears when available, and Record again starts another take when enabled.",
+    "source": "src/components/GuidedTakeReview.tsx:93-118,205-232; src/App.tsx:7192-7205",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "CMP-01",
+    "feature": "Comparison",
+    "control": "Best Take and Current Take cards",
+    "states": [
+      "no best take",
+      "best and current present",
+      "card playing",
+      "card expanded"
+    ],
+    "expected": "Cards expose playback and full-screen opening; a current take can be pinned as Best for comparison.",
+    "source": "src/components/PipCompareRow.tsx:135-188,704,1055-1073,1189-1245",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "CMP-02",
+    "feature": "Comparison",
+    "control": "Audio Both takes / Focus take",
+    "states": [
+      "single focused take",
+      "both takes visible"
+    ],
+    "expected": "The review control toggles the audio comparison view between the current take and both takes.",
+    "source": "src/components/GuidedTakeReview.tsx:190-192; src/App.tsx:7009-7020",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "VAULT-01",
+    "feature": "Take Vault",
+    "control": "Take library / Take Vault",
+    "states": [
+      "empty",
+      "populated",
+      "different session selected"
+    ],
+    "expected": "The vault shows the current session's take count; an empty session prompts recording; project folders can be selected.",
+    "source": "src/components/PracticeHub.tsx:506; src/components/TakeVaultDrawer.tsx:354-371,466-501",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-28 verifies empty state, search open, dismissal; populated states remain blocked."
+  },
+  {
+    "id": "VAULT-02",
+    "feature": "Take Vault",
+    "control": "Search and All / Video / Audio / Best filters",
+    "states": [
+      "search closed",
+      "matching query",
+      "no match",
+      "each media filter"
+    ],
+    "expected": "Search matches name, notes, intention, and focus; media filters show the corresponding takes and empty-state copy.",
+    "source": "src/components/TakeVaultDrawer.tsx:170-190,375-449,510-526; src/components/VaultMediaSegment.tsx:48-55",
+    "status": "untested"
+  },
+  {
+    "id": "VAULT-03",
+    "feature": "Take Vault",
+    "control": "Newest / Top rated sort",
+    "states": [
+      "newest",
+      "top rated"
+    ],
+    "expected": "Tapping the sort trigger toggles between newest and top-rated take order.",
+    "source": "src/components/GallerySortStrip.tsx:16-30; src/components/TakeVaultDrawer.tsx:515-532",
+    "status": "untested"
+  },
+  {
+    "id": "VAULT-04",
+    "feature": "Take Vault",
+    "control": "Take actions: Play, Make Best, Load Take, Save Video, Delete",
+    "states": [
+      "audio take",
+      "video take",
+      "best take",
+      "current take"
+    ],
+    "expected": "A take can be played, assigned to Best or Current, and deleted; video takes expose Save Video.",
+    "source": "src/components/TakeCard.tsx:402-419,481-554; src/components/TakeVaultDrawer.tsx:592-642",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "VAULT-05",
+    "feature": "Take Vault",
+    "control": "Select, bulk save, and delete",
+    "states": [
+      "no selection",
+      "one selected",
+      "all filtered selected",
+      "delete confirmation"
+    ],
+    "expected": "Selection mode supports selecting visible filtered takes, bulk saving, and confirmed deletion; deleting all also requires confirmation.",
+    "source": "src/components/TakeVaultDrawer.tsx:225-322,401-436,657-692",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "HF-01",
+    "feature": "Handsfree",
+    "control": "Long press Record / settings toggle",
+    "states": [
+      "off",
+      "listening",
+      "already recording"
+    ],
+    "expected": "A long press toggles handsfree; enabling while manually recording is blocked; the settings branch offers a toggle.",
+    "source": "src/components/RecordingModeCarousel.tsx:81-104,212-225; src/components/ControlDeck.tsx:386-400",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-16. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "HF-02",
+    "feature": "Handsfree",
+    "control": "Automatic sound start / silence stop / replay",
+    "states": [
+      "preparing",
+      "listening",
+      "recording",
+      "countdown",
+      "saving",
+      "playback",
+      "listening again"
+    ],
+    "expected": "After a quiet baseline, playing starts a take; a quiet gap stops it, automatic playback follows, then the next take can begin.",
+    "source": "src/components/HandsFreeStage.tsx:49-56,176-198; src/hooks/useAutoSoundRecording.ts:319-424,962-986; src/utils/handsFreePhase.ts",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  },
+  {
+    "id": "HF-03",
+    "feature": "Handsfree",
+    "control": "Finish & listen / Next take / Quiet gap / Start level / Turn off",
+    "states": [
+      "recording or countdown",
+      "playback",
+      "settings open",
+      "off"
+    ],
+    "expected": "Manual controls can end a take or advance after playback; settings adjust quiet gap and start threshold; Close disables handsfree.",
+    "source": "src/components/HandsFreeStage.tsx:146-216; src/components/HandsFreeSettingsRows.tsx:48-100",
+    "status": "blocked",
+    "evidence": "sessions/2026-09-26.json: GAP-01/UI-03. Actual browser capture failed; dependent populated/captured-media workflow not certified."
+  }
+]

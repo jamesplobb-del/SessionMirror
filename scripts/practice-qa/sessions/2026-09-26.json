@@ -1,0 +1,315 @@
+{
+  "date": "2026-09-26",
+  "environment": "Actual working-tree app via dedicated Vite QA config at http://127.0.0.1:5217; desktop in-app browser; synthetic media; test-only library; lead serial UI operator",
+  "sourceFingerprintReport": "../results/2026-09-26T23-01-05-830Z/summary.json",
+  "evidenceKind": "Observed browser DOM/accessibility snapshots, HTML media properties, and console logs from the parent task. Values below are observations, not scripted success state.",
+  "limitation": "Passed cases certify only listed states/outcomes. They do not pass every control in the corresponding feature. Untested and hardware-only paths remain listed separately.",
+  "cases": [
+    {
+      "id": "MEDIA-01",
+      "status": "passed",
+      "scope": "test apparatus only",
+      "steps": "Generate 3-second sample on media.html, reload, Reopen saved sample, Validate playback and audio",
+      "expected": "Persisted generated video and non-silent audio decode and play",
+      "observed": "435140 bytes, video/webm;codecs=vp8,opus, 640x360, readyState4; audioDuration2.939977s, channels2, RMS0.0565474, playbackTime0.609431s, decodedVideoFrames22",
+      "remaining": "Not proof of actual app recording"
+    },
+    {
+      "id": "UI-01",
+      "status": "passed",
+      "scope": "onboarding forward path",
+      "steps": "Get started \u2192 instrument picker \u2192 search trump \u2192 Trumpet \u2192 Start practicing",
+      "expected": "Filtered Trumpet option and Home with selected instrument",
+      "observed": "Picker showed only Trumpet after search; Home showed Trumpet and side-by-side Record/Routine controls",
+      "remaining": "Previous step, empty search, every instrument"
+    },
+    {
+      "id": "UI-02",
+      "status": "passed",
+      "scope": "onboarding persistence",
+      "steps": "Reload actual app after first-use completion",
+      "expected": "No welcome tour; selected instrument preserved",
+      "observed": "Home reopened with Trumpet; intro absent",
+      "remaining": "Fresh-profile Skip branch"
+    },
+    {
+      "id": "UI-03",
+      "status": "failed",
+      "scope": "browser audio/video recording",
+      "steps": "Home Record \u2192 tap video Record; switch Audio \u2192 tap prominent Record",
+      "expected": "Capture starts and timer/stop control appears",
+      "observed": "Neither starts. Logs reach userPressedRecord and prepareStream. Preview live at 1920x1080, readyState4. Actual writer returns null on web and start callback silently returns false",
+      "evidence": "../recording-findings.md; ../regressions/recording-web-writer.mjs",
+      "remaining": "Native iOS recording not tested"
+    },
+    {
+      "id": "UI-04",
+      "status": "failed",
+      "scope": "suggested routine entry",
+      "steps": "Fresh Home \u2192 Try a suggested routine",
+      "expected": "Instrument suggestions immediately",
+      "observed": "Your routines saved-list screen instead; New routine is required before Suggested for trumpet",
+      "evidence": "../regressions/suggested-routine-entry.mjs",
+      "remaining": "No product fix applied"
+    },
+    {
+      "id": "UI-05",
+      "status": "passed",
+      "scope": "routine create/save/reopen",
+      "steps": "New routine \u2192 Fundamentals \u2192 rename QA Fundamentals \u2192 Save for later \u2192 reload",
+      "expected": "Named four-step routine persists",
+      "observed": "Home Start your routine QA Fundamentals \u00b7 0 of 4 exercises completed; preserved after reload",
+      "remaining": "Custom/reorder/import/share plans"
+    },
+    {
+      "id": "UI-06",
+      "status": "passed",
+      "scope": "routine tool entry and pause",
+      "steps": "Start QA Fundamentals \u2192 Pause routine \u2192 Resume routine",
+      "expected": "Tuner and configured drone; pause stops routine activity; resume available",
+      "observed": "A4 440.0Hz +0.0cents In tune; drone B-flat3 active. Pause showed Paused and drone off; Resume restored active controls",
+      "remaining": "Acoustic drone output and hardware routes"
+    },
+    {
+      "id": "UI-07",
+      "status": "passed",
+      "scope": "routine advancement",
+      "steps": "Done & next through steps 1\u20133",
+      "expected": "Next title and saved tool configuration load",
+      "observed": "Long tones step2 with60BPM widget, Lip slurs step3 on Metronome68BPM, recording step4 audio/hands-free",
+      "remaining": "Actual step4 performance blocked by UI-03"
+    },
+    {
+      "id": "UI-08",
+      "status": "passed",
+      "scope": "metronome controls",
+      "steps": "Stop \u2192 Increase tempo \u2192 Start \u2192 Time signature3/4 \u2192 Stop",
+      "expected": "Transport state changes, tempo increments, beat count updates",
+      "observed": "Start/Stop button state changed;68\u219269BPM;3 beat controls after3/4 selection",
+      "remaining": "Audible pulse precision, all subdivisions and programs"
+    },
+    {
+      "id": "UI-09",
+      "status": "passed",
+      "scope": "routine checklist completion",
+      "steps": "Finish routine at step4; reload later",
+      "expected": "4/4 completed on Home",
+      "observed": "Routine complete QA Fundamentals \u00b7 4 of 4 exercises completed; survived reload",
+      "remaining": "Checklist completion is not proof of recording or full-duration practice"
+    },
+    {
+      "id": "UI-10",
+      "status": "passed",
+      "scope": "Staff Jumper missed-input review",
+      "steps": "Games \u2192 Staff Jumper \u2192 Play; allow misses; Pause \u2192 Finish run",
+      "expected": "Run, pause controls, honest score/miss summary",
+      "observed": "Run Complete;0points,0%accuracy,28misses,34seconds. One test-surface tap produced a Detected note but no correct-score claim",
+      "remaining": "Correct-note rhythm scoring and all configurations"
+    },
+    {
+      "id": "UI-11",
+      "status": "passed",
+      "scope": "Staff Jumper retry/exit",
+      "steps": "Play Again \u2192 Pause \u2192 Exit",
+      "expected": "New run resets score and can exit to lobby",
+      "observed": "New count-in, score0 accuracy100%; Exit returned lobby",
+      "remaining": "Resume scoring and persistence of best scores"
+    },
+    {
+      "id": "UI-12",
+      "status": "passed",
+      "scope": "Balance test input and exit",
+      "steps": "Balance \u2192 Quick Play \u2192 Play; hold game surface; release; Pause \u2192 Quit run",
+      "expected": "Synthetic pitch produces progress; pause/quit work",
+      "observed": "Advanced to Note2of3;1.9s balanced and19% complete observed; pause and quit returned setup",
+      "remaining": "Hold command suffered browser-control latency; exact timing and full3-note completion unverified"
+    },
+    {
+      "id": "UI-13",
+      "status": "passed",
+      "scope": "Learn lesson navigation",
+      "steps": "Learn \u2192 first8notes \u2192 Play \u2192 Next \u2192 Previous \u2192 Back to setup",
+      "expected": "Note and fingering change together; navigation works",
+      "observed": "C4/open fingering \u2192 D4/valves1+3;2/8; back restored setup",
+      "remaining": "Pitch-triggered progression and other instruments"
+    },
+    {
+      "id": "UI-14",
+      "status": "passed",
+      "scope": "multitrack project metadata",
+      "steps": "Open Multitrack \u2192 Projects \u2192 rename QA Practice Parts \u2192 Duplicate",
+      "expected": "Independent copied project, original retained",
+      "observed": "QA Practice Parts copy active/Saved; original QA Practice Parts listed as other project",
+      "remaining": "Duplicate with recorded native video"
+    },
+    {
+      "id": "UI-15",
+      "status": "passed",
+      "scope": "multitrack layout cancel/apply",
+      "steps": "Layout4boxes \u2192 Cancel; reopen \u21924boxes \u2192 Apply",
+      "expected": "Cancel retains2; Apply creates4",
+      "observed": "2 boxes after cancel,4 boxes after apply",
+      "remaining": "Other layouts, drag reorder, extra-box positioning"
+    },
+    {
+      "id": "UI-16",
+      "status": "passed",
+      "scope": "workspace toggle and empty editor/export",
+      "steps": "Hands-Free off; open Multitrack; Editor Timeline/Mixer; empty Export",
+      "expected": "Toggle off feedback; empty states; invalid export disabled",
+      "observed": "Hands-free off toast; Record a part to start mixing; Render/Share/Save to Vault disabled for empty project",
+      "remaining": "Other widgets and completed native export"
+    },
+    {
+      "id": "UI-17",
+      "status": "passed",
+      "scope": "multitrack actual import and transport",
+      "steps": "Projects \u2192 Import shared project \u2192 generated btmulti \u2192 OK \u2192 Play all",
+      "expected": "Separate project, both4-second parts decode and progress",
+      "observed": "QA pulses two part Saved,2parts,0:00/0:04. Both HTML audio elements reached currentTime4 readyState4 without errors after playback",
+      "remaining": "An intermediate clock-text wait was inconclusive; exact mix synchronization/audio balance not measured"
+    },
+    {
+      "id": "UI-18",
+      "status": "passed",
+      "scope": "multitrack mixer persistence",
+      "steps": "Editor/Mixer \u2192 mute440Hz \u2192660Hz volumeArrowLeft \u2192 Done \u2192 reload \u2192 reopen Mixer",
+      "expected": "Mute and59% level persist with imported assets",
+      "observed": "Unmute440Hz pressed;660Hz slider0.59 status59%; project and both parts restored after reload",
+      "remaining": "Measured audible gain/mute behavior"
+    },
+    {
+      "id": "UI-19",
+      "status": "passed",
+      "scope": "multitrack seek and reopened playback",
+      "steps": "Timeline To end; after reload unmute first part \u2192 Done \u2192 Play take",
+      "expected": "End at4seconds and persisted media remains playable",
+      "observed": "Timeline0:04/0:08; first audio currentTime0.510839 pausedfalse readyState4; second paused at0",
+      "remaining": "Drag trimming, alignment, render export"
+    },
+    {
+      "id": "UI-20",
+      "status": "passed",
+      "scope": "settings persistence",
+      "steps": "Dark Mode on; Feature tips off; Stop After SilenceArrowRight; close/reload/reopen",
+      "expected": "Theme and values persist",
+      "observed": "app-dark-mode class; DarkModetrue,Featuretipsfalse,Silence2.5 afterreload",
+      "remaining": "Actual stopping behavior and physical haptic/mic routing"
+    },
+    {
+      "id": "UI-21",
+      "status": "passed",
+      "scope": "feature help",
+      "steps": "Settings \u2192 Multitrack \u2192 Close help",
+      "expected": "Relevant instructions and dismissal",
+      "observed": "Multitrack help explains Workspace, parts, layout, tools, editor, headphones; closed correctly",
+      "remaining": "Other help topics"
+    },
+    {
+      "id": "UI-22",
+      "status": "passed",
+      "scope": "replayed onboarding",
+      "steps": "Settings \u2192 Replay Welcome Tour \u2192 Skip intro",
+      "expected": "Welcome dialog appears and can be dismissed",
+      "observed": "Welcome to BestTake/Get started/Skip intro; skip returned to tools. Saved routine/instrument remained visible when Home opened",
+      "remaining": "Navigation during exit transition was not certified"
+    },
+    {
+      "id": "UI-23",
+      "status": "passed",
+      "scope": "music import and search",
+      "steps": "Music \u2192 Import testPDF \u2192 search nonexistent title \u2192 clear using keyboard",
+      "expected": "Library item appears; empty search result recovers",
+      "observed": "1score music layout check;0scores/no matches;clear restored1score",
+      "remaining": "Multiple files, malformed PDFs, photos, size limits"
+    },
+    {
+      "id": "UI-24",
+      "status": "passed",
+      "scope": "score reading",
+      "steps": "Open score \u2192 Page \u2192 One page \u2192 Next \u2192 Previous \u2192 Library",
+      "expected": "PDF loads and page controls navigate",
+      "observed": "document music-layout-check.pdf,2pages;1\u20132/2 changed to2/2;Library returned On stand item",
+      "remaining": "Ink/annotations, page-turn gestures, recording with score"
+    },
+    {
+      "id": "UI-25",
+      "status": "passed",
+      "scope": "music folder creation",
+      "steps": "New folder \u2192 QA Scores \u2192 Create \u2192 All music",
+      "expected": "Named empty folder created",
+      "observed": "QA Scores heading,0scores;folder listed in All music",
+      "remaining": "Moving/reordering score by drag, folder rename/removal"
+    },
+    {
+      "id": "UI-26",
+      "status": "passed",
+      "scope": "music delete cancellation",
+      "steps": "Select \u2192 Select all music \u2192 Delete all \u2192 Cancel \u2192 Done",
+      "expected": "Confirmation appears and cancellation preserves score",
+      "observed": "Delete music alert named the score and explained effects;Cancel restored list without deletion",
+      "remaining": "Final destructive deletion not executed"
+    },
+    {
+      "id": "UI-27",
+      "status": "failed",
+      "scope": "browser Music PDF persistence",
+      "steps": "Import music-layout-check.pdf; wait for score in library; reload. Repeat import/reload without selection or deletion.",
+      "expected": "Imported score remains listed and opens after reload.",
+      "observed": "Music returned to Bring your music empty state after both reloads; QA Scores folder persisted. A second clean import/reload reproduced this without any delete interaction.",
+      "evidence": "../multitrack-findings.md; ../regressions/music-web-reload.mjs",
+      "remaining": "Native Filesystem persistence untested; browser-only finding."
+    },
+    {
+      "id": "UI-28",
+      "status": "passed",
+      "scope": "empty Take library and dismissal",
+      "steps": "Open Take library \u2192 Search takes \u2192 Close vault \u2192 Home",
+      "expected": "Empty library is honest, search opens, dismiss returns control to app.",
+      "observed": "Take Vault showed 0 takes for music layout check, Search takes searchbox and Takes/Practice/References tabs; No takes yet / Record a take to start comparing. Close and Home opened BestTake with saved instrument and completed routine.",
+      "remaining": "Populated take actions, filters, playback and comparison remain blocked by UI-03."
+    },
+    {
+      "id": "GAP-01",
+      "status": "blocked",
+      "scope": "real recording dependents",
+      "steps": "Recording gate UI-03",
+      "expected": "Record \u2192 save \u2192 compare \u2192 Vault \u2192 reopen; hands-free capture; record new multitrack part",
+      "observed": "Browser native-writer gate prevents real capture",
+      "remaining": "Needs approved web fallback change or supported native recording environment"
+    },
+    {
+      "id": "GAP-02",
+      "status": "blocked",
+      "scope": "native audio test host",
+      "steps": "node scripts/verify-drone-renderer.mjs",
+      "expected": "Native renderer assertions run",
+      "observed": "AVAudioMixerNode initialization abort: comp != nullptr, before assertions",
+      "remaining": "Run on a working Core Audio/device environment"
+    },
+    {
+      "id": "GAP-03",
+      "status": "untested",
+      "scope": "physical iPhone",
+      "steps": "Not run",
+      "expected": "Native capture/export, Bluetooth, interruptions, camera switching, latency, haptics",
+      "observed": "No physical device pass",
+      "remaining": "Dedicated device matrix"
+    },
+    {
+      "id": "GAP-04",
+      "status": "untested",
+      "scope": "remaining control census",
+      "steps": "Static scan and curated inventories only for untouched paths",
+      "expected": "Per-control semantic review plus live outcome evidence",
+      "observed": "1087 JSX interactive candidates discovered; this batch only exercised the explicit cases above",
+      "remaining": "No claim of exhaustive feature/state coverage"
+    }
+  ],
+  "counts": {
+    "passed": 26,
+    "failed": 3,
+    "blocked": 2,
+    "untested": 2
+  }
+}

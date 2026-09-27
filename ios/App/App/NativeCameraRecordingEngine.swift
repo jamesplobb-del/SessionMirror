@@ -445,6 +445,7 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         sessionQueue.async { [weak self] in
             defer { completion?() }
             guard let self = self else { return }
+            guard !AudioRouteConfigurator.isAppBackgrounded else { return }
 
             // Hands-free in Tools owns the audio-only capture session without a
             // tuner monitor, so `isTunerMonitorActive` alone left that path with
@@ -634,6 +635,13 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         profile: NativeCameraAudioSessionProfile,
         micInputPreference: AudioRouteConfigurator.MicInputPreference = .auto
     ) throws {
+        guard !AudioRouteConfigurator.isAppBackgrounded else {
+            throw NSError(
+                domain: "NativeCameraRecording",
+                code: 15,
+                userInfo: [NSLocalizedDescriptionKey: "Capture cannot start while BestTake is backgrounded"]
+            )
+        }
         activeAudioProfile = profile
         activeMicInputPreference = micInputPreference
         let session = AVAudioSession.sharedInstance()
@@ -777,6 +785,10 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
     }
 
     private func restoreAudioSessionAfterTest() {
+        if AudioRouteConfigurator.isAppBackgrounded {
+            AudioRouteConfigurator.suspendForAppBackground()
+            return
+        }
         do {
             try AudioRouteConfigurator.applyRecordingRoute(
                 enableHQ: AudioRouteConfigurator.shouldUseHighQualityRoute()
@@ -1007,6 +1019,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.begin")
                 self.session.stopRunning()
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.stopPreview stopRunning.end")
+            }
+            if AudioRouteConfigurator.isAppBackgrounded {
+                AudioRouteConfigurator.suspendForAppBackground()
             }
 
             // Hand the caller back here, not after the teardown below. Once
@@ -1816,6 +1831,9 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                 self.session.stopRunning()
                 AudioRouteConfigurator.debugCaptureEvent("NativeCameraRecordingEngine.didFinishRecording stopRunning.end")
             }
+            if AudioRouteConfigurator.isAppBackgrounded {
+                AudioRouteConfigurator.suspendForAppBackground()
+            }
 
             let completion = self.stopCompletion
             self.stopCompletion = nil
@@ -2531,14 +2549,17 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                         self.pendingTrimStartMs = 0
                         self.isAudioOnlyRecording = false
 
+                        // Release capture before trimming/exporting the take. Export can
+                        // outlive the app's remaining background execution time.
+                        if self.session.isRunning && !self.isPreviewActive && !self.isBridgePreviewActive {
+                            self.session.stopRunning()
+                        }
+                        self.isSessionConfigured = false
+                        self.audioDataOutput = nil
+                        self.restoreAudioSessionAfterTest()
+
                         guard let fileURL = audioURL, sampleCount > 0 else {
                             self.audioOnlyTakeId = nil
-                            self.restoreAudioSessionAfterTest()
-                            if self.session.isRunning && !self.isPreviewActive && !self.isBridgePreviewActive {
-                                self.session.stopRunning()
-                            }
-                            self.isSessionConfigured = false
-                            self.audioDataOutput = nil
                             DispatchQueue.main.async {
                                 completion?(.failure(NSError(
                                     domain: "NativeAudioRecording",
@@ -2556,7 +2577,6 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
                                     case .success(let url):
                                         self.finalizeAudioOnlyStopResult(for: url, completion: completion)
                                     case .failure(let error):
-                                        self.restoreAudioSessionAfterTest()
                                         DispatchQueue.main.async {
                                             completion?(.failure(error))
                                         }
@@ -2743,18 +2763,11 @@ final class NativeCameraRecordingEngine: NSObject, AVCaptureFileOutputRecordingD
         do {
             let info = try buildStopResult(for: fileURL, audioOnly: true)
             print("[NativeAudioRecording] recording stopped")
-            restoreAudioSessionAfterTest()
-            if session.isRunning && !isPreviewActive && !isBridgePreviewActive {
-                session.stopRunning()
-            }
-            isSessionConfigured = false
-            audioDataOutput = nil
             audioOnlyTakeId = nil
             DispatchQueue.main.async {
                 completion?(.success(info))
             }
         } catch {
-            restoreAudioSessionAfterTest()
             audioOnlyTakeId = nil
             DispatchQueue.main.async {
                 completion?(.failure(error))

@@ -25,15 +25,17 @@
 			</array>
 		</dict>
 	</array>
-	<!-- Two file types travel between musicians, and they are different things.
-	     .btplan is a practice routine: the ordered list of exercises a teacher
-	     sends a student. .btroutine is a metronome program: bars and tempo ramps
-	     for the practice timeline's click. Declaring each is what makes BestTake
-	     appear in "Open With" for that attachment; iOS then copies the file into
-	     Documents/Inbox and delivers the URL via appUrlOpen, where the extension
-	     decides which importer runs. -->
+	<!-- Register PDFs and the three BestTake file types so Files and other apps
+	     can offer BestTake as an Open In destination. iOS delivers copied files
+	     through appUrlOpen; the extension selects the matching importer. -->
 	<key>CFBundleDocumentTypes</key>
 	<array>
+		<dict>
+			<key>CFBundleTypeName</key><string>PDF Sheet Music</string>
+			<key>CFBundleTypeRole</key><string>Viewer</string>
+			<key>LSHandlerRank</key><string>Alternate</string>
+			<key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>
+		</dict>
 		<dict>
 			<key>CFBundleTypeName</key><string>BestTake Multitrack Project</string>
 			<key>CFBundleTypeRole</key><string>Editor</string>
@@ -73,7 +75,7 @@
 			<key>UTTypeConformsTo</key><array><string>public.data</string></array>
 			<key>UTTypeTagSpecification</key><dict>
 				<key>public.filename-extension</key><array><string>btmulti</string></array>
-				<key>public.mime-type</key><string>application/octet-stream</string>
+			<key>public.mime-type</key><string>application/vnd.besttake.multitrack</string>
 			</dict>
 		</dict>
 		<dict>
@@ -83,7 +85,7 @@
 			<string>BestTake Practice Routine</string>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.json</string>
+				<string>public.data</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
@@ -93,7 +95,7 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
-					<string>application/json</string>
+					<string>application/vnd.besttake.practice-plan</string>
 				</array>
 			</dict>
 		</dict>
@@ -104,7 +106,7 @@
 			<string>BestTake Metronome Program</string>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.json</string>
+				<string>public.data</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
@@ -114,7 +116,7 @@
 				</array>
 				<key>public.mime-type</key>
 				<array>
-					<string>application/json</string>
+					<string>application/vnd.besttake.metronome-program</string>
 				</array>
 			</dict>
 		</dict>

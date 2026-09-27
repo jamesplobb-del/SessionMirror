@@ -20,6 +20,7 @@ import {
 import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
+import { describeHandsFreeGate } from '../utils/instrumentProfiles'
 import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
 import { DRONE_WAVEFORM_OPTIONS, type DroneWaveform } from '../utils/droneEngine'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
@@ -839,9 +840,7 @@ function SettingsDrawer({
                 min={1}
                 max={100}
                 step={1}
-                formatValue={(value) =>
-                  value <= 30 ? 'Sensitive' : value >= 70 ? 'Loud only' : 'Balanced'
-                }
+                formatValue={(value) => describeHandsFreeGate(value)}
                 onChange={(value) => onUpdate({ soundVolumeThreshold: value })}
               />
             </SettingsGroup>

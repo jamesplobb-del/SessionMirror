@@ -15,7 +15,7 @@ export type SaveTakeResult =
   | { ok: false; reason: 'missing_file' | 'permission_denied' | 'save_failed' | 'unsupported' }
 
 export type ShareTakeResult =
-  | { ok: true }
+  | { ok: true; savedToPhotos?: boolean }
   | { ok: false; reason: 'missing_file' | 'share_failed' }
 
 function classifySaveError(err: unknown): SaveTakeResult {
@@ -267,11 +267,12 @@ export async function shareTakeToSystem(take: Take): Promise<ShareTakeResult> {
 
   try {
     if (Capacitor.getPlatform() === 'ios') {
-      await BestTakeAudioPlugin.shareMediaFile({
+      const result = await BestTakeAudioPlugin.shareMediaFile({
         path: url,
         title: take.name || 'BestTake Take',
         audioGain: resolveNativeExportAudioGain(take),
       })
+      return { ok: true, savedToPhotos: result.savedToPhotos === true }
     } else {
       await Share.share({
         title: take.name || 'BestTake Take',

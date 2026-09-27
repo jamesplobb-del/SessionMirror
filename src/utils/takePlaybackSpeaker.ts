@@ -151,6 +151,7 @@ subscribeHeadphoneOutput(() => {
  */
 function applyGraphOutputElementState(el: HTMLMediaElement): void {
   el.muted = false
+  el.defaultMuted = false
   if (el.volume <= 0) {
     el.volume = 1
   }

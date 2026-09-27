@@ -1,3 +1,4 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useState } from 'react'
 import { summarizePracticeSessions } from '../db/practiceRepository'
 import { formatElapsed, loadRoutineHistory, type RoutineDay } from '../utils/practiceRoutines'
@@ -18,7 +19,7 @@ export default function RoutineProgressSummary({ day, onOpenHistory }: { day: Ro
   if (!day?.startedAt) return null
   const history = loadRoutineHistory(day.routineId).filter(item => item.date !== day.date && item.startedAt)
   const elapsed = Object.values(day.elapsedMsByStep).reduce((sum, ms) => sum + ms, 0)
-  return <details className="routine-session-summary">
+  return <PremiumDisclosure className="routine-session-summary">
     <summary>{day.completedAt ? 'Session recap' : 'Session progress'}</summary>
     <p>{formatElapsed(elapsed)} active · {day.doneStepIds.length} completed · {day.skippedStepIds.length} skipped</p>
     {summary ? <p>{summary.attempts} saved {summary.attempts === 1 ? 'take' : 'takes'}
@@ -28,7 +29,7 @@ export default function RoutineProgressSummary({ day, onOpenHistory }: { day: Ro
       <span><strong>{item.title}</strong><small>{day.doneStepIds.includes(id) ? 'Completed' : day.skippedStepIds.includes(id) ? 'Skipped' : 'In progress'} · {formatElapsed(day.elapsedMsByStep[id] ?? 0)}</small></span>
       {item.projectId && onOpenHistory && <button type="button" onClick={() => onOpenHistory(item.projectId!, item.title)}>Journal</button>}
     </li>)}</ul>}
-    {history.length > 0 && <details>
+    {history.length > 0 && <PremiumDisclosure>
       <summary>Earlier practice · {history.length} {history.length === 1 ? 'day' : 'days'}</summary>
       <ul>{history.map(item => <li key={item.date}>
         <strong>{item.date}</strong> · {item.doneStepIds.length} completed · {item.skippedStepIds.length} skipped
@@ -36,6 +37,6 @@ export default function RoutineProgressSummary({ day, onOpenHistory }: { day: Ro
         {onOpenHistory && <div className="routine-recap-history-links">{Object.entries(item.itemsByStep).map(([id, snapshot]) => snapshot.projectId
           ? <button type="button" key={id} onClick={() => onOpenHistory(snapshot.projectId!, snapshot.title)}>{snapshot.title}</button> : null)}</div>}
       </li>)}</ul>
-    </details>}
-  </details>
+    </PremiumDisclosure>}
+  </PremiumDisclosure>
 }

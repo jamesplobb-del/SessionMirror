@@ -1,0 +1,147 @@
+[
+  {
+    "id": "SHELL-01",
+    "feature": "Onboarding",
+    "control": "Get started, Previous step, Skip intro, Start practicing",
+    "states": [
+      "fresh install",
+      "second step",
+      "replayed tour"
+    ],
+    "expected": "Progress through two steps, go back, or dismiss without losing saved practice data.",
+    "source": "src/components/OnboardingTutorial.tsx:84-140",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-01 and UI-22 cover forward flow/replay/skip; Previous remains untested."
+  },
+  {
+    "id": "SHELL-02",
+    "feature": "Instrument selection",
+    "control": "Picker, Search instruments, instrument option, Close",
+    "states": [
+      "no instrument",
+      "matching search",
+      "no results",
+      "existing selection"
+    ],
+    "expected": "Search filters options, selecting updates Home, dismissal preserves prior value, reload preserves selection.",
+    "source": "src/components/OnboardingTutorial.tsx:117-140; src/components/PracticeHub.tsx:482,628",
+    "status": "untested",
+    "evidence": "UI-01 and UI-02 verify Trumpet selection/search/persistence; no-match and cancellation remain untested."
+  },
+  {
+    "id": "SHELL-03",
+    "feature": "Home/navigation",
+    "control": "Record, Routine, Take library, Your routines, Games, Metronome, Tuner, Music, Settings",
+    "states": [
+      "empty library",
+      "saved routine",
+      "completed routine",
+      "tool active"
+    ],
+    "expected": "Each shortcut opens the named destination and allows returning; today's Home retains the side-by-side main actions.",
+    "source": "src/components/PracticeHub.tsx:480-630",
+    "status": "untested",
+    "evidence": "Specific navigation cases recorded in session log; full branch combinations not certified."
+  },
+  {
+    "id": "SHELL-04",
+    "feature": "Workspace",
+    "control": "Pitch Analysis, Take Cards, Metronome, Drone, Audio Enhance, Hands-Free, References, Expand View, Multitrack",
+    "states": [
+      "audio mode",
+      "video mode",
+      "widget on/off",
+      "sheet closing"
+    ],
+    "expected": "Checkboxes match widget state, menu actions open the appropriate surface, exiting sheets stop intercepting input.",
+    "source": "src/components/SettingsBranchWheel.tsx:460-680; src/components/ControlDeck.tsx:450-465",
+    "status": "untested",
+    "evidence": "UI-16 confirms Hands-Free off and Multitrack entry; remaining checkbox/state combinations untested."
+  },
+  {
+    "id": "SHELL-05",
+    "feature": "General settings",
+    "control": "Dark Mode and Haptic Feedback switches",
+    "states": [
+      "off",
+      "on",
+      "after reload"
+    ],
+    "expected": "Theme updates visually and persists; haptic preference persists and affects feedback on supported hardware.",
+    "source": "src/components/SettingsDrawer.tsx:790-805",
+    "status": "untested",
+    "evidence": "UI-20 verifies Dark Mode including app-dark-mode class and reload. Physical haptics untested."
+  },
+  {
+    "id": "SHELL-06",
+    "feature": "Recording settings",
+    "control": "Use iPhone Mic, Stop After Silence, Trigger Sensitivity",
+    "states": [
+      "idle",
+      "headset connected",
+      "hands-free active",
+      "after reload"
+    ],
+    "expected": "Values persist and affect actual routing, trigger, and stopping behavior on supported devices.",
+    "source": "src/components/SettingsDrawer.tsx:808-845",
+    "status": "untested",
+    "evidence": "UI-20 verifies silence slider 2\u21922.5 and persistence; recording effects blocked by browser writer/native hardware."
+  },
+  {
+    "id": "SHELL-07",
+    "feature": "Tuner settings",
+    "control": "Source Instrument tabs, Idle Mic Tuner, Drone Waveform, Open From iOS",
+    "states": [
+      "voice/strings/winds",
+      "on/off",
+      "each waveform",
+      "quick tool instructions"
+    ],
+    "expected": "Selected values update the correct tuner/drone behavior; iOS entry instructions are accessible.",
+    "source": "src/components/SettingsDrawer.tsx:850-940",
+    "status": "untested"
+  },
+  {
+    "id": "SHELL-08",
+    "feature": "Playback settings",
+    "control": "Audio Enhance, Mute Metronome on Playback, Pause YouTube While Recording",
+    "states": [
+      "off/on",
+      "playing",
+      "recording",
+      "after reload"
+    ],
+    "expected": "Selected behavior is applied to playback/recording without altering originals.",
+    "source": "src/components/SettingsDrawer.tsx:958-996",
+    "status": "untested"
+  },
+  {
+    "id": "SHELL-09",
+    "feature": "Help/guidance",
+    "control": "Help topics, Feature tips, Reset feature guides, Replay Welcome Tour",
+    "states": [
+      "help open/closed",
+      "tips on/off",
+      "seen guides",
+      "replayed tour"
+    ],
+    "expected": "Topics describe their feature; settings and tour replay work without losing data.",
+    "source": "src/components/SettingsDrawer.tsx:1020-1060",
+    "status": "untested",
+    "evidence": "UI-20/21/22 verify tips persistence, Multitrack help, tour replay and skip. Other topics and guide reset untested."
+  },
+  {
+    "id": "SHELL-10",
+    "feature": "External/native settings",
+    "control": "Report a bug, Privacy policy, Redeem code, iCloud backup, Reset All Settings",
+    "states": [
+      "available/unavailable native service",
+      "cancel",
+      "confirmed action"
+    ],
+    "expected": "External actions open correct destinations; destructive reset requires confirmation; backups use native storage settings.",
+    "source": "src/components/SettingsDrawer.tsx:998-1085",
+    "status": "untested",
+    "evidence": "No email sent, purchases initiated, cloud backup changed, or settings reset in this pass."
+  }
+]

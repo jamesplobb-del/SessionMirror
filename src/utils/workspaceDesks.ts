@@ -148,7 +148,7 @@ export function summarizeDesk(
   transposition: TunerTranspositionId,
 ): string {
   const parts: string[] = []
-  if (desk.showMetronome) parts.push(`♩${Math.round(desk.metronome.bpm)}`)
+  if (desk.showMetronome) parts.push(`♩${Math.round(desk.metronome.bpm)} · ${desk.metronome.meter}`)
   if (desk.showDrone && desk.drone.pitchClass !== null) {
     parts.push(
       `Drone ${getWrittenPitchLabel(desk.drone.pitchClass, desk.drone.octave, transposition).noteName}`,

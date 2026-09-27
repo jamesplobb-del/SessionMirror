@@ -1,0 +1,82 @@
+/* Approved premium finish over the current app layout. Native camera and tuner own their backgrounds. */
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) {
+  --ls-bg:#f8faff; --ls-panel:#fff; --ls-soft:#f0f4fa; --ls-ink:#1b2d43;
+  --ls-muted:#718094; --ls-blue:#346fce; --ls-line:#e1e7f0;
+  --ls-glass:#ffffffed; --ls-radius:24px;
+  --ls-shadow:0 8px 28px #223f7010,0 1px 2px #223f7005;
+  --premium-ease:cubic-bezier(.22,1,.36,1);
+  --take-best:#b39150; --take-current:#447dcc;
+}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]).app-dark-mode {
+  --ls-bg:#101b2a; --ls-panel:#192738; --ls-soft:#1e2f44; --ls-ink:#f0f4fa;
+  --ls-muted:#9baabd; --ls-blue:#90bbff; --ls-line:#2b3a4f;
+  --ls-glass:#192738f0; --ls-shadow:0 10px 30px #0002,0 1px 0 #ffffff06;
+}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-layer .practice-menu-card.practice-menu-card--electric-edge {
+  background:radial-gradient(ellipse at 10% 0%,color-mix(in srgb,var(--ls-blue) 7%,transparent),transparent 56%),var(--ls-bg)!important;
+}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-card--electric-edge .practice-menu-header {padding:max(20px, env(safe-area-inset-top)) 24px 14px!important;border-bottom:0!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-brand {font-size:20px!important;font-weight:560!important;letter-spacing:-.7px;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-card--electric-edge .practice-menu-scroll {padding:8px 24px max(24px, env(safe-area-inset-bottom))!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-focus-flow {gap:15px!important;}
+/* Keep the current side-by-side Record / Routine cards, their blue/gold
+   accents and responsive sizing from open-lens-system. */
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-launch-button {
+  box-shadow:var(--ls-shadow)!important;
+}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-launch-copy strong {
+  font-weight:550!important;letter-spacing:-.65px;
+}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-library {border-radius:19px!important;background:var(--ls-panel)!important;box-shadow:0 3px 12px #223f7005!important;padding:15px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-library strong {font-weight:550!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-shortcut {background:var(--ls-panel)!important;border:1px solid var(--ls-line)!important;border-radius:19px!important;box-shadow:0 3px 12px #223f7005!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .daily-challenges {border-radius:19px!important;border-color:var(--ls-line)!important;box-shadow:none!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .open-lens-header {padding:14px 24px!important;min-height:76px;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .audio-mode-home--inplace .audio-mode-take-card {border-radius:25px!important;padding:20px!important;box-shadow:var(--ls-shadow)!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .audio-mode-take-card--best {border-color:color-mix(in srgb,var(--take-best) 32%,var(--ls-line))!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .audio-mode-take-card__pill {font-size:13px!important;font-weight:550!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .audio-mode-take-card__play {box-shadow:0 3px 12px #223f7008!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray {border-radius:28px!important;box-shadow:0 25px 70px #101b2a26,inset 0 1px 0 #ffffff50!important;padding:20px!important;backdrop-filter:blur(24px);}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__header {margin-bottom:16px;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__title {font-size:24px!important;letter-spacing:-.8px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__grid {gap:9px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__item {border-radius:17px!important;background:var(--ls-soft)!important;border:1px solid transparent!important;min-height:68px;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__item--active {background:color-mix(in srgb,var(--ls-blue) 11%,var(--ls-panel))!important;border-color:color-mix(in srgb,var(--ls-blue) 45%,var(--ls-line))!important;box-shadow:inset 0 1px 0 #ffffff20!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .settings-branch-tray__label {font-size:11px!important;font-weight:550!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .native-bottom-sheet--vault {border-radius:30px 30px 0 0!important;box-shadow:0 -12px 70px #142a4920!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-sheet-header {padding:8px 24px 15px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-drawer-scroll {padding:15px 22px 28px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row {border:1px solid var(--ls-line)!important;border-radius:22px!important;box-shadow:var(--ls-shadow)!important;overflow:hidden;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row__main {padding:15px!important;gap:14px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row__thumb {border-radius:16px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row__title {font-size:15px!important;letter-spacing:-.3px;font-weight:550!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row--benchmark {border-color:color-mix(in srgb,var(--take-best) 35%,var(--ls-line))!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-take-row--challenger {border-color:color-mix(in srgb,var(--ls-blue) 35%,var(--ls-line))!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-section-tabs {border-radius:18px!important;padding:4px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-section-tabs button {border-radius:14px!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.metronome-widget,.drone-widget) {border-radius:24px!important;background:var(--ls-glass)!important;backdrop-filter:blur(24px);box-shadow:0 16px 50px #152b4926!important;border-color:var(--ls-line)!important;}
+html#lens-design-system.lens-system.premium-app:not([data-game-concept]) button:focus-visible {outline:2px solid var(--ls-blue);outline-offset:4px;}
+@media(prefers-reduced-motion:no-preference) {
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.practice-home-launch-button,.practice-home-library,.practice-menu-shortcut,.settings-branch-tray__item,.vault-take-row__play-btn,.audio-mode-take-card__play) {transition:scale 0.252s var(--premium-ease),box-shadow 0.27s,border-color 0.225s,background-color 0.225s;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.practice-home-launch-button,.practice-home-library,.practice-menu-shortcut,.settings-branch-tray__item,.vault-take-row__play-btn,.audio-mode-take-card__play):active {scale:.975;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.practice-home-instrument,.practice-home-launch-actions,.practice-home-links,.daily-challenges,.practice-menu-focus-tools,.vault-take-row,.settings-branch-tray__item) {animation:premium-arrive 0.585s var(--premium-ease) both;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-launch-actions {animation-delay:45ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-links {animation-delay:90ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .daily-challenges {animation-delay:126ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-focus-tools {animation-delay:162ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.vault-take-row,.settings-branch-tray__item):nth-child(2) {animation-delay:31.5ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.vault-take-row,.settings-branch-tray__item):nth-child(3) {animation-delay:63ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.vault-take-row,.settings-branch-tray__item):nth-child(4) {animation-delay:94.5ms;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.vault-take-row,.settings-branch-tray__item):nth-child(n+5) {animation-delay:126ms;}
+  @keyframes premium-arrive {from{opacity:0;translate:0 12px;}to{opacity:1;translate:0 0;}}
+}
+@media(prefers-reduced-motion:reduce) {
+ html#lens-design-system.lens-system.premium-app:not([data-game-concept]) *,html#lens-design-system.lens-system.premium-app:not([data-game-concept]) *::before,html#lens-design-system.lens-system.premium-app:not([data-game-concept]) *::after {animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}
+}
+
+@media(prefers-reduced-motion:no-preference) {
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-layer {background:transparent;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-card {transform-origin:50% 70%;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-menu-focus-flow>.practice-home-launch-actions {animation-duration:0.765s;}
+  html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .practice-home-links {animation-duration:0.765s;}
+}

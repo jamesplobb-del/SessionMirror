@@ -1,3 +1,5 @@
+import { premiumMotion } from '../utils/premiumMotion'
+import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
 import {
   useCallback,
   useEffect,
@@ -119,8 +121,12 @@ const COMPACT_BELOW = 330
 const BALL_SIZE = 56
 /** The collapse control sits inside the bar now; nothing floats above it. */
 const COLLAPSE_HEADROOM = 0
-/** First run sits just above the control deck, where the bar used to be pinned. */
-const DEFAULT_BOTTOM_GAP = 124
+/**
+ * First run sits above the control deck and the tuner or metronome tool row.
+ * The gap is measured from the bottom of the screen, and the home-indicator
+ * inset is added on top so a phone with a safe area clears the same row.
+ */
+const DEFAULT_BOTTOM_GAP = 164
 const KEY_STEP = 16
 const ARROWS: Record<string, readonly [number, number]> = {
   ArrowLeft: [-1, 0],
@@ -319,7 +325,7 @@ export default function RoutineBar({
     if (!restRef.current) {
       restRef.current = loadWidgetPosition(folded ? BALL_POSITION_ID : POSITION_ID) ?? {
         x: folded ? window.innerWidth - EDGE - el.offsetWidth : (window.innerWidth - el.offsetWidth) / 2,
-        y: window.innerHeight - DEFAULT_BOTTOM_GAP - el.offsetHeight,
+        y: window.innerHeight - insetsRef.current.bottom - DEFAULT_BOTTOM_GAP - el.offsetHeight,
       }
     }
     if (!folded) barHeightRef.current = el.offsetHeight
@@ -510,7 +516,7 @@ export default function RoutineBar({
   const time = targetMs > 0 ? `${formatElapsed(elapsed)} / ${formatElapsed(targetMs)}` : formatElapsed(elapsed)
   // One row has no room for the target; the track under it still shows it.
   const clock = compact
-    ? `${index}/${count} · ${paused ? 'Paused' : formatElapsed(elapsed)}`
+    ? `${index} of ${count} · ${paused ? 'Paused' : formatElapsed(elapsed)}`
     : paused
       ? `Paused · ${time}`
       : time
@@ -556,7 +562,7 @@ export default function RoutineBar({
         onKeyDown={dockHost ? dockItem.keyDown : moveWithKeys}
         initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.6 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={iosSpringSnappy}
+        transition={premiumMotion(iosSpringSnappy, 'widget')}
       >
         <svg className="routine-ball__ring" viewBox="0 0 52 52" aria-hidden>
           <circle className="routine-ball__track" cx="26" cy="26" r="24" />
@@ -648,7 +654,7 @@ export default function RoutineBar({
         onDragEnd={endDrag}
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={iosSpringSnappy}
+        transition={premiumMotion(iosSpringSnappy, 'widget')}
         onKeyDown={(event) => {
           if (event.key !== 'Escape' || !open) return
           event.stopPropagation()
@@ -738,7 +744,7 @@ export default function RoutineBar({
 
         <AnimatePresence initial={false}>
           {open && (
-            <motion.div
+            <PremiumMotionDiv
               key="panel"
               id={panelId}
               className={`routine-bar__panel routine-bar__panel--${room.side}`}
@@ -746,7 +752,7 @@ export default function RoutineBar({
               initial={{ opacity: 0, y: reducedMotion ? 0 : room.side === 'below' ? -6 : 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: reducedMotion ? 0 : room.side === 'below' ? -6 : 6 }}
-              transition={{ duration: reducedMotion ? 0 : 0.16, ease: [0.32, 0.72, 0, 1] }}
+              transition={premiumMotion({ duration: reducedMotion ? 0 : .16 }, 'popover')}
             >
               <header className="routine-bar__panel-head">
                 <span className="routine-bar__eyebrow">{routine.name}</span>
@@ -835,7 +841,7 @@ export default function RoutineBar({
                   <span>Home</span>
                 </button>
               </footer>
-            </motion.div>
+            </PremiumMotionDiv>
           )}
         </AnimatePresence>
       </motion.section>

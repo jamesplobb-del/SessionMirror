@@ -1,3 +1,6 @@
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
+import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
+import { premiumMotion } from '../utils/premiumMotion'
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -46,6 +49,7 @@ export default function RoutineMetronomeEditor({ isOpen, value, itemTitle, onSav
   onSave: (prefs: MetronomePrefs) => void
   onClose: () => void
 }) {
+  const reduced = useReducedMotion()
   const restoreRef = useRef<MetronomePrefs | null>(null)
   const savedRef = useRef<MetronomePrefs | null>(null)
   const screenRef = useRef<HTMLDivElement>(null)
@@ -57,8 +61,15 @@ export default function RoutineMetronomeEditor({ isOpen, value, itemTitle, onSav
   useEffect(() => {
     if (!isOpen) return
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const siblings = Array.from(document.body.children).filter((node): node is HTMLElement => node instanceof HTMLElement && node !== screenRef.current)
+    const inert = siblings.map(node => node.inert)
+    siblings.forEach(node => { node.inert = true })
     const frame = requestAnimationFrame(() => screenRef.current?.focus())
-    return () => { cancelAnimationFrame(frame); trigger?.focus({ preventScroll: true }) }
+    return () => {
+      cancelAnimationFrame(frame)
+      siblings.forEach((node, index) => { node.inert = inert[index] })
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true })
+    }
   }, [isOpen])
 
   useEffect(() => {
@@ -84,10 +95,14 @@ export default function RoutineMetronomeEditor({ isOpen, value, itemTitle, onSav
     onClose()
   }
 
-  if (!isOpen || typeof document === 'undefined') return null
+  if (typeof document === 'undefined') return null
 
   return createPortal(
-    <div
+    <AnimatePresence>{isOpen && <PremiumMotionDiv
+      initial={{ opacity: 0, y: reduced ? 0 : 30, scale: reduced ? 1 : .975 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: reduced ? 0 : 18, scale: reduced ? 1 : .985, transition: { duration: reduced ? .1 : .27 } }}
+      transition={premiumMotion({ duration: .1 }, 'screen')}
       ref={screenRef}
       tabIndex={-1}
       className="routine-metronome-screen app-ui-overlay--audio-mode app-ui-overlay--audio-practice-metronome"
@@ -111,13 +126,13 @@ export default function RoutineMetronomeEditor({ isOpen, value, itemTitle, onSav
     >
       <header className="routine-metronome-screen__header">
         <button type="button" className="routine-metronome-screen__back" aria-label="Cancel metronome changes" onClick={onClose}><ArrowLeft aria-hidden /></button>
-        <div className="routine-metronome-screen__title"><small>{itemTitle || 'ROUTINE ITEM'}</small><h2>Metronome</h2></div>
+        <div className="routine-metronome-screen__title"><small>{itemTitle || 'This exercise'}</small><h2>Metronome</h2></div>
         <button type="button" className="routine-metronome-screen__save" onClick={save}>Save</button>
       </header>
       <div className="routine-metronome-screen__stage">
         <AudioPracticeMetronomeView showVisualStyle={false} />
       </div>
-    </div>,
+    </PremiumMotionDiv>}</AnimatePresence>,
     document.body,
   )
 }

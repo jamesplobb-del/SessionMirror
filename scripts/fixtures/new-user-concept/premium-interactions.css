@@ -1,0 +1,20 @@
+@import "../../../src/styles/premium-interactions.css";
+/* One full-device backing keeps the live pitch wash continuous through the
+   preview's safe areas, tabs, graph and bottom dock. */
+.premium-tuner-wash {
+  position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 72%,transparent),color-mix(in srgb,var(--silk-wash) 72%,transparent)),var(--ls-bg);
+  transition:opacity 0.648s cubic-bezier(.16,1,.3,1),--silk-wash 0.81s cubic-bezier(.25,.65,.3,1);
+}
+.app-dark-mode .premium-tuner-wash {
+  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 46%,transparent),color-mix(in srgb,var(--silk-wash) 46%,transparent)),var(--ls-bg);
+}
+.concept-screen--tuner .premium-tuner-wash {opacity:1;}
+.concept-screen>.lens-safe-top {position:relative;z-index:1;}
+.concept-screen>.lens-content {z-index:1;}
+html#lens-design-system.lens-system.premium-app .concept-screen--tuner .app-ui-overlay.app-ui-overlay--audio-practice-tuner,
+html#lens-design-system.lens-system.premium-app .concept-screen--tuner .lens-dock-container {background:transparent!important;}
+
+@media(prefers-reduced-motion:reduce) {
+  .premium-tuner-wash {transition:opacity .1s linear,--silk-wash .2s linear;}
+}

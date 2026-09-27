@@ -1,8 +1,7 @@
-import { Check, ChevronDown } from 'lucide-react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
+import { ChevronDown } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import Pressable from '../ui/Pressable'
+import { PremiumPicker } from '../ui/PremiumPicker'
 
 export interface MetronomeAudioSelectOption<T extends string> {
   value: T
@@ -29,144 +28,24 @@ interface MetronomeAudioSelectProps<T extends string> {
   onChange: (value: T) => void
 }
 
-export default function MetronomeAudioSelect<T extends string>({
-  label,
-  ariaLabel,
-  value,
-  options,
-  onChange,
-}: MetronomeAudioSelectProps<T>) {
+export default function MetronomeAudioSelect<T extends string>({ label, ariaLabel, value, options, onChange }: MetronomeAudioSelectProps<T>) {
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const listboxId = useId()
-  const selectedOption = options.find((option) => option.value === value) ?? options[0]
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return
-      setOpen(false)
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown, { capture: true })
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, { capture: true })
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open])
-
-  return (
-    <div ref={rootRef} className={`metronome-audio-select pointer-events-auto ${open ? 'metronome-audio-select--open' : ''}`}>
-      <span className="metronome-audio-select__label">{label}</span>
-      <div className="metronome-audio-select__field">
-        <Pressable
-          type="button"
-          className="metronome-audio-select__control"
-          intensity="soft"
-          aria-label={selectedOption ? `${ariaLabel}: ${selectedOption.label}` : ariaLabel}
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-controls={listboxId}
-          onClick={() => {
-            setOpen((visible) => !visible)
-          }}
-        >
-          <span className="metronome-audio-select__selection">
-            {selectedOption?.glyph ? (
-              <span className="metronome-audio-select__glyph" aria-hidden>
-                {selectedOption.glyph}
-              </span>
-            ) : (
-              <span className="metronome-audio-select__value">
-                {selectedOption?.shortLabel ?? selectedOption?.label ?? value}
-              </span>
-            )}
-            <ChevronDown
-              className="metronome-audio-select__chevron"
-              strokeWidth={2.2}
-              aria-hidden
-            />
-          </span>
-        </Pressable>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              id={listboxId}
-              className="metronome-audio-select__menu"
-              role="listbox"
-              aria-label={ariaLabel}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={iosEaseOut}
-              style={motionGpuLayer}
-            >
-              <motion.div
-                className="metronome-audio-select__menu-content"
-                initial={{ transform: 'translateY(-7px) scale(.975)' }}
-                animate={{ transform: 'translateY(0px) scale(1)' }}
-                exit={{ transform: 'translateY(-5px) scale(.985)' }}
-                transition={iosEaseOut}
-                style={motionGpuLayer}
-              >
-                {options.map((option) => {
-                  if (option.disabled) {
-                    return (
-                      <div
-                        key={option.value}
-                        className="metronome-audio-select__option metronome-audio-select__option--header"
-                        role="presentation"
-                      >
-                        {option.label}
-                      </div>
-                    )
-                  }
-
-                  const selected = option.value === value
-                  return (
-                    <Pressable
-                      key={option.value}
-                      type="button"
-                      className={`metronome-audio-select__option ${selected ? 'metronome-audio-select__option--selected' : ''}`}
-                      role="option"
-                      aria-selected={selected}
-                      intensity="soft"
-                      haptic={selected ? false : 'light'}
-                      onClick={() => {
-                        if (!selected) {
-                          onChange(option.value)
-                        }
-                        setOpen(false)
-                      }}
-                    >
-                      <span className="metronome-audio-select__option-body">
-                        {option.glyph ? (
-                          <span className="metronome-audio-select__option-glyph" aria-hidden>
-                            {option.glyph}
-                          </span>
-                        ) : null}
-                        <span className="metronome-audio-select__option-text">
-                          <span>{option.label}</span>
-                          {option.hint ? (
-                            <span className="metronome-audio-select__option-hint">{option.hint}</span>
-                          ) : null}
-                        </span>
-                      </span>
-                      {selected && <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden />}
-                    </Pressable>
-                  )
-                })}
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+  const selected = options.find(option => option.value === value) ?? options[0]
+  return <div className={`metronome-audio-select pointer-events-auto ${open ? 'metronome-audio-select--open' : ''}`}>
+    <span className="metronome-audio-select__label">{label}</span>
+    <div className="metronome-audio-select__field">
+      <Pressable type="button" className="metronome-audio-select__control" intensity="soft"
+        aria-label={selected ? `${ariaLabel}: ${selected.label}` : ariaLabel}
+        aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+        <span className="metronome-audio-select__selection">
+          {selected?.glyph ? <span className="metronome-audio-select__glyph" aria-hidden>{selected.glyph}</span>
+            : <span className="metronome-audio-select__value">{selected?.shortLabel ?? selected?.label ?? value}</span>}
+          <ChevronDown className="metronome-audio-select__chevron" strokeWidth={1.7} aria-hidden />
+        </span>
+      </Pressable>
     </div>
-  )
+    <PremiumPicker isOpen={open} title={ariaLabel} value={value}
+      options={options.map(option => ({ ...option, section: option.disabled }))}
+      onChange={onChange} onClose={() => setOpen(false)} />
+  </div>
 }

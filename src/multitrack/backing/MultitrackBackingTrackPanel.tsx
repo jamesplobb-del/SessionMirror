@@ -1,3 +1,4 @@
+import PremiumDisclosure from '../../components/ui/PremiumDisclosure'
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from 'react'
 import { FileAudio, Link, Pause, Play, Trash2, Upload, X, Youtube } from 'lucide-react'
 import Pressable from '../../components/ui/Pressable'
@@ -304,7 +305,7 @@ export default function MultitrackBackingTrackPanel({
         ) : null}
       </div>
 
-      <details className="multitrack-advanced" open={backing.kind === 'youtube' || undefined}>
+      <PremiumDisclosure className="multitrack-advanced" open={backing.kind === 'youtube' || undefined}>
         <summary>Practice reference (YouTube)</summary>
         <p>For practice only. Timing is approximate and this audio is excluded from exports. Import an audio file for synchronized recording.</p>
         <Pressable type="button" intensity="soft" onClick={() => setYoutubeInputOpen((open) => !open)} className="multitrack-backing-strip__chip">
@@ -332,7 +333,7 @@ export default function MultitrackBackingTrackPanel({
           {youtubeError ? <span>{youtubeError}</span> : null}
         </div>
       ) : null}
-      </details>
+      </PremiumDisclosure>
     </section>
   )
 }

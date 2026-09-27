@@ -36,7 +36,7 @@ function TunerTranspositionMenu({
       <header className="tuner-transposition-menu__header">
         <div>
           <h2><span className="electric-tuning-old">Tuner settings</span><span className="electric-tuning-new">Tuning</span></h2>
-          <span>Notes and cents are shown at concert pitch.</span>
+          <span>Note names follow your written part. Cents stay at concert pitch.</span>
         </div>
         <button type="button" onClick={onClose} aria-label="Close tuner settings">
           <X aria-hidden />

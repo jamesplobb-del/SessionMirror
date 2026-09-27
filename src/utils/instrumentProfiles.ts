@@ -77,9 +77,8 @@ export const INSTRUMENT_PROFILES: readonly InstrumentProfile[] = [
     label: 'Euphonium / baritone',
     family: 'Brass',
     tunerInstrument: 'winds',
-    // Treble-clef B♭ reading, which is what most band parts use. Bass-clef
-    // readers can switch to Concert pitch in Settings.
-    tunerTransposition: 'bb_octave',
+    // Bass-clef concert reading. Treble-clef B♭ is its own row inside the games.
+    tunerTransposition: 'concert',
     soundVolumeThreshold: MEDIUM_GATE,
   },
   {
@@ -287,7 +286,7 @@ export function getInstrumentSettings(id: string): InstrumentSettingsPatch | nul
   if (!profile) return null
   return {
     tunerInstrument: profile.tunerInstrument,
-    tunerTransposition: 'concert',
+    tunerTransposition: profile.tunerTransposition,
     soundVolumeThreshold: profile.soundVolumeThreshold,
   }
 }
@@ -300,8 +299,9 @@ export function instrumentHeading(id: string | null): string {
   return profile.label.split(' / ')[0] ?? profile.label
 }
 
+/** The words Settings, the hands-free widget, and Home all use for one slider. */
 export function describeHandsFreeGate(threshold: number): string {
-  if (threshold >= LOUD_GATE) return 'Loud gate'
-  if (threshold >= MEDIUM_GATE) return 'Medium gate'
-  return 'Quiet gate'
+  if (threshold >= 70) return 'Loud only'
+  if (threshold <= 30) return 'Sensitive'
+  return 'Balanced'
 }

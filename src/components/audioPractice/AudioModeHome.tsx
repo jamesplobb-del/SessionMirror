@@ -13,7 +13,8 @@ import {
   type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { LoaderCircle, Pause, Play, RotateCw, Share, Pin, X } from 'lucide-react'
+import { Pause, Play, RotateCw, Share, Pin, X } from 'lucide-react'
+import { PremiumActivity } from '../ui/PremiumRecordingFeedback'
 import Pressable from '../ui/Pressable'
 import './recording-flow.css'
 import { useMediaWaveform } from '../../hooks/useMediaWaveform'
@@ -558,7 +559,7 @@ export function AudioModeTakeCard({
    * is still empty — that is what makes the card read as the recorder. */
   const liveStage = stage && (isRecording || !playable)
   const subtitle = isPreparing
-    ? 'Preparing playback…'
+    ? 'Preparing playback'
     : preparationFailed
       ? readiness?.message ?? 'Playback preparation failed.'
       : stage && isRecording
@@ -566,7 +567,7 @@ export function AudioModeTakeCard({
         : playable
           ? null
           : stage && !micReady
-            ? 'Preparing microphone…'
+            ? 'Getting ready'
             : emptyHint ?? 'Ready for a new take'
 
   return (
@@ -668,7 +669,7 @@ export function AudioModeTakeCard({
           }
         >
           {isPreparing ? (
-            <LoaderCircle className="h-5 w-5 animate-spin" strokeWidth={2.2} />
+            <PremiumActivity />
           ) : preparationFailed ? (
             <RotateCw className="h-5 w-5" strokeWidth={2.2} />
           ) : isPlaying ? (

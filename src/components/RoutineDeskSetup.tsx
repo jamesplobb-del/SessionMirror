@@ -1,3 +1,4 @@
+import PremiumReveal from './ui/PremiumReveal'
 import { useState } from 'react'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getPracticeRhythmOptions, AUDIO_PRACTICE_CLICK_SOUNDS } from './audioPractice/audioPracticeMetronome'
@@ -60,8 +61,7 @@ export default function RoutineDeskSetup({
             <i />
           </Pressable>
           <small className="routine-tool__hint">Keep a steady pulse at your chosen tempo.</small>
-          {desk.showMetronome && (
-            <div className="routine-metronome-controls">
+          <PremiumReveal open={desk.showMetronome} className="routine-metronome-controls">
               <Pressable
                 type="button"
                 intensity="soft"
@@ -76,8 +76,7 @@ export default function RoutineDeskSetup({
                   <small>Open the metronome to set this item's click</small>
                 </span>
               </Pressable>
-            </div>
-          )}
+          </PremiumReveal>
         </div>
 
         <div className="routine-tool">
@@ -103,7 +102,7 @@ export default function RoutineDeskSetup({
             <i />
           </Pressable>
           <small className="routine-tool__hint">Choose a concert-pitch reference to play against.</small>
-          {desk.showDrone && (
+          <PremiumReveal open={desk.showDrone}>
             <div className="routine-pitch-row" role="radiogroup" aria-label="Drone note">
               {Array.from({ length: 12 }, (_, pitchClass) => (
                 <Pressable
@@ -121,7 +120,7 @@ export default function RoutineDeskSetup({
                 </Pressable>
               ))}
             </div>
-          )}
+          </PremiumReveal>
         </div>
 
         <div className="routine-tool"><Pressable
@@ -161,6 +160,7 @@ export default function RoutineDeskSetup({
       <RoutineProgramSetup value={step.programId} onChange={programId => onChange({ programId })} />
       <RoutineMetronomeEditor
         isOpen={metronomeEditorOpen}
+        itemTitle={step.title}
         value={desk.metronome}
         onSave={prefs => patchDesk({ metronome: prefs })}
         onClose={() => setMetronomeEditorOpen(false)}

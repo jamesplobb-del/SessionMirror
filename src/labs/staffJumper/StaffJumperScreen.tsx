@@ -16,18 +16,17 @@ import {
 import './staff-jumper.css'
 import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
+import { transposePitchReadout } from '../../utils/tunerTransposition'
 import { GAME_TEST_INPUT_AVAILABLE, isGameTestInputOn, SILENT_READOUT, setGameTestInputOn, syntheticReadout, TEST_TAP_HOLD_MS, useGameTestInput } from '../gameTestInput'
 import {
   computeAccuracy,
   DIFFICULTY_DESCRIPTIONS,
   DIFFICULTY_LABELS,
   DIFFICULTY_TIMEOUT_SECONDS,
-  getConcertTonicPitchClass,
   getScaleRangePreview,
   getTargetNoteAtStep,
   keysForScaleMode,
   midiPoolForConfig,
-  pitchClassLabel,
   STAFF_JUMPER_DIFFICULTIES,
   scaleDisplayName,
   type StaffJumperDifficulty,
@@ -551,7 +550,8 @@ export default function StaffJumperScreen({
     draftTransposition,
   ])
   const meterSpec = METERS[draftMeter]
-  const droneNoteLabel = pitchClassLabel(getConcertTonicPitchClass(draftConfig), draftKey)
+  const droneNoteLabel = draftKey.replace(/b/g, '♭').replace(/#/g, '♯')
+  const heardNoteName = transposePitchReadout(readout, draftTransposition).noteName
 
   const hasPitchSignal =
     Number.isFinite(readout.frequencyHz) &&
@@ -622,7 +622,7 @@ export default function StaffJumperScreen({
             </Pressable>
             <p className={`sj-start__mic ${hasPitchSignal ? 'sj-start__mic--live' : ''}`}>
               <Mic aria-hidden />
-              {hasPitchSignal ? `Hearing ${readout.noteName}` : 'Play a note to check your mic'}
+              {hasPitchSignal ? `Hearing ${heardNoteName}` : 'Play a note to check your mic'}
             </p>
             {(draftMetronome || draftDrone) && (
               <p className="balance-ready__headphones">

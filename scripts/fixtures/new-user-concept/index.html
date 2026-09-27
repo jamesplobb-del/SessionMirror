@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BestTake · Premium concept</title>
+    <link rel="icon" href="/icons/icon.png" />
+    <style>
+      :root { color-scheme: light; --page:#edf2f6; --ink:#243b4c; --muted:#697d8e; --line:#d4dfe7; --accent:#216d9f; --active:#fff; --phone:#fbfdff; --shadow:#243f5612; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--page); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+      body.dark { color-scheme:dark; --page:#14232f; --ink:#e6f0f7; --muted:#a0b3c3; --line:#344b5b; --accent:#91cbef; --active:#243c4d; --phone:#2b4152; --shadow:#0003; }
+      button { font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+      button:focus-visible,iframe:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+      .review { display:grid; grid-template-columns:minmax(180px,230px) minmax(0,406px); align-items:center; justify-content:center; gap:clamp(38px,6vw,80px); max-width:1000px; min-height:100dvh; margin:0 auto; padding:34px 28px; }
+      .story { min-width:0; padding:16px 0; }
+      .brand { display:flex; align-items:center; gap:9px; margin-bottom:20px; font-size:14px; font-weight:650; letter-spacing:-.2px; }
+      .brand img { width:29px; height:29px; object-fit:contain; border-radius:7px; }
+      h1 { margin:0; font-size:24px; line-height:1.13; letter-spacing:-.8px; font-weight:600; }
+      .chapters { display:flex; flex-direction:column; gap:5px; margin:20px 0 18px -12px; }
+      .chapter { display:flex; width:100%; align-items:center; gap:13px; padding:12px; border:1px solid transparent; border-radius:12px; background:none; text-align:left; }
+      .chapter:hover { background:color-mix(in srgb,var(--active) 55%,transparent); }
+      .chapter[aria-pressed="true"] { background:var(--active); border-color:var(--line); }
+      .chapter-number { display:grid; place-items:center; flex:0 0 24px; height:24px; border:1px solid var(--line); border-radius:50%; color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+      .chapter[aria-pressed="true"] .chapter-number { border-color:var(--accent); background:var(--accent); color:var(--page); }
+      .chapter-label { flex:1; font-size:13px; font-weight:550; }
+      .chapter-arrow { color:var(--accent); opacity:0; font-size:17px; line-height:1; }
+      .chapter[aria-pressed="true"] .chapter-arrow { opacity:1; }
+      .review-controls { display:flex; align-items:center; justify-content:space-between; gap:14px; padding-top:12px; border-top:1px solid var(--line); }
+      .replay { display:flex; align-items:center; gap:6px; min-height:36px; padding:5px 0; border:0; background:none; color:var(--accent); font-size:12px; }
+      .replay svg { width:14px; height:14px; }
+      .themes { display:flex; gap:2px; padding:3px; border:1px solid var(--line); border-radius:20px; }
+      .themes button { min-height:29px; padding:5px 12px; border:0; border-radius:16px; background:none; color:var(--muted); font-size:11px; }
+      .themes button[aria-pressed="true"] { background:var(--active); color:var(--ink); box-shadow:0 1px 3px var(--shadow); }
+      .preview { width:100%; max-width:406px; margin:0; }
+      .phone { width:100%; padding:7px; border:1px solid color-mix(in srgb,var(--line) 75%,var(--phone)); border-radius:41px; background:var(--phone); box-shadow:0 22px 65px var(--shadow); }
+      .screen { position:relative; width:100%; aspect-ratio:390/800; overflow:hidden; border-radius:33px; background:var(--page); }
+      iframe { position:absolute; inset:0; display:block; width:390px; height:800px; border:0; transform-origin:0 0; }
+      figcaption { margin:15px 0 0; color:var(--muted); font-size:10px; line-height:1.6; text-align:center; letter-spacing:.1px; }
+      .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+      @media (max-width:900px) {
+        .review { display:flex; flex-direction:column; justify-content:flex-start; gap:10px; min-height:0; height:100dvh; padding:12px 14px; }
+        .story { display:grid; grid-template-columns:1fr auto; align-items:center; gap:7px 12px; flex:0 0 auto; width:100%; max-width:530px; padding:0; }
+        .brand { gap:7px; margin:0; font-size:12px; }
+        .brand img { width:23px; height:23px; border-radius:6px; }
+        h1 { font-size:16px; font-weight:550; letter-spacing:-.4px; text-align:right; }
+        .chapters { grid-column:1 / -1; flex-direction:row; flex-wrap:nowrap; gap:4px; margin:0; }
+        .chapter { flex:1 1 0; justify-content:center; width:auto; min-width:0; gap:6px; min-height:33px; padding:5px 7px; border-color:var(--line); border-radius:9px; }
+        .chapter-label { flex:0 1 auto; font-size:11px; white-space:nowrap; }
+        .chapter-number { flex-basis:18px; height:18px; font-size:9px; }
+        .chapter-arrow { display:none; }
+        .review-controls { grid-column:1 / -1; gap:12px; padding:0; border:0; }
+        .replay { min-height:29px; font-size:11px; }
+        .themes { padding:2px; }
+        .themes button { min-height:25px; padding:3px 11px; }
+        .preview { flex:0 0 auto; max-width:100%; }
+        .phone { border-radius:31px; }
+        .screen { border-radius:23px; }
+        figcaption { margin-top:7px; font-size:9px; line-height:1.4; }
+      }
+      @media (max-width:450px) {
+        .chapter-number { display:none; }
+        .chapter { padding-inline:5px; }
+        .chapter-label { font-size:10px; }
+      }
+      @media (prefers-reduced-motion:no-preference) {
+        body,button { transition:background-color .18s,color .18s,border-color .18s; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="review">
+      <section class="story" aria-labelledby="review-title">
+        <div class="brand"><img src="/icons/icon.png" alt="" /><span>BestTake</span></div>
+        <h1 id="review-title">Premium concept</h1>
+        <nav class="chapters" aria-label="Preview a moment">
+          <button class="chapter" type="button" data-command="home" aria-pressed="true"><span class="chapter-number">1</span><span class="chapter-label">Home</span><span class="chapter-arrow" aria-hidden="true">→</span></button>
+          <button class="chapter" type="button" data-command="listen" aria-pressed="false"><span class="chapter-number">2</span><span class="chapter-label">Record</span><span class="chapter-arrow" aria-hidden="true">→</span></button>
+          <button class="chapter" type="button" data-command="workspace" aria-pressed="false"><span class="chapter-number">3</span><span class="chapter-label">Workspace</span><span class="chapter-arrow" aria-hidden="true">→</span></button>
+          <button class="chapter" type="button" data-command="library" aria-pressed="false"><span class="chapter-number">4</span><span class="chapter-label">Library</span><span class="chapter-arrow" aria-hidden="true">→</span></button>
+        </nav>
+        <div class="review-controls">
+          <button class="replay" type="button" id="replay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2.5 8M3 4v6h6" /></svg>First launch</button><button class="replay" type="button" data-command="examples">Reset samples</button>
+          <div class="themes" role="group" aria-label="Appearance"><button type="button" data-dark="false" aria-pressed="true">Light</button><button type="button" data-dark="true" aria-pressed="false">Dark</button></div>
+        </div>
+        <p class="sr-only" id="chapter-status" role="status" aria-live="polite"></p>
+      </section>
+      <figure class="preview">
+        <div class="phone"><div class="screen"><iframe src="./frame.html" title="Interactive BestTake premium concept"></iframe></div></div>
+        <figcaption>Browser concept · Sample audio</figcaption>
+      </figure>
+    </main>
+    <script>
+      const frame = document.querySelector('iframe');
+      const screen = document.querySelector('.screen');
+      const chapterButtons = [...document.querySelectorAll('.chapter[data-command]')];
+      const themeButtons = [...document.querySelectorAll('[data-dark]')];
+      const chapterStatus = document.querySelector('#chapter-status');
+      const stageChapters = { intro:'first', first:'first', return:'home', home:'home', recording:'listen', listen:'listen', keep:'listen', next:'listen', compare:'listen', done:'listen', tools:'tools',workspace:'workspace',library:'library' };
+      let dark = new URLSearchParams(location.search).get('dark') === '1';
+      let ready = false;
+      let pendingCommand = null;
+      const send = (command, extras = {}) => frame.contentWindow?.postMessage({ type:'besttake-concept-command', command, ...extras }, location.origin);
+      function activate(chapter, announce = false) {
+        if (!chapterButtons.some(button => button.dataset.command === chapter)) return;
+        chapterButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.command === chapter)));
+        if (announce) chapterStatus.textContent = chapterButtons.find(button => button.dataset.command === chapter)?.querySelector('.chapter-label').textContent || '';
+      }
+      function setTheme(value) {
+        dark = value;
+        document.body.classList.toggle('dark', dark);
+        themeButtons.forEach(button => button.setAttribute('aria-pressed', String((button.dataset.dark === 'true') === dark)));
+        send('theme', { dark });
+      }
+      function navigate(command) {
+        activate(command === 'reset' ? 'first' : command, true);
+        if (ready) send(command);
+        else pendingCommand = command;
+      }
+      chapterButtons.forEach(button => button.addEventListener('click', () => navigate(button.dataset.command)));
+      document.querySelector('[data-command=examples]').addEventListener('click', () => navigate('examples'));
+      document.querySelector('#replay').addEventListener('click', () => navigate('reset'));
+      themeButtons.forEach(button => button.addEventListener('click', () => setTheme(button.dataset.dark === 'true')));
+      window.addEventListener('message', event => {
+        if (event.origin !== location.origin || event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object') return;
+        if (event.data.type === 'besttake-concept-ready') {
+          ready = true;
+          send('theme', { dark });
+          if (pendingCommand) { send(pendingCommand); pendingCommand = null; }
+        } else if (event.data.type === 'besttake-concept-state') {
+          activate(stageChapters[event.data.stage]);
+        }
+      });
+      const preview = document.querySelector('.preview');
+      const story = document.querySelector('.story');
+      const resizeFrame = () => { frame.style.transform = `scale(${screen.clientWidth / 390})`; };
+      function fitPreview() {
+        if (window.innerWidth <= 900) {
+          const viewportHeight = window.visualViewport?.height || window.innerHeight;
+          const availableHeight = viewportHeight - preview.getBoundingClientRect().top - 12;
+          // Reserve the phone rim and a two-line caption, then preserve the app's aspect ratio.
+          const widthFromHeight = Math.max(0, (availableHeight - 49) * 390 / 800 + 16);
+          preview.style.width = `${Math.min(406, window.innerWidth - 28, widthFromHeight)}px`;
+        } else {
+          preview.style.removeProperty('width');
+        }
+        resizeFrame();
+      }
+      new ResizeObserver(resizeFrame).observe(screen);
+      new ResizeObserver(fitPreview).observe(story);
+      window.addEventListener('resize', fitPreview);
+      window.visualViewport?.addEventListener('resize', fitPreview);
+      fitPreview();
+      setTheme(dark);
+    </script>
+  </body>
+</html>

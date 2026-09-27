@@ -1,3 +1,4 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, Pencil, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import type { Project } from '../db'
@@ -306,11 +307,11 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
       {setupId === item.id && <div className="music-library__setup-panel music-routine-item-settings" id={`music-score-setup-${item.id}`}>
         <MusicToolSetup step={scoreStep(item)} instrumentId={instrumentId} onChange={patch => updateScoreSetup(item, patch)} />
         <button type="button" className="music-library__remove-score" disabled={disabled || Boolean(busy)} onClick={() => setDeleteIds([item.id])}><Trash2 aria-hidden /> Delete music</button>
-        <details className="music-routine-more"><summary>More options</summary>
+        <PremiumDisclosure className="music-routine-more"><summary>More options</summary>
           <label className="music-routine-check"><input type="checkbox" checked={Boolean(scoreStep(item).desk?.autoSoundRecording)}
             onChange={event => updateScoreSetup(item, { desk: { ...(scoreStep(item).desk ?? blankDesk('audio')), autoSoundRecording: event.target.checked } })} /> Hands-free recording</label>
           <RoutineProgramSetup scope="score" value={scoreStep(item).programId} onChange={programId => updateScoreSetup(item, { programId })} />
-        </details>
+        </PremiumDisclosure>
       </div>}
     </li>)}</ol>}
     {!visible.length && (music.length || selectedFolder) && <p className="music-library__no-results">{searching ? `No music matches “${query}”.` : 'No scores here yet. Import music or drag a score into this folder.'}</p>}

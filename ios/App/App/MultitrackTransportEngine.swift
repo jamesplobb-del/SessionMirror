@@ -69,6 +69,10 @@ final class MultitrackTransportEngine {
 
     func prepare(sources: [Source]) throws -> [String: Any] {
         try controlQueue.sync {
+            guard !AudioRouteConfigurator.isAppBackgrounded else {
+                throw NSError(domain: "BestTake.MultitrackTransport", code: 7,
+                              userInfo: [NSLocalizedDescriptionKey: "Multitrack playback cannot start in the background"])
+            }
             stopLocked(resetPreparedSources: true)
             do {
 
@@ -170,6 +174,10 @@ final class MultitrackTransportEngine {
         leadSec: Double = 0.30
     ) throws -> StartResult {
         try controlQueue.sync {
+            guard !AudioRouteConfigurator.isAppBackgrounded else {
+                throw NSError(domain: "BestTake.MultitrackTransport", code: 7,
+                              userInfo: [NSLocalizedDescriptionKey: "Multitrack playback cannot start in the background"])
+            }
             guard isPrepared else {
                 throw NSError(
                     domain: "BestTake.MultitrackTransport",
@@ -325,6 +333,13 @@ final class MultitrackTransportEngine {
     func stop() {
         controlQueue.sync {
             stopLocked(resetPreparedSources: true)
+        }
+    }
+
+    func suspendForAppBackground(completion: @escaping () -> Void) {
+        controlQueue.async { [weak self] in
+            self?.stopLocked(resetPreparedSources: true)
+            DispatchQueue.main.async(execute: completion)
         }
     }
 

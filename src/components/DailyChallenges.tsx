@@ -1,3 +1,4 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useRef, useState } from 'react'
 import { Trophy, Check, ChevronRight, X, LockKeyhole } from 'lucide-react'
 import { CHALLENGE_CHANGED, CHARACTER_COSTS, characterUnlocked, loadChallengeProgress, trophyCount } from '../utils/dailyChallenges'
@@ -54,7 +55,7 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
     setSelectionError(saved !== id)
   }
   return <section className="daily-challenges" aria-label="Today's challenges">
-    <details className="daily-challenges__disclosure">
+    <PremiumDisclosure className="daily-challenges__disclosure">
     <summary><span><strong>Today’s challenges</strong><small>{Number(practiceDone) + Number(gameDone)} of 2 complete</small></span><ChevronRight aria-hidden /></summary>
     <header><div><small>Two small wins for your music</small></div><button onClick={() => setCollection(true)} aria-label={`Open collection, ${total} trophies`}><Trophy aria-hidden /> {total}</button></header>
     {error ? <div role="status"><p>Challenges couldn’t be saved on this device. Your practice tools still work.</p><button onClick={refresh}>Try again</button></div> : plan && <>
@@ -71,7 +72,7 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
     <button className="daily-challenges__collection" onClick={() => setCollection(true)}>
       {next ? <><img src={next.asset} alt="" /><span><strong>{next.name} is next</strong><small>{Math.max(0, CHARACTER_COSTS[next.id] - total)} more trophies to unlock</small></span></> : <span>Your character collection</span>}<ChevronRight aria-hidden />
     </button>
-    </details>
+    </PremiumDisclosure>
     {collection && <dialog ref={dialogRef} className="challenge-collection" onCancel={() => setCollection(false)} onClose={() => setCollection(false)} aria-labelledby="challenge-collection-title">
       <header><span><Trophy aria-hidden /> {total} trophies</span><button onClick={() => setCollection(false)} aria-label="Close collection"><X aria-hidden /></button></header>
       <h2 id="challenge-collection-title">Your players</h2>

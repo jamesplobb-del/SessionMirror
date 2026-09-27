@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { PremiumStatusToast } from './ui/PremiumRecordingFeedback'
 import {
   createGuidanceState, FEATURE_GUIDES, GUIDANCE_EVENT, GUIDANCE_PREFERENCES_EVENT, CONFIRMATION_EVENT,
   guidanceReducer, readGuidancePreferences, writeGuidancePreferences, setFeatureTipsEnabled,
@@ -16,6 +17,9 @@ interface Props {
   workspaceOpen: boolean
   handsFreeEnabled: boolean
   isRecording: boolean
+  recordingActivity?: string | null
+  feedbackError?: string | null
+  onDismissFeedbackError?: () => void
 }
 interface Position { left: number; top: number; width: number; maxHeight: number; target: DOMRect }
 
@@ -268,8 +272,9 @@ export default function FeatureGuidance(props: Props) {
         <button type="button" className="feature-guidance-disable" onClick={() => setFeatureTipsEnabled(false)}>Don’t show tips</button>
       </div>
     </div>}
-    <div className="feature-confirmation" role="status" aria-live="polite" aria-atomic="true" hidden={!toastVisible}>
-      {toastVisible ? confirmation?.text : ''}
-    </div>
+    <PremiumStatusToast
+      message={documentHidden ? null : props.feedbackError || props.recordingActivity || (toastVisible ? confirmation?.text ?? null : null)}
+      tone={props.feedbackError ? 'error' : props.recordingActivity ? 'busy' : 'success'}
+      onDismiss={props.feedbackError ? props.onDismissFeedbackError : undefined} />
   </>, document.body)
 }

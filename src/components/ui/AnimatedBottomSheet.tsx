@@ -1,4 +1,5 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { PremiumMotionDiv, PremiumMotionButton } from './PremiumMotionSurface'
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useLayoutEffect, useRef, useState, useCallback, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { useSheetDragDismiss, readSheetSlideDistance } from '../../hooks/useSheetDragDismiss'
@@ -105,20 +106,22 @@ export default function AnimatedBottomSheet({
 
   if (typeof document === 'undefined') return null
 
+  const premiumSheet = !document.documentElement.dataset.gameConcept
   const sheetTransition =
-    reduceMotion ? { duration:0.1 } : electric ? {type:'spring' as const,stiffness:440,damping:40,mass:.85} :
+    reduceMotion ? { duration:0.1 } : premiumSheet ? {duration:.738,ease:[.16,1,.3,1] as [number,number,number,number]} : electric ? {type:'spring' as const,stiffness:440,damping:40,mass:.85} :
     motionPreset === 'default'
       ? iosSpringSheet
       : motionPreset === 'light'
         ? { duration: 0.28, ease: [0.32, 0.72, 0, 1] as [number, number, number, number] }
         : iosSheetPremium
   const backdropTransition =
+    premiumSheet ? {duration:reduceMotion ? .1 : .432,ease:"easeOut" as const} :
     motionPreset === 'default'
       ? iosFade
       : motionPreset === 'light'
         ? { duration: 0.2, ease: 'easeOut' as const }
         : iosSheetBackdrop
-  const useScale = !electric && !reduceMotion && motionPreset !== 'light'
+  const useScale = !reduceMotion && (premiumSheet || (!electric && motionPreset !== 'light'))
 
   const handleSheetAnimationComplete = () => {
     if (!isOpen || enterNotifiedRef.current) return
@@ -148,7 +151,7 @@ export default function AnimatedBottomSheet({
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.button
+          <PremiumMotionButton
             key="sheet-backdrop"
             type="button"
             className={`tutorial-sheet-backdrop native-sheet-backdrop fixed inset-0 cursor-default touch-none ${backdropClass} ${zClass ? zClass.backdrop : elevated ? 'tutorial-sheet-backdrop--elevated z-[90]' : 'z-40'}`}
@@ -165,7 +168,7 @@ export default function AnimatedBottomSheet({
             onClick={backdropArmed ? handleDismiss : undefined}
           />
 
-          <motion.div
+          <PremiumMotionDiv
             key="sheet-surface"
             className={`animated-bottom-sheet fixed inset-x-0 bottom-0 flex ${maxHeightClass} flex-col rounded-t-[2rem] ${zClass ? zClass.sheet : elevated ? 'animated-bottom-sheet--elevated z-[100]' : 'z-50'}`}
             style={{
@@ -181,7 +184,7 @@ export default function AnimatedBottomSheet({
             transition={sheetTransition}
             onAnimationComplete={handleSheetAnimationComplete}
           >
-            <motion.div
+            <PremiumMotionDiv
               ref={sheetRef}
               className={`native-bottom-sheet flex min-h-0 flex-1 flex-col overflow-hidden ${sheetSurfaceClass}`}
               role="dialog"
@@ -205,8 +208,8 @@ export default function AnimatedBottomSheet({
               </div>
               {children}
             </div>
-            </motion.div>
-          </motion.div>
+            </PremiumMotionDiv>
+          </PremiumMotionDiv>
         </>
       )}
     </AnimatePresence>,

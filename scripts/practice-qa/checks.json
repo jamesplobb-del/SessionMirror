@@ -1,0 +1,118 @@
+[
+  {
+    "file": "scripts/verify-feature-guidance.mjs",
+    "scope": "guidance reducer and mocked persistence"
+  },
+  {
+    "file": "scripts/verify-navigation-response.mjs",
+    "scope": "navigation source contracts"
+  },
+  {
+    "file": "scripts/verify-last-practice-destination.mjs",
+    "scope": "destination persistence utility"
+  },
+  {
+    "file": "scripts/verify-handsfree-cycle.mjs",
+    "scope": "handsfree phase utilities"
+  },
+  {
+    "file": "scripts/verify-handsfree-playback.mjs",
+    "scope": "extracted callback with mocked media"
+  },
+  {
+    "file": "scripts/verify-camera-handsfree-playback.mjs",
+    "scope": "extracted replay effect with mocks"
+  },
+  {
+    "file": "scripts/verify-take-guidance.mjs",
+    "scope": "take guidance state utility"
+  },
+  {
+    "file": "scripts/verify-live-recording-waveform.mjs",
+    "scope": "hook with synthetic PCM"
+  },
+  {
+    "file": "scripts/verify-trim-metadata.mjs",
+    "scope": "trim metadata utility"
+  },
+  {
+    "file": "scripts/verify-multitrack-upgrade.mjs",
+    "scope": "multitrack model and source contracts"
+  },
+  {
+    "file": "scripts/verify-multitrack-sharing.mjs",
+    "scope": "project sharing utilities and bridge boundaries"
+  },
+  {
+    "file": "scripts/verify-multitrack-editor.mjs",
+    "scope": "editor utility and source contracts"
+  },
+  {
+    "file": "scripts/verify-music-library.mjs",
+    "scope": "music library data utilities"
+  },
+  {
+    "file": "scripts/verify-document-handoff.mjs",
+    "scope": "document handoff bridge contracts"
+  },
+  {
+    "file": "scripts/verify-practice-routines.mjs",
+    "scope": "routine storage/progress utilities"
+  },
+  {
+    "file": "scripts/verify-routine-preset-tools.mjs",
+    "scope": "routine preset utilities"
+  },
+  {
+    "file": "scripts/verify-routine-music.mjs",
+    "scope": "routine music serialization"
+  },
+  {
+    "file": "scripts/verify-routine-music-share.mjs",
+    "scope": "shared routine music utilities"
+  },
+  {
+    "file": "scripts/verify-routine-program-share.mjs",
+    "scope": "linked program sharing utilities"
+  },
+  {
+    "file": "scripts/verify-staff-jumper-difficulty-ranges.mjs",
+    "scope": "game instrument difficulty ranges"
+  },
+  {
+    "file": "scripts/verify-staff-jumper-review.mjs",
+    "scope": "game pitch/rhythm/layout utilities"
+  },
+  {
+    "file": "scripts/verify-metronome-background.mjs",
+    "scope": "metronome pause/resume model"
+  },
+  {
+    "file": "scripts/verify-tuner-stability.mjs",
+    "scope": "simulated tuner buffers"
+  },
+  {
+    "file": "scripts/verify-drone-transitions.mjs",
+    "scope": "drone state command ordering"
+  },
+  {
+    "file": "scripts/verify-practice-chart-ink.mjs",
+    "scope": "Score ink model and actual exported PDF drawing operations; not native annotation gestures"
+  },
+  {
+    "file": "scripts/verify-metronome-program-review.mjs",
+    "scope": "Tempo ramps, pins, count-in, loop and pause against a simulated click boundary"
+  },
+  {
+    "file": "scripts/verify-daily-challenges.mjs",
+    "scope": "Reward persistence, duplicate prevention and storage-failure retry model"
+  },
+  {
+    "file": "scripts/verify-multitrack-native-read.mjs",
+    "scope": "Native asset decoding contract with mocked native filesystem boundary"
+  },
+  {
+    "file": "scripts/verify-multitrack-reference-preview.mjs",
+    "scope": "Reference preview source and layout contracts; not native video playback"
+  }
+]

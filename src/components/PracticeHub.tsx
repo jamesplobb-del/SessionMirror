@@ -1,8 +1,12 @@
+import { PremiumPicker } from './ui/PremiumPicker'
+import PremiumFlowPage from './ui/PremiumFlowPage'
+import PremiumDisclosure from './ui/PremiumDisclosure'
+import { PremiumMotionDiv, PremiumMotionSection } from './ui/PremiumMotionSurface'
 import type { DailyChallengePlan } from '../utils/dailyChallengePlan'
 import DailyChallenges from './DailyChallenges'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
 import {
   Check,
   ChevronDown,
@@ -16,7 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import Pressable from './ui/Pressable'
-import { iosFade, iosSpringSnappy, motionExitHide, motionGpuLayer } from '../utils/motionPresets'
+import { motionExitHide, motionGpuLayer } from '../utils/motionPresets'
 import {
   INSTRUMENT_FAMILIES,
   describeHandsFreeGate,
@@ -72,6 +76,8 @@ interface PracticeHubProps {
   projects: Project[]
   takes: Take[]
   tunerTransposition: TunerTranspositionId
+  /** The player's saved hands-free gate, not the instrument preset. */
+  handsFreeThreshold: number
   hapticFeedback: boolean
   onClose: () => void
   onOpenSettings?: () => void
@@ -141,6 +147,7 @@ export default function PracticeHub({
   projects,
   takes,
   tunerTransposition,
+  handsFreeThreshold,
   hapticFeedback,
   onClose,
   onOpenQuickPractice,
@@ -173,6 +180,7 @@ export default function PracticeHub({
 }: PracticeHubProps) {
   const dialogRef = useRef<HTMLElement>(null)
   const reducedMotion = useReducedMotion()
+  const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false)
   const [page, setPage] = useState<HubPage>(loadHubPage)
   const pageRef = useRef<HubPage>(page)
   pageRef.current = page
@@ -289,7 +297,7 @@ export default function PracticeHub({
   const instrumentProfile = instrumentId ? getInstrumentProfile(instrumentId) : undefined
   const tunerKey = getTunerTransposition(tunerTransposition)
   const homeSubtitle = instrumentProfile
-    ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(instrumentProfile.soundVolumeThreshold)}`
+    ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(handsFreeThreshold)}`
     : 'Sets practice suggestions and input sensitivity; tuner stays in concert pitch'
   const homeDay = routineDay?.routineId === routine?.id ? routineDay : null
   const homeProgress = routine ? routineProgress(routine, homeDay) : null
@@ -297,7 +305,6 @@ export default function PracticeHub({
   const lastMusic = lastPracticeDestination?.kind === 'music' && onContinueMusic
     ? projects.find(project => project.id === lastPracticeDestination.projectId && hasPracticeChart(project.id))
     : null
-  const firstSession = takes.length === 0 && !routine?.steps.length
   const homeRoutineLabel = !routine?.steps.length ? 'Try a suggested routine'
     : homeProgress?.complete || !homeNext ? 'Routine complete'
     : homeDay?.startedAt ? 'Continue your routine' : 'Start your routine'
@@ -306,15 +313,16 @@ export default function PracticeHub({
   if (typeof document === 'undefined') return null
 
   return createPortal(
+    <>
     <AnimatePresence initial={false}>
       {isOpen && (
-        <motion.div
+        <PremiumMotionDiv
           key="practice-menu"
           className={`practice-menu-layer ${activePage === 'routine' ? 'practice-menu-layer--routine-guide' : activePage === 'home' ? 'practice-menu-layer--home' : ''}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transitionEnd: motionExitHide }}
-          transition={iosFade}
+          transition={reducedMotion ? {duration:.12} : {duration:.468,ease:[.22,1,.36,1]}}
           style={motionGpuLayer}
         >
           <button
@@ -324,18 +332,18 @@ export default function PracticeHub({
             onClick={onClose}
           />
 
-          <motion.section
+          <PremiumMotionSection
             ref={dialogRef}
-            className={`practice-menu-card ${activePage === 'home' ? 'practice-menu-card--electric-edge' : ''} ${activePage === 'home' && firstSession ? 'practice-menu-card--first-session' : ''} ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
+            className={`practice-menu-card ${activePage === 'home' ? 'practice-menu-card--electric-edge' : ''} ${activePage === 'routine' ? 'practice-menu-card--routine-guide' : page === 'home' ? 'practice-menu-card--home' : ''}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby={activePage === 'routine' ? undefined : 'practice-menu-title'}
             aria-label={activePage === 'routine' ? 'Build your routine' : undefined}
             tabIndex={-1}
-            initial={{ transform: activePage === 'routine' || reducedMotion ? 'translateY(0px) scale(1)' : 'translateY(10px) scale(.96)' }}
+            initial={{ transform: activePage === 'routine' || reducedMotion ? 'translateY(0px) scale(1)' : 'translateY(28px) scale(.95)' }}
             animate={{ transform: 'translateY(0px) scale(1)' }}
-            exit={{ transform: activePage === 'routine' || reducedMotion ? 'translateY(0px) scale(1)' : 'translateY(8px) scale(.97)' }}
-            transition={iosSpringSnappy}
+            exit={{ transform: activePage === 'routine' || reducedMotion ? 'translateY(0px) scale(1)' : 'translateY(18px) scale(.975)' }}
+            transition={reducedMotion ? {duration:.12} : {type:"spring",duration:.72,bounce:.06}}
           >
             <header className="practice-menu-header">
               <div className="practice-menu-header-slot">
@@ -405,12 +413,12 @@ export default function PracticeHub({
               {launchError && <p className="focus-error" role="alert">{launchError}</p>}
               {/* Internal navigation replaces content immediately; keep sheet motion separate. */}
                 {activePage === 'routine' && routineBuilderRequest ? (
-                  <motion.div
+                  <PremiumMotionDiv
                     key="routine-builder"
                     className="practice-menu-page"
                     initial={{ transform: `translateX(${reducedMotion ? 0 : 8}px)` }}
                     animate={{ transform: 'translateX(0px)' }}
-                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
+                    transition={{ duration: reducedMotion ? 0 : .558, ease: [.22, 1, .36, 1] }}
                   >
                     <MusicRoutineBuilder
                       key={routine?.id ?? 'new-routine'}
@@ -427,6 +435,10 @@ export default function PracticeHub({
                       }}
                       onSaveAndStart={saveAndStartRoutine}
                       onCreatePracticeItem={onCreatePracticeItem}
+                      onOpenMusicLibrary={onOpenMusic ? () => {
+                        onCloseRoutineBuilder()
+                        onOpenMusic()
+                      } : undefined}
                       todayStarted={Boolean(routine && routineDay?.routineId === routine.id && routineDay.startedAt)}
                       onDelete={() => {
                         onDeleteRoutine()
@@ -434,14 +446,14 @@ export default function PracticeHub({
                       }}
                       onCancel={closeBuilder}
                     />
-                  </motion.div>
+                  </PremiumMotionDiv>
                 ) : activePage === 'instrument' ? (
-                  <motion.div
+                  <PremiumMotionDiv
                     key="instrument"
                     className="practice-menu-page"
                     initial={{ transform: `translateX(${reducedMotion ? 0 : 8}px)` }}
                     animate={{ transform: 'translateX(0px)' }}
-                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
+                    transition={{ duration: reducedMotion ? 0 : .558, ease: [.22, 1, .36, 1] }}
                   >
                     <InstrumentSheet
                       selectedId={instrumentId}
@@ -452,25 +464,26 @@ export default function PracticeHub({
                         setPage('home')
                       }}
                     />
-                  </motion.div>
+                  </PremiumMotionDiv>
                 ) : activePage === 'today' && routine ? (
-                  <div key="today" className="practice-menu-page">
+                  <PremiumFlowPage key="today" className="practice-menu-page">
                     <RoutineHomeDisclosure routine={routine} day={routineDay} tunerTransposition={tunerTransposition}
                       hapticFeedback={hapticFeedback} startingStepId={startingRoutineStepId} onOpenItemHistory={onOpenItemHistory}
                       onStartStep={(stepId) => void startRoutineStep(stepId)} onToggleStep={onToggleRoutineStep}
                       onEdit={() => onOpenRoutineBuilder('edit')} />
-                  </div>
+                  </PremiumFlowPage>
                 ) : (
-                  <motion.div
+                  <PremiumMotionDiv
                     key="home"
                     className="practice-menu-page"
                     initial={{ transform: `translateX(${reducedMotion ? 0 : -8}px)` }}
                     animate={{ transform: 'translateX(0px)' }}
-                    transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}
+                    transition={{ duration: reducedMotion ? 0 : .558, ease: [.22, 1, .36, 1] }}
                   >
                     <section className="practice-menu-focus-flow">
                       <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
-                        className="practice-home-instrument" onClick={() => setPage('instrument')}
+                        className="practice-home-instrument" onClick={() => setInstrumentPickerOpen(true)}
+                        aria-haspopup="dialog" aria-expanded={instrumentPickerOpen}
                         aria-label={instrumentProfile ? `${instrumentProfile.label}. Change instrument.` : 'Choose your instrument'}
                         aria-describedby="practice-home-instrument-description">
                         <span className="practice-home-instrument-copy">
@@ -608,13 +621,19 @@ export default function PracticeHub({
                         )}
                       </div>
                     </section>
-                  </motion.div>
+                  </PremiumMotionDiv>
                 )}
             </div>
-          </motion.section>
-        </motion.div>
+          </PremiumMotionSection>
+        </PremiumMotionDiv>
       )}
-    </AnimatePresence>,
+    </AnimatePresence>
+    <PremiumPicker isOpen={isOpen && instrumentPickerOpen} title="Your instrument" searchable
+      value={instrumentId ?? ''} hapticFeedback={hapticFeedback}
+      options={INSTRUMENT_FAMILIES.flatMap(family => getInstrumentProfilesByFamily(family).map(profile => ({ value: profile.id, label: profile.label, group: family })))}
+      description="Practice suggestions for what you play. The tuner stays in concert pitch."
+      onChange={onSelectInstrument} onClose={() => setInstrumentPickerOpen(false)} />
+    </>,
     document.body,
   )
 }
@@ -706,7 +725,7 @@ function RoutineHomeDisclosure(props: TodayBoardProps) {
     : `${progress.done} of ${progress.total} done${progress.minutesLeft > 0 ? ` · ${formatMinutes(progress.minutesLeft)} left` : ''}`
 
   return (
-    <details className="practice-home-disclosure practice-home-routine">
+    <PremiumDisclosure className="practice-home-disclosure practice-home-routine">
       <summary>
         <span className={`practice-home-routine__count ${progress.complete ? 'is-complete' : ''}`} aria-hidden>
           {progress.complete ? <Check /> : `${progress.done}/${progress.total}`}
@@ -721,7 +740,7 @@ function RoutineHomeDisclosure(props: TodayBoardProps) {
       <div className="practice-home-routine__content">
         <TodayBoard {...props} compact />
       </div>
-    </details>
+    </PremiumDisclosure>
   )
 }
 

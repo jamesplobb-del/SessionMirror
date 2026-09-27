@@ -1,3 +1,4 @@
+import { TakePlaybackStatus } from './ui/PremiumRecordingFeedback'
 import { useTakeGuidance } from '../context/TakeGuidanceContext'
 import { useTakePlaybackEnhancerRevision } from '../hooks/useTakePlaybackEnhancerEnabled'
 import { memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent, type PointerEvent } from 'react'
@@ -665,16 +666,12 @@ function PipWindow({
                   haptic="light"
                   className="absolute inset-0 z-[1] cursor-pointer border-0 bg-transparent p-0"
                   onClick={handleVideoAreaClick}
-                  aria-label={`Open Expand View with ${label}`}
+                  aria-label={`Open full-screen playback of ${label}`}
                 />
               )
             )}
 
-            {(isPreparing || playbackError) && (
-              <p role="status" className="absolute inset-x-1 top-1 z-20 rounded bg-black/80 px-2 py-1 text-center text-[10px] text-white">
-                {isPreparing ? 'Preparing audio…' : 'Could not prepare playback. Try again.'}
-              </p>
-            )}
+            <TakePlaybackStatus active={Boolean(isPreparing || playbackError)} busy={isPreparing} />
             <div className="absolute inset-0 z-[5] pointer-events-none">
               {!suspendPlayback && (
               <Pressable

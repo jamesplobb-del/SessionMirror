@@ -13,7 +13,7 @@ import {
   type DroneState,
   type DroneWaveform,
 } from '../utils/droneEngine'
-import { APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
+import { APP_BACKGROUND_SUSPEND_EVENT, APP_INTERACTIVE_MEDIA_RECOVERY_EVENT } from '../utils/appForeground'
 import { loadDronePrefs, saveDronePrefs, type DronePrefs } from '../utils/dronePrefs'
 import { triggerLightHaptic } from '../utils/haptics'
 
@@ -209,6 +209,13 @@ function stepOctave(delta: 1 | -1, hapticFeedback: boolean): void {
 function attachRecoveryListener(): void {
   if (recoveryListenerAttached || typeof window === 'undefined') return
   recoveryListenerAttached = true
+  window.addEventListener(APP_BACKGROUND_SUSPEND_EVENT, () => {
+    // Clear the UI state as well as the native graph. Otherwise foreground
+    // recovery would restart a reference tone that was stopped in background.
+    commandSequence += 1
+    commit({ ...prefs, activeNotes: [], enabled: false })
+    if (isDroneNativeAvailable()) void droneStop().catch(() => {})
+  })
   window.addEventListener(APP_INTERACTIVE_MEDIA_RECOVERY_EVENT, () => {
     if (!isDroneNativeAvailable() || prefs.activeNotes.length === 0 || recoveryInFlight) return
     const sequence = commandSequence

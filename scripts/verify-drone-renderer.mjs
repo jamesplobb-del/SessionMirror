@@ -15,6 +15,7 @@ try {
   source = source.slice(0, start) + '    private init() {}\n' + source.slice(end)
   source += `
 private enum AudioRouteConfigurator {
+    static var isAppBackgrounded = false
     static func prepareMetronomePlaybackSessionIfNeeded() throws {}
 }
 extension DroneEngine {

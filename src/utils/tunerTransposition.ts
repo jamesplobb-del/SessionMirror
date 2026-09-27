@@ -1,4 +1,4 @@
-import { midiToNoteName, type PitchReadout } from './pitchUtils'
+import type { PitchReadout } from './pitchUtils'
 
 /**
  * A written-pitch preset. `writtenOffsetSemitones` is added to sounding MIDI
@@ -285,13 +285,12 @@ export function transposePitchReadout(
 ): PitchReadout {
   if (readout.noteName === '—' || !Number.isFinite(readout.midi)) return readout
 
-  const semitones = getTunerTransposition(transposition).writtenOffsetSemitones
-  if (semitones === 0) return readout
-
-  const writtenMidi = readout.midi + semitones
+  const concertPitchClass = ((Math.round(readout.midi) % 12) + 12) % 12
+  const concertOctave = Math.floor(Math.round(readout.midi) / 12) - 1
+  const written = getWrittenPitchLabel(concertPitchClass, concertOctave, transposition)
   return {
     ...readout,
-    midi: writtenMidi,
-    noteName: midiToNoteName(writtenMidi),
+    midi: written.midi,
+    noteName: written.noteName,
   }
 }

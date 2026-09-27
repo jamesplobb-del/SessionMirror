@@ -1,3 +1,4 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useState } from 'react'
 import { Play, Repeat2 } from 'lucide-react'
 import { formatPassageTime, parsePassageTime } from '../utils/practicePassages'
@@ -24,7 +25,7 @@ export default function ReferencePassageControls({ controls }: { controls: Retur
     </button>
     {!ready && <p className="focus-help" role="status">Waiting for the reference player…</p>}
     {error && <p className="focus-error" role="alert">{error}</p>}
-    <details className="reference-passage">
+    <PremiumDisclosure className="reference-passage">
     <summary><span>{hasPassage ? 'Edit passage' : 'Choose a passage'}</span><small>{passage.startSeconds !== null && passage.endSeconds !== null
       ? `${formatPassageTime(passage.startSeconds)}–${formatPassageTime(passage.endSeconds)}` : 'Choose the part you’re practicing'}</small></summary>
     <div className="reference-passage__fields">
@@ -39,6 +40,6 @@ export default function ReferencePassageControls({ controls }: { controls: Retur
     </div>
     {validation && <p role="alert">{validation}</p>}
     {!ready && <p>Waiting for the reference player. You can still enter and save a passage.</p>}
-  </details>
+  </PremiumDisclosure>
   </section>
 }

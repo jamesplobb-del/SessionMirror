@@ -23,7 +23,7 @@ const plugin = { name: 'drone-boundaries', setup(b) {
       droneStart = globalThis.__droneTest.start, droneGetState = globalThis.__droneTest.getState;
       export const droneSetOctave = async () => {}, droneSetVolume = async () => {}, droneSetWaveform = async () => {}, droneSoloNote = async (pitchClass, octave = 4) => ({ ...globalThis.__droneTest.base, activeNotes: [pitchClass], octave, enabled: true }), droneToggleNote = async () => {};` :
     a.path.endsWith('dronePrefs') ? 'export const loadDronePrefs = () => globalThis.__droneTest.base; export const saveDronePrefs = () => {};' :
-    a.path.endsWith('appForeground') ? "export const APP_INTERACTIVE_MEDIA_RECOVERY_EVENT = 'recover'" :
+    a.path.endsWith('appForeground') ? "export const APP_BACKGROUND_SUSPEND_EVENT = 'background'; export const APP_INTERACTIVE_MEDIA_RECOVERY_EVENT = 'recover'" :
     'export const triggerLightHaptic = () => {};'
   }))
 } }
@@ -67,6 +67,13 @@ resumeChord?.()
 await flush()
 assert.deepEqual(drone.readDroneState().activeNotes, [0, 4, 7])
 
+const recoveriesBeforeBackground = recoveries
+events.get('background')()
+await flush()
+assert.deepEqual(drone.readDroneState().activeNotes, [], 'Backgrounding silences the drone state')
+events.get('recover')()
+assert.equal(recoveries, recoveriesBeforeBackground, 'Foreground does not restart a backgrounded drone')
+
 // A routine may apply its desk before the drone widget mounts for the first time.
 const fresh = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text + '\n// fresh routine mount').toString('base64')}`)
 const beforeRestore = restores
@@ -76,4 +83,4 @@ fresh.useDrone({ volume: 1, waveform: 'sine' })
 assert.equal(restores, beforeRestore, 'First mount must not send a silent restore after a routine command')
 await flush()
 assert.deepEqual(fresh.readDroneState().activeNotes, [5])
-console.log('Drone checks passed: initial restoration, shared recovery, and stale stop responses preserve newer commands.')
+console.log('Drone checks passed: initial restoration, shared recovery, background silence, and stale stop responses preserve newer commands.')

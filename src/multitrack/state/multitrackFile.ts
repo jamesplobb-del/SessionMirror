@@ -59,7 +59,7 @@ export async function buildMultitrackFile(session: MultitrackSession): Promise<B
   const header = new Uint8Array(12)
   header.set(new TextEncoder().encode(MAGIC))
   new DataView(header.buffer).setUint32(8, manifest.length, true)
-  return new Blob([header, manifest, ...blobs], { type: 'application/octet-stream' })
+  return new Blob([header, manifest, ...blobs], { type: 'application/vnd.besttake.multitrack' })
 }
 
 function record(value: unknown): Record<string, any> {

@@ -231,7 +231,15 @@ import {
   stabilizeViewportAfterMediaInteraction,
 } from './utils/viewportSync'
 import { resumePlaybackAudioContext } from './utils/playbackAudioContext'
-import { hasPracticeChart, setChartVisible } from './utils/practiceChartStorage'
+import { hasPracticeChart, savePracticeChart, setChartVisible } from './utils/practiceChartStorage'
+import { musicExerciseTitle, prepareRoutineMusicFile } from './utils/routineMusic'
+import {
+  consumePendingPdfOpen,
+  discardOpenedPdfCopy,
+  getPendingPdfOpen,
+  releaseFailedPdfOpen,
+  subscribePdfOpen,
+} from './utils/incomingPdfOpen'
 import { loadExerciseLibrary } from './utils/routineLibrary'
 import {
   APP_BACKGROUND_SUSPEND_EVENT,
@@ -791,7 +799,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const audioEnhancerSettingsRef = useRef(settings.audioEnhancerSettings)
   audioEnhancerSettingsRef.current = settings.audioEnhancerSettings
   const pendingChallengerIdRef = useRef<string | null>(null)
-  /** User closed the current-take box — skip auto-fill until the next recording. */
+  /** No older current take remains — skip auto-fill until the next recording. */
   const challengerUserDismissedRef = useRef(false)
   const reloadTakesGenerationRef = useRef(0)
   const takesRef = useRef<Take[]>([])
@@ -911,18 +919,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       )
     },
     [updateSettings],
-  )
-
-  // The introduction finishes in Home or its real routine builder.
-  const handleOnboardingRoutineChoice = useCallback(
-    (mode: RoutineBuilderMode) => {
-      markAllCoachMarksSeen()
-      setShowOnboardingTutorial(false)
-      setTutorialTourEnabled(false)
-      setRoutineBuilderRequest(mode)
-      setIsPracticeHubOpen(true)
-    },
-    [],
   )
 
   useEffect(() => {
@@ -3717,7 +3713,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   ])
 
   const handleOpenFullPracticeTool = useCallback(
-    (tab: 'music' | 'metronome' | 'tuner') => {
+    async (tab: 'music' | 'metronome' | 'tuner') => {
       triggerLightHaptic(settings.hapticFeedback)
       dismissPracticeHub()
       setIsSettingsOpen(false)
@@ -3740,7 +3736,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       ) {
         // Keep the Music tab from mounting while Camera's replay is still
         // restoring its audio route. Opening it early starts a second cleanup.
-        void finishAutoPlayback().then(openTool, openTool)
+        await finishAutoPlayback().then(openTool, openTool)
         return
       }
       openTool()
@@ -4813,6 +4809,62 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     dismissPracticeHub()
   }, [dismissPracticeHub, handleOpenMusicScore])
 
+  const incomingPdfBusyRef = useRef(false)
+  useEffect(() => {
+    const openPdfFromFiles = () => {
+      if (!getPendingPdfOpen() || incomingPdfBusyRef.current || isRecording || isStopping || practiceTransitionBusy) return
+      const incoming = consumePendingPdfOpen()
+      if (!incoming) return
+      incomingPdfBusyRef.current = true
+      void (async () => {
+        let projectId: string | null = null
+        let saved = false
+        try {
+          const { readMultitrackAsset } = await import('./multitrack/state/readMultitrackAsset')
+          const blob = await readMultitrackAsset(Capacitor.convertFileSrc(incoming.url), 'This PDF', incoming.url)
+            .catch(() => { throw new Error('Could not read this PDF from Files. Try opening it again.') })
+          const pdf = await prepareRoutineMusicFile(new File([blob], incoming.name, { type: 'application/pdf' }))
+          projectId = await handleCreatePracticeItem(musicExerciseTitle(pdf.name))
+          await savePracticeChart(projectId, pdf)
+          saved = true
+          setMusicChartRevision(value => value + 1)
+          void discardOpenedPdfCopy(incoming.url)
+
+          // File handoff should land on the score, even if BestTake was last
+          // left in Camera, Multitrack, a review, or another Tools tab.
+          if (multitrackOpen) {
+            setMultitrackOpen(false)
+            setMultitrackPendingRecordingTakeId(null)
+            multitrackRecordingActiveRef.current = false
+            setSuppressNativeBridgeRecovery(false)
+          }
+          setReviewSlot(null)
+          setReviewContext('compare')
+          setFocusPanel(null)
+          await handleOpenFullPracticeTool('music')
+          await handleOpenMusicScore(projectId)
+        } catch (error) {
+          if (projectId && !saved) {
+            await deleteProject(projectId).catch(() => {})
+            setProjects(current => current.filter(project => project.id !== projectId))
+          }
+          if (!saved) releaseFailedPdfOpen(incoming.url)
+          const detail = error instanceof Error ? error.message : 'Please try opening the file again.'
+          showAlertOutsideTree({
+            title: saved ? 'PDF added to Music' : "Couldn't open PDF",
+            message: saved ? 'The score is in your Music library. Open it there when you are ready.' : detail,
+            tone: saved ? 'success' : 'error',
+          })
+        } finally {
+          incomingPdfBusyRef.current = false
+        }
+      })()
+    }
+    const unsubscribe = subscribePdfOpen(openPdfFromFiles)
+    openPdfFromFiles()
+    return unsubscribe
+  }, [handleCreatePracticeItem, handleOpenFullPracticeTool, handleOpenMusicScore, isRecording, isStopping, multitrackOpen, practiceTransitionBusy, setSuppressNativeBridgeRecovery])
+
   // Save the setup that belongs to this score. Routine desks remain owned by
   // their individual exercises and are never overwritten by library browsing.
   useEffect(() => {
@@ -5171,6 +5223,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [deferHudMediaPause, markOverlayClosed, sortedTakes]
   )
 
+  const handleOpenCompareReview = useCallback((slot: ReviewSlot) => {
+    setReviewContext('compare')
+    setReviewSlot(slot)
+    deferHudMediaPause()
+  }, [deferHudMediaPause])
+
   const referencePassage = useYoutubePracticePassage({
     projectId: focusedPractice?.projectId ?? null,
     videoId: youtubeUrl ? parseYoutubeVideoId(youtubeUrl) : null,
@@ -5461,14 +5519,26 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     void releaseTakePlaybackAudio()
     stabilizeViewportAfterMediaInteraction()
     setChallengerPipPlaying(false)
-    challengerUserDismissedRef.current = true
+    const chronologicalTakes = sortTakes(takes, 'newest')
+    const currentIndex = chronologicalTakes.findIndex((take) => take.id === challengerId)
+    const previousTake = currentIndex < 0 ? null : chronologicalTakes
+      .slice(currentIndex + 1)
+      .find((take) =>
+        take.id !== benchmarkId &&
+        take.id !== benchmarkTake?.id &&
+        takeHasPlaybackMedia(take)
+      )
+    challengerUserDismissedRef.current = !previousTake
     pendingChallengerIdRef.current = null
-    setChallengerId(null)
+    setChallengerId(previousTake?.id ?? null)
   }, [
     autoPlaybackTakeId,
+    benchmarkId,
+    benchmarkTake?.id,
     challengerId,
     releaseAutoRecordSuppress,
     stopAutoPlaybackAudio,
+    takes,
     teardownPipMedia,
   ])
 
@@ -6110,22 +6180,18 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     leaveSplitView('split-exit')
   }, [leaveSplitView])
 
-  // Every take-box expansion now enters the same stacked comparison as Workspace.
-  // Once there, tapping a box cannot open the older single-take review.
-  const handleOpenSplitView = useCallback(() => {
-    if (!isSplitView) handleToggleSplitView()
-  }, [handleToggleSplitView, isSplitView])
-
   const handleExpandBenchmark = useMemo(
     () => libraryBenchmarkPlayback || takeHasPlaybackMedia(benchmarkTake)
-      ? handleOpenSplitView
+      ? () => handleOpenCompareReview('benchmark')
       : undefined,
-    [benchmarkTake, handleOpenSplitView, libraryBenchmarkPlayback],
+    [benchmarkTake, handleOpenCompareReview, libraryBenchmarkPlayback],
   )
 
   const handleExpandChallenger = useMemo(
-    () => takeHasPlaybackMedia(challengerTake) ? handleOpenSplitView : undefined,
-    [challengerTake, handleOpenSplitView],
+    () => takeHasPlaybackMedia(challengerTake)
+      ? () => handleOpenCompareReview('challenger')
+      : undefined,
+    [challengerTake, handleOpenCompareReview],
   )
 
   const showPinCurrentAsBest = Boolean(
@@ -6177,8 +6243,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           isExperimentalOpen || focusPanel !== null ||
           isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
           handsFreePlaybackPending || practiceSessionActive || pipDragState.isDragging || Boolean(takeDeleteError)}
-        feedbackPaused={showOnboardingTutorial || isRecording || isStopping || takePlaybackActive ||
+        feedbackPaused={showOnboardingTutorial || isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
           handsFreePlaybackPending || isLabsOpen || Boolean(takeDeleteError)}
+        feedbackError={takeDeleteError}
+        onDismissFeedbackError={() => setTakeDeleteError(null)}
+        recordingActivity={!showOnboardingTutorial && !isPracticeHubOpen && !isSettingsOpen && !isVaultOpen &&
+          !isReviewOpen && !isLabsOpen && !multitrackOpen && !quickSettingsOpen && !settings.autoSoundRecording &&
+          !isRecording && !takeDeleteError && onRecordSurface
+          ? isStopping || pendingTakeSaves > 0 ? 'Saving take' : challengerId && audioTakeReadiness[challengerId]?.status === 'preparing' ? 'Preparing playback' : null
+          : null}
         surface={musicPageVisible ? 'music' : onRecordSurface ? 'recording' : 'other'}
         recordingReady={ready || simulatorCaptureAvailable}
         hasTakes={takes.length > 0}
@@ -6231,6 +6304,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 projects={projects}
                 takes={takes}
                 tunerTransposition={settings.tunerTransposition}
+                handsFreeThreshold={settings.soundVolumeThreshold}
                 hapticFeedback={settings.hapticFeedback}
                 onClose={handleClosePracticeHub}
                 onOpenQuickPractice={() => { handlePauseRoutine(); handleOpenQuickPractice() }}
@@ -6296,22 +6370,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   />
                 )}
 
-              {takeDeleteError && (
-                <div
-                  role="alert"
-                  className="fixed left-1/2 top-[max(1rem,env(safe-area-inset-top))] z-[220] flex w-[min(92vw,24rem)] -translate-x-1/2 items-start gap-3 rounded-md border border-white/15 bg-black/95 px-4 py-3 text-left text-sm text-white shadow-2xl"
-                >
-                  <span className="min-w-0 flex-1 leading-5">{takeDeleteError}</span>
-                  <button
-                    type="button"
-                    onClick={() => setTakeDeleteError(null)}
-                    className="min-h-11 shrink-0 px-2 font-semibold text-white/80"
-                    aria-label="Dismiss message"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              )}
 
               {youtubeUrl && (
                 <YoutubeBenchmarkPlayer
@@ -6696,15 +6754,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
               )}
 
-              {!onRecordSurface && !metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && (
+              {!onRecordSurface && !metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && !referenceVisible && (
                 <PracticeToolStrip
                   reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
                   referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
                   light={recordingMode === 'audio'} disabled={isStopping}
-                  onReference={() => {
-                    if (youtubeUrl) handleToggleSplitView()
-                    else setFocusPanel('references')
-                  }}
+                  onReference={() => { setReferenceVisible(true); setReferenceExpanded(true) }}
                 />
               )}
 
@@ -6849,12 +6904,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
                   {recordingMode === 'audio' && !isSplitView && (
                     <div className="relative flex min-h-0 flex-1 overflow-hidden">
-                      <div className="music-library-layer min-h-0 flex-1" hidden={!isAudioPracticeMusicTab || !musicLibraryOpen} style={{ display: isAudioPracticeMusicTab && musicLibraryOpen ? 'flex' : 'none' }}>
+                      <AnimatedTabPanel panelKey="audio-practice-music-layer" active={isAudioPracticeMusicTab && musicLibraryOpen} keepMounted className="music-library-layer flex min-h-0 flex-1">
                         <MusicLibrary projects={projects} activeProjectId={activeProjectId} instrumentId={preferredInstrumentId} revision={musicChartRevision}
                           disabled={isRecording || isStopping || practiceTransitionBusy}
                           onCreateItem={handleCreatePracticeItem} onOpen={handleOpenMusicScore}
                           onImported={() => setMusicChartRevision(value => value + 1)} />
-                      </div>
+                      </AnimatedTabPanel>
                       <AnimatedTabPanel
                         panelKey="audio-practice-metronome-layer"
                         active={audioPracticeTab === 'metronome'}
@@ -7177,7 +7232,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         }}
                         vaultRevision={takes.length}
                         isRecording={isRecording}
-                        isStopping={isStopping}
+                        isStopping={isStopping || pendingTakeSaves > 0}
                         elapsed={elapsed}
                         ready={ready || simulatorCaptureAvailable}
                         recordingMode={recordingMode}
@@ -7449,16 +7504,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         initialInstrumentId={preferredInstrumentId ?? undefined}
                         onComplete={handleCompleteOnboardingTutorial}
                         onSkip={handleSkipOnboardingTutorial}
-                        onQuickPlay={() => {
-                          markAllCoachMarksSeen()
-                          setShowOnboardingTutorial(false)
-                          setTutorialTourEnabled(false)
-                          handlePauseRoutine()
-                          handleRecordingModeChange('audio')
-                          handleOpenQuickPractice()
-                        }}
                         onSelectInstrument={handleSelectInstrument}
-                        onChooseRoutine={handleOnboardingRoutineChoice}
                         hapticFeedback={settings.hapticFeedback}
                       />
                     )}

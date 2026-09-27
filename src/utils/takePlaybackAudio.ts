@@ -5,7 +5,10 @@ import {
   safePlayMutedMedia,
   type PlaybackAttemptOptions,
 } from './mediaPlayback'
-import { resumePlaybackAudioContext } from './playbackAudioContext'
+import {
+  ensurePlaybackAudioContextRunning,
+  resumePlaybackAudioContext,
+} from './playbackAudioContext'
 import { engageStereoPlayback, releaseStereoPlayback } from './stereoPlaybackRoute'
 import {
   attachPlaybackRouteEndedListener,
@@ -158,6 +161,7 @@ export interface UserGesturePlaybackCallbacks {
 function prepareMediaForAudiblePlayback(media: HTMLMediaElement): void {
   prepareInlineMediaElement(media)
   media.muted = false
+  media.defaultMuted = false
   media.volume = 1
   media.preload = 'auto'
 
@@ -217,7 +221,9 @@ function wireTakePlaybackAfterStart(
 async function prepareLoudPlaybackBeforeStart(media: HTMLMediaElement): Promise<void> {
   await prepareNaturalMediaPreview(media)
   primeTakePlaybackForPreparedSession(media)
-  await resumePlaybackAudioContext()
+  if (!(await ensurePlaybackAudioContextRunning())) {
+    throw new Error('Playback audio did not recover after the route changed.')
+  }
 }
 
 export function playTakeMediaFromUserGesture(
@@ -257,9 +263,6 @@ export function playInlineTakeBoxFromUserGesture(
       await waitForFirstMediaFrame(media)
       try {
         await media.play()
-        attachInlineTakeBoxEndedListener(media)
-        wireTakePlaybackAfterStart(media, true)
-        callbacks.onPlaying?.()
       } catch {
         // First play() rejection was previously fatal — the button silently
         // reverted to "Play" with no explanation, so the user had to notice
@@ -270,12 +273,16 @@ export function playInlineTakeBoxFromUserGesture(
         await media.play()
         media.muted = false
         media.volume = 1
-        attachInlineTakeBoxEndedListener(media)
-        wireTakePlaybackAfterStart(media, true)
-        callbacks.onPlaying?.()
       }
+      attachInlineTakeBoxEndedListener(media)
+      wireTakePlaybackAfterStart(media, true)
+      if (!(await ensurePlaybackAudioContextRunning())) {
+        throw new Error('Playback audio stopped after the video started.')
+      }
+      callbacks.onPlaying?.()
     } catch (error: unknown) {
-      console.log(error)
+      console.warn('[TakePlayback] inline playback failed', error)
+      media.pause()
       callbacks.onFailure?.(error)
       await finalizeInlineTakeBoxPlaybackCleanup()
     }

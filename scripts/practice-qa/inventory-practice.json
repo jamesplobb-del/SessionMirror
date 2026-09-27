@@ -1,0 +1,333 @@
+[
+  {
+    "id": "ROU-01",
+    "feature": "Practice Home",
+    "control": "Your routines / Quick routine / today's board",
+    "states": [
+      "no routine",
+      "routine saved",
+      "active step",
+      "complete"
+    ],
+    "expected": "A saved plan can be opened, today's next step can start or resume, and progress updates after steps are checked.",
+    "source": "src/components/PracticeHub.tsx:498-520,776-866",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-05/UI-09. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "ROU-02",
+    "feature": "Routine builder",
+    "control": "New routine, instrument, suggested plan, goal, or custom plan",
+    "states": [
+      "empty library",
+      "instrument chosen",
+      "preset chosen",
+      "custom plan"
+    ],
+    "expected": "Each route reaches a lineup suited to the chosen instrument or goal, and a saved plan appears in the routines list.",
+    "source": "src/components/GuidedRoutineBuilder.tsx:429-454,493-523,591-596",
+    "status": "failed",
+    "evidence": "sessions/2026-09-26.json: UI-04; regressions/suggested-routine-entry.mjs. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "ROU-03",
+    "feature": "Routine builder",
+    "control": "Exercise selection, More exercises, add/remove/reorder",
+    "states": [
+      "no exercises",
+      "selected exercises",
+      "reordered",
+      "maximum steps"
+    ],
+    "expected": "The lineup reflects selection and ordering; controls respect the step limit and disable impossible moves.",
+    "source": "src/components/GuidedRoutineBuilder.tsx:510-549,553-560",
+    "status": "untested"
+  },
+  {
+    "id": "ROU-04",
+    "feature": "Routine builder",
+    "control": "Exercise tool, game choice, current workspace settings",
+    "states": [
+      "record",
+      "tune",
+      "metronome",
+      "game",
+      "current settings checked"
+    ],
+    "expected": "Each exercise opens its selected tool, including the chosen game, and only eligible tools offer current workspace settings.",
+    "source": "src/components/GuidedRoutineBuilder.tsx:563-573",
+    "status": "untested"
+  },
+  {
+    "id": "ROU-05",
+    "feature": "Routine builder",
+    "control": "Per-exercise metronome, drone, pitch graph, hands-free and program",
+    "states": [
+      "tool off",
+      "tool on",
+      "custom settings saved"
+    ],
+    "expected": "Selected tool settings persist with the exercise and are restored when its routine step starts.",
+    "source": "src/components/RoutineDeskSetup.tsx:48-160; src/components/RoutineProgramSetup.tsx:4-15",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-06/UI-07. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "ROU-06",
+    "feature": "Routine builder",
+    "control": "Import routine / Share routine file",
+    "states": [
+      "valid plan",
+      "malformed file",
+      "share sheet available"
+    ],
+    "expected": "Valid shared plans import with independent IDs; malformed files show an error; sharing exports the routine layout.",
+    "source": "src/components/GuidedRoutineBuilder.tsx:455-486,528-532; src/components/RoutineShareDialog.tsx:31-36",
+    "status": "untested"
+  },
+  {
+    "id": "ROU-07",
+    "feature": "Routine session",
+    "control": "Step Start/Resume, check/uncheck, pause/resume, Done/Skip",
+    "states": [
+      "not started",
+      "active",
+      "paused",
+      "completed",
+      "skipped"
+    ],
+    "expected": "Step and daily status change consistently, elapsed progress survives leaving the view, and next step advances.",
+    "source": "src/components/PracticeHub.tsx:810-866; src/components/RoutineBar.tsx:597-815",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-06/UI-07/UI-09. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "ROU-08",
+    "feature": "Routine session",
+    "control": "Widget collapse, resize, move, edit, close",
+    "states": [
+      "expanded",
+      "collapsed",
+      "resized",
+      "session ended"
+    ],
+    "expected": "Widget controls change presentation or open editing; ending closes the routine session without losing saved plan progress.",
+    "source": "src/components/RoutineBar.tsx:541-557,663-697,812-830",
+    "status": "untested"
+  },
+  {
+    "id": "ROU-09",
+    "feature": "Daily challenges",
+    "control": "Practice challenge, game challenge, trophy collection",
+    "states": [
+      "new day",
+      "practice completed",
+      "game completed",
+      "trophy awarded"
+    ],
+    "expected": "Challenge entries launch their activity; completion awards trophies and the collection reflects the new total.",
+    "source": "src/components/DailyChallenges.tsx:57-89",
+    "status": "untested"
+  },
+  {
+    "id": "GAME-01",
+    "feature": "Practice Games",
+    "control": "Games entry and game selection",
+    "states": [
+      "games menu",
+      "Balance",
+      "Staff Jumper",
+      "Learn"
+    ],
+    "expected": "Each game opens from Practice Home and returns to the games menu without trapping navigation.",
+    "source": "src/components/PracticeHub.tsx:524-537; src/labs/balance/BalanceArcadeShell.tsx:52-53",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-10/UI-12/UI-13. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "GAME-02",
+    "feature": "Balance",
+    "control": "Instrument, Quick Play, Today's Challenge, Trophies",
+    "states": [
+      "default instrument",
+      "changed instrument",
+      "daily unfinished",
+      "daily finished"
+    ],
+    "expected": "Instrument selection changes note range; Quick Play starts a run; the daily challenge and trophies reflect completion.",
+    "source": "src/labs/balance/BalanceHome.tsx:88-167",
+    "status": "untested"
+  },
+  {
+    "id": "GAME-03",
+    "feature": "Balance",
+    "control": "Game options, target note, tolerance, crossing time, custom sequence",
+    "states": [
+      "default",
+      "adjusted",
+      "custom sequence"
+    ],
+    "expected": "Settings affect the next run; sequence editor supports adding, moving, removing, saving, and selecting notes.",
+    "source": "src/labs/balance/BalanceSetup.tsx:459-731; src/labs/balance/BalanceRoutineEditor.tsx:62-156",
+    "status": "untested"
+  },
+  {
+    "id": "GAME-04",
+    "feature": "Balance",
+    "control": "Pause/Resume, Retry, Continue, Stop, results",
+    "states": [
+      "playing",
+      "paused",
+      "missed note",
+      "finished"
+    ],
+    "expected": "Run controls transition to the intended phase, and results offer replay, settings, and games navigation.",
+    "source": "src/labs/balance/BalanceScreen.tsx:401-584; src/labs/balance/BalanceResults.tsx:104-106",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-12. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "GAME-05",
+    "feature": "Staff Jumper",
+    "control": "Instrument, key/scale, range, difficulty, tempo, meter, lives/click/drone",
+    "states": [
+      "initial setup",
+      "changed settings",
+      "custom scale"
+    ],
+    "expected": "The example and started run use selected settings; tempo and range stay in bounds.",
+    "source": "src/labs/staffJumper/StaffJumperScreen.tsx:568-1022",
+    "status": "untested"
+  },
+  {
+    "id": "GAME-06",
+    "feature": "Staff Jumper",
+    "control": "Start, Pause/Resume, End, Restart",
+    "states": [
+      "count-in",
+      "running",
+      "paused",
+      "game over"
+    ],
+    "expected": "Pause freezes the run; resume continues it; ending and replaying navigate and reset as labeled.",
+    "source": "src/labs/staffJumper/StaffJumperGame.tsx:990-1014; src/labs/staffJumper/StaffJumperScreen.tsx:1055-1129",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-10/UI-11. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "GAME-07",
+    "feature": "Learn instrument",
+    "control": "Lesson, instrument, microphone reconnect, Play",
+    "states": [
+      "setup",
+      "mic permission pending",
+      "listening",
+      "lesson started"
+    ],
+    "expected": "The chosen lesson and instrument drive note targets; mic retry can recover input before or during play.",
+    "source": "src/labs/learnInstrument/LearnInstrumentScreen.tsx:205-324,486",
+    "status": "untested"
+  },
+  {
+    "id": "GAME-08",
+    "feature": "Learn instrument",
+    "control": "Previous/Next note, progress, Play again",
+    "states": [
+      "first note",
+      "later note",
+      "lesson complete"
+    ],
+    "expected": "Note navigation updates the chart and progress; completion allows replay or another instrument.",
+    "source": "src/labs/learnInstrument/LearnInstrumentScreen.tsx:183-199,383-444",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-13. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "TOOL-01",
+    "feature": "Quick Tuner",
+    "control": "Open, microphone permission/retry, instrument, exit",
+    "states": [
+      "permission prompt",
+      "denied",
+      "listening",
+      "exit"
+    ],
+    "expected": "Permission and recovery controls reach live note readout when input exists; instrument choice updates the source profile; exit returns home.",
+    "source": "src/components/QuickTunerScreen.tsx:272-371",
+    "status": "untested"
+  },
+  {
+    "id": "TOOL-02",
+    "feature": "Live Tuner",
+    "control": "Pitch readout, tuner settings/transposition, Pitch Insights",
+    "states": [
+      "silence",
+      "detected note",
+      "transposed",
+      "saving off"
+    ],
+    "expected": "Detected pitch and cents update from input; transposition changes written note labeling; Insights opens with current saving state.",
+    "source": "src/components/LivePitchTuner.tsx:433-568,909-951",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-06. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "TOOL-03",
+    "feature": "Quick Metronome",
+    "control": "BPM, Tap, Play/Stop",
+    "states": [
+      "stopped",
+      "playing",
+      "editing BPM",
+      "tapped tempo"
+    ],
+    "expected": "Tempo edits and tap tempo change BPM, and play/stop changes the audible and visible pulse.",
+    "source": "src/components/LiveMetronomeStage.tsx:125-220; src/components/QuickMetronomeScreen.tsx:58-63",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-08. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "TOOL-04",
+    "feature": "Quick Metronome",
+    "control": "Meter, subdivision, accent, sound",
+    "states": [
+      "each meter",
+      "each subdivision",
+      "accent on/off",
+      "each sound"
+    ],
+    "expected": "Selections update the active controls and subsequent click pattern and sound.",
+    "source": "src/components/LiveMetronomeStage.tsx:237-294",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-08. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "TOOL-05",
+    "feature": "Drone",
+    "control": "Pitch, chord mode, octave, sound toggle, close",
+    "states": [
+      "silent",
+      "single pitch",
+      "chord",
+      "octave changed"
+    ],
+    "expected": "Selected written pitches sound at the corresponding concert pitches, octave controls shift them, and stop/close silence playback.",
+    "source": "src/components/audioPractice/DroneSoundWheel.tsx:295-434; src/components/DraggableDroneWidget.tsx:272-310",
+    "status": "untested",
+    "evidence": "sessions/2026-09-26.json: UI-06. Only explicitly recorded outcomes tested; other listed states remain untested."
+  },
+  {
+    "id": "TOOL-06",
+    "feature": "Floating metronome",
+    "control": "BPM, meter, subdivision, move, resize, close",
+    "states": [
+      "stopped",
+      "playing",
+      "expanded",
+      "closed"
+    ],
+    "expected": "Widget settings control the click and stay usable while moved or resized; closing stops the widget.",
+    "source": "src/components/DraggableMetronomeWidget.tsx:517-684",
+    "status": "untested"
+  }
+]

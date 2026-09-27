@@ -7,25 +7,32 @@ interface AnimatedTabPanelProps {
   children: ReactNode
   className?: string
   dataTutorial?: string
+  /** Libraries retain selection/import state while their panel is hidden. */
+  keepMounted?: boolean
 }
 
-/** One active media panel, painted immediately without scaling/fading the
- * entire camera/tuner surface on every tab selection. */
+/** Mount the active media panel immediately; animate its presentation only.
+ * An outgoing tuner/readout never stays behind the next screen. The full
+ * viewport background and audio lifecycle belong to the parent, not motion. */
 export default function AnimatedTabPanel({
   panelKey,
   active,
   children,
   className,
   dataTutorial,
+  keepMounted = false,
 }: AnimatedTabPanelProps) {
-  if (!active) return null
+  if (!active && !keepMounted) return null
 
   return (
     <div
       key={panelKey}
-      className={className}
+      className={`${className ?? ''} premium-tab-panel${active ? ' premium-tab-panel--active' : ''}`}
       data-tutorial={dataTutorial}
-      style={{ position: 'absolute', inset: 0 }}
+      data-active-panel={active ? panelKey : undefined}
+      hidden={!active}
+      inert={!active}
+      style={{ position: 'absolute', inset: 0, ...(!active ? { display: 'none' } : {}) }}
     >
       {children}
     </div>

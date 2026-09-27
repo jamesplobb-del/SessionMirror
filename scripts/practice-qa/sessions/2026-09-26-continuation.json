@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-26",
+  "platform": "QA Vite app at http://127.0.0.1:5217/, phone viewport 393×852, VITE_GAME_TEST_INPUT=1, VITE_FAKE_MEDIA=1. Browser only. Not an iPhone result.",
+  "sourceFingerprint": "1f33213cd3e9e6eb59c3270507f3c697d8d2835746fd760d99532f5990c649cc",
+  "automated": {
+    "report": "results/2026-09-27T00-23-35-719Z/summary.md",
+    "passed": 30,
+    "failed": [
+      "regressions/music-web-reload.mjs",
+      "regressions/recording-web-writer.mjs"
+    ],
+    "newlyPassing": "regressions/suggested-routine-entry.mjs"
+  },
+  "cases": [
+    {
+      "id": "UI-29",
+      "status": "passed",
+      "scope": "browser, suggested routine after the presets-mode fix",
+      "steps": "Fresh QA profile with no instrument chosen. Home → Try a suggested routine → Trumpet → Continue.",
+      "expected": "Suggested for trumpet, not the empty Your routines list.",
+      "observed": "Landed on Suggested for trumpet with Fundamentals and Full practice. Regression script passed. Closing the builder before saving left Home on Choose your instrument, so a second Try a suggested routine asked for the instrument again.",
+      "remaining": "Already-selected instrument path was verified earlier on the iPhone (IOS-03), not repeated as a second browser profile."
+    },
+    {
+      "id": "UI-30",
+      "status": "failed",
+      "scope": "shared layout, phone width. Measured in the browser phone frame, not on the physical iPhone.",
+      "steps": "Start Fundamentals. On Tuner step 1, measure routine bar against Drone/Insights/Tuning. Done & next to Lip slurs on the Metronome tab.",
+      "expected": "Routine bar sits clear of the tuner tool row and the metronome Time/Rhythm/Sound row.",
+      "observed": "routine-bar.routine-bar--audio.is-compact is top 625–728 (103px). Tuner rail Drone/Insights/Tuning is top 703–747, so the bar covers 25px of that 44px row. On Metronome, the click-sound control is top 702–752 and overlaps the bar by 27px. Screenshot shows 4/4, Quarter, and the sound label clipped under the Lip slurs card. Progress reads 3/4 · 0:23 while the click is in 4/4.",
+      "evidence": "DOM rects at 393×852; screenshots qa-after-start.png and qa-metronome-overlap.png"
+    },
+    {
+      "id": "UI-31",
+      "status": "passed",
+      "scope": "Staff Jumper setup only, trumpet, no scored run",
+      "steps": "Games → Staff Jumper. Cycle Easy, Medium, Hard. Open the range picker.",
+      "expected": "Levels are selectable and ranges stay on the screen.",
+      "observed": "Easy B3–C5, Medium B3–F5, Hard A3–G5, all C major treble 4/4 80 BPM. Key list uses flats (Bb, Eb). Range picker span is labeled C Major · F♯3–A6 and offers notes through A6. Mic line read Hearing A4 while the staff range is the trumpet written range. No Medium or Hard play-through.",
+      "remaining": "Correct-note scoring, lives, free play, and the other 12 instruments."
+    }
+  ],
+  "sourceFollowUp": {
+    "pitchAndRoutineReviewers": "Stopped immediately on the other-model usage limit and returned no findings. Verified in the current tree by the lead instead. Do not relaunch those models.",
+    "multitrackReviewer": "641219c5-b7d8-4fbf-8050-a879278e7b70. Export path and the generic alert were confirmed in source. Dragging a clip updates live playback immediately; the saved trim and position wait for Editor Done.",
+    "stillPresentShared": [
+      "Room-noise and high-note octave folding: useLivePitchTracker normalizes with normalizeInstrumentFrequency before the range check. Ceilings remain voice 1100 Hz, strings 1700 Hz, winds 3300 Hz, and anything outside is doubled or halved into range.",
+      "Tuner transposition menu is concertOnly. App Store listing still says the tuner transposes. Note names in pitchUtils are sharps only. Staff Jumper spells flats when the key prefers them, and its mic line prints the raw readout note.",
+      "Home euphonium is mapped to euphonium-treble for every game.",
+      "Staff Jumper fullRange still includes horn C7, recorder C7, piccolo D7, and bassoon C6.",
+      "Take rename input does not stop Enter or Space, so the row handler opens the take. A space never lands in the name.",
+      "Shared .btplan files are stamped version 1 while PRACTICE_PLAN_VERSION is 2. The reader still accepts version 1.",
+      "Hands-free has three label sets: Settings uses Sensitive / Balanced / Loud only; the widget uses Sensitive / Medium / Loud only; Home uses the instrument profile default via describeHandsFreeGate, not the saved slider.",
+      "Guided build-your-own steps keep minutes at 0, so the routine total is Untimed. The music-first builder does have a minutes field. Metronome lineup text omits the meter. The metronome editor falls back to the title ROUTINE ITEM."
+    ]
+  },
+  "notRetested": [
+    "Recording and playback, per the owner's request.",
+    "Audio-only native export. Source still rejects with no video track; phone retry still needs the QA app.",
+    "Native trim/mute/volume restart. Browser mixer persistence already passed as UI-18."
+  ]
+}

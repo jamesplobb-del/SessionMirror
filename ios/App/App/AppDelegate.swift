@@ -107,6 +107,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
+        AudioRouteConfigurator.setAppBackgrounded(false)
         CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
@@ -125,6 +126,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
+        AudioRouteConfigurator.setAppBackgrounded(false)
         CameraSessionGuard.markForegroundActivation()
         lockInterfaceToPortrait()
     }
@@ -180,7 +182,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Control Center and the volume overlay make the app inactive without
         // backgrounding it. Suspending here would tear down the camera/audio
         // route under a live metronome and can switch the system volume route.
-        AudioRouteConfigurator.suspendForAppBackground()
+        AudioRouteConfigurator.setAppBackgrounded(true)
+        InlineTakeBoxPlaybackController.shared.stop(notify: true)
+        let audioEnginesStopped = DispatchGroup()
+        audioEnginesStopped.enter()
+        DroneEngine.shared.suspendForAppBackground {
+            audioEnginesStopped.leave()
+        }
+        audioEnginesStopped.enter()
+        MultitrackTransportEngine.shared.suspendForAppBackground {
+            audioEnginesStopped.leave()
+        }
+        audioEnginesStopped.notify(queue: .main) {
+            if AudioRouteConfigurator.isAppBackgrounded {
+                AudioRouteConfigurator.suspendForAppBackground()
+            }
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

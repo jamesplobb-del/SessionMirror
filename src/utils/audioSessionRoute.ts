@@ -121,6 +121,7 @@ export interface CameraSessionStateSnapshot {
 export interface NativeShareResult {
   success: boolean
   completed?: boolean
+  savedToPhotos?: boolean
 }
 
 /** Top-left-origin percent rect for multitrack grid compositing. */

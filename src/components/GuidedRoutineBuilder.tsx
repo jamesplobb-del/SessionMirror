@@ -1,8 +1,10 @@
+import PremiumDisclosure from './ui/PremiumDisclosure'
+import PremiumFlowPage from './ui/PremiumFlowPage'
 import SwipeRoutineItem from './SwipeRoutineItem'
 import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { AnimatePresence, useReducedMotion } from 'framer-motion'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, FileMusic, Music2, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { kindNeedsDesk, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
 import RoutineDeskSetup from './RoutineDeskSetup'
@@ -16,8 +18,9 @@ import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, 
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import type { MetronomePrefs } from '../utils/metronomeConfig'
 import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
-import { hasPracticeChart } from '../utils/practiceChartStorage'
+import { hasPracticeChart, savePracticeChart } from '../utils/practiceChartStorage'
 import { importPracticePlanFileFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION } from '../utils/practiceRoutineShare'
+import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import type { LabsRoute } from './labs/LabsOverlay'
 import '../styles/routine-guide.css'
 
@@ -93,6 +96,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const [customToolKey, setCustomToolKey] = useState<string | null>(null)
   const [customGameRoute, setCustomGameRoute] = useState<LabsRoute>('menu')
   const [customSetup, setCustomSetup] = useState<RoutineStep | null>(null)
+  const [customMinutes, setCustomMinutes] = useState(0)
   const [metronomeEditorOpen, setMetronomeEditorOpen] = useState(false)
   const [customReference, setCustomReference] = useState('')
   const [customReferenceVideo, setCustomReferenceVideo] = useState<string | null>(null)
@@ -100,6 +104,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [direction, setDirection] = useState(1)
   const [error, setError] = useState('')
+  const [musicImportStatus, setMusicImportStatus] = useState('')
+  const [importingMusic, setImportingMusic] = useState(false)
   const [shareItem, setShareItem] = useState<Routine | null>(null)
   const [instrumentReturn, setInstrumentReturn] = useState<Screen>('library')
   const [changingInstrument, setChangingInstrument] = useState(false)
@@ -108,6 +114,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const reducedMotion = useReducedMotion()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const musicInputRef = useRef<HTMLInputElement>(null)
+  const musicImportBusyRef = useRef(false)
   const instrumentName = instrument ? getInstrumentProfile(instrument)?.label ?? 'Your instrument' : 'Any instrument'
   const musicSetup = customToolKey === 'music'
   const templates = useMemo(() => getStepTemplates(instrument), [instrument])
@@ -140,7 +148,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const move = (next: Screen, backwards = false) => { setDirection(backwards ? -1 : 1); setError(''); setScreen(next) }
   useEffect(() => { scrollRef.current?.scrollTo(0, 0) }, [screen])
   const clearItemSetup = () => {
-    setEditingStepId(null); setCustomToolKey(null); setCustomSetup(null); setCustomReference(''); setCustomReferenceVideo(null); setCustomGameRoute('menu'); setUseCurrent(false); setMetronomeEditorOpen(false)
+    setEditingStepId(null); setCustomToolKey(null); setCustomSetup(null); setCustomMinutes(0); setCustomReference(''); setCustomReferenceVideo(null); setCustomGameRoute('menu'); setUseCurrent(false); setMetronomeEditorOpen(false)
   }
   const back = () => {
     if (screen === 'routines') onCancel()
@@ -152,6 +160,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       const previous = customSteps[customIndex - 1]
       setCustomReference(previous?.referenceQuery ?? '')
       setCustomReferenceVideo(previous?.referenceVideoId ?? null)
+      setCustomMinutes(previous?.minutes ?? 0)
       setCustomToolKey(previous ? toolKeyForStep(previous) : null)
       setCustomGameRoute(previous?.gameRoute ?? 'menu')
       setCustomIndex(index => index - 1); setCustomSteps(steps => steps.slice(0, -1)); setDirection(-1)
@@ -211,6 +220,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     setCustomToolKey(toolKeyForStep(step))
     setCustomGameRoute(step.gameRoute ?? 'menu')
     setCustomSetup(createStep(step))
+    setCustomMinutes(step.minutes)
     setCustomReference(step.referenceQuery)
     setCustomReferenceVideo(step.referenceVideoId)
     setUseCurrent(false)
@@ -250,7 +260,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       title,
       kind: choice.kind,
       topic: customSetup?.topic ?? 'other',
-      minutes: customSetup?.minutes ?? 0,
+      minutes: customMinutes,
       desk,
       id: editingStepId ?? customSetup?.id,
       projectId: customSetup?.projectId ?? null,
@@ -288,7 +298,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     }
     const nextSteps = [...customSteps, step]
     if (customIndex < customItems.length - 1) {
-      setCustomSteps(nextSteps); setCustomIndex(index => index + 1); setCustomToolKey(null); setCustomSetup(null); setCustomReferenceVideo(null); setCustomReference(''); setCustomGameRoute('menu'); setUseCurrent(false); move('custom-tool')
+      setCustomSteps(nextSteps); setCustomIndex(index => index + 1); setCustomToolKey(null); setCustomSetup(null); setCustomMinutes(0); setCustomReferenceVideo(null); setCustomReference(''); setCustomGameRoute('menu'); setUseCurrent(false); move('custom-tool')
       return
     }
     try {
@@ -341,6 +351,36 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       openSavedRoutine(result.routine)
     }).catch(() => setError('Could not read that routine file. Please try again.'))
   }
+  const importMusicFiles = async (files: File[]) => {
+    if (!files.length || musicImportBusyRef.current) return
+    musicImportBusyRef.current = true
+    setImportingMusic(true)
+    setMusicImportStatus('')
+    setError('')
+    const failures: string[] = []
+    let added = 0
+    try {
+      for (const [index, original] of files.entries()) {
+        setMusicImportStatus(`Importing music ${index + 1} of ${files.length}…`)
+        try {
+          const file = await prepareRoutineMusicFile(original)
+          const projectId = await onCreatePracticeItem(musicExerciseTitle(file.name))
+          await savePracticeChart(projectId, file)
+          added += 1
+          try { storeLibraryExercise({ instrumentId: instrument, step: createMusicExercise(file.name, projectId) }) }
+          catch { failures.push(`${file.name}: added to Music Library, but could not save it as a recent exercise.`) }
+        } catch (cause) {
+          failures.push(`${original.name}: ${cause instanceof Error ? cause.message : 'Could not import this file.'}`)
+        }
+      }
+      if (added) setExercises(loadExerciseLibrary())
+      setMusicImportStatus(added ? `${added} ${added === 1 ? 'score' : 'scores'} added to Music Library.` : '')
+      if (failures.length) setError(failures.join('\n'))
+    } finally {
+      musicImportBusyRef.current = false
+      setImportingMusic(false)
+    }
+  }
   const canStart = screen === 'lineup' && !pendingSetup.length && Boolean(onSaveAndStart)
   const editingToday = routine?.id === draft.id
   const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
@@ -374,11 +414,14 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       {[0, 1, 2].map(index => <i key={index} className={index <= (screen === 'instrument' ? 0 : screen === 'library' || screen === 'choose' || screen.startsWith('custom') ? 1 : 2) ? 'is-on' : ''} />)}
     </div>}
     <div className="routine-guide-scroll" ref={scrollRef}>
-        <motion.div key={`${screen}-${screen === 'custom-tool' ? `${customIndex}-${editingStepId ?? ''}` : 0}`} custom={direction}
-          // Replace the previous step immediately. A full transform lets the
-          // compositor handle the short entrance without a blank fade between pages.
-          variants={{ enter: (d: number) => ({ transform: `translateX(${reducedMotion ? 0 : d * 10}px)` }), center: { transform: 'translateX(0px)' } }}
-          initial="enter" animate="center" onAnimationComplete={definition => { if (definition === 'center') titleRef.current?.focus({ preventScroll: true }) }} transition={{ duration: reducedMotion ? 0 : .16, ease: [.22, 1, .36, 1] }}>
+        <PremiumFlowPage key={`${screen}-${screen === 'custom-tool' ? `${customIndex}-${editingStepId ?? ''}` : 0}`}
+          direction={direction} data-routine-screen={screen}
+          onAnimationComplete={() => {
+            // Do not steal focus if the musician has already started editing.
+            const page = titleRef.current?.closest('.premium-flow-page')
+            if (page?.contains(document.activeElement) && document.activeElement !== page) return
+            titleRef.current?.focus({ preventScroll: true })
+          }}>
           <header className="routine-guide-heading">
             <div className="routine-guide-motif" aria-hidden="true">{[0, 1, 2, 3, 4, 5, 6].map(index => <i key={index} />)}</div>
             {screen !== 'instrument' && screen !== 'routines' && <button className="routine-guide-instrument" type="button" onClick={() => { setInstrumentReturn(screen); setChangingInstrument(true); move('instrument', true) }}>{instrumentName}<ChevronRight aria-hidden /></button>}
@@ -424,20 +467,26 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
               )}
             </section>
 
-            {/* Receiving one. On device a shared routine usually arrives by
-              * tapping the attachment, which opens the app straight into it;
-              * this is the way in for a file already saved on the phone, and
-              * the only way in on the web build. */}
-            <section className="routine-guide-saved" aria-label="Open a shared routine">
-              <h3>Open a shared routine</h3>
-              <button type="button" className="routine-guide-own" onClick={() => importInputRef.current?.click()}>
-                <Upload aria-hidden />
-                <span>
-                  <strong>Open a shared routine</strong>
-                  <small>Add a .{PRACTICE_PLAN_EXTENSION} routine someone sent you</small>
-                </span>
-                <ArrowRight aria-hidden />
-              </button>
+            <section className="routine-guide-imports" aria-label="Import into your library">
+              <h3>Import</h3>
+              <div className="routine-guide-import-grid">
+                <button type="button" className="routine-guide-own" disabled={importingMusic} onClick={() => musicInputRef.current?.click()}>
+                  <FileMusic aria-hidden />
+                  <span><strong>Import PDF</strong><small>Or a photo of your music</small></span>
+                  <ArrowRight aria-hidden />
+                </button>
+                <button type="button" className="routine-guide-own" onClick={() => importInputRef.current?.click()}>
+                  <Upload aria-hidden />
+                  <span><strong>Import routine</strong><small>Open a shared .{PRACTICE_PLAN_EXTENSION} file</small></span>
+                  <ArrowRight aria-hidden />
+                </button>
+              </div>
+              {musicImportStatus && <p className="routine-guide-import-status" role="status">{musicImportStatus}</p>}
+              <input ref={musicInputRef} type="file" multiple hidden accept="application/pdf,image/jpeg,image/png,image/webp,.pdf" onChange={event => {
+                const files = Array.from(event.target.files ?? [])
+                event.target.value = ''
+                void importMusicFiles(files)
+              }} />
               <input
                 ref={importInputRef}
                 type="file"
@@ -450,6 +499,14 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
                 }}
               />
             </section>
+            {props.onOpenMusicLibrary && <section className="routine-guide-music-link" aria-label="Music Library">
+              <h3>Music</h3>
+              <button type="button" className="routine-guide-own" onClick={props.onOpenMusicLibrary}>
+                <Music2 aria-hidden />
+                <span><strong>Music Library</strong><small>Open your scores and practice with them</small></span>
+                <ArrowRight aria-hidden />
+              </button>
+            </section>}
           </div>}
           {screen === 'goals' && <>
             <div className="routine-guide-tool-list">{PRACTICE_GOALS.map(item => <button type="button" key={item.id} className="routine-guide-choice" aria-pressed={goal === item.id} onClick={() => setGoal(item.id)}><span><strong>{item.title}</strong><small>{item.detail}</small></span>{goal === item.id && <Check aria-hidden />}</button>)}</div>
@@ -473,7 +530,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
                 <span className="routine-guide-check">{isSelected(`saved:${step.id}`) ? <Check aria-hidden /> : <Plus aria-hidden />}</span><strong>{step.title}</strong><small>Your exercise</small>
               </Pressable>)}
             </div>
-            {templates.length > 6 && <details className="routine-guide-more"><summary>More exercises</summary><div className="routine-guide-grid">{templates.slice(6).map(renderTemplate)}</div></details>}
+            {templates.length > 6 && <PremiumDisclosure className="routine-guide-more"><summary>More exercises</summary><div className="routine-guide-grid">{templates.slice(6).map(renderTemplate)}</div></PremiumDisclosure>}
             <button type="button" className="routine-guide-text" onClick={() => move('lineup')}>Back to lineup</button>
           </>}
           {screen === 'lineup' && <>
@@ -517,6 +574,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
             {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
             {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
+            <label className="routine-guide-field">Minutes <small>· optional</small><input type="number" inputMode="numeric" min={0} max={180} aria-label="Exercise minutes" value={customMinutes || ''} placeholder="Untimed" onChange={event => setCustomMinutes(Math.max(0, Math.min(180, Math.round(Number(event.target.value) || 0))))} /></label>
           </>}
           {screen === 'custom-settings' && customSetup && <div className="routine-guide-editor">
             <RoutineDeskSetup
@@ -540,11 +598,12 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>Choose what you want to work on</small></span><ArrowRight aria-hidden /></button>
             <button type="button" className="routine-guide-own" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items and choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
           </>}
-        </motion.div>
+        </PremiumFlowPage>
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
     <RoutineMetronomeEditor
       isOpen={metronomeEditorOpen}
+      itemTitle={setupTitle}
       value={normalizeDeskMetronome(customSetup?.desk?.metronome)}
       onSave={saveMetronomeItem}
       onClose={() => {
@@ -552,7 +611,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
         if (screen === 'lineup') clearItemSetup()
       }}
     />
-    {shareItem && <RoutineShareDialog routine={shareItem} onClose={() => setShareItem(null)} />}
+    <AnimatePresence>{shareItem && <RoutineShareDialog routine={shareItem} onClose={() => setShareItem(null)} />}</AnimatePresence>
     {action && <footer className="routine-guide-footer"><div className="routine-guide-footer__actions">
       {secondaryAction && <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-secondary" disabled={disabled} onClick={secondaryAction.run}>{secondaryAction.label}</Pressable>}
       <Pressable type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-continue" disabled={disabled} onClick={action}>{actionLabel}<ArrowRight aria-hidden /></Pressable>

@@ -81,12 +81,11 @@ const TO_LESSON: Record<string, string> = {
  * Home's instrument ids → canonical ids.
  *
  * Most are the same string. The exceptions are rows Home folds together:
- * Home's euphonium reads treble-clef B♭, the written pitch its tuner shows;
- * voice and keys each have a treble and a bass row here; and "Something else"
- * is the games' neutral Concert Pitch.
+ * voice and keys each have a treble and a bass row here, and "Something else"
+ * is the games' neutral Concert Pitch. Home's euphonium stays the bass-clef
+ * concert part. Treble-clef B♭ remains a separate row inside the games.
  */
 const FROM_HOME: Record<string, string> = {
-  euphonium: 'euphonium-treble',
   voice: 'voice-treble',
   piano: 'piano-treble',
   other: 'concert',

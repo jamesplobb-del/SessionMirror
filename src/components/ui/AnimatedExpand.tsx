@@ -1,4 +1,6 @@
-import { AnimatePresence, motion } from 'framer-motion'
+import { premiumMotion } from '../../utils/premiumMotion'
+import { PremiumMotionDiv } from './PremiumMotionSurface'
+import { AnimatePresence } from 'framer-motion'
 import { type ReactNode } from 'react'
 import { iosEaseOut, motionGpuLayer } from '../../utils/motionPresets'
 
@@ -13,16 +15,16 @@ export default function AnimatedExpand({ open, children, className = '' }: Anima
   return (
     <AnimatePresence initial={false}>
       {open && (
-        <motion.div
+        <PremiumMotionDiv
           className={className}
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={iosEaseOut}
+          transition={premiumMotion(iosEaseOut, 'popover')}
           style={motionGpuLayer}
         >
           {children}
-        </motion.div>
+        </PremiumMotionDiv>
       )}
     </AnimatePresence>
   )

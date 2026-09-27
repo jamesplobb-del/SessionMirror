@@ -122,8 +122,27 @@ final class DroneEngine {
         }
     }
 
+    /// Only the metronome owns background audio. Stop the drone graph before
+    /// AppDelegate deactivates the shared session so it cannot reclaim the route.
+    func suspendForAppBackground(completion: @escaping () -> Void) {
+        controlQueue.async { [weak self] in
+            guard let self else {
+                DispatchQueue.main.async(execute: completion)
+                return
+            }
+            self.recoveryGeneration &+= 1
+            self.stateLock.lock()
+            self.voices.removeAll(keepingCapacity: true)
+            self.isRunning = false
+            self.stateLock.unlock()
+            self.engine.stop()
+            DispatchQueue.main.async(execute: completion)
+        }
+    }
+
     @discardableResult
     func toggleNote(pitchClass: Int) -> Bool {
+        guard !AudioRouteConfigurator.isAppBackgrounded else { return false }
         guard (0...11).contains(pitchClass) else { return false }
 
         stateLock.lock()
@@ -145,6 +164,7 @@ final class DroneEngine {
 
     @discardableResult
     func soloNote(pitchClass: Int) -> Bool {
+        guard !AudioRouteConfigurator.isAppBackgrounded else { return false }
         guard (0...11).contains(pitchClass) else { return false }
 
         stateLock.lock()
@@ -226,6 +246,7 @@ final class DroneEngine {
     }
 
     func restoreState(activeNotes: [Int], octave: Int, volume: Float, waveform: String?) {
+        guard !AudioRouteConfigurator.isAppBackgrounded else { return }
         stateLock.lock()
         self.octave = max(0, min(8, octave))
         requestedVolume = max(0, min(1, volume))
@@ -404,6 +425,7 @@ final class DroneEngine {
 
     // All graph/session operations run serially, outside the UI and render locks.
     private func startEngineIfNeeded() {
+        guard !AudioRouteConfigurator.isAppBackgrounded else { return }
         stateLock.lock()
         let shouldPlay = voices.contains { $0.value.targetGain > 0.001 }
         stateLock.unlock()

@@ -21,7 +21,7 @@ export const PRACTICE_PLAN_FORMAT = 'besttake.practice-plan'
 export const PRACTICE_PLAN_VERSION = 2
 export const PRACTICE_PLAN_EXTENSION = 'btplan'
 export const PRACTICE_PLAN_UTI = 'com.besttake.app.practice-plan'
-export const PRACTICE_PLAN_MIME = 'application/json'
+export const PRACTICE_PLAN_MIME = 'application/vnd.besttake.practice-plan'
 
 const MAX_SETUP_ONLY_BYTES = 5_000_000
 /** Older routine files may contain embedded scores; those bytes are never imported. */
@@ -68,7 +68,7 @@ export function buildPracticePlanFile(routine: Routine, appVersion?: string): st
   }
   const envelope: PracticePlanEnvelope = {
     format: PRACTICE_PLAN_FORMAT,
-    version: 1,
+    version: PRACTICE_PLAN_VERSION,
     app: 'BestTake',
     appVersion,
     exportedAt: Date.now(),

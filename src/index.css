@@ -1026,8 +1026,7 @@ body.settings-branch-open * {
 }
 
 .review-timeline-waveform > .review-timeline-waveform__playhead {
-  transition: left 90ms linear, transform 120ms ease-out;
-  will-change: left, transform;
+  transition: transform 120ms ease-out;
 }
 
 .audio-mode-take-card {
@@ -1501,34 +1500,45 @@ body.settings-branch-open * {
 
 .app-ui-overlay--audio-mode.app-ui-overlay--audio-practice-metronome .control-deck.control-deck--workspace-only {
   position: absolute;
-  left: max(12px, env(safe-area-inset-left, 0px));
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  top: 48%;
+  bottom: auto;
   z-index: 42;
-  width: 74px !important;
+  width: 27px !important;
   pointer-events: auto;
+  transform: translateY(-50%);
 }
 
 .metronome-workspace-launcher {
   display: flex;
-  min-width: 74px;
-  min-height: 58px;
+  width: 27px;
+  min-width: 27px;
+  height: 94px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  border: 1px solid rgba(157, 198, 229, 0.28);
-  border-radius: 15px;
-  background: rgba(20, 43, 65, 0.82);
-  color: #e8f5ff;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
-  font-size: 10px;
+  gap: 5px;
+  padding: 5px 2px;
+  border: 1px solid #c8d9e9;
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  background: #f8fbff;
+  color: #2873cd;
+  box-shadow: 2px 4px 12px rgba(24, 57, 90, 0.12);
+  font-size: 9px;
   font-weight: 600;
-  backdrop-filter: blur(10px);
+  touch-action: none;
 }
 
 .metronome-workspace-launcher svg {
-  width: 21px;
-  height: 21px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.metronome-workspace-launcher span {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
 }
 
 .animated-bottom-sheet--elevated,
@@ -6247,6 +6257,38 @@ html.app-dark-mode .pitch-spectrogram--glass {
   position: absolute;
   z-index: 1;
 }
+
+.settings-branch-tray-anchor--side {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(340px, 88vw);
+}
+
+.settings-branch-tray--side {
+  height: 100%;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-top: max(18px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  border-radius: 0 22px 22px 0;
+}
+
+.settings-branch-tray__close {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 12px;
+  background: var(--tray-tile);
+  color: var(--tray-text);
+}
+
+.settings-branch-tray__close svg { width: 19px; height: 19px; }
 
 html.app-audio-mode .settings-branch-backdrop {
   background: rgba(15, 23, 42, 0.26);
