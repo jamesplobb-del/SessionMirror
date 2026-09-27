@@ -22,10 +22,17 @@ globalThis.localStorage = {
 }
 
 const instruments = await load('src/utils/instrumentProfiles.ts')
+const writtenPitch = await load('src/utils/tunerTransposition.ts')
 assert.equal(instruments.instrumentHeading('trumpet'), 'Trumpet')
-assert.equal(instruments.describeHandsFreeGate(34), 'Balanced')
+assert.equal(instruments.describeHandsFreeGate(34), 'Loud only')
 assert.equal(instruments.describeHandsFreeGate(16), 'Sensitive')
 assert.equal(instruments.describeHandsFreeGate(70), 'Loud only')
+assert.equal(writtenPitch.getWrittenPitchLabel(10, 3, 'bb').noteName, 'C4', 'Trumpet reads C over concert B♭')
+assert.equal(writtenPitch.getWrittenPitchLabel(10, 3, 'concert').noteName, 'B♭3', 'Concert flat spelling is retained')
+const convertedPitch = writtenPitch.transposePitchReadout({ noteName: 'A#3', midi: 58, cents: 11, frequencyHz: 235 }, 'bb')
+assert.equal(convertedPitch.noteName, 'C4')
+assert.equal(convertedPitch.cents, 11, 'Written pitch must not change concert-pitch cents')
+assert.equal(convertedPitch.frequencyHz, 235, 'Written pitch must not change the measured frequency')
 
 const routines = await load('src/utils/practiceRoutines.ts')
 const { normalizeDeskMetronome } = await load('src/utils/deskMetronome.ts')

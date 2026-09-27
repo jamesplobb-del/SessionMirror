@@ -12,7 +12,7 @@ import type { TunerInstrument } from '../../utils/pitchConfig'
 import { iosSpringSnappy, motionGpuLayer } from '../../utils/motionPresets'
 import { triggerLightHaptic } from '../../utils/haptics'
 import { playTakeMediaAudible, primeTakePlaybackAudioSync } from '../../utils/takePlaybackAudio'
-import { waitForMediaProgressing } from '../../utils/mediaPlayback'
+import { waitForMediaProgressing, waitForMediaReady } from '../../utils/mediaPlayback'
 import { routeTakePlaybackToSpeaker } from '../../utils/takePlaybackSpeaker'
 import {
   pauseYoutubeProxy,
@@ -170,6 +170,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const backingAudioRef = useRef<HTMLAudioElement>(null)
   const backingYoutubeIframeRef = useRef<HTMLIFrameElement>(null)
   const youtubeStartTimerRef = useRef<number | null>(null)
+  const backingArmTimerRef = useRef<number | null>(null)
   const youtubeStartGenerationRef = useRef(0)
   const youtubeScheduledPerformanceRef = useRef<number | null>(null)
   const ownedBackingBlobUrlsRef = useRef<Set<string>>(new Set())
@@ -329,6 +330,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   const pauseBacking = useCallback(() => {
     clearYoutubeStartSchedule()
+    if (backingArmTimerRef.current !== null) {
+      window.clearTimeout(backingArmTimerRef.current)
+      backingArmTimerRef.current = null
+    }
     const backing = session.backing
     if (backing.kind === 'audio') {
       backingAudioRef.current?.pause()
@@ -387,8 +392,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
   }, [session.backing])
 
-  const prepareBackingAtStart = useCallback(async () => {
+  const prepareBackingAtStart = useCallback(async (positionSec = 0) => {
     const backing = session.backing
+    const stopAt = session.endSec ?? null
+    const position = stopAt === null ? Math.max(0, positionSec) : Math.min(Math.max(0, positionSec), stopAt)
     if (backing.kind === 'audio') {
       const audio = backingAudioRef.current
       if (!audio) return
@@ -397,7 +404,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       audio.preload = 'auto'
       routeTakePlaybackToSpeaker(audio, backing.volume, false)
       try {
-        audio.currentTime = 0
+        audio.currentTime = position
       } catch {
         /* media may still be loading */
       }
@@ -410,17 +417,19 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const iframe = backingYoutubeIframeRef.current
       setYoutubeProxyVolumeFromUi(iframe, backing.volume)
       wakeYoutubeReference(iframe, { attemptPlay: false, uiVolume: backing.volume })
-      seekYoutubeProxy(iframe, 0)
+      seekYoutubeProxy(iframe, position)
     }
-  }, [session.backing])
+  }, [session.backing, session.endSec])
 
   const startBackingPlayback = useCallback(async () => {
     const backing = session.backing
     if (backing.kind === 'none') return false
+    const stopAt = session.endSec ?? null
 
     if (backing.kind === 'audio') {
       const audio = backingAudioRef.current
       if (!audio) return false
+      if (stopAt !== null && audio.currentTime >= stopAt - 0.02) return false
       // No ended-listener: the backing track finishing must not tear down the
       // audio route while takes are still playing or a recording is running.
       const started = await playTakeMediaAudible(audio, {
@@ -440,7 +449,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     // loading. Its onLoad handler will start it once the player is ready.
     setBackingPlaying(true)
     return iframe !== null
-  }, [session.backing])
+  }, [session.backing, session.endSec])
 
   const scheduleYoutubeBackingStart = useCallback(async (performanceEpochMs: number) => {
     clearYoutubeStartSchedule()
@@ -607,18 +616,20 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           )
           nativeBackingCacheRef.current = { src: session.backing.src, path }
         }
-        // The backing's own zero IS timeline zero, so it has nothing to play
-        // during a lead-in — it waits out the gap instead of starting early.
-        const backingStartsInside = startSec >= 0
-        sources.push({
-          id: 'backing',
-          label: session.backing.fileName || 'Backing track',
-          path,
-          sourceInSec: backingStartsInside ? startSec : 0,
-          ...(session.endSec ? { sourceOutSec: session.endSec } : {}),
-          ...(backingStartsInside ? null : { timelineDelaySec: -startSec }),
-          volume: session.backing.volume,
-        })
+        // The backing starts at timeline zero and continues to its own end.
+        // Only a user-selected project end can trim it.
+        if (session.endSec === undefined || startSec < session.endSec - 0.02) {
+          const backingStartsInside = startSec >= 0
+          sources.push({
+            id: 'backing',
+            label: session.backing.fileName || 'Backing track',
+            path,
+            sourceInSec: backingStartsInside ? startSec : 0,
+            ...(session.endSec !== undefined ? { sourceOutSec: session.endSec } : null),
+            ...(backingStartsInside ? null : { timelineDelaySec: -startSec }),
+            volume: session.backing.volume,
+          })
+        }
       } catch (error) {
         console.error('[Multitrack] backing track preparation failed', error)
         throw new Error(`${session.backing.fileName || 'The backing track'} could not be loaded. Choose the file again.`)
@@ -629,7 +640,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [session.backing, session.panels, session.endSec, session.practice.bpm, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
 
   const playAllFromStart = useCallback(async (requestedStart = 0) => {
+    if (session.backing.kind === 'audio' && backingAudioRef.current) {
+      await waitForMediaReady(backingAudioRef.current, 2500)
+      sync.setBackingDurationSec(backingAudioRef.current.duration)
+    }
     const duration = session.endSec ?? Math.max(sync.state.duration,
+      session.backing.kind === 'audio' && backingAudioRef.current && Number.isFinite(backingAudioRef.current.duration)
+        ? backingAudioRef.current.duration : 0,
       ...session.panels.map(p => p.kind === 'performance' && !p.hidden ? panelEndSec(p, session.practice.bpm) : 0))
     const startAt = playbackStartPosition(requestedStart, duration)
     sync.pause()
@@ -644,7 +661,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const started = startAt > 0 ? await sync.play() : await sync.playAllFromUserGesture(preRollSec)
       if (started) {
         const delay = Math.max(0, -multitrackTransport.rawPosition() * 1000)
-        window.setTimeout(() => { if (generation === nativeGridPlaybackGenerationRef.current) void playBackingFromStart() }, delay)
+        if (backingArmTimerRef.current !== null) window.clearTimeout(backingArmTimerRef.current)
+        backingArmTimerRef.current = window.setTimeout(() => {
+          backingArmTimerRef.current = null
+          if (generation !== nativeGridPlaybackGenerationRef.current) return
+          void prepareBackingAtStart(Math.max(0, startAt)).then(() => startBackingPlayback())
+        }, delay)
       }
       return started
     }
@@ -728,14 +750,28 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [
     buildNativeMonitorSources,
     pauseBacking,
-    playBackingFromStart,
+    prepareBackingAtStart,
     scheduleYoutubeBackingStart,
+    startBackingPlayback,
     session.backing.kind, session.endSec, session.panels,
     session.practice.bpm, session.practice.meter, session.practice.clickSound,
     showAlert,
     stopNativeGridPlayback,
     sync,
   ])
+
+  useEffect(() => {
+    const audio = backingAudioRef.current
+    if (!audio || session.backing.kind !== 'audio') return
+    const capAtExplicitEnd = () => {
+      if (session.endSec === undefined || audio.currentTime < session.endSec - 0.02) return
+      audio.pause()
+      setBackingPlaying(false)
+      sync.pause()
+    }
+    audio.addEventListener('timeupdate', capAtExplicitEnd)
+    return () => audio.removeEventListener('timeupdate', capAtExplicitEnd)
+  }, [session.endSec, session.backing, sync])
 
   const pauseAllPlayback = useCallback(() => {
     sync.pause()
@@ -1795,6 +1831,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           audioRef={backingAudioRef}
           youtubeIframeRef={backingYoutubeIframeRef}
           playYoutubeWhenReady={backingPlaying}
+          onAudioDurationChange={sync.setBackingDurationSec}
         />
       ) : null}
 

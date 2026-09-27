@@ -18,7 +18,9 @@ interface TuningGaugeProps {
 }
 
 function splitNoteName(noteName: string): { pitch: string; octave: string } {
-  const match = /^([A-G]#?)(-?\d+)$/.exec(noteName)
+  // Written names use ♭ and ♯. Those have to split the same way as C5,
+  // or the octave stays in the large letter instead of the small figure.
+  const match = /^([A-G](?:#|♯|b|♭)?)(-?\d+)$/.exec(noteName)
   return match ? { pitch: match[1], octave: match[2] } : { pitch: noteName, octave: '' }
 }
 

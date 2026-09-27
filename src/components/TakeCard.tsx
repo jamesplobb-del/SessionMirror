@@ -19,6 +19,7 @@ import Pressable from './ui/Pressable'
 import { useActionSheet } from '../context/ActionSheetContext'
 import { triggerLightHaptic } from '../utils/haptics'
 import { getTakeMediaType } from '../utils/mediaType'
+import { formatDuration } from '../utils/videoDuration'
 import { reResolveCachedTakeThumbnail } from '../utils/takeThumbnailCache'
 import type { Take, TakeUpdate } from '../types'
 import type { BestTakeHistoryEntry } from '../db'
@@ -351,7 +352,7 @@ function TakeCard({
               )}
             </div>
             {simplified && (isBenchmark || isChallenger) && <p className="vault-take-role">{isBenchmark ? 'Best Take' : 'Current Take'}</p>}
-            <p className="vault-take-row__date">{formattedDate}</p>
+            <p className="vault-take-row__date">{formattedDate}{take.duration && take.duration > 0 ? ` · ${formatDuration(take.duration)}` : ''}</p>
             {(bestHistoryEntry || focusArea) && (
               <div className="vault-take-row__practice-chips">
                 {bestHistoryEntry && (

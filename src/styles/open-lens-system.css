@@ -236,7 +236,8 @@ html#lens-design-system .lens-camera .open-lens-library-shortcut { color:#ecf7ff
 
 /* One quiet material for optional workspace widgets; camera remains translucent. */
 html#lens-design-system .lens-screen { --widget-surface:var(--ls-glass); --widget-border:var(--ls-line); --widget-ink:var(--ls-ink); --widget-muted:var(--ls-muted); --widget-accent:var(--ls-blue); --widget-control:var(--ls-soft); }
-html#lens-design-system .lens-camera { --widget-surface:#173449b0; --widget-border:#d6edff55; --widget-ink:#f1f8ff; --widget-muted:#bfd5e5; --widget-accent:#a9dbff; --widget-control:#ffffff12; }
+html#lens-design-system .lens-camera { --widget-surface:#f7fafff5; --widget-border:#bdccdc; --widget-ink:#19334c; --widget-muted:#4e657a; --widget-accent:#2168b1; --widget-control:#e8f0f8; }
+html#lens-design-system.app-dark-mode .lens-camera { --widget-surface:#122e41e8; --widget-border:#d6edff66; --widget-ink:#f1f8ff; --widget-muted:#d0e1ec; --widget-accent:#a9dbff; --widget-control:#ffffff1c; }
 html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget,.reference-widget-panel,.music-widget__panel,.hands-free-stage__center) { border:1px solid var(--widget-border)!important; border-radius:20px!important; background:var(--widget-surface)!important; color:var(--widget-ink)!important; box-shadow:0 8px 26px #0e2d4518!important; backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }
 html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget,.reference-widget-panel,.music-widget__panel)::before,
 html#lens-design-system :is(.metronome-widget,.drone-widget,.pitch-glass-panel--widget)::after { content:none!important; }
@@ -252,6 +253,17 @@ html#lens-design-system .pitch-widget-living { background:transparent!important;
 html#lens-design-system .pitch-widget-living .pitch-living-readout { top:18px!important; }
 html#lens-design-system .pitch-widget-living .pitch-living-readout__note { color:var(--widget-ink)!important; font-size:56px!important; text-shadow:none!important; }
 html#lens-design-system .pitch-widget-living .pitch-living-readout__detail { color:var(--widget-muted)!important; font-size:10px; }
+html#lens-design-system .lens-camera .pitch-widget-living .pitch-living-readout { color:var(--widget-ink); }
+html#lens-design-system .lens-camera .pitch-widget-living .pitch-living-readout__coach { color:var(--widget-muted); }
+html#lens-design-system .lens-camera .pitch-widget-living .pitch-living-readout__status { background:var(--widget-control); border-color:var(--widget-border); color:var(--widget-accent); box-shadow:none; }
+html#lens-design-system .lens-camera .drone-widget-draggable { --drone-fade:var(--widget-surface); --drone-ink:var(--widget-ink); --drone-ink-dim:var(--widget-muted); --drone-line:var(--widget-border); --drone-tile:var(--widget-control); }
+html#lens-design-system .lens-camera .metronome-widget__bpm-note { color:var(--widget-muted); }
+html#lens-design-system .lens-camera .metronome-widget__bpm-input { color:var(--widget-ink); background:var(--widget-control); border-color:var(--widget-border); }
+html#lens-design-system .lens-camera .metronome-widget__beats .metronome-beat-marker { color:var(--widget-muted); }
+html#lens-design-system .lens-camera .metronome-widget__beats .metronome-beat-marker--accented,
+html#lens-design-system .lens-camera .metronome-widget__beats .metronome-beat-marker--active { color:var(--widget-accent); }
+html#lens-design-system .lens-camera .metronome-widget__beats .metronome-beat-marker--downbeat { color:var(--audio-gold,#f7a600); }
+html#lens-design-system .lens-camera .metronome-widget__beats .metronome-beat-marker__sub-notch { background:var(--widget-muted); }
 html#lens-design-system :is(.pitch-widget-close,.widget-collapse,.music-widget__close) { background:var(--widget-control)!important; border:0!important; color:var(--widget-muted)!important; box-shadow:none!important; }
 html#lens-design-system :is(.pitch-widget-close,.widget-collapse,.music-widget__close) svg { color:inherit!important; }
 html#lens-design-system .widget-ball { border:1px solid var(--widget-border); background:var(--widget-surface); color:var(--widget-ink); box-shadow:0 5px 15px #10263820; }

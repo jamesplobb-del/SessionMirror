@@ -50,13 +50,18 @@ export function initHeadphoneOutputDetection(): void {
   if (detectionInstalled || !Capacitor.isNativePlatform()) return
   detectionInstalled = true
 
-  void BestTakeAudioPlugin.getPlaybackOutputProfile()
-    .then((snapshot) => setHeadphonesConnected(snapshotHasHeadphones(snapshot)))
+  // Subscribe before the initial probe so a route change cannot be replaced
+  // by an older snapshot that resolves later.
+  let routeEventObserved = false
+  void BestTakeAudioPlugin.addListener('audioRouteChanged', (snapshot) => {
+    routeEventObserved = true
+    setHeadphonesConnected(snapshotHasHeadphones(snapshot))
+  })
+    .then(() => BestTakeAudioPlugin.getPlaybackOutputProfile())
+    .then((snapshot) => {
+      if (!routeEventObserved) setHeadphonesConnected(snapshotHasHeadphones(snapshot))
+    })
     .catch(() => {
       /* read-only probe — ignore if unavailable */
     })
-
-  void BestTakeAudioPlugin.addListener('audioRouteChanged', (snapshot) => {
-    setHeadphonesConnected(snapshotHasHeadphones(snapshot))
-  })
 }

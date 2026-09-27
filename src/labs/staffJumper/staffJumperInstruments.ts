@@ -179,7 +179,7 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   },
   {
     id: 'bass-clarinet', name: 'Bass Clarinet', shortName: 'Bass Clarinet', family: 'Woodwind',
-    clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
+    clef: 'treble', transposition: 'bb_octave', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Eb3, N.C6),
     fullRange: reads(N.Eb3, N.C7),
   },
@@ -197,13 +197,13 @@ export const STAFF_JUMPER_INSTRUMENTS: readonly StaffJumperInstrument[] = [
   },
   {
     id: 'tenor-sax', name: 'B♭ Tenor Sax', shortName: 'Tenor Sax', family: 'Woodwind',
-    clef: 'treble', transposition: 'bb', homeKey: 'C', homeRootMidi: N.C4,
+    clef: 'treble', transposition: 'bb_octave', homeKey: 'C', homeRootMidi: N.C4,
     range: reads(N.Bb3, N.Fs6),
     fullRange: reads(N.Bb3, N.F7),
   },
   {
     id: 'bari-sax', name: 'E♭ Baritone Sax', shortName: 'Bari Sax', family: 'Woodwind',
-    clef: 'treble', transposition: 'eb', homeKey: 'G', homeRootMidi: N.G4,
+    clef: 'treble', transposition: 'eb_octave', homeKey: 'G', homeRootMidi: N.G4,
     range: reads(N.Bb3, N.Fs6),
     fullRange: reads(N.A3, N.F7),
   },

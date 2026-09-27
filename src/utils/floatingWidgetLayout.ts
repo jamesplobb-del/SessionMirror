@@ -8,6 +8,36 @@ export interface WidgetPosition {
   y: number
 }
 
+export interface WidgetRect extends WidgetPosition {
+  width: number
+  height: number
+}
+
+/** Place a full widget near its ball without covering another panel or an open tray. */
+export function findAvailableWidgetPanelPosition(
+  boundsWidth: number, boundsHeight: number, widgetWidth: number, widgetHeight: number,
+  desired: WidgetPosition, occupied: WidgetRect[],
+): WidgetPosition {
+  const gap = 12
+  const start = clampWidgetPosition(boundsWidth, boundsHeight, widgetWidth, widgetHeight, desired.x, desired.y)
+  const maxX = Math.max(gap, boundsWidth - widgetWidth - gap)
+  const maxY = Math.max(gap, boundsHeight - widgetHeight - gap)
+  const xs = [start.x, gap, maxX, ...occupied.flatMap(rect => [rect.x - widgetWidth - gap, rect.x + rect.width + gap])]
+  const ys = [start.y, gap, maxY, ...occupied.flatMap(rect => [rect.y - widgetHeight - gap, rect.y + rect.height + gap])]
+  const candidates = xs.flatMap(x => ys.map(y => clampWidgetPosition(boundsWidth, boundsHeight,
+    widgetWidth, widgetHeight, x, y)))
+  const overlap = (position: WidgetPosition, rect: WidgetRect) =>
+    Math.max(0, Math.min(position.x + widgetWidth + gap, rect.x + rect.width + gap) - Math.max(position.x, rect.x)) *
+    Math.max(0, Math.min(position.y + widgetHeight + gap, rect.y + rect.height + gap) - Math.max(position.y, rect.y))
+  candidates.sort((a, b) => {
+    const score = (position: WidgetPosition) =>
+      occupied.reduce((area, rect) => area + overlap(position, rect), 0) * 1000 +
+      (position.x - start.x) ** 2 + (position.y - start.y) ** 2
+    return score(a) - score(b)
+  })
+  return candidates[0] ?? start
+}
+
 /** Default spawn position: horizontally centered, below the HUD header. */
 export function clampWidgetPosition(
   boundsWidth: number,

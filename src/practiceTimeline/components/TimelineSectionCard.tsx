@@ -138,7 +138,7 @@ export default function TimelineSectionCard({
         className={`practice-timeline__section-card ${
           isDragging ? 'practice-timeline__section-card--dragging' : ''
         } ${swiping ? 'practice-timeline__section-card--swiping' : ''}`}
-        style={{ transform: `translateX(${cardTranslate}px)` }}
+        style={cardTranslate ? { transform: `translateX(${cardTranslate}px)` } : undefined}
         draggable={!deleteRevealed}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

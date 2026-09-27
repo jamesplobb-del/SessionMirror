@@ -121,7 +121,9 @@ export function loadStaffJumperSetupPrefs(): StaffJumperSetupPrefs | null {
       transposition:
         parsed.transposition === 'concert' ||
         parsed.transposition === 'bb' ||
+        parsed.transposition === 'bb_octave' ||
         parsed.transposition === 'eb' ||
+        parsed.transposition === 'eb_octave' ||
         parsed.transposition === 'f' ||
         parsed.transposition === 'a' ||
         parsed.transposition === 'g'

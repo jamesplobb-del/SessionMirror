@@ -179,14 +179,14 @@ export function resolveUiTickResolved(
 }
 
 export function accentLevelToClickTier(
-  beatIndex: number,
+  _beatIndex: number,
   level: MetronomeAccentLevel,
 ): MetronomeClickTier | null {
   if (level === 'silent') return null
   // A weak MAIN beat gets its own tier — quieter than an accent, but still
   // clearly a beat rather than an offbeat tick.
   if (level === 'weak') return 'beat'
-  if (level === 'strong' && beatIndex === 0) return 'downbeat'
+  if (level === 'strong') return 'downbeat'
   return 'macro'
 }
 

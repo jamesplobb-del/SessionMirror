@@ -91,8 +91,9 @@ export default function StaffJumperRangePicker({
     config.tunerInstrument,
   )
   const initial = exerciseMidiBounds(config)
-  const [low, setLow] = useState(initial.minMidi)
-  const [high, setHigh] = useState(initial.maxMidi)
+  const initialPool = midiPoolForConfig(config)
+  const [low, setLow] = useState(initialPool[0] ?? initial.minMidi)
+  const [high, setHigh] = useState(initialPool.at(-1) ?? initial.maxMidi)
   const [awaitingSecond, setAwaitingSecond] = useState(false)
 
   useLayoutEffect(() => {

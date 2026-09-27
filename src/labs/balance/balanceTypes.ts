@@ -133,6 +133,7 @@ export interface BalanceNoteResult {
 
 export interface BalanceRoutineResult {
   id: string
+  launchKind?: 'quick' | 'daily'
   routineType: BalanceRoutineType
   routineName: string
   startedAt: number

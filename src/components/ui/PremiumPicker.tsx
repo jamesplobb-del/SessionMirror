@@ -56,7 +56,8 @@ export function PremiumPicker<T extends string>({
     // Focus without bringing up the keyboard. Search is available deliberately.
     const frame = requestAnimationFrame(() => {
       panel.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
-      panel.current?.focus({ preventScroll: true })
+      const selected = panel.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]:not(:disabled)')
+      ;(selected ?? panel.current)?.focus({ preventScroll: true })
     })
     return () => {
       cancelAnimationFrame(frame)

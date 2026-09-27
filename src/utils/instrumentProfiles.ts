@@ -33,9 +33,8 @@ export interface InstrumentProfile {
 
 /**
  * Auto-record gates by acoustic output, not by family. A flute and a violin
- * sit in the same band; a trumpet and an alto sax sit well above it. All three
- * stay under 70, which is where the Settings slider starts labelling itself
- * "Loud only" — the picker should bias the gate, not preset an extreme.
+ * sit in the same band; a trumpet and an alto sax sit well above it. The
+ * labels describe these actual preset bands, while the slider stays continuous.
  */
 const QUIET_GATE = 16
 const MEDIUM_GATE = 24
@@ -301,7 +300,7 @@ export function instrumentHeading(id: string | null): string {
 
 /** The words Settings, the hands-free widget, and Home all use for one slider. */
 export function describeHandsFreeGate(threshold: number): string {
-  if (threshold >= 70) return 'Loud only'
-  if (threshold <= 30) return 'Sensitive'
+  if (threshold >= LOUD_GATE) return 'Loud only'
+  if (threshold <= QUIET_GATE) return 'Sensitive'
   return 'Balanced'
 }

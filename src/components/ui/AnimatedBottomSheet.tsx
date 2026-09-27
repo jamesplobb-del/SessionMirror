@@ -101,6 +101,22 @@ export default function AnimatedBottomSheet({
     }
   }, [isOpen])
 
+  useLayoutEffect(() => {
+    if (!isOpen) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      // Nested pickers and sheets get the first chance to handle Escape.
+      const visibleDialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'))
+        .filter(node => node.getClientRects().length > 0)
+      if (visibleDialogs.at(-1)?.getAttribute('aria-label') !== ariaLabel) return
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [ariaLabel, isOpen, onClose])
+
   const reduceMotion = useReducedMotion()
   const electric = typeof document !== 'undefined' && document.documentElement.dataset.refinement === 'depth-electric'
 

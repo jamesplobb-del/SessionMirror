@@ -22,7 +22,7 @@ import type { StaffJumperClef } from './staffNotationMap'
 
 export type StaffJumperTransposition = Extract<
   TunerTranspositionId,
-  'concert' | 'bb' | 'eb' | 'f' | 'g' | 'a'
+  'concert' | 'bb' | 'bb_octave' | 'eb' | 'eb_octave' | 'f' | 'g' | 'a'
 >
 
 export interface WrittenRange {
@@ -51,8 +51,10 @@ const TREBLE_RANGES: Record<StaffJumperTransposition, WrittenRange> = {
   concert: { minMidi: N.G3, maxMidi: N.G6, label: 'G3–G6' },
   /** Trumpet, Bb clarinet, tenor sax — low F#3, top around written D6. */
   bb: { minMidi: N.Fs3, maxMidi: N.D6, label: 'F♯3–D6' },
+  bb_octave: { minMidi: N.Fs3, maxMidi: N.D6, label: 'F♯3–D6' },
   /** Alto and bari sax — written low Bb3 up to F#6. */
   eb: { minMidi: N.Bb3, maxMidi: N.Fs6, label: 'B♭3–F♯6' },
+  eb_octave: { minMidi: N.Bb3, maxMidi: N.Fs6, label: 'B♭3–F♯6' },
   /** French horn in F reads treble from written F3 to about C6. */
   f: { minMidi: N.F3, maxMidi: N.C6, label: 'F3–C6' },
   /** Alto flute in G. */

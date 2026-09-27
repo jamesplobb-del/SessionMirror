@@ -84,6 +84,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
     private var routeObserver: NSObjectProtocol?
+    private var lastReportedHeadphoneOutput: Bool?
     private var nativeTestPlayer: AVPlayer?
     private var nativeTestEndObserver: NSObjectProtocol?
     private var playbackRouteRestorePending = false
@@ -160,14 +161,18 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 sampleCount: sampleCount
             )
         }
+        lastReportedHeadphoneOutput = headphoneOutputEvent()["usesHeadphones"] as? Bool
         routeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
             queue: .main
         ) { [weak self] _ in
-            AudioRouteConfigurator.logRoute("route-change event")
             guard let self = self else { return }
-            self.notifyListeners("audioRouteChanged", data: AudioRouteConfigurator.routeSnapshot())
+            let event = self.headphoneOutputEvent()
+            let usesHeadphones = event["usesHeadphones"] as? Bool ?? false
+            guard usesHeadphones != self.lastReportedHeadphoneOutput else { return }
+            self.lastReportedHeadphoneOutput = usesHeadphones
+            self.notifyListeners("audioRouteChanged", data: event)
         }
         DispatchQueue.main.async { [weak self] in
             self?.warmHaptics()
@@ -426,6 +431,23 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         result["usesHeadphones"] = headphonePorts.contains(outputPort)
         result["portType"] = outputPort
         call.resolve(result)
+    }
+
+    /// Route notifications can arrive in bursts as Bluetooth switches profiles.
+    /// The live UI only needs the output state, so avoid querying availableInputs
+    /// and serializing a full session snapshot on the main thread for each one.
+    private func headphoneOutputEvent() -> [String: Any] {
+        let outputPorts = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
+        let bluetoothPorts: Set<AVAudioSession.Port> = [.bluetoothA2DP, .bluetoothHFP, .bluetoothLE]
+        let headphonePorts: Set<AVAudioSession.Port> = [
+            .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .headphones, .headsetMic, .airPlay,
+        ]
+        return [
+            "outputPort": outputPorts.first?.rawValue ?? "none",
+            "usesBluetoothOutput": outputPorts.contains { bluetoothPorts.contains($0) },
+            "usesA2DPOutput": outputPorts.contains(.bluetoothA2DP),
+            "usesHeadphones": outputPorts.contains { headphonePorts.contains($0) },
+        ]
     }
 
     // MARK: - Native playback A/B test (AVPlayer — bypasses WKWebView / Web Audio)
@@ -1202,6 +1224,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("besttake-audio-plate-\(UUID().uuidString).mov")
         try? FileManager.default.removeItem(at: url)
+        var keepPlate = false
+        defer { if !keepPlate { try? FileManager.default.removeItem(at: url) } }
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
@@ -1242,8 +1266,13 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         CVPixelBufferUnlockBaseAddress(pixelBuffer, [])
+        let readinessDeadline = Date().addingTimeInterval(max(10, seconds * 2))
         for frame in 0..<frameCount {
             while !input.isReadyForMoreMediaData {
+                if writer.status != .writing || Date() >= readinessDeadline {
+                    writer.cancelWriting()
+                    throw writer.error ?? NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not finish an audio panel."])
+                }
                 Thread.sleep(forTimeInterval: 0.002)
             }
             let time = CMTime(value: CMTimeValue(frame), timescale: fps)
@@ -1254,12 +1283,16 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         input.markAsFinished()
         let finished = DispatchSemaphore(value: 0)
         writer.finishWriting { finished.signal() }
-        finished.wait()
+        if finished.wait(timeout: .now() + 30) == .timedOut {
+            writer.cancelWriting()
+            throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timed out preparing an audio panel."])
+        }
         guard writer.status == .completed else {
             throw writer.error ?? NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
         }
         let asset = AVURLAsset(url: url)
         if let track = asset.tracks(withMediaType: .video).first {
+            keepPlate = true
             return (asset, track, url)
         }
         let loaded = DispatchSemaphore(value: 0)
@@ -1271,6 +1304,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         if loaded.wait(timeout: .now() + 2) == .timedOut || tracks.isEmpty {
             throw NSError(domain: "BestTake", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not prepare an audio panel."])
         }
+        keepPlate = true
         return (asset, tracks[0], url)
     }
 
@@ -1291,6 +1325,12 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         var audioParameters: [AVMutableAudioMixInputParameters] = []
         var longestDuration = CMTime.zero
         var audioPanelPlates: [(asset: AVURLAsset, url: URL)] = []
+        var handedOffPlates = false
+        defer {
+            if !handedOffPlates {
+                for plate in audioPanelPlates { try? FileManager.default.removeItem(at: plate.url) }
+            }
+        }
 
         for sourceAny in sources {
             let source = sourceAny as [String: Any]
@@ -1738,6 +1778,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+        handedOffPlates = true
     }
 
     @objc func shareMediaFile(_ call: CAPPluginCall) {

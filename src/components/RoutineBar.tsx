@@ -580,7 +580,7 @@ export default function RoutineBar({
         </svg>
         <span className="routine-ball__step">
           {index}
-          <small>/{count}</small>
+          <small> of {count}</small>
         </span>
         <span className="routine-ball__time">{paused ? 'Paused' : formatElapsed(elapsed)}</span>
         <ChevronDown className="routine-ball__expand" aria-hidden />
@@ -718,7 +718,7 @@ export default function RoutineBar({
             {!compact && (
               <span className="routine-bar__step">
                 {index}
-                <small>/{count}</small>
+                <small> of {count}</small>
               </span>
             )}
             <span className="routine-bar__text">

@@ -104,8 +104,10 @@ const WRITTEN_PITCH_CHOICES: {
   instruments: string
 }[] = [
   { id: 'concert', name: 'Concert C', instruments: 'Flute · Violin · Voice · Piano' },
-  { id: 'bb', name: 'B♭', instruments: 'Trumpet · Clarinet · Tenor sax' },
-  { id: 'eb', name: 'E♭', instruments: 'Alto sax · Bari sax' },
+  { id: 'bb', name: 'B♭', instruments: 'Trumpet · Clarinet' },
+  { id: 'bb_octave', name: 'B♭ + octave', instruments: 'Tenor sax · Bass clarinet' },
+  { id: 'eb', name: 'E♭', instruments: 'Alto sax' },
+  { id: 'eb_octave', name: 'E♭ + octave', instruments: 'Bari sax' },
   { id: 'f', name: 'F', instruments: 'French horn' },
   { id: 'a', name: 'A', instruments: 'Clarinet in A' },
   { id: 'g', name: 'G', instruments: 'Alto flute' },
@@ -237,19 +239,19 @@ export default function StaffJumperScreen({
   const [customNotes, setCustomNotes] = useState<number[]>(() => savedPrefs?.customNotes ?? [0, 2, 4, 7, 9])
   const [draftScaleMode, setDraftScaleMode] = useState<StaffJumperScaleMode>(() => savedPrefs?.scaleMode ?? 'major')
   const [draftKey, setDraftKey] = useState<StaffJumperKey>(() => {
-    if (savedPrefs && savedPrefs.instrumentId === savedSetup.instrumentId) return savedPrefs.key
+    if (savedPrefs && (savedPrefs.instrumentId === savedSetup.instrumentId || savedPrefs.instrumentId === null)) return savedPrefs.key
     return savedSetup.key
   })
   const [draftRange, setDraftRange] = useState<StaffJumperRange>(() => savedPrefs?.range ?? '1-octave')
   // A range the player set for this instrument wins; otherwise the level's own.
   const [draftRangeLowMidi, setDraftRangeLowMidi] = useState<number | undefined>(() => {
-    if (savedPrefs?.instrumentId === savedSetup.instrumentId && savedPrefs.rangeLowMidi !== undefined) {
+    if ((savedPrefs?.instrumentId === savedSetup.instrumentId || savedPrefs?.instrumentId === null) && savedPrefs?.rangeLowMidi !== undefined) {
       return savedPrefs.rangeLowMidi
     }
     return difficultyRangeFor(savedSetup.instrumentId, savedPrefs?.difficulty ?? 'easy')?.lowMidi
   })
   const [draftRangeHighMidi, setDraftRangeHighMidi] = useState<number | undefined>(() => {
-    if (savedPrefs?.instrumentId === savedSetup.instrumentId && savedPrefs.rangeHighMidi !== undefined) {
+    if ((savedPrefs?.instrumentId === savedSetup.instrumentId || savedPrefs?.instrumentId === null) && savedPrefs?.rangeHighMidi !== undefined) {
       return savedPrefs.rangeHighMidi
     }
     return difficultyRangeFor(savedSetup.instrumentId, savedPrefs?.difficulty ?? 'easy')?.highMidi

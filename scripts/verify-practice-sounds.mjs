@@ -54,6 +54,7 @@ try json.write(to:URL(fileURLWithPath:CommandLine.arguments[1]))
   const rendered=JSON.parse(await readFile(join(temp,'native.json'),'utf8'))
   globalThis.localStorage={getItem:()=>JSON.stringify({waveform:'sine',volume:0,octave:0})}
   const prefs=m.loadDronePrefs();assert.equal(prefs.waveform,'sine');assert.equal(prefs.volume,0);assert.equal(prefs.octave,0)
+  assert.equal(prefs.lastPitchClass,null,'an unset drone note must not turn into pitch class C')
   delete globalThis.localStorage
   // Verify restored oscillator voices and cleanup through the real scheduler.
   for(const [sound,expectedWave] of [['classic','triangle'],['woodblock','square'],['soft','sine'],['electronic','square']]) {

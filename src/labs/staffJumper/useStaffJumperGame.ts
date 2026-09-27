@@ -559,6 +559,15 @@ export function useStaffJumperGame(
     if (state.isFalling) stopAudio()
   }, [state.isFalling, stopAudio])
 
+  // The count-in label must clear when the clicks end even if free play's
+  // pitch-judging animation loop has been suspended by the browser.
+  useEffect(() => {
+    if (state.phase !== 'playing' || !state.isCountingIn) return
+    const remaining = Math.max(0, countInUntilMsRef.current - performance.now())
+    const timer = window.setTimeout(() => dispatch({ type: 'COUNT_IN_COMPLETE' }), remaining)
+    return () => window.clearTimeout(timer)
+  }, [state.phase, state.isCountingIn])
+
   const resetNoteClock = useCallback((timeoutMs: number) => {
     noteDeadlineAtRef.current = null
     noteRemainingMsRef.current = timeoutMs
@@ -901,7 +910,7 @@ export function useStaffJumperGame(
           }
           const isReleasingPreviousNote = releasingPitchClassRef.current != null
 
-          if (detectedNow != null && pitchClassesMatch(detectedNow, target)) {
+          if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
             wrongStableMs = 0
             wrongPitchClassRef.current = null
             // A held repeated pitch must earn stability within this slot; its
@@ -993,7 +1002,7 @@ export function useStaffJumperGame(
           }
         } else if (attackAccepted && releasedAtWallMs == null) {
           // Follow the hold. A brief dropout is not a release; a real one is.
-          if (detectedNow != null && pitchClassesMatch(detectedNow, target)) {
+          if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
             soundedUntilWallMs = now
           } else if (now - soundedUntilWallMs > HOLD_DROPOUT_GRACE_MS) {
             releasedAtWallMs = soundedUntilWallMs

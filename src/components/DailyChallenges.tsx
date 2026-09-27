@@ -47,6 +47,7 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
   const step = plan?.practice.routine.steps[0]
   const matchingDay = plan && day?.routineId && [plan.practice.routine.id, plan.practice.sourceRoutineId].includes(day.routineId) ? day : plan ? loadRoutineDay(plan.practice.routine) : null
   const elapsed = step && matchingDay?.date === plan?.date ? matchingDay?.elapsedMsByStep[step.id] ?? 0 : 0
+  const finishedEarly = Boolean(step && !practiceDone && matchingDay?.doneStepIds.includes(step.id) && elapsed < 60_000)
   const choose = (id: PracticeGameCharacterId) => {
     if (!characterUnlocked(id, progress)) return
     savePracticeGameCharacter(id)
@@ -57,11 +58,11 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
   return <section className="daily-challenges" aria-label="Today's challenges">
     <PremiumDisclosure className="daily-challenges__disclosure">
     <summary><span><strong>Today’s challenges</strong><small>{Number(practiceDone) + Number(gameDone)} of 2 complete</small></span><ChevronRight aria-hidden /></summary>
-    <header><div><small>Two small wins for your music</small></div><button onClick={() => setCollection(true)} aria-label={`Open collection, ${total} trophies`}><Trophy aria-hidden /> {total}</button></header>
+    <header><div><small>Two small wins for your music</small></div><button onClick={() => setCollection(true)} aria-label={`Open collection, ${total} ${total === 1 ? 'trophy' : 'trophies'}`}><Trophy aria-hidden /> {total}</button></header>
     {error ? <div role="status"><p>Challenges couldn’t be saved on this device. Your practice tools still work.</p><button onClick={refresh}>Try again</button></div> : plan && <>
       <button className="daily-challenges__item" onClick={() => onPractice(plan)} aria-label={`${step?.title}. ${plan.practice.hint} ${practiceDone ? 'Completed. Practice again.' : 'Earn one trophy.'}`}>
         <span className={`daily-challenges__mark ${practiceDone ? 'is-done' : ''}`}>{practiceDone ? <Check aria-hidden /> : '01'}</span>
-        <span className="daily-challenges__copy"><strong>{step?.title}</strong><small>{practiceDone ? 'Complete · Practice again' : `${elapsed > 0 ? `${Math.min(60, Math.floor(elapsed / 1000))}/60 seconds · ` : '1 minute · '}Finish the exercise to earn 1 trophy`}</small></span><ChevronRight aria-hidden />
+        <span className="daily-challenges__copy"><strong>{step?.title}</strong><small>{practiceDone ? 'Complete · Practice again' : finishedEarly ? `Finished early · ${Math.ceil((60_000 - elapsed) / 1000)} more seconds to earn a trophy. Practice again.` : `${elapsed > 0 ? `${Math.min(60, Math.floor(elapsed / 1000))}/60 seconds · ` : '1 minute · '}Finish the exercise to earn 1 trophy`}</small></span><ChevronRight aria-hidden />
       </button>
       <button className="daily-challenges__item" onClick={() => onGame(plan)} aria-label={`${plan.game.title}. ${plan.game.objective} ${gameDone ? 'Completed. Play again.' : 'Earn one trophy.'}`}>
         <span className={`daily-challenges__mark ${gameDone ? 'is-done' : ''}`}>{gameDone ? <Check aria-hidden /> : '02'}</span>
@@ -70,11 +71,11 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
       <span className="daily-challenges__completion" aria-live="polite">{practiceDone && gameDone ? 'Both complete. Your next challenges arrive tomorrow.' : `${plan.instrumentLabel} · New challenges each day`}</span>
     </>}
     <button className="daily-challenges__collection" onClick={() => setCollection(true)}>
-      {next ? <><img src={next.asset} alt="" /><span><strong>{next.name} is next</strong><small>{Math.max(0, CHARACTER_COSTS[next.id] - total)} more trophies to unlock</small></span></> : <span>Your character collection</span>}<ChevronRight aria-hidden />
+      {next ? <><img src={next.asset} alt="" /><span><strong>{next.name} is next</strong><small>{Math.max(0, CHARACTER_COSTS[next.id] - total)} more {CHARACTER_COSTS[next.id] - total === 1 ? 'trophy' : 'trophies'} to unlock</small></span></> : <span>Your character collection</span>}<ChevronRight aria-hidden />
     </button>
     </PremiumDisclosure>
     {collection && <dialog ref={dialogRef} className="challenge-collection" onCancel={() => setCollection(false)} onClose={() => setCollection(false)} aria-labelledby="challenge-collection-title">
-      <header><span><Trophy aria-hidden /> {total} trophies</span><button onClick={() => setCollection(false)} aria-label="Close collection"><X aria-hidden /></button></header>
+      <header><span><Trophy aria-hidden /> {total} {total === 1 ? 'trophy' : 'trophies'}</span><button onClick={() => setCollection(false)} aria-label="Close collection"><X aria-hidden /></button></header>
       <h2 id="challenge-collection-title">Your players</h2>
       <p>Earn trophies through daily practice. Unlock a player once, and use it in Staff Jumper and Balance. Your trophies are never spent.</p>
       <div className="challenge-collection__grid">{PRACTICE_GAME_CHARACTERS.map(item => {
@@ -87,7 +88,7 @@ export default function DailyChallenges({ routine, day, instrumentId, onPractice
       })}</div>
       <p className="challenge-collection__personality" aria-live="polite"><strong>{player.name}</strong> · {player.personality}</p>
       {selectionError && <p role="alert">Your player couldn’t be saved. Please try again.</p>}
-      <footer>Two daily challenges. No streak to lose. Existing Balance rewards still count as character unlocks.</footer>
+      <footer>Two daily challenges. Daily trophies do not require a streak; Balance keeps its own streak.</footer>
     </dialog>}
   </section>
 }

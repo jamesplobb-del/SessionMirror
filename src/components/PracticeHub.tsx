@@ -298,7 +298,7 @@ export default function PracticeHub({
   const tunerKey = getTunerTransposition(tunerTransposition)
   const homeSubtitle = instrumentProfile
     ? `${tunerKey.id === 'concert' ? 'Concert pitch' : `Written ${tunerKey.shortLabel}`} · ${describeHandsFreeGate(handsFreeThreshold)}`
-    : 'Sets practice suggestions and input sensitivity; tuner stays in concert pitch'
+    : 'Sets practice suggestions and input sensitivity; tuner notes follow your part'
   const homeDay = routineDay?.routineId === routine?.id ? routineDay : null
   const homeProgress = routine ? routineProgress(routine, homeDay) : null
   const homeNext = routine ? routine.steps.find(item => item.id === (homeDay?.activeStepId ?? homeDay?.pausedStepId)) ?? nextOpenStep(routine, homeDay) : null
@@ -387,7 +387,7 @@ export default function PracticeHub({
                   </>
                 )}
                 {activePage === 'instrument' && (
-                  <p>Sets practice suggestions and input sensitivity; the tuner stays in concert pitch</p>
+                  <p>Sets practice suggestions and input sensitivity; tuner notes follow your part</p>
                 )}
                 {activePage === 'routine' && (
                   <p>Each step opens the right tool, already set.</p>
@@ -631,7 +631,7 @@ export default function PracticeHub({
     <PremiumPicker isOpen={isOpen && instrumentPickerOpen} title="Your instrument" searchable
       value={instrumentId ?? ''} hapticFeedback={hapticFeedback}
       options={INSTRUMENT_FAMILIES.flatMap(family => getInstrumentProfilesByFamily(family).map(profile => ({ value: profile.id, label: profile.label, group: family })))}
-      description="Practice suggestions for what you play. The tuner stays in concert pitch."
+      description="Practice suggestions and written note names for what you play."
       onChange={onSelectInstrument} onClose={() => setInstrumentPickerOpen(false)} />
     </>,
     document.body,
@@ -677,7 +677,7 @@ function InstrumentSheet({
                     <span>
                       <strong>{profile.label}</strong>
                       <small>
-                        Concert-pitch tuner
+                        {profile.tunerTransposition === 'concert' ? 'Concert-pitch tuner' : 'Written-pitch tuner'}
                         {' · '}
                         {describeHandsFreeGate(profile.soundVolumeThreshold)}
                       </small>
@@ -693,7 +693,7 @@ function InstrumentSheet({
       <p className="practice-menu-note">
         {hasRoutine
           ? 'Changing instruments updates suggestions and input sensitivity. Today’s checks and the desks you built stay.'
-          : 'This sets practice suggestions and how loud a note must be to start a take. The tuner stays in concert pitch.'}
+          : 'This sets practice suggestions, written note names, and how loud a note must be to start a take.'}
       </p>
     </section>
   )
@@ -883,6 +883,10 @@ function TodayBoard({
           <div>
             <strong>Today’s practice is saved.</strong>
             <small>{progress.done === progress.total ? 'A good place to pause. Your tools will be ready next time.' : 'You can come back to the skipped items whenever you’re ready.'}</small>
+            <Pressable type="button" intensity="soft" haptic="light" hapticFeedback={hapticFeedback}
+              disabled={startingStepId !== null} onClick={() => onStartStep(routine.steps[0].id)}>
+              {startingStepId ? 'Opening…' : 'Practice again'}
+            </Pressable>
           </div>
         </div>
       ) : null}

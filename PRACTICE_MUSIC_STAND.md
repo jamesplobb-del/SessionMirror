@@ -1,5 +1,7 @@
 # Practice on the music — full picture
 
+**Owner update (2026-09-27):** When a player enables a tool from the music stand's Workspace tray, it should open as a full widget on first use. The player can collapse it to a ball afterward. Keep the tray and score controls usable and prevent expanded widgets from covering each other. This decision supersedes the older “default to balls” instructions below; do not change first-open behavior to fix overlap.
+
 For Opus. This is the **product**, not a patch list. v1 already imports a PDF and floats ugly Music buttons over the page. That UI is wrong. Rebuild the *experience* using the tools that already exist. Do not build a forScore clone.
 
 ## The scene

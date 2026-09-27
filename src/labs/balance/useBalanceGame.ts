@@ -101,11 +101,13 @@ function waitMs(ms: number, timers: Set<number>): Promise<void> {
 function createRoutineResult(
   state: ReturnType<typeof createBalanceState>,
   customRoutines: readonly BalanceCustomRoutine[],
+  launchKind: 'quick' | 'daily',
 ): BalanceRoutineResult {
   const totalBalancedMs = state.noteResults.reduce((sum, result) => sum + result.balancedMs, 0)
   const totalConfidentMs = state.noteResults.reduce((sum, result) => sum + result.totalConfidentMs, 0)
   return {
     id: `${state.startedAt ?? Date.now()}-${state.targets.length}`,
+    launchKind,
     routineType: state.settings.routineType,
     routineName: routineSummary(state.settings, customRoutines),
     startedAt: state.startedAt ?? Date.now(),
@@ -404,7 +406,7 @@ export function useBalanceGame({
 
   useEffect(() => {
     if (state.phase !== 'routineResults') return
-    const result = createRoutineResult(state, dataRef.current.customRoutines)
+    const result = createRoutineResult(state, dataRef.current.customRoutines, launchRef.current.kind)
     if (resultPersistedRef.current === result.id) return
     resultPersistedRef.current = result.id
     const previousTrophies = dataRef.current.trophies
@@ -558,7 +560,7 @@ export function useBalanceGame({
   }, [])
 
   const routineResult = useMemo(
-    () => (state.phase === 'routineResults' ? createRoutineResult(state, data.customRoutines) : null),
+    () => (state.phase === 'routineResults' ? createRoutineResult(state, data.customRoutines, launchRef.current.kind) : null),
     [data.customRoutines, state],
   )
 

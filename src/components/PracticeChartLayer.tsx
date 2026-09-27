@@ -4,6 +4,7 @@ import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
+import { useActionSheet } from '../context/ActionSheetContext'
 import {
   DEFAULT_CHART_VIEW, deletePracticeChart, loadChartView, loadPracticeChart,
   savePracticeChart, saveChartView, setChartVisible,
@@ -41,6 +42,7 @@ const HINT_MS = 2600
 interface PracticeChartLayerProps {
   projectId: string
   revision?: number
+  onScoreReplaced?: (fileName: string) => Promise<void>
   workspace: HudQuickSettings
   onWorkspaceChange: (key: MusicWorkspaceKey, enabled: boolean) => void
   referencesVisible?: boolean
@@ -115,8 +117,9 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0,
+  revision = 0, onScoreReplaced,
 }: PracticeChartLayerProps) {
+  const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
   const paper = useRef<ChartPaperHandle | null>(null)
   const [chart, setChart] = useState<PracticeChart | null>(null)
@@ -454,6 +457,7 @@ export default function PracticeChartLayer({
   }, [active, busy, chart, offerFileOnOpen, pick, projectId])
 
   const remove = useCallback(async () => {
+    if (!await showConfirm({ title: 'Remove this score?', message: 'The music file and all markings on it will be deleted. Recordings stay in this practice item.', confirmLabel: 'Remove music', destructive: true })) return
     setBusy(true)
     setError('')
     try {
@@ -470,7 +474,7 @@ export default function PracticeChartLayer({
     } finally {
       setBusy(false)
     }
-  }, [projectId])
+  }, [projectId, showConfirm])
 
   /*
    * The same gesture the deck's Record has: tap to start or stop, hold to arm
@@ -521,10 +525,12 @@ export default function PracticeChartLayer({
         const file = event.target.files?.[0]
         event.target.value = ''
         if (!file) return
+        if (chart && !await showConfirm({ title: 'Replace this score?', message: 'Replacing the music will remove its markings. Your recordings and tool settings will stay.', confirmLabel: 'Replace music', destructive: true })) return
         setBusy(true)
         setError('')
         try {
           setChart(await savePracticeChart(projectId, file))
+          if (chart && onScoreReplaced) await onScoreReplaced(file.name)
           clearInkStrokes(projectId)
           setStrokes([])
           setMarker(null)

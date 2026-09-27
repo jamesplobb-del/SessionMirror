@@ -54,6 +54,7 @@ import { useAudioPracticeTab } from './hooks/useAudioPracticeTab'
 import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from './hooks/useDrone'
 import { loadLastSurface, saveLastSurface } from './utils/deskMemory'
 import { loadLastPracticeDestination, saveLastPracticeDestination, type LastPracticeDestination } from './utils/lastPracticeDestination'
+import { chooseInitialProjectId, rememberActiveProjectId } from './utils/lastActiveProject'
 import { SKIP_MEDIA_PERMISSION_GATE } from './utils/skipMediaPermissionGate'
 import type { DeskSnapshot } from './utils/workspaceDesks'
 import { shareTakeToSystem } from './utils/shareTakeVideo'
@@ -161,6 +162,7 @@ import {
   listPracticeItemStates,
   getPracticeItemState,
   listProjects,
+  renameProject,
   saveLibraryAudioItem,
   saveTake,
   setProjectBenchmarkBinding,
@@ -426,7 +428,7 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
 
   const settings = loadAppSettingsForSessionStart()
   const projectList = await listProjects()
-  const initialId = projectList[0]?.id ?? null
+  const initialId = chooseInitialProjectId(projectList)
   let takes: Take[] = []
   let takeRows: VaultTake[] = []
   let benchmarkId: string | null = null
@@ -585,6 +587,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     bootSnapshot.activeProjectId
   )
+  useEffect(() => {
+    if (activeProjectId) rememberActiveProjectId(activeProjectId)
+  }, [activeProjectId])
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [guidedTakeId, setGuidedTakeId] = useState<string | null>(null)
   const [guidedAudioBothTakeId, setGuidedAudioBothTakeId] = useState<string | null>(null)
@@ -1633,6 +1638,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setChallengerId(null)
     challengerUserDismissedRef.current = false
     return project
+  }, [])
+
+  const handleRenameMusicScore = useCallback(async (projectId: string, name: string) => {
+    await renameProject(projectId, name)
+    setProjects(current => current.map(project => project.id === projectId ? { ...project, name: name.trim() } : project))
   }, [])
 
   const handleDeleteProject = useCallback(
@@ -3226,6 +3236,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     bootSurfaceAppliedRef.current = true
     if (bootSurface.mode !== 'audio') return
     const frame = window.requestAnimationFrame(() => {
+      // Restoring yesterday's Audio surface is not a deliberate mode switch.
+      keepWorkspaceAcrossModeRef.current = true
       handleRecordingModeChangeRef.current('audio')
     })
     return () => window.cancelAnimationFrame(frame)
@@ -3447,6 +3459,17 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     requestQuickFunctionFromApp('metronome', 'inAppSettings')
   }, [])
 
+  const challengeReturnProjectIdRef = useRef<string | null>(null)
+  const restoreChallengeProject = useCallback(() => {
+    const projectId = challengeReturnProjectIdRef.current
+    challengeReturnProjectIdRef.current = null
+    if (projectId && projectId !== activeProjectIdRef.current) {
+      void handleSelectProject(projectId).catch(error => {
+        console.warn('[Routine] could not restore the previous folder', error)
+      })
+    }
+  }, [handleSelectProject])
+
   const restoreRoutineAfterChallenge = useCallback(() => {
     if (!isChallengeRoutine(routineRef.current)) return
     exitRoutineProgram()
@@ -3462,7 +3485,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     focusedPracticeSessionIdRef.current = null
     setFocusedPractice(null)
     setFocusedPracticeSessionId(null)
-  }, [commitRoutineDay])
+    restoreChallengeProject()
+  }, [commitRoutineDay, restoreChallengeProject])
 
   useEffect(() => {
     if (isPracticeHubOpen) restoreRoutineAfterChallenge()
@@ -5824,6 +5848,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Explicit IDs are identity. Two instruments playing "Long tones" must never
     // acquire each other's recordings or references through a name-only match.
     let itemProjectId = step.projectId
+    if (isChallengeRoutine(target) && !itemProjectId) {
+      const saved = loadRoutine()
+      if (saved?.instrumentId === target.instrumentId) {
+        const matches = saved.steps.filter(item => item.projectId && item.kind === step.kind &&
+          item.title.trim().toLowerCase() === step.title.trim().toLowerCase())
+        if (matches.length === 1) itemProjectId = matches[0].projectId
+      }
+    }
     let sessionId: string | null = null
     const savedDesk = day.desksByStep[step.id] ?? step.desk
     const desk = savedDesk
@@ -5847,8 +5879,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         // the current reader so fit, reading position and annotations survive.
         setChartVisible(project.id, true)
         musicSetupOwnerRef.current = null
-        setMusicLibraryOpen(false)
-        setMusicChartRevision(value => value + 1)
       }
       // A reference pinned in the builder is part of the step's setup, like its
       // tempo: select it before the sitting opens so it is already loaded.
@@ -5862,6 +5892,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         resumeSessionId: day.sessionIdsByStep[step.id]?.at(-1) ?? null,
         desk: desk && (step.kind === 'tune' || step.kind === 'metro') ? { ...desk, mode: 'audio' } : desk,
       })
+      if (desk?.showMusic) {
+        // Select the step's project before refreshing chart availability. While
+        // still on Music, refreshing against the previous project reopens the
+        // library and hides the score this step is trying to show.
+        setMusicLibraryOpen(false)
+        setMusicChartRevision(value => value + 1)
+      }
     } else {
       const previousSessionId = focusedPracticeSessionIdRef.current
       if (previousSessionId) await endPracticeSession(previousSessionId)
@@ -5928,6 +5965,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       const day = routineDayRef.current
       if (day) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
+      challengeReturnProjectIdRef.current = activeProjectIdRef.current
       // A temporary challenge never replaces the user's saved routine.
       const temporary = target.routine
       routineRef.current = temporary
@@ -5976,11 +6014,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       const next = stepAfter(target, stepId)
       if (next) await openRoutineStep(next.id)
       else {
+        // Finishing the final step leaves the practice surface. Do not keep a
+        // hands-free mic armed behind Today or prepare another take there.
+        if (autoSoundRecordingEnabledRef.current) handleAutoSoundRecordingChange(false)
         if (isChallengeRoutine(target)) {
           const saved = loadRoutine()
           routineRef.current = saved
           setRoutine(saved)
           commitRoutineDay(saved ? loadRoutineDay(saved) : null)
+          restoreChallengeProject()
         }
         handleOpenRoutineToday()
       }
@@ -5989,7 +6031,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setTakeDeleteError('Could not advance practice. Your saved takes and completed items are safe; try again from Today.')
       handleOpenRoutineToday()
     })
-  }, [commitRoutineDay, deferHudMediaPause, ensureRoutineDay, handleOpenRoutineToday,
+  }, [commitRoutineDay, deferHudMediaPause, ensureRoutineDay, handleAutoSoundRecordingChange, handleOpenRoutineToday,
+    restoreChallengeProject,
     openRoutineStep, rememberCurrentPracticeDesk, runPracticeTransition])
 
   const handleCompleteRoutineStep = useCallback(
@@ -6366,7 +6409,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onJumpToStep={handleJumpToRoutineStep}
                     onEditRoutine={isChallengeRoutine(routine) ? undefined : handleEditRoutineFromBar}
                     onOpenToday={handleOpenRoutineToday}
-                    preferBall={musicPageVisible}
+                    preferBall={musicPageVisible || isLabsOpen}
                   />
                 )}
 
@@ -6545,6 +6588,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     key={activeProjectId}
                     projectId={activeProjectId}
                     revision={musicChartRevision}
+                    onScoreReplaced={fileName => handleRenameMusicScore(activeProjectId, musicExerciseTitle(fileName))}
                     offerFileOnOpen={false}
                     workspace={{ ...hudQuickSettings, showTakeCards: musicTakesVisible }}
                     referencesVisible={referenceVisible}
@@ -6908,6 +6952,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         <MusicLibrary projects={projects} activeProjectId={activeProjectId} instrumentId={preferredInstrumentId} revision={musicChartRevision}
                           disabled={isRecording || isStopping || practiceTransitionBusy}
                           onCreateItem={handleCreatePracticeItem} onOpen={handleOpenMusicScore}
+                          onRename={handleRenameMusicScore}
                           onImported={() => setMusicChartRevision(value => value + 1)} />
                       </AnimatedTabPanel>
                       <AnimatedTabPanel

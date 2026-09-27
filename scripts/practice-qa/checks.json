@@ -8,6 +8,10 @@
     "scope": "navigation source contracts"
   },
   {
+    "file": "scripts/verify-widget-ball-placement.mjs",
+    "scope": "collapsed and expanded widget placement around other panels and stand controls"
+  },
+  {
     "file": "scripts/verify-last-practice-destination.mjs",
     "scope": "destination persistence utility"
   },
@@ -58,6 +62,14 @@
   {
     "file": "scripts/verify-practice-routines.mjs",
     "scope": "routine storage/progress utilities"
+  },
+  {
+    "file": "scripts/verify-focus-practice.mjs",
+    "scope": "real SQLite practice persistence and Best Take deletion integrity"
+  },
+  {
+    "file": "scripts/verify-tap-tempo.mjs",
+    "scope": "tempo change and reset across timed taps"
   },
   {
     "file": "scripts/verify-routine-preset-tools.mjs",

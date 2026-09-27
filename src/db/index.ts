@@ -20,6 +20,7 @@ export {
   getTakesByProject,
   listBestTakeHistory,
   listProjects,
+  renameProject,
   saveTake,
   setProjectBestTake,
   setTakeEnhancerBaked,

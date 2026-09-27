@@ -94,11 +94,11 @@
   z-index: 1;
   transition: transform 180ms ease;
   touch-action: pan-y;
-  will-change: transform;
 }
 
 .practice-timeline__section-card--swiping {
   transition: none;
+  will-change: transform;
 }
 
 .practice-timeline__section-card--dragging {
@@ -2665,4 +2665,34 @@
   .app-ui-overlay--audio-mode .practice-timeline-editor__essential .metronome-audio-select__control {
     font-size: 0.93rem;
   }
+}
+
+/* Program is a destination, not another tab in the sliding tool picker. */
+.program-top-nav {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: min(calc(100% - 2rem), 29rem);
+  min-height: 3.25rem;
+  margin: 0.35rem auto 0.55rem;
+  color: var(--audio-text-primary);
+}
+
+.program-top-nav__back {
+  position: absolute;
+  left: 0;
+  min-height: 2.75rem;
+  padding: 0 0.3rem;
+  border: 0;
+  background: transparent;
+  color: var(--audio-blue);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.program-top-nav strong {
+  font-size: 1rem;
+  font-weight: 700;
 }

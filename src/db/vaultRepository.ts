@@ -117,6 +117,14 @@ export async function listProjects(): Promise<Project[]> {
   return (result.values ?? []).map((row) => mapProjectRow(row as SqlRow))
 }
 
+export async function renameProject(projectId: string, name: string): Promise<void> {
+  const trimmed = name.trim()
+  if (!trimmed) throw new Error('Name cannot be empty.')
+  const db = getVaultDatabase()
+  await db.run('UPDATE projects SET name = ? WHERE id = ?', [trimmed, projectId])
+  await persistWebStore()
+}
+
 export async function deleteProject(projectId: string): Promise<void> {
   const db = getVaultDatabase()
   await db.run('DELETE FROM projects WHERE id = ?', [projectId])
@@ -251,7 +259,12 @@ export async function setTakeEnhancerBaked(takeId: string, baked: boolean): Prom
 
 export async function deleteVaultTake(takeId: string): Promise<void> {
   const db = getVaultDatabase()
-  await db.run('DELETE FROM takes WHERE id = ?', [takeId])
+  await db.executeSet([
+    { statement: 'DELETE FROM best_take_history WHERE take_id = ?', values: [takeId] },
+    { statement: `UPDATE projects SET benchmark_source = NULL, benchmark_ref_id = NULL
+                  WHERE benchmark_source = 'take' AND benchmark_ref_id = ?`, values: [takeId] },
+    { statement: 'DELETE FROM takes WHERE id = ?', values: [takeId] },
+  ], true)
   await persistWebStore()
 }
 

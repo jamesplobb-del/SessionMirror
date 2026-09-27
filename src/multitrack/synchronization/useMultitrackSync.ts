@@ -15,6 +15,7 @@ import {
   updateTakePlaybackSpeakerGain,
 } from '../../utils/takePlaybackSpeaker'
 import { multitrackTransport } from './multitrackTransport'
+import { projectDurationSec } from './projectTiming'
 
 /** Timeline drift past which a slaved element is hard-seeked back onto the transport. */
 const SLAVE_TOLERANCE_SEC = 0.12
@@ -41,7 +42,7 @@ function primeElementForPlayback(element: HTMLMediaElement): void {
 }
 
 export function useMultitrackSync() {
-  const projectRulesRef = useRef<{ endSec?: number; hidden: Set<string>; sections: Map<string, { start?: number; end?: number; visualLeadIn?: number }> }>({ hidden: new Set(), sections: new Map() })
+  const projectRulesRef = useRef<{ endSec?: number; backingDurationSec: number; hidden: Set<string>; sections: Map<string, { start?: number; end?: number; visualLeadIn?: number }> }>({ backingDurationSec: 0, hidden: new Set(), sections: new Map() })
   const mediaMapRef = useRef<Map<string, HTMLMediaElement>>(new Map())
   const excludePanelIdRef = useRef<string | null>(null)
   const referencePanelIdsRef = useRef<string[] | null>(null)
@@ -57,6 +58,7 @@ export function useMultitrackSync() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const playbackEndRef = useRef(0)
   const rafRef = useRef<number | null>(null)
   const lastUiTimeUpdateRef = useRef(0)
   const lastVisualSyncRef = useRef(0)
@@ -259,14 +261,24 @@ export function useMultitrackSync() {
     const durations = getEntries(null)
       .map(([panelId, el]) => effectiveDuration(panelId, el))
       .filter((v) => Number.isFinite(v) && v > 0)
-    setDuration(projectRulesRef.current.endSec ?? (durations.length > 0 ? Math.max(...durations) : 0))
+    const end = projectDurationSec(durations.length > 0 ? Math.max(...durations) : 0,
+      projectRulesRef.current.backingDurationSec, projectRulesRef.current.endSec)
+    playbackEndRef.current = end
+    setDuration(end)
   }, [effectiveDuration, getEntries])
 
   const setProjectRules = useCallback((endSec: number | undefined, hidden: string[], sections: Array<{ id: string; start?: number; end?: number; visualLeadIn?: number }>) => {
-    projectRulesRef.current = { endSec, hidden: new Set(hidden), sections: new Map(sections.map(s => [s.id, s])) }
+    projectRulesRef.current = { ...projectRulesRef.current, endSec, hidden: new Set(hidden), sections: new Map(sections.map(s => [s.id, s])) }
     for (const [id, el] of mediaMapRef.current) if (hidden.includes(id)) el.pause()
     applyMixStateToAll(); refreshDuration()
   }, [applyMixStateToAll, refreshDuration])
+
+  const setBackingDurationSec = useCallback((value: number) => {
+    const next = Number.isFinite(value) && value > 0 ? value : 0
+    if (Math.abs(projectRulesRef.current.backingDurationSec - next) < 0.01) return
+    projectRulesRef.current.backingDurationSec = next
+    refreshDuration()
+  }, [refreshDuration])
 
   const setPanelTrim = useCallback(
     (panelId: string, startSec: number, endSec: number | null) => {
@@ -363,7 +375,7 @@ export function useMultitrackSync() {
   const playElements = useCallback(async (entries: Array<[string, HTMLMediaElement]>, startTime: number) => {
     previewPanelIdRef.current = null
     const elements = entries.map(([, el]) => el)
-    if (elements.length === 0) return false
+    if (elements.length === 0 && projectRulesRef.current.backingDurationSec <= 0) return false
 
     chaseModeRef.current = false
     pendingStartRef.current.clear()
@@ -469,7 +481,8 @@ export function useMultitrackSync() {
       })
     }
     applyMixStateToAll()
-    const playing = starts.some(Boolean) || pendingStartRef.current.size > 0
+    const playing = starts.some(Boolean) || pendingStartRef.current.size > 0 ||
+      (elements.length === 0 && projectRulesRef.current.backingDurationSec > 0)
     if (playing) {
       // Roll the transport from the intended start; the rAF loop locks it onto
       // real playback once the elements are actually progressing.
@@ -663,7 +676,7 @@ export function useMultitrackSync() {
 
     const started =
       recordingMonitor || results.some((result) => result.status === 'fulfilled') ||
-      pendingStartRef.current.size > 0
+      pendingStartRef.current.size > 0 || projectRulesRef.current.backingDurationSec > 0
     if (started) {
       const timelineNow = startTime + (Date.now() - epochMs) / 1000
       setPreRollRemaining(Math.max(0, -timelineNow))
@@ -930,7 +943,8 @@ export function useMultitrackSync() {
         }
       }
 
-      if (entries.length > 0 || chasing || recordingPreview) {
+      if (entries.length > 0 || chasing || recordingPreview ||
+        (isPlayingRef.current && projectRulesRef.current.backingDurationSec > 0)) {
         let timeline = multitrackTransport.rawPosition()
         if (masterEntry) {
           const [masterId, master] = masterEntry
@@ -954,9 +968,11 @@ export function useMultitrackSync() {
           }
 
           // Playback follows the transport — never the other way around.
-          timeline = transportLockedRef.current ? multitrackTransport.rawPosition() : refPos
+          timeline = transportLockedRef.current || projectRulesRef.current.backingDurationSec > 0
+            ? multitrackTransport.rawPosition() : refPos
         }
-        const projectEnd = projectRulesRef.current.endSec
+        const projectEnd = projectRulesRef.current.endSec ??
+          (projectRulesRef.current.backingDurationSec > 0 ? playbackEndRef.current : undefined)
         if (!chasing && !recordingPreview && projectEnd !== undefined && timeline >= projectEnd) {
           for (const [, el] of entries) el.pause()
           pending.clear(); multitrackTransport.pause(); setCurrentTime(projectEnd)
@@ -1086,6 +1102,7 @@ export function useMultitrackSync() {
     setExcludePanelId,
     setReferencePanelIds,
     setProjectRules,
+    setBackingDurationSec,
     setPanelVolume,
     setPanelMuted,
     setPanelTrim,

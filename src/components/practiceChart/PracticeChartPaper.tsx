@@ -145,8 +145,13 @@ export default function PracticeChartPaper({
   }, [])
 
   const resolvedFit = useMemo(
-    () => resolveChartFit(fit, pages ?? [], viewport.width, viewport.height),
-    [fit, pages, viewport.width, viewport.height],
+    () => {
+      const preferred = resolveChartFit(fit, pages ?? [], viewport.width, viewport.height)
+      // A stationary half turn operates on one reading page. Clipping half of
+      // a two-page spread hides the next page before the player reaches it.
+      return halfTurn && preferred === 'spread' ? 'page' : preferred
+    },
+    [fit, halfTurn, pages, viewport.width, viewport.height],
   )
   const layout = useMemo<ChartStripLayout>(
     () => layoutChartStrip(pages ?? [], viewport.width, viewport.height, resolvedFit, zoom),

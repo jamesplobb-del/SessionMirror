@@ -7,7 +7,6 @@ import AppIntents
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
-    private var audioRouteObserver: NSObjectProtocol?
     private var audioInterruptionObserver: NSObjectProtocol?
 
     /// Keep the Swift plugin class linked so Capacit asr packageClassList can resolve it.
@@ -43,7 +42,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         lockInterfaceToPortrait()
         configurePersistentAudioSession()
-        installAudioRouteObserver()
         installAudioInterruptionObserver()
         return !handledQuickAction
     }
@@ -79,19 +77,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 "active=\(session.isOtherAudioPlaying) otherAudioPlaying=\(session.isOtherAudioPlaying) " +
                 "route=\(snapshot["outputPort"] as? String ?? "unknown")"
             )
-        }
-    }
-
-    private func installAudioRouteObserver() {
-        audioRouteObserver = NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification,
-            object: AVAudioSession.sharedInstance(),
-            queue: .main
-        ) { notification in
-            let reasonRaw = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
-            let reason = reasonRaw.flatMap { AVAudioSession.RouteChangeReason(rawValue: $0) }
-            AudioRouteConfigurator.logRoute("route-change event (passive) reason=\(String(describing: reason))")
-            AudioRouteConfigurator.logMicRouteProof(context: "routeChange.\(String(describing: reason))")
         }
     }
 
@@ -201,10 +186,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        if let observer = audioRouteObserver {
-            NotificationCenter.default.removeObserver(observer)
-            audioRouteObserver = nil
-        }
         if let observer = audioInterruptionObserver {
             NotificationCenter.default.removeObserver(observer)
             audioInterruptionObserver = nil

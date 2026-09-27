@@ -21,6 +21,11 @@ export interface PracticeChart {
 }
 
 const charts = new Map<string, PracticeChart>()
+export const PRACTICE_CHART_CHANGED = 'besttake:practice-chart-changed'
+function notifyChartChanged(projectId: string): void {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent(PRACTICE_CHART_CHANGED, { detail: projectId }))
+}
 const metadataKey = (id: string) => `besttake:practice-chart:v1:${id}`
 export const chartVisibleKey = (id: string) => `besttake:practice-chart-visible:v1:${id}`
 const viewKey = (id: string) => `besttake:practice-chart-view:v1:${id}`
@@ -115,6 +120,7 @@ export async function savePracticeChart(projectId: string, file: File): Promise<
   // New music is a new part: start at the first page rather than wherever the
   // player had scrolled the one it replaced.
   saveChartView(projectId, { ...loadChartView(projectId), fraction: 0 })
+  notifyChartChanged(projectId)
   return chart
 }
 
@@ -132,6 +138,7 @@ export async function deletePracticeChart(projectId: string): Promise<void> {
   const old = charts.get(projectId)
   if (old?.objectUrl) URL.revokeObjectURL(old.objectUrl)
   charts.delete(projectId)
+  notifyChartChanged(projectId)
 }
 
 /* ---- How this part is being read --------------------------------------- */

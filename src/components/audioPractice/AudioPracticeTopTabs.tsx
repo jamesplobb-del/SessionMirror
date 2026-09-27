@@ -34,6 +34,12 @@ export default function AudioPracticeTopTabs({
   const [selectedTab, setSelectedTab] = useOptimistic(activeTab)
   const toolTabs = includeGames ? TABS : TABS.filter(tab => tab.id !== 'games')
   const tabs = includeRecording ? [{ id: 'audio' as const, label: 'Record' }, ...toolTabs] : toolTabs
+  if (activeTab === 'practice') {
+    return <nav className="program-top-nav pointer-events-auto" aria-label="Program navigation">
+      <button type="button" className="program-top-nav__back" onClick={() => onTabChange('metronome')}>‹ Metronome</button>
+      <strong>Program</strong>
+    </nav>
+  }
   return (
     <>
     {onBackToRecording && <button className="tools-record-return" onClick={onBackToRecording}>‹ Recording</button>}

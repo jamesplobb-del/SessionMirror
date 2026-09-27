@@ -483,7 +483,7 @@ export function LiveAudioTunerPane({
                   onClick={toggleTransposition}
                   aria-expanded={transpositionOpen}
                   aria-controls="pitch-living-transposition-panel"
-                  aria-label={`Open tuner settings. Concert pitch`}
+                  aria-label={`Open tuner settings. ${tunerTransposition === 'concert' ? 'Concert pitch' : `Written ${transposition.shortLabel}`}`}
                   title={transpositionOpen ? 'Hide tuner settings' : `Tuner settings · ${transposition.shortLabel}`}
                 >
                   <Settings className="electric-tuning-old" aria-hidden /><SlidersHorizontal className="electric-tuning-new" aria-hidden />
@@ -659,7 +659,7 @@ function LivePitchTunerAudio({
   liveMicEnabled,
   micStreamRef,
   tunerInstrument = 'voice',
-  tunerTransposition: _requestedTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
   hapticsEnabled,
@@ -687,7 +687,6 @@ function LivePitchTunerAudio({
   audioToolsEnabled?: boolean
   nativePitchProcessing?: boolean
 }) {
-  const tunerTransposition = DEFAULT_TUNER_TRANSPOSITION
   const [inputAdvice, setInputAdvice] = useState<TunerInputAdvice>(null)
   useEffect(() => { setInputAdvice(null) }, [tunerInstrument, enabled])
   const pitchHistoryRef = useRef<TunerHistorySample[]>([])
@@ -989,7 +988,7 @@ export default function LivePitchTuner({
   micStreamRef,
   persistWhenPaused = false,
   tunerInstrument = 'voice',
-  tunerTransposition: _requestedTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
   hapticsEnabled,
@@ -1000,7 +999,6 @@ export default function LivePitchTuner({
   audioToolsEnabled = true,
   nativePitchProcessing = false,
 }: LivePitchTunerProps) {
-  const tunerTransposition = DEFAULT_TUNER_TRANSPOSITION
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
   const isAudio = variant === 'audio'

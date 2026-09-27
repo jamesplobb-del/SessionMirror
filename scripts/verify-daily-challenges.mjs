@@ -8,6 +8,14 @@ let fail = false
 }
 const built = await build({ entryPoints: ['src/utils/dailyChallenges.ts'], bundle: true, write: false, platform: 'node', format: 'esm' })
 const c = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)
+const trophyBuild = await build({ entryPoints: ['src/labs/balance/balanceTrophies.ts'], bundle: true, write: false, platform: 'node', format: 'esm' })
+const balance = await import(`data:text/javascript;base64,${Buffer.from(trophyBuild.outputFiles[0].text).toString('base64')}`)
+const centeredRun = { routineType: 'single', completed: true, centeredPercent: 95, noteResults: [], totalBalancedMs: 0 }
+const balanceData = { trophies: {}, unlockedCharacterIds: [], routineSummaries: [{ ...centeredRun, launchKind: 'daily' }] }
+assert.equal(balance.awardBalanceTrophies(balanceData).newlyUnlocked.includes('center-stage'), false,
+  'one daily Balance hold must not grant the Quick Play Center Stage reward')
+assert.equal(balance.awardBalanceTrophies({ ...balanceData, routineSummaries: [{ ...centeredRun, launchKind: 'quick' }] }).newlyUnlocked.includes('center-stage'), true,
+  'a qualifying Quick Play routine should still grant Center Stage')
 const first = new Date(2026, 8, 8, 12)
 assert.equal(c.awardChallenge('practice', first), true)
 assert.equal(c.awardChallenge('practice', first), false)

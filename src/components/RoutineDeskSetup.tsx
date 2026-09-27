@@ -14,6 +14,7 @@ import type { DeskSnapshot } from '../utils/workspaceDesks'
 export default function RoutineDeskSetup({
   step,
   instrumentId,
+  tunerTransposition,
   hapticFeedback,
   onChange,
 }: {
@@ -28,7 +29,7 @@ export default function RoutineDeskSetup({
   const desk = { ...savedDesk, metronome: normalizeDeskMetronome(savedDesk.metronome) }
   const patchDesk = (patch: Partial<DeskSnapshot>) => onChange({ desk: { ...desk, ...patch } })
   const droneLabel = (pitchClass: number) =>
-    getWrittenPitchLabel(pitchClass, desk.drone.octave, 'concert').label
+    getWrittenPitchLabel(pitchClass, desk.drone.octave, tunerTransposition).label
 
   const metronome = desk.metronome
   const subdivisionLabel = getPracticeRhythmOptions(metronome.meter, metronome.pulseModeId)
@@ -101,7 +102,7 @@ export default function RoutineDeskSetup({
             <strong>Drone</strong>
             <i />
           </Pressable>
-          <small className="routine-tool__hint">Choose a concert-pitch reference to play against.</small>
+          <small className="routine-tool__hint">Choose the note as written for your instrument.</small>
           <PremiumReveal open={desk.showDrone}>
             <div className="routine-pitch-row" role="radiogroup" aria-label="Drone note">
               {Array.from({ length: 12 }, (_, pitchClass) => (

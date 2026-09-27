@@ -22,11 +22,13 @@ export function MultitrackBackingMediaHost({
   audioRef,
   youtubeIframeRef,
   playYoutubeWhenReady = false,
+  onAudioDurationChange,
 }: {
   backing: MultitrackBackingTrack
   audioRef: RefObject<HTMLAudioElement | null>
   youtubeIframeRef: RefObject<HTMLIFrameElement | null>
   playYoutubeWhenReady?: boolean
+  onAudioDurationChange?: (durationSec: number) => void
 }) {
   useEffect(() => {
     const audio = audioRef.current
@@ -35,13 +37,15 @@ export function MultitrackBackingMediaHost({
       audio.pause()
       audio.removeAttribute('src')
       audio.load()
+      onAudioDurationChange?.(0)
       return
     }
+    onAudioDurationChange?.(0)
     audio.src = backing.src
     audio.volume = backing.volume
     audio.preload = 'auto'
     audio.load()
-  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null])
+  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, onAudioDurationChange])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -51,7 +55,9 @@ export function MultitrackBackingMediaHost({
 
   return (
     <div className="multitrack-backing-media-host" aria-hidden>
-      <audio ref={audioRef} className="hidden" preload="metadata" />
+      <audio ref={audioRef} className="hidden" preload="metadata"
+        onLoadedMetadata={event => onAudioDurationChange?.(event.currentTarget.duration)}
+        onDurationChange={event => onAudioDurationChange?.(event.currentTarget.duration)} />
       {backing.kind === 'youtube' ? (
         <div className="multitrack-backing-strip__youtube-host">
           <iframe

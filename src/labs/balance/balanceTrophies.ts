@@ -90,7 +90,7 @@ function earnedTrophyIds(summaries: readonly BalanceRoutineResult[]): Set<Balanc
   if (summaries.some((summary) => summary.completed && summary.routineType === 'scale')) {
     earned.add('scale-walker')
   }
-  if (summaries.some((summary) => summary.completed && summary.centeredPercent >= 90)) {
+  if (summaries.some((summary) => summary.launchKind !== 'daily' && summary.completed && summary.centeredPercent >= 90)) {
     earned.add('center-stage')
   }
   if (

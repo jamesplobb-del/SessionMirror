@@ -1,8 +1,8 @@
 import PremiumDisclosure from './ui/PremiumDisclosure'
-import { useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, Pencil, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import type { Project } from '../db'
-import { deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart } from '../utils/practiceChartStorage'
+import { deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart, PRACTICE_CHART_CHANGED } from '../utils/practiceChartStorage'
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import { clearMusicScoreSettings, loadMusicOrder, loadMusicOrganization, loadMusicScoreSettings, loadMusicSetup, orderMusic, saveMusicOrder, saveMusicOrganization, saveMusicScoreSettings, saveMusicSetup, type MusicOrganization } from '../utils/musicLibrary'
 import { loadExerciseLibrary } from '../utils/routineLibrary'
@@ -23,6 +23,7 @@ interface Props {
   disabled: boolean
   onCreateItem: (name: string) => Promise<string>
   onOpen: (projectId: string) => Promise<void>
+  onRename: (projectId: string, name: string) => Promise<void>
   onImported: () => void
 }
 type DragKind = 'score' | 'folder'
@@ -44,7 +45,7 @@ function setupLabel(id: string): string {
 }
 
 /** Folders organize the library; a score's recordings stay in its practice item. */
-export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onImported }: Props) {
+export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const scroll = useRef<HTMLElement>(null)
   const working = useRef(false)
@@ -64,7 +65,15 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
   const [selecting, setSelecting] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [deleteIds, setDeleteIds] = useState<string[] | null>(null)
-  const music = useMemo(() => orderMusic(projects.filter(item => hasPracticeChart(item.id)), order), [projects, order, revision])
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [chartRevision, setChartRevision] = useState(0)
+  useEffect(() => {
+    const refresh = () => setChartRevision(current => current + 1)
+    window.addEventListener(PRACTICE_CHART_CHANGED, refresh)
+    return () => window.removeEventListener(PRACTICE_CHART_CHANGED, refresh)
+  }, [])
+  const music = useMemo(() => orderMusic(projects.filter(item => hasPracticeChart(item.id)), order), [projects, order, revision, chartRevision])
   const selectedFolder = organization.folders.find(folder => folder.id === folderId) ?? null
   const searching = Boolean(query.trim())
   const visible = music.filter(item => ((selectedFolder ? (organization.placements[item.id] ?? null) === folderId : searching || !organization.placements[item.id]))
@@ -305,6 +314,17 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
         {!selecting && dragHandle('score', item.id, item.name)}
       </div>
       {setupId === item.id && <div className="music-library__setup-panel music-routine-item-settings" id={`music-score-setup-${item.id}`}>
+        {renamingId === item.id ? <form className="music-library__score-rename" onSubmit={event => {
+          event.preventDefault()
+          const name = renameValue.trim()
+          if (!name || working.current) return
+          working.current = true
+          setBusy('Renaming score…')
+          void onRename(item.id, name).then(() => { setRenamingId(null); setError('') })
+            .catch(() => setError('Could not rename this score. Please try again.'))
+            .finally(() => { working.current = false; setBusy('') })
+        }}><input autoFocus aria-label="Score name" maxLength={80} value={renameValue} onChange={event => setRenameValue(event.target.value)} /><button type="submit" disabled={!renameValue.trim() || Boolean(busy)}>Save</button><button type="button" onClick={() => setRenamingId(null)}>Cancel</button></form>
+          : <button type="button" className="music-library__rename-score" onClick={() => { setRenamingId(item.id); setRenameValue(item.name) }}><Pencil aria-hidden /> Rename score</button>}
         <MusicToolSetup step={scoreStep(item)} instrumentId={instrumentId} onChange={patch => updateScoreSetup(item, patch)} />
         <button type="button" className="music-library__remove-score" disabled={disabled || Boolean(busy)} onClick={() => setDeleteIds([item.id])}><Trash2 aria-hidden /> Delete music</button>
         <PremiumDisclosure className="music-routine-more"><summary>More options</summary>

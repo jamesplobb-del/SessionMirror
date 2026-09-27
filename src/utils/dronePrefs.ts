@@ -35,6 +35,7 @@ function parseWaveform(value: unknown): DroneWaveform {
 }
 
 function parsePitchClass(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
   const pitchClass = Number(value)
   return Number.isInteger(pitchClass) && pitchClass >= 0 && pitchClass <= 11 ? pitchClass : null
 }

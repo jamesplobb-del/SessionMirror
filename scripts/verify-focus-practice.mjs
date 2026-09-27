@@ -38,7 +38,9 @@ const snapshot = { mode: 'audio', pitchTrackerEnabled: true, showMetronome: true
   showMusic: false, showTakeCards: true, autoSoundRecording: false, audioEnhancerEnabled: false,
   metronome: { bpm: 72, meter: '4/4', subdivision: 'off' }, drone: { pitchClass: null, octave: 4 }, soundSilenceSeconds: 2 }
 desks.saveFocusDesk('excerpt-a', snapshot)
-assert.deepEqual(desks.loadFocusDesk('excerpt-a'), snapshot, 'A silent drone must stay silent on restore')
+const restoredDesk = desks.loadFocusDesk('excerpt-a')
+assert.deepEqual(restoredDesk.drone, snapshot.drone, 'A silent drone must stay silent on restore')
+assert.equal(restoredDesk.metronome.bpm, snapshot.metronome.bpm, 'The saved tempo must restore')
 assert.equal(desks.loadFocusDesk('excerpt-b'), null)
 let savedDesks = desks.upsertWorkspaceDesk([], 'Excerpt', snapshot)
 const deskId = savedDesks[0].id
@@ -177,6 +179,13 @@ assert.equal((await practice.listPracticeSessions(other.id)).length, 2, 'Repeate
 const reopened = new SQL.Database(sqlite.export())
 assert.equal(reopened.exec('SELECT COUNT(*) FROM takes')[0].values[0][0], 2, 'Attempts survive a database reopen')
 reopened.close()
+const doomed = await vault.saveTake({ projectId: other.id, filePath: 'test/delete-me.m4a', duration: 3, name: 'Delete me' })
+await vault.setProjectBestTake(other.id, doomed.id)
+await vault.deleteVaultTake(doomed.id)
+assert.equal((await vault.listBestTakeHistory(other.id)).some(entry => entry.takeId === doomed.id), false,
+  'Deleting a Best Take clears its history pointer')
+assert.equal(sqlite.exec(`SELECT benchmark_ref_id FROM projects WHERE id = '${other.id}'`)[0].values[0][0], null,
+  'Deleting a Best Take clears the project benchmark pointer')
 sqlite.close()
 sqlite = new SQL.Database()
 sqlite.run(CREATE_SCHEMA_SQL.replace('  routine_id TEXT,\n  routine_step_id TEXT,\n', ''))

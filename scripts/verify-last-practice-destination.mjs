@@ -27,4 +27,21 @@ assert.equal(loadLastPracticeDestination(), null)
 storage.set('sessionmirror:last-practice-destination', '{"kind":"music","projectId":42}')
 assert.equal(loadLastPracticeDestination(), null)
 
-console.log('PASS: last routine or standalone score survives relaunch; invalid saved destinations are ignored')
+const projectBundle = await build({
+  entryPoints: ['src/utils/lastActiveProject.ts'], bundle: true, write: false,
+  platform: 'node', format: 'esm',
+})
+const { chooseInitialProjectId, rememberActiveProjectId } = await import(
+  `data:text/javascript;base64,${Buffer.from(projectBundle.outputFiles[0].text).toString('base64')}`
+)
+const projects = [
+  { id: 'new-empty', name: 'New folder', createdAt: 2 },
+  { id: 'saved-takes', name: 'Saved takes', createdAt: 1 },
+]
+assert.equal(chooseInitialProjectId(projects), 'new-empty')
+rememberActiveProjectId('saved-takes')
+assert.equal(chooseInitialProjectId(projects), 'saved-takes')
+assert.equal(chooseInitialProjectId(projects.slice(0, 1)), 'new-empty')
+assert.equal(chooseInitialProjectId([]), null)
+
+console.log('PASS: practice destination and last-used Take Vault folder survive relaunch; deleted folders fall back safely')

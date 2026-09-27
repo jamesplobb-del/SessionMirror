@@ -19,12 +19,12 @@ interface DailyTemplate {
 
 const DAILY_TEMPLATES: readonly DailyTemplate[] = [
   { id: 'steady-start', name: 'Steady Start', offsets: [0], goalSeconds: 8, toleranceCents: 12 },
-  { id: 'deep-breath', name: 'Deep Breath', offsets: [0], goalSeconds: 12, toleranceCents: 12 },
+  { id: 'deep-breath', name: 'Long Hold', offsets: [0], goalSeconds: 12, toleranceCents: 12 },
   { id: 'three-in-a-row', name: 'Three in a Row', offsets: [0, 0, 0], goalSeconds: 6, toleranceCents: 12 },
   { id: 'wide-steps', name: 'Wide Steps', offsets: [-4, 0, 4], goalSeconds: 6, toleranceCents: 12 },
   { id: 'fine-point', name: 'Fine Point', offsets: [0], goalSeconds: 6, toleranceCents: 6 },
-  { id: 'high-air', name: 'High Air', offsets: [7], goalSeconds: 8, toleranceCents: 12 },
-  { id: 'low-air', name: 'Low Air', offsets: [-7], goalSeconds: 8, toleranceCents: 12 },
+  { id: 'high-air', name: 'High Note', offsets: [7], goalSeconds: 8, toleranceCents: 12 },
+  { id: 'low-air', name: 'Low Note', offsets: [-7], goalSeconds: 8, toleranceCents: 12 },
   { id: 'five-note-climb', name: 'Five Note Climb', offsets: [0, 2, 4, 5, 7], goalSeconds: 5, toleranceCents: 12 },
   { id: 'the-long-one', name: 'The Long One', offsets: [0], goalSeconds: 20, toleranceCents: 14 },
   { id: 'centre-hold', name: 'Centre Hold', offsets: [0, 5], goalSeconds: 8, toleranceCents: 8 },

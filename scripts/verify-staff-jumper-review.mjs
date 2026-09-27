@@ -1,6 +1,6 @@
 import { build } from 'esbuild'
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,6 +8,14 @@ const dir = await mkdtemp(join(tmpdir(), 'staff-review-'))
 try {
  await build({stdin:{contents:`export * from './src/labs/staffJumper/staffJumperRhythm'; export * from './src/labs/staffJumper/staffJumperMusicLogic'; export * from './src/labs/staffJumper/staffJumperNotationLayout';`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:join(dir,'test.mjs'),loader:{'.png':'dataurl','.jpg':'dataurl','.webp':'dataurl','.svg':'dataurl'}})
  const m = await import(pathToFileURL(join(dir,'test.mjs')))
+ const pitch = { noteName: 'C', midi: 60, frequencyHz: 261.63, cents: 0 }
+ for (const cents of [-20,-15,15,20]) assert.equal(m.isReadoutCorrectPitch({ ...pitch, cents }, 0,
+  { difficulty: 'hard', transposition: 'concert' }), true)
+ for (const cents of [-30,-25,25,30]) assert.equal(m.isReadoutCorrectPitch({ ...pitch, cents }, 0,
+  { difficulty: 'hard', transposition: 'concert' }), false)
+ const gameHook = await readFile('src/labs/staffJumper/useStaffJumperGame.ts', 'utf8')
+ assert.equal((gameHook.match(/isReadoutCorrectPitch\(readoutNow, target, current\.config\)/g) ?? []).length, 3,
+  'click attacks, click holds, and free play must share the cents-aware pitch rule')
  let checked=0
  for (const meter of ['simple','compound']) for (const difficulty of ['easy','medium','hard']) for(let seed=1;seed<=30;seed++) {
   const key={};const spec=m.METERS[meter]; let prior=null

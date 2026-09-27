@@ -47,6 +47,13 @@ export function panelEndSec(panel: PerformancePanelState, bpm: number): number {
   return Math.max(0, rawEnd - (panel.trimStartSec ?? 0) - panelOffsetMs(panel, bpm) / 1000)
 }
 
+/** A backing track can define the song length until the user chooses an end. */
+export function projectDurationSec(partEndSec: number, backingEndSec: number, explicitEndSec?: number): number {
+  if (explicitEndSec !== undefined) return explicitEndSec
+  return Math.max(0, Number.isFinite(partEndSec) ? partEndSec : 0,
+    Number.isFinite(backingEndSec) ? backingEndSec : 0)
+}
+
 /** Play at the end means replay, including the final display-frame rounding. */
 export function playbackStartPosition(requested: number, duration: number): number {
   const position = Number.isFinite(requested) ? Math.max(0, requested) : 0

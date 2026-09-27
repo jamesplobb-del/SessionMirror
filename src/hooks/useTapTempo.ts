@@ -28,6 +28,21 @@ export function useTapTempo(onBpm: (bpm: number) => void, options?: UseTapTempoO
       return
     }
 
+    if (taps.length >= 2) {
+      const previous = taps.slice(1).map((tap, index) => tap - taps[index])
+      const sorted = [...previous].sort((a, b) => a - b)
+      const typicalMs = sorted[Math.floor(sorted.length / 2)]
+      const newMs = now - taps[taps.length - 1]
+      // A deliberate tempo change starts a new run with the latest two taps.
+      if (typicalMs > 0 && Math.abs(newMs - typicalMs) / typicalMs > 0.25) {
+        tapsRef.current = [taps[taps.length - 1], now]
+        onBpm(minBpm === MIN_BPM && maxBpm === MAX_BPM
+          ? clampBpm(60000 / newMs)
+          : clampTapBpm(60000 / newMs, minBpm, maxBpm))
+        return
+      }
+    }
+
     tapsRef.current = [...taps, now].slice(-MAX_TAPS)
 
     const recent = tapsRef.current

@@ -19,6 +19,6 @@ export default function ChallengeRewardNotice() {
   if (!reward) return null
   const names = PRACTICE_GAME_CHARACTERS.filter(c => reward.unlocked.includes(c.id)).map(c => c.name)
   return createPortal(<aside className="challenge-reward-notice" role="status" aria-live="polite">
-    <Trophy aria-hidden /><span><strong>Challenge complete · +1 trophy</strong><small>{names.length ? `${names.join(', ')} unlocked! Choose your player in the collection.` : `${reward.total} trophies earned. A little practice adds up.`}</small></span><button onClick={() => setReward(null)} aria-label="Dismiss reward"><X aria-hidden /></button>
+    <Trophy aria-hidden /><span><strong>Challenge complete · +1 trophy</strong><small>{names.length ? `${names.join(', ')} unlocked! Choose your player in the collection.` : `${reward.total} ${reward.total === 1 ? 'trophy' : 'trophies'} earned. A little practice adds up.`}</small></span><button onClick={() => setReward(null)} aria-label="Dismiss reward"><X aria-hidden /></button>
   </aside>, document.body)
 }

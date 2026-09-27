@@ -42,6 +42,20 @@ try {
   }
   assert.ok(instruments >= 20, `expected graded ranges for the band and string instruments, got ${instruments}`)
 
+  for (const [instrumentId, transposition] of [
+    ['bass-clarinet', 'bb_octave'], ['tenor-sax', 'bb_octave'], ['bari-sax', 'eb_octave'],
+  ]) {
+    assert.equal(m.getStaffJumperInstrument(instrumentId).transposition, transposition,
+      `${instrumentId} must sound an octave below its written pitch`)
+  }
+
+  for (const [id, highestWrittenMidi] of [
+    ['french-horn', 84], ['recorder', 84], ['piccolo', 96], ['bassoon', 77],
+  ]) {
+    assert.equal(m.resolveFullWrittenRange(id, 'concert', 'treble', 'winds').maxMidi,
+      highestWrittenMidi, `${id} range picker must stop at its published top`)
+  }
+
   // The bug that started this: Easy on clarinet crossing the break.
   for (const id of ['clarinet', 'bass-clarinet']) {
     assert.ok(m.difficultyRangeFor(id, 'easy').highMidi <= B_FLAT_4, `${id} Easy must stay at or below throat B♭`)

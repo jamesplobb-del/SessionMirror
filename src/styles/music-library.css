@@ -49,6 +49,11 @@
 .music-library__score[aria-pressed=true] .music-library__select-mark{border-color:var(--ml-accent);background:var(--ml-accent);color:white}
 .music-library__select-mark svg{width:15px;height:15px;stroke-width:2.7}
 .music-library__remove-score{display:flex;align-items:center;gap:7px;min-height:44px;margin-top:12px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#a23d49!important;font-size:12px;font-weight:600}
+.music-library__rename-score{display:flex;align-items:center;gap:7px;min-height:44px;margin-bottom:10px;padding:0 8px;border:0;background:transparent;color:var(--ml-accent)!important;font-size:12px;font-weight:600}
+.music-library__rename-score svg{width:16px;height:16px}
+.music-library__score-rename{display:flex;gap:8px;margin-bottom:12px}
+.music-library__score-rename input{min-width:0;flex:1;min-height:44px;padding:0 10px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel)}
+.music-library__score-rename button{min-height:44px;padding:0 12px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);color:var(--ml-accent)}
 .music-library__delete-confirm{margin:0 0 16px;padding:16px;border:1px solid #e7c7cb;border-radius:14px;background:#fff6f7;box-shadow:0 8px 22px #261b2010}
 .music-library__delete-confirm strong{display:block;font-size:15px;color:var(--ml-ink,#1d3049)}
 .music-library__delete-confirm p{margin:8px 0 14px;font-size:12px;line-height:1.5;color:var(--ml-muted)}
