@@ -1,3 +1,4 @@
+import { requirePlus } from '../plus/plusAccess'
 import { useCallback, useState } from 'react'
 import {
   DEFAULT_APP_SETTINGS,
@@ -10,6 +11,8 @@ export function useAppSettings() {
   const [settings, setSettings] = useState<AppSettings>(() => loadAppSettingsForSessionStart())
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    if (patch.autoSoundRecording && !requirePlus('handsfree')) return
+    if (patch.showMusic && !requirePlus('music')) return
     setSettings((prev) => {
       const next = { ...prev, ...patch }
       saveAppSettings(next)

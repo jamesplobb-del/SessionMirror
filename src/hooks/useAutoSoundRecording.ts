@@ -1,10 +1,12 @@
+import { canUsePlus } from '../plus/plusAccess'
 import { createHandsFreeHealth } from '../utils/handsFreeHealth'
 import { createHandsFreeSilence } from '../utils/handsFreeSilence'
+import { handsFreeStartGate, handsFreeQuietBoundary, handsFreeStopGates } from '../utils/handsFreeRoom'
 import { advanceAutoStart } from '../utils/autoStartGate'
 import { createAudioFrameFreshness } from '../utils/audioFrameFreshness'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { combinedGateLevel, readAnalyserMetrics } from '../utils/audioLevel'
-import { getAutoRecordProfile, type AutoRecordProfile } from '../utils/appSettings'
+import { getAutoRecordProfile } from '../utils/appSettings'
 import { AUTO_RECORD_MAX_IDLE_PREROLL_MS, AUTO_RECORD_PREROLL_MS } from '../utils/autoRecordPlayback'
 import { isAppInForeground, subscribeAppForeground } from '../utils/appForeground'
 import { getPlaybackAudioContext, isSharedPlaybackContext } from '../utils/playbackAudioContext'
@@ -27,11 +29,8 @@ const MONITOR_WARMUP_MS = 500
 // settling time to establish a quiet baseline without making normal speech feel
 // ignored when hands-free mode is first enabled.
 const NATIVE_MONITOR_WARMUP_MS = 500
-// Arming: a fresh monitor must see a few genuinely quiet frames before its
-// first trigger. AVAudioSession activation and the WebKit mic ramp both land
-// as a burst right at the start of the stream, and that burst used to read as
-// an attack the instant hands-free came on. Wait for a quiet baseline before
-// arming; the existing pre-roll preserves the onset of a sustained phrase.
+// Arming needs a few frames at the room's baseline, not absolute silence.
+// Startup bursts cannot establish that baseline by themselves.
 const ARM_QUIET_FRAMES = 3
 const POST_PLAYBACK_WARMUP_MS = 450
 const START_LATCH_MS = 3500
@@ -39,7 +38,7 @@ const WARM_RETRY_MS = 800
 const HEALTH_CHECK_MS = 2500
 const STALL_RECOVERY_MS = 2200
 const START_FAILURE_CLEAR_MS = 3000
-const QUIET_EMA_ALPHA = 0.03
+const QUIET_EMA_ALPHA = 0.08
 const METRONOME_START_HOLD_MS = 300
 const METRONOME_TAIL_MS = 90
 const METRONOME_CLEAN_START_FRAMES = 4
@@ -84,15 +83,6 @@ function percentile(sorted: number[], ratio: number): number {
   if (sorted.length === 0) return 0
   const index = Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))
   return sorted[index] ?? 0
-}
-
-function computeEffectiveGate(profile: AutoRecordProfile, quietRms: number): number {
-  if (quietRms <= 0) return profile.gate
-
-  const ambientGate = quietRms * profile.noiseHeadroom + profile.noiseMargin
-  const merged = Math.max(profile.gate, ambientGate)
-  const cap = profile.gate * profile.gateCapMultiplier
-  return Math.min(merged, cap)
 }
 
 function isStreamAudioLive(stream: MediaStream | null): boolean {
@@ -192,6 +182,7 @@ export function useAutoSoundRecording({
   const startLatchTimerRef = useRef<number | null>(null)
   const cooldownUntilRef = useRef(0)
   const quietRmsEmaRef = useRef(0)
+  const quietLevelEmaRef = useRef(0)
   const effectiveGateRef = useRef(0)
   const lastTickAtRef = useRef(0)
   const [monitorEpoch, setMonitorEpoch] = useState(0)
@@ -216,6 +207,7 @@ export function useAutoSoundRecording({
   const silenceMsRef = useRef(silenceMs)
   const wasRecordingRef = useRef(isRecording)
   const appliedVolumeThresholdRef = useRef(volumeThreshold)
+  const appliedInstrumentFamilyRef = useRef(instrumentFamily)
   const prevSuppressStartRef = useRef(suppressStart)
   const prevMonitoringPausedRef = useRef(monitoringPaused)
   const metronomeClickGuardUntilRef = useRef(0)
@@ -239,9 +231,11 @@ export function useAutoSoundRecording({
   getAutoPreRollAgeMsRef.current = getAutoPreRollAgeMs
   restartAutoPreRollCaptureRef.current = restartAutoPreRollCapture
   isNativeAudioCaptureActiveRef.current = isNativeAudioCaptureActive
-  profileRef.current = getAutoRecordProfile(volumeThreshold, instrumentFamily)
+  // Start-level preferences apply to the next take. Changing their peak
+  // weighting mid-take would invalidate the room's learned stopping level.
+  if (!isRecording) profileRef.current = getAutoRecordProfile(volumeThreshold, instrumentFamily)
   silenceMsRef.current = silenceMs
-  effectiveGateRef.current = computeEffectiveGate(profileRef.current, quietRmsEmaRef.current)
+  effectiveGateRef.current = handsFreeStartGate(profileRef.current, quietRmsEmaRef.current)
 
   // Native audio hands-free deliberately stops WebKit's microphone once the
   // hidden pre-roll owns the hardware. That can briefly make the WebKit
@@ -317,6 +311,7 @@ export function useAutoSoundRecording({
   }
 
   const triggerAutoStart = () => {
+    if (!canUsePlus()) return
     if (!shouldMonitorRef.current || !isAppInForeground() ||
         startLatchRef.current || isRecordingRef.current || suppressStartRef.current) {
       return
@@ -370,7 +365,7 @@ export function useAutoSoundRecording({
 
   const tryCommitPendingPerformanceStart = (): boolean => {
     if (!pendingPerformanceGateRef.current) return false
-    if (!shouldMonitorRef.current || !isAppInForeground() || suppressStartRef.current) {
+    if (!canUsePlus() || !shouldMonitorRef.current || !isAppInForeground() || suppressStartRef.current) {
       pendingPerformanceGateRef.current = false
       clearStartLatch()
       return false
@@ -428,7 +423,7 @@ export function useAutoSoundRecording({
     const profile = profileRef.current
     const gateLevel = profile.usePeak
       ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45) : metrics.rms
-    const stopGate = Math.max(profile.gate * profile.stopGateRatio, effectiveGateRef.current * 0.55)
+    const stopGates = handsFreeStopGates(profile, quietRmsEmaRef.current, quietLevelEmaRef.current, effectiveGateRef.current)
     if (recordingStartedAtRef.current === null) recordingStartedAtRef.current = now
     if (now - recordingStartedAtRef.current < MIN_RECORDING_MS) return false
     const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
@@ -442,7 +437,7 @@ export function useAutoSoundRecording({
       if (decision.stop) finishHandsFreeTake()
       return decision.stop
     }
-    const loud = metronomeActive ? metrics.rms >= stopGate : metrics.rms >= stopGate || gateLevel >= stopGate
+    const loud = metronomeActive ? metrics.rms >= stopGates.rms : metrics.rms >= stopGates.rms || gateLevel >= stopGates.peak
     const decision = silenceGateRef.current.sample(now, loud, silenceMsRef.current, frameMs)
     setReplayCountdown(decision.remainingSeconds)
     if (!decision.stop) return false
@@ -508,6 +503,7 @@ export function useAutoSoundRecording({
       monitorWarmUntilRef.current = 0
       pendingPerformanceGateRef.current = false
       quietRmsEmaRef.current = 0
+      quietLevelEmaRef.current = 0
       effectiveGateRef.current = profileRef.current.gate
       setHandsFreeRecording(false)
       setMonitorReady(false)
@@ -622,7 +618,7 @@ export function useAutoSoundRecording({
     }
 
     let cancelled = false
-    const calibrationSamples: number[] = []
+    const calibrationSamples: { rms: number; level: number }[] = []
     let calibrated = false
     const setupEpoch = monitorEpoch
     let nativeTapListener: PluginListenerHandle | null = null
@@ -662,6 +658,7 @@ export function useAutoSoundRecording({
       // first real frame, not on the subscription.
       let firstFrameAt: number | null = null
       let quietFramesSeen = 0
+      let armingNoticeShown = false
       // Keep an already-triggered take running across a monitor restart. A
       // hidden native pre-roll is different: it must still settle on a quiet
       // baseline, otherwise the capture-session startup samples can be read as
@@ -841,6 +838,11 @@ export function useAutoSoundRecording({
         if (useNativeMetrics && !nativeFrameFresh) {
           return
         }
+        if (!Number.isFinite(metrics.rms) || !Number.isFinite(metrics.peak)) {
+          resetStartCandidate()
+          silenceGateRef.current.pause()
+          return
+        }
 
         if (isNativePath && firstFrameAt === null) {
           firstFrameAt = now
@@ -849,39 +851,104 @@ export function useAutoSoundRecording({
           }
         }
 
-        if (now < monitorWarmUntilRef.current) {
-          // Learn the room from every startup frame. The lower percentile
-          // keeps a note played during startup from becoming the noise floor,
-          // while still adapting when the room is louder than the saved gate.
-          calibrationSamples.push(metrics.rms)
-          quietFramesSeen = metrics.rms < profile.gate * 0.9 ? quietFramesSeen + 1 : 0
+        // Manual recording bypasses calibration altogether. An existing take
+        // also keeps its stop detector during microphone recovery.
+        if (isRecordingRef.current) {
+          setMonitorReady(true)
           resetStartCandidate()
-          attackSinceRef.current = null
+          if (autoTriggeredRef.current && maybeAutoStopFromSilence(metrics, now,
+            useNativeMetrics ? (nativeFrameRef?.durationMs ?? 0) : POLL_INTERVAL_MS)) {
+            armed = false
+            quietFramesSeen = 0
+            calibrationSamples.length = 0
+            setMonitorReady(false)
+          }
           return
         }
 
-        if (!calibrated && calibrationSamples.length > 0) {
-          const sorted = [...calibrationSamples].sort((a, b) => a - b)
-          quietRmsEmaRef.current = percentile(sorted, 0.2)
-          effectiveGateRef.current = computeEffectiveGate(profile, quietRmsEmaRef.current)
+        if (suppressStartRef.current) {
+          setMonitorReady(false)
+          resetStartCandidate()
+          armed = false
+          quietFramesSeen = 0
+          calibrationSamples.length = 0
+          return
+        }
+
+        const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
+        const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
+        if (metronomeTransient) {
+          // Never teach the room model our own click. Preserve a phrase
+          // candidate, but only clean frames may confirm it.
+          metronomeClickPeakRef.current = Math.max(metronomeClickPeakRef.current, metrics.rms)
+          return
+        }
+        const inClickTail = metronomeActive && now <= metronomeClickGuardUntilRef.current + METRONOME_TAIL_MS
+        if (inClickTail && metrics.rms < metronomeClickPeakRef.current * 0.45) return
+
+        const level = profile.usePeak
+          ? combinedGateLevel(metrics, profile.peakWeight ?? 0.45) : metrics.rms
+        if (!calibrated || now < monitorWarmUntilRef.current) {
+          calibrationSamples.push({ rms: metrics.rms, level })
+          if (calibrationSamples.length > 32) calibrationSamples.shift()
+          resetStartCandidate()
+          if (now < monitorWarmUntilRef.current || calibrationSamples.length < ARM_QUIET_FRAMES) return
+
+          quietRmsEmaRef.current = percentile(calibrationSamples.map(s => s.rms).sort((a, b) => a - b), 0.2)
+          quietLevelEmaRef.current = percentile(calibrationSamples
+            .filter(s => s.rms <= handsFreeStartGate(profile, quietRmsEmaRef.current))
+            .map(s => s.level).sort((a, b) => a - b), 0.8)
+          effectiveGateRef.current = handsFreeStartGate(profile, quietRmsEmaRef.current)
+          const boundary = handsFreeQuietBoundary(quietRmsEmaRef.current, effectiveGateRef.current)
+          // A quiet baseline heard earlier in warm-up still counts if the
+          // musician has already begun playing. Do not wait for that note to end.
+          for (const sample of calibrationSamples) {
+            quietFramesSeen = sample.rms <= boundary ? quietFramesSeen + 1 : 0
+            if (quietFramesSeen >= ARM_QUIET_FRAMES) { armed = true; break }
+          }
           calibrationSamples.length = 0
           calibrated = true
           void warmRecorderRef.current()
         }
 
-        // Require consecutive quiet frames. A timeout must never arm in
-        // ongoing room noise; the musician can always use manual recording.
+        const quietBoundary = handsFreeQuietBoundary(quietRmsEmaRef.current, effectiveGateRef.current)
+        if (metrics.rms < effectiveGateRef.current && loudSinceRef.current === null && !startLatchRef.current) {
+          const alpha = metrics.rms < quietRmsEmaRef.current ? 0.18 : QUIET_EMA_ALPHA
+          quietRmsEmaRef.current += (metrics.rms - quietRmsEmaRef.current) * alpha
+          quietLevelEmaRef.current += (level - quietLevelEmaRef.current) * alpha
+          effectiveGateRef.current = handsFreeStartGate(profile, quietRmsEmaRef.current)
+        }
+
         if (!armed) {
-          quietFramesSeen = metrics.rms < effectiveGateRef.current * 0.9 ? quietFramesSeen + 1 : 0
+          quietFramesSeen = metrics.rms <= quietBoundary ? quietFramesSeen + 1 : 0
           if (healthRef.current.observeArming(now, quietFramesSeen < ARM_QUIET_FRAMES)) {
+            armingNoticeShown = true
             setHandsFreeNotice('sensitive')
           }
           if (quietFramesSeen < ARM_QUIET_FRAMES) {
+            // A changed room must be able to establish a new baseline while
+            // waiting. A rolling lower percentile resists isolated bumps.
+            calibrationSamples.push({ rms: metrics.rms, level })
+            if (calibrationSamples.length >= 24) {
+              const sorted = calibrationSamples.map(s => s.rms).sort((a, b) => a - b)
+              const low = percentile(sorted, 0.2)
+              if (percentile(sorted, 0.8) <= low * 1.35 + profile.noiseMargin) {
+                quietRmsEmaRef.current = low
+                quietLevelEmaRef.current = percentile(calibrationSamples.map(s => s.level).sort((a, b) => a - b), 0.8)
+                effectiveGateRef.current = handsFreeStartGate(profile, low)
+              }
+              calibrationSamples.shift()
+            }
             resetStartCandidate()
-            attackSinceRef.current = null
             return
           }
           armed = true
+          calibrationSamples.length = 0
+        }
+        healthRef.current.observeArming(now, false)
+        if (armingNoticeShown) {
+          armingNoticeShown = false
+          setHandsFreeNotice(current => current === 'sensitive' ? null : current)
         }
 
         // A live level meter is not proof that the hidden recorder is ready.
@@ -924,41 +991,11 @@ export function useAutoSoundRecording({
             }
           }
 
-          if (!suppressStartRef.current && metrics.rms < effectiveGateRef.current * 0.9) {
-            quietRmsEmaRef.current =
-              quietRmsEmaRef.current === 0
-                ? metrics.rms
-                : quietRmsEmaRef.current * (1 - QUIET_EMA_ALPHA) + metrics.rms * QUIET_EMA_ALPHA
-            effectiveGateRef.current = computeEffectiveGate(profile, quietRmsEmaRef.current)
-          }
-
-          if (suppressStartRef.current) {
-            resetStartCandidate()
-            attackSinceRef.current = null
-            armed = false
-            quietFramesSeen = 0
-            return
-          }
-
           const currentGate = effectiveGateRef.current
-          const metronomeActive = sharedMetronomeEngine.getSnapshot().playing
-          const metronomeTransient = metronomeActive && now <= metronomeClickGuardUntilRef.current
-
-          if (metronomeTransient) {
-            // Keep a genuine phrase candidate across the known click. Only
-            // clean frames can confirm it, so a click cannot advance a start.
-            metronomeClickPeakRef.current = Math.max(metronomeClickPeakRef.current, metrics.rms)
-            attackSinceRef.current = null
-            return
-          }
-
           // Require sustained energy, not a peak from a tap, click, or mic bump.
-          attackSinceRef.current = null
-          const inClickTail = metronomeActive && now <= metronomeClickGuardUntilRef.current + METRONOME_TAIL_MS
           const tailGate = inClickTail
             ? Math.max(currentGate, metronomeClickPeakRef.current * 0.45)
             : currentGate
-          if (inClickTail && metrics.rms < tailGate) return
           const decision = advanceAutoStart(loudSinceRef.current, now, metrics.rms, tailGate,
             Math.max(profile.holdMs, metronomeActive ? METRONOME_START_HOLD_MS : 0))
           loudSinceRef.current = decision.since
@@ -969,17 +1006,6 @@ export function useAutoSoundRecording({
               !startLatchRef.current) triggerAutoStart()
 
           return
-        }
-
-        resetStartCandidate()
-        attackSinceRef.current = null
-
-        if (!autoTriggeredRef.current) return
-        if (maybeAutoStopFromSilence(metrics, now, useNativeMetrics ? (nativeFrameRef?.durationMs ?? 0) : POLL_INTERVAL_MS)) {
-          // Each new take must earn a fresh quiet baseline after cooldown.
-          armed = false
-          quietFramesSeen = 0
-          setMonitorReady(false)
         }
       }
 
@@ -1074,15 +1100,19 @@ export function useAutoSoundRecording({
   }, [shouldMonitor, streamGeneration, streamRef, monitorEpoch])
 
   useEffect(() => {
-    if (!shouldMonitor) return
-    if (appliedVolumeThresholdRef.current === volumeThreshold) return
+    // Apply new preferences to the next calibration without erasing the room
+    // baseline or reattaching capture in the middle of a real take.
+    if (!shouldMonitor || isRecording) return
+    if (appliedVolumeThresholdRef.current === volumeThreshold && appliedInstrumentFamilyRef.current === instrumentFamily) return
 
     const timer = window.setTimeout(() => {
-      if (appliedVolumeThresholdRef.current === volumeThreshold) return
+      if (appliedVolumeThresholdRef.current === volumeThreshold && appliedInstrumentFamilyRef.current === instrumentFamily) return
 
       appliedVolumeThresholdRef.current = volumeThreshold
-      profileRef.current = getAutoRecordProfile(volumeThreshold)
+      appliedInstrumentFamilyRef.current = instrumentFamily
+      profileRef.current = getAutoRecordProfile(volumeThreshold, instrumentFamily)
       quietRmsEmaRef.current = 0
+      quietLevelEmaRef.current = 0
       effectiveGateRef.current = profileRef.current.gate
       resetStartCandidate()
       attackSinceRef.current = null
@@ -1093,7 +1123,7 @@ export function useAutoSoundRecording({
     return () => {
       window.clearTimeout(timer)
     }
-  }, [volumeThreshold, instrumentFamily, shouldMonitor])
+  }, [volumeThreshold, instrumentFamily, shouldMonitor, isRecording])
 
   useEffect(() => {
     if (!shouldMonitor) return
@@ -1120,6 +1150,7 @@ export function useAutoSoundRecording({
     attackSinceRef.current = null
     silenceSinceRef.current = null
     quietRmsEmaRef.current = 0
+    quietLevelEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
     monitorWarmUntilRef.current = performance.now() + POST_PLAYBACK_WARMUP_MS
     clearStartLatch()
@@ -1137,6 +1168,7 @@ export function useAutoSoundRecording({
     attackSinceRef.current = null
     silenceSinceRef.current = null
     quietRmsEmaRef.current = 0
+    quietLevelEmaRef.current = 0
     effectiveGateRef.current = profileRef.current.gate
     monitorWarmUntilRef.current = performance.now() + POST_PLAYBACK_WARMUP_MS
     clearStartLatch()

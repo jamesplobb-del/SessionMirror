@@ -1,3 +1,6 @@
+import { requirePlus } from '../plus/plusAccess'
+import { usePlus } from '../plus/usePlus'
+import { canSaveRoutine } from '../utils/routineLibrary'
 import { AnimatePresence } from 'framer-motion'
 import PremiumReveal from './ui/PremiumReveal'
 import PremiumFlowPage from './ui/PremiumFlowPage'
@@ -33,11 +36,13 @@ function exerciseSummary(step: RoutineStep): string {
 
 /** The approved music-first flow. Existing plans keep the same routine model. */
 export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
+  const plus = usePlus()
   const [draft, setDraft] = useState(() => props.mode === 'edit' && props.routine ? props.routine : createRoutine('My practice', [], props.instrumentId))
   const [screen, setScreen] = useState<'music' | 'lineup'>(() => props.mode === 'edit' && props.routine ? 'lineup' : 'music')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [legacy, setLegacy] = useState<'edit' | null>(null)
   const [musicEditorOpen, setMusicEditorOpen] = useState(false)
+  const [musicEditorOrigin, setMusicEditorOrigin] = useState<'new' | 'saved' | null>(null)
   const [exerciseLibrary, setExerciseLibrary] = useState(loadExerciseLibrary)
   const [revision, setRevision] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -58,7 +63,11 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   useEffect(() => { scroll.current?.scrollTo(0, 0) }, [screen])
 
   const patchStep = (id: string, patch: Partial<RoutineStep>) => setDraft(current => ({ ...current, steps: current.steps.map(step => step.id === id ? { ...step, ...patch } : step) }))
-  const patchDesk = (step: RoutineStep, patch: Partial<DeskSnapshot>) => patchStep(step.id, { desk: { ...(step.desk ?? blankDesk('audio')), ...patch } })
+  const patchDesk = (step: RoutineStep, patch: Partial<DeskSnapshot>) => {
+    if (patch.autoSoundRecording && !requirePlus('handsfree')) return
+    if (patch.showMusic && !requirePlus('music')) return
+    patchStep(step.id, { desk: { ...(step.desk ?? blankDesk('audio')), ...patch } })
+  }
   const music = useMemo(() => {
     const unique = new Map<string, (typeof exerciseLibrary)[number]>()
     for (const item of exerciseLibrary) {
@@ -76,9 +85,10 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
         programId: scoreSettings ? scoreSettings.programId : item.step.programId } }
     }), loadMusicOrder())
   }, [exerciseLibrary, props.projects, props.instrumentId, revision])
-  const missingMusic = draft.steps.filter(step => (step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId)))
+  const missingMusic = !plus.active ? [] : draft.steps.filter(step => (step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId)))
 
   const openPicker = (id: string | null = null) => {
+    if (!requirePlus('music')) return
     replaceId.current = id
     if (fileInput.current) { fileInput.current.multiple = id === null; fileInput.current.click() }
   }
@@ -88,6 +98,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     if (steps[0]) setExpanded(steps[0].id)
   }
   const importFiles = async (files: File[]) => {
+    if (!requirePlus('music')) return
     if (busyRef.current || !files.length) return
     const replacement = replaceId.current ? draft.steps.find(step => step.id === replaceId.current) : null
     replaceId.current = null
@@ -132,6 +143,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
       if (expanded === selected.id) setExpanded(null)
       return
     }
+    if (!requirePlus('music')) return
     if (draft.steps.length >= MAX_ROUTINE_STEPS) { setError(`Keep your routine to ${MAX_ROUTINE_STEPS} exercises or fewer.`); return }
     setDraft(current => ({ ...current, steps: [...current.steps, reuseMusicExercise(step)] }))
   }
@@ -141,7 +153,32 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     setExerciseName(''); setShowExercise(false)
   }
   const openRoutine = (routine: Routine) => { setDraft(routine); setExpanded(null); setScreen('lineup'); setError('') }
+  const startNewRoutine = () => {
+    setExerciseLibrary(loadExerciseLibrary())
+    setRevision(value => value + 1)
+    setDraft(createRoutine('My practice', [], props.instrumentId))
+    setExpanded(null)
+    setShowExercise(false)
+    setExerciseName('')
+    setChooseFromLibraryId(null)
+    setError('')
+    setScreen('music')
+    setMusicEditorOrigin('new')
+    setMusicEditorOpen(true)
+  }
+  const openSavedRoutine = (routine: Routine) => {
+    setExerciseLibrary(loadExerciseLibrary())
+    setRevision(value => value + 1)
+    openRoutine(routine)
+    setLegacy(null)
+    setShowExercise(false)
+    setExerciseName('')
+    setChooseFromLibraryId(null)
+    setMusicEditorOrigin('saved')
+    setMusicEditorOpen(true)
+  }
   const save = async (start: boolean) => {
+    if (!canSaveRoutine(draft, () => { void save(start) })) return
     if (!draft.steps.length || busyRef.current) return
     if (start && missingMusic.length) {
       setExpanded(missingMusic[0].id)
@@ -169,7 +206,8 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     mode={legacy === 'edit' ? 'edit' : props.mode}
     routine={legacy === 'edit' ? draft : props.routine}
     onCancel={legacy ? () => setLegacy(null) : props.onCancel}
-    onOpenSharedRoutine={routine => { openRoutine(routine); setLegacy(null); setMusicEditorOpen(true) }}
+    onStartMusicRoutine={startNewRoutine}
+    onOpenMusicRoutine={openSavedRoutine}
     onSave={legacy === 'edit' ? next => { openRoutine(next); setLegacy(null) } : props.onSave}
     onSaveAndStart={legacy === 'edit' ? undefined : props.onSaveAndStart} />
 
@@ -177,7 +215,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     if (event.key === 'Escape') { event.stopPropagation(); if (!busyRef.current) props.onCancel() }
   }}>
     <nav className="music-routine-nav"><button type="button" disabled={busy} aria-label="Back" onClick={() => {
-      if (screen === 'music') setScreen('lineup')
+      if (screen === 'lineup' && musicEditorOrigin === 'new') setScreen('music')
       else if (musicEditorOpen) setMusicEditorOpen(false)
       else props.onCancel()
     }}><ArrowLeft /></button><span>BESTTAKE <i /> YOUR ROUTINE</span><button type="button" disabled={busy} aria-label="Close routine builder" onClick={props.onCancel}><X /></button></nav>

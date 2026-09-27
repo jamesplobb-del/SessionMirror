@@ -1,3 +1,5 @@
+import { canSaveRoutine } from '../utils/routineLibrary'
+import { requirePlus } from '../plus/plusAccess'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import PremiumFlowPage from './ui/PremiumFlowPage'
 import SwipeRoutineItem from './SwipeRoutineItem'
@@ -196,6 +198,10 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     setCustomIndex(0); setCustomSteps([]); clearItemSetup(); setLineupReturn('library'); move('custom-items')
   }
   const startNewRoutine = () => {
+    if (props.onStartMusicRoutine) {
+      props.onStartMusicRoutine()
+      return
+    }
     setDraft(createRoutine('My practice', [], instrument))
     setSelection({}); setConfiguredIds([]); setCustomItems([]); setCustomInput(''); setCustomIndex(0); setCustomSteps([])
     clearItemSetup()
@@ -204,8 +210,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     move(instrument ? 'library' : 'instrument')
   }
   const openSavedRoutine = (item: Routine) => {
-    if (props.onOpenSharedRoutine && item.steps.some(step => step.sharedScoreName)) {
-      props.onOpenSharedRoutine(item)
+    if (props.onOpenMusicRoutine) {
+      props.onOpenMusicRoutine(item)
       return
     }
     setDraft(item); setInstrument(item.instrumentId); setSelection(selectionForRoutine(item))
@@ -315,6 +321,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const customMusicPinned = Boolean(customSetup?.projectId && hasPracticeChart(customSetup.projectId))
   const pendingSetup = draft.steps.filter(step => !configuredIds.includes(step.id))
   const saveDraft = (start: boolean) => {
+    if (!canSaveRoutine(draft, () => saveDraft(start))) return
     if (pendingSetup.length) { openItemSetup(pendingSetup[0]); return }
     const next = { ...draft, steps: draft.steps.map(step => createStep(step)), name: draft.name.trim() || `${instrumentName} practice`, instrumentId: instrument, updatedAt: Date.now() }
     try {
@@ -352,6 +359,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     }).catch(() => setError('Could not read that routine file. Please try again.'))
   }
   const importMusicFiles = async (files: File[]) => {
+    if (!requirePlus('music')) return
     if (!files.length || musicImportBusyRef.current) return
     musicImportBusyRef.current = true
     setImportingMusic(true)
@@ -432,7 +440,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <button type="button" className="routine-guide-new-routine" onClick={startNewRoutine}>
               <span><Plus aria-hidden /></span>
               <strong>New routine</strong>
-              <small>Build a plan around your instrument and goals</small>
+              <small>Choose music, then set up your exercises</small>
               <ChevronRight aria-hidden />
             </button>
             <section className="routine-guide-saved" aria-label="Your saved routines">

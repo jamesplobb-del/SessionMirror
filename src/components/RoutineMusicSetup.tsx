@@ -1,3 +1,4 @@
+import { requirePlus } from '../plus/plusAccess'
 import { FileMusic, Trash2, Upload } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
@@ -39,6 +40,7 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
   const desk = step.desk ?? blankDesk('audio')
 
   const choose = async (file: File) => {
+    if (!requirePlus('music')) return
     setBusy(true)
     setError('')
     try {

@@ -272,11 +272,19 @@ export default function RoutineBar({
   const compact = width < COMPACT_BELOW
 
   useLayoutEffect(() => {
-    const findDock = () => setDockHost(preferBall && window.innerWidth >= 700
-      ? document.getElementById('music-widget-dock') : null)
+    const findDock = () => {
+      const next = preferBall && window.innerWidth >= 700
+        ? document.getElementById('music-widget-dock') : null
+      setDockHost(current => current === next ? current : next)
+    }
     findDock()
+    // The Music rail can mount after the routine when entering a score. Resize
+    // alone never fires in that case, leaving the ball in its old portal.
+    const observer = new MutationObserver(findDock)
+    const shell = document.querySelector('.app-shell')
+    if (preferBall && shell) observer.observe(shell, { childList: true })
     window.addEventListener('resize', findDock)
-    return () => window.removeEventListener('resize', findDock)
+    return () => { observer.disconnect(); window.removeEventListener('resize', findDock) }
   }, [preferBall])
 
   useEffect(() => {

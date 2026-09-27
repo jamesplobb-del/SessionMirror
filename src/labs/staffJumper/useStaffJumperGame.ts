@@ -1,3 +1,5 @@
+import { requirePlus } from '../../plus/plusAccess'
+import { isFreeStaffJumperSetup } from '../../plus/plusPolicy'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
@@ -587,6 +589,7 @@ export function useStaffJumperGame(
   }, [])
 
   const start = useCallback((config: StaffJumperConfig) => {
+    if (!isFreeStaffJumperSetup({ key: config.key, mode: config.scaleMode, range: config.range, difficulty: config.difficulty, customScale: config.customPitchClasses, rangeLowMidi: config.rangeLowMidi, rangeHighMidi: config.rangeHighMidi }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
@@ -599,6 +602,8 @@ export function useStaffJumperGame(
   }, [resetAttackTracking, resetNoteClock, startAudio])
 
   const restart = useCallback(() => {
+    const previous = stateRef.current.config
+    if (previous && !isFreeStaffJumperSetup({ key: previous.key, mode: previous.scaleMode, range: previous.range, difficulty: previous.difficulty, customScale: previous.customPitchClasses, rangeLowMidi: previous.rangeLowMidi, rangeHighMidi: previous.rangeHighMidi }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null

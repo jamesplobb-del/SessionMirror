@@ -4,7 +4,7 @@ import { build } from 'esbuild'
 
 const result = await build({
   stdin: { contents: `export * from './src/utils/routineMusic'; export * from './src/utils/practiceRoutines'; export * from './src/utils/routineLibrary'; export * from './src/utils/deskMetronome'`, resolveDir: process.cwd() },
-  bundle: true, write: false, platform: 'node', format: 'esm', external: ['pdfjs-dist/*'],
+  bundle: true, plugins:[{name:'plus-entitled-fixture',setup(b){b.onResolve({filter:/\/plusAccess$/},()=>({path:'plus',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const canUsePlus=()=>true, requirePlus=()=>true'}))}}], write: false, platform: 'node', format: 'esm', external: ['pdfjs-dist/*'],
 })
 const api = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
 const storage = new Map()

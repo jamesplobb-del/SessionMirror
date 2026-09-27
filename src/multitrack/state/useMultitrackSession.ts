@@ -1,3 +1,4 @@
+import { requirePlus } from '../../plus/plusAccess'
 import { DEFAULT_LAYOUT_STYLE, withPortraitLayout } from '../layout/quietWorkspaceLayout'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { Take } from '../../types'
@@ -59,6 +60,9 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     const prev = sessionRef.current
     const next = typeof action === 'function' ? action(prev) : action
     if (next === prev) return
+    const boxes = (value: MultitrackSession) => value.panels.filter(panel => panel.kind === 'performance' && !panel.hidden).length
+    if (boxes(next) > 2 && boxes(next) > boxes(prev) && !requirePlus('multitrack')) return
+    if (next.sheetMusic !== prev.sheetMusic && ((next.sheetMusic.asset && next.sheetMusic.asset !== prev.sheetMusic.asset) || (next.sheetMusic.cues?.length ?? 0) > (prev.sheetMusic.cues?.length ?? 0)) && !requirePlus('music')) return
     const now = Date.now()
     if (now - lastEditAt.current > 350 || !history.current.length) history.current = [...history.current.slice(-39), prev]
     lastEditAt.current = now
@@ -153,6 +157,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   const setLayout = useCallback((layoutId: string) => {
+    if (getLayoutPreset(layoutId).panelCount > 2 && !requirePlus('multitrack')) return
     setSession((prev) => withPortraitLayout(prev, layoutId))
   }, [])
 
@@ -168,6 +173,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     const current = sessionRef.current
     const vacant = floating ? undefined
       : current.panels.find(p => p.kind === 'performance' && !p.hidden && !p.overlay && !p.take && !p.missingTakeId)
+    if ((!vacant || current.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === vacant.id) >= 2) && current.panels.filter(p => p.kind === 'performance' && !p.hidden).length >= 2 && !requirePlus('multitrack')) return null
     const floatingCount = current.panels.filter(p => p.kind === 'performance' && p.overlay).length
     const id = vacant?.id ?? (floating
       ? (floatingCount < 4 ? `extra-${crypto.randomUUID()}` : undefined)
@@ -208,7 +214,8 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     })
   }, [setSession])
 
-  const assignTakeToPanel = useCallback((panelId: string, take: Take | null) => {
+  const assignTakeToPanel = useCallback((panelId: string, take: Take | null, completedCapture = false) => {
+    if (take && !completedCapture && sessionRef.current.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === panelId) >= 2 && !requirePlus('multitrack')) return
     setSession(prev => ({ ...prev, panels: prev.panels.map(panel => {
       if (panel.id !== panelId || panel.kind !== 'performance') return panel
       if (panel.take?.id === take?.id) return { ...panel, take, missingTakeId: undefined }
@@ -339,6 +346,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   )
 
   const assignSheetMusic = useCallback((panelId: string, asset: SheetMusicAsset | null) => {
+    if (asset && !requirePlus('music')) return
     setSession((prev) => ({
       ...prev,
       sheetMusic: panelId === prev.sheetMusic.id ? { ...prev.sheetMusic, asset } : prev.sheetMusic,
@@ -351,6 +359,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
    * second they were dropped, so a player can walk the page line by line.
    */
   const addSheetCue = useCallback((asset: SheetMusicAsset, startSec: number) => {
+    if (asset && !requirePlus('music')) return
     setSession((prev) => {
       const cues = prev.sheetMusic.cues ?? []
       if (!prev.sheetMusic.asset && cues.length === 0) {
@@ -380,6 +389,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   const updateSheetCueAsset = useCallback((cueId: string, asset: SheetMusicAsset) => {
+    if (asset && !requirePlus('music')) return
     setSession((prev) => ({
       ...prev,
       sheetMusic: {
@@ -406,6 +416,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   const updateBacking = useCallback((backing: MultitrackBackingTrack) => {
+    if (backing.kind !== 'none' && !requirePlus(backing.kind === 'youtube' ? 'youtube' : 'music')) return
     setSession((prev) => ({ ...prev, backing }))
   }, [])
 

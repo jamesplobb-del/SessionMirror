@@ -1,4 +1,5 @@
-import { parseRoutine, parseStep, type Routine, type RoutineStep } from './practiceRoutines'
+import { canUsePlus, requirePlus } from '../plus/plusAccess'
+import { loadRoutine, parseRoutine, parseStep, type Routine, type RoutineStep } from './practiceRoutines'
 
 const ROUTINES = 'besttake:routine-library:v1'
 const EXERCISES = 'besttake:exercise-library:v1'
@@ -11,7 +12,21 @@ export function loadRoutineLibrary(): Routine[] {
   } catch { return [] }
 }
 
-export function storeLibraryRoutine(routine: Routine): void {
+export const SHARED_ROUTINE_IDS_KEY = 'besttake:shared-routine-ids:v1'
+function sharedRoutineIds(): string[] {
+  try { const ids = JSON.parse(localStorage.getItem(SHARED_ROUTINE_IDS_KEY) ?? '[]'); return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [] } catch { return [] }
+}
+export function canSaveRoutine(routine: Routine, resume?: () => void): boolean {
+  if (canUsePlus()) return true
+  const shared = sharedRoutineIds()
+  const active = loadRoutine()
+  const existing = [...loadRoutineLibrary(), ...(active ? [active] : [])]
+  if (shared.includes(routine.id) || existing.some(item => item.id === routine.id)) return true
+  return !existing.some(item => !shared.includes(item.id)) || requirePlus('routines', resume)
+}
+export function storeLibraryRoutine(routine: Routine, options?: { shared: boolean }): void {
+  if (options?.shared) localStorage.setItem(SHARED_ROUTINE_IDS_KEY, JSON.stringify([...new Set([...sharedRoutineIds(), routine.id])]))
+  else if (!canSaveRoutine(routine)) throw new Error('Plus is required to save another routine.')
   const saved = loadRoutineLibrary()
   // Today can still hold the older version after an edit is saved to the
   // library but before the user taps Use. Do not overwrite that saved edit.

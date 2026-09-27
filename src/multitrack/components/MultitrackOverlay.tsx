@@ -1,3 +1,4 @@
+import { requirePlus } from '../../plus/plusAccess'
 import PremiumDisclosure from '../../components/ui/PremiumDisclosure'
 import { nativeTakePlaybackEnhancerParams } from '../../utils/takePlaybackSpeaker'
 import { readMultitrackAsset } from '../state/readMultitrackAsset'
@@ -344,6 +345,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   }, [clearYoutubeStartSchedule, session.backing])
 
   const handleBackingChange = useCallback((nextBacking: typeof session.backing) => {
+    if (nextBacking.kind !== 'none' && !requirePlus(nextBacking.kind === 'youtube' ? 'youtube' : 'music')) return
     const currentBacking = session.backing
     if (
       currentBacking.kind !== 'audio' ||
@@ -1161,7 +1163,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       const take = pendingReview.take
       const capturedOffsetMs = timelineOffsetMsForTake(take, session.practice.bpm)
       const offsetMs = Math.round(-startSec * 1000)
-      assignTakeToPanel(pendingReview.panelId, take)
+      assignTakeToPanel(pendingReview.panelId, take, true)
       updatePanel(pendingReview.panelId, { timelineOffsetMs: offsetMs, trimStartSec: Math.max(0, capturedOffsetMs / 1000), mirrored: pendingReview.mirrored })
       sync.setPanelOffset(pendingReview.panelId, offsetMs)
       sync.setPanelTrim(pendingReview.panelId, Math.max(0, capturedOffsetMs / 1000), null)
@@ -1177,7 +1179,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         updateProject({ endSec: newEnd })
       }
     } else {
-      assignTakeToPanel(pendingReview.panelId, pendingReview.take)
+      assignTakeToPanel(pendingReview.panelId, pendingReview.take, true)
       updatePanel(pendingReview.panelId, { mirrored: pendingReview.mirrored })
     }
 
@@ -1279,6 +1281,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
    */
   const openRecordingForPanel = useCallback(
     (panelId: string, startSec = 0) => {
+      if (session.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === panelId) >= 2 && !requirePlus('multitrack')) return
+
       triggerLightHaptic(hapticFeedback)
       recordStartSecRef.current = Math.max(0, startSec)
       setTileSheetPanelId(null)
@@ -1381,6 +1385,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   /** Timeline "+ image": pick a screenshot that cuts in at the playhead. */
   const handleAddImageAt = useCallback((atSec: number) => {
+    if (!requirePlus('music')) return
     pendingImageAtSecRef.current = Math.max(0, atSec)
     sheetMusicInputRef.current?.click()
   }, [])
@@ -1643,6 +1648,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               onPracticeChange={handlePracticeChange}
               onRecord={() => {
                 if (isRecording || isStopping) return
+                if (session.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === activePanel.id) >= 2 && !requirePlus('multitrack')) return
+                if ((session.backing.kind !== 'none' || session.sheetMusic.asset || session.sheetMusic.cues?.length) && !requirePlus('music')) return
                 discardNextRecordingRef.current = false
                 recordingTargetPanelIdRef.current = activePanel.id
                 sync.setExcludePanelId(activePanel.id)

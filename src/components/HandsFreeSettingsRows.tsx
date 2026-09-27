@@ -70,7 +70,7 @@ export default function HandsFreeSettingsRows({
       <div className="hands-free-settings__row">
         <div className="hands-free-settings__label">
           <strong>Starts at</strong>
-          <small>{describeHandsFreeGate(threshold)} · louder waits for a real entrance</small>
+          <small>{describeHandsFreeGate(threshold)} · adapts to room noise</small>
         </div>
         <div className="hands-free-settings__stepper" role="group" aria-label="Start level">
           <Pressable
@@ -99,7 +99,7 @@ export default function HandsFreeSettingsRows({
         </div>
       </div>
 
-      <p className="hands-free-settings__hint">Long-press Record to turn hands-free off.</p>
+      <p className="hands-free-settings__hint">Tap Record anytime. Long-press to turn hands-free off.</p>
     </div>
   )
 }

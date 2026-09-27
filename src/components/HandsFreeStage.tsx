@@ -53,7 +53,7 @@ const PHASE_COPY: Record<HandsFreePhase, { title: string; detail: string }> = {
   countdown: { title: 'Ready to listen', detail: 'Keep playing to continue the take' },
   saving: { title: 'Preparing take', detail: 'Playback will start automatically' },
   playback: { title: 'Listen back', detail: 'We’ll listen for your next take afterward' },
-  preparing: { title: 'Getting ready', detail: 'Give the microphone a quiet moment' },
+  preparing: { title: 'Getting ready', detail: 'Adjusting to the room — you can tap Record anytime' },
   listening: { title: 'Your turn', detail: 'Start playing — recording begins automatically' },
 }
 
@@ -190,7 +190,7 @@ function HandsFreeStage({
         )}
         {notice && <div className="hands-free-panel__notice">
           <small>{notice === 'sensitive'
-            ? 'The start level may be too sensitive: background sound or repeated short takes were detected. Raise the start level to trigger only when you play.'
+            ? 'Changing background sound or repeated short takes detected. Room sensitivity adapts automatically. You can also tap Record.'
             : notice === 'microphone' ? 'Microphone signal interrupted. Reconnecting automatically… Check your audio connection if this continues.'
             : 'Recording did not start. Rearming automatically for your next take.'}</small>
           {notice === 'sensitive' && !settingsOpen && <button type="button" onClick={openSettings}>Adjust start level</button>}

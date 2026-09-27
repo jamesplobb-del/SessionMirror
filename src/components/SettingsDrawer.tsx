@@ -35,7 +35,9 @@ import PrivacyPolicySheet from './PrivacyPolicySheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
 import { useTutorialAction } from '../context/TutorialContext'
-import { redeemOfferCode } from '../utils/offerCodes'
+import { PromoCodePanel } from '../plus/PlusPaywall'
+import { showPlus } from '../plus/plusAccess'
+import { usePlus } from '../plus/usePlus'
 import BugReportLink from './BugReportLink'
 
 interface SettingsDrawerProps {
@@ -562,23 +564,7 @@ function SettingsDrawer({
   onOpenQuickMetronome,
 }: SettingsDrawerProps) {
   const notifyTutorial = useTutorialAction()
-  const redeemingCode = useRef(false)
-  const [codeBusy, setCodeBusy] = useState(false)
-  const [codeError, setCodeError] = useState<string | null>(null)
-  const handleRedeemCode = async () => {
-    if (redeemingCode.current) return
-    redeemingCode.current = true
-    setCodeBusy(true)
-    setCodeError(null)
-    try {
-      await redeemOfferCode()
-    } catch (error) {
-      setCodeError(error instanceof Error ? error.message : 'Could not open code redemption. Please try again.')
-    } finally {
-      redeemingCode.current = false
-      setCodeBusy(false)
-    }
-  }
+  const plus = usePlus()
   const [featureTipsEnabled, setFeatureTipsPreference] = useState(() => readGuidancePreferences().enabled)
   useEffect(() => {
     const sync = () => setFeatureTipsPreference(readGuidancePreferences().enabled)
@@ -1002,15 +988,10 @@ function SettingsDrawer({
                 onClick={() => setPrivacyPolicyOpen(true)}
               />
             </SettingsGroup>
-            <SettingsGroup title="Promo codes" footer="Have a code? Redeem it securely with the App Store. Any offer price is shown before you confirm.">
-              <LinkRow
-                icon={Sparkles}
-                tint={TINT.purple}
-                label={codeBusy ? 'Opening App Store…' : 'Redeem a code'}
-                onClick={() => { void handleRedeemCode() }}
-              />
+            <SettingsGroup title="BestTake Plus" footer="One payment unlocks Plus forever. Learn and Balance stay free.">
+              <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased || plus.alphaUnlocked ? 'Plus unlocked · Manage purchase' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
             </SettingsGroup>
-            {codeError ? <p className="set-group__footer" role="alert">{codeError}</p> : null}
+            <SettingsGroup title="Promo codes"><PromoCodePanel /></SettingsGroup>
             {onOpenLabs ? (
               <SettingsGroup footer="Pitch-controlled games for warm-ups. They never touch recording or playback.">
                 <LinkRow

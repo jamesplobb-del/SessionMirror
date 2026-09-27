@@ -72,7 +72,7 @@ function ModeSlot({
 }: ModeSlotProps) {
   const isCenter = position === 'center'
   const isVideo = mode === 'video'
-  const recordStartBlocked = isCenter && isVideo && !ready && !isRecording
+  const recordStartBlocked = isCenter && isVideo && !ready && !isRecording && !handsFreePhase
 
   const ariaLabel = isCenter
     ? handsFreePhase === 'playback'
@@ -185,7 +185,7 @@ function RecordingModeCarousel({
     (mode: RecordingMode) => {
       if (mode === value) {
         if (handsFreePhase === 'playback') return
-        if (!isRecording && mode === 'video' && !ready) return
+        if (!isRecording && mode === 'video' && !ready && !autoSoundRecording) return
         if (isRecording) {
           triggerRecordStopHaptic(hapticFeedback)
         } else {
@@ -202,6 +202,7 @@ function RecordingModeCarousel({
       onChange(mode)
     },
     [
+      autoSoundRecording,
       handsFreePhase,
       hapticFeedback,
       isRecording,

@@ -51,6 +51,8 @@ import { useTutorialAction } from '../context/TutorialContext'
 import { safeRandomUUID } from '../utils/uuid'
 import { isTunerDiagnosticMode } from '../utils/tunerDiagnosticMode'
 import { motionExitHide } from '../utils/motionPresets'
+import { showPlus } from '../plus/plusAccess'
+import { usePlus } from '../plus/usePlus'
 import '../styles/pitch-insights-capture.css'
 
 type NoisyActivityPrompt = NoisyPitchWindow & { status: 'suggested' | 'deleting' | 'failed' }
@@ -281,10 +283,12 @@ export function LiveAudioTunerPane({
   onTurnOffAndClearRecent?: () => void
 }) {
   const notifyTutorial = useTutorialAction()
+  const plus = usePlus()
   const stageRef = useRef<HTMLDivElement>(null)
   const [droneOpen, setDroneOpen] = useState(false)
   const [transpositionOpen, setTranspositionOpen] = useState(false)
   const [insightsOpen, setInsightsOpen] = useState(false)
+  useEffect(() => { if (!plus.active) setInsightsOpen(false) }, [plus.active])
   const pitchActive = readout.noteName !== '—'
   const pitchZone = pitchActive ? getIntonationZone(readout.cents) : 'idle'
   const droneActive = Boolean(drone?.activeNotes.length)
@@ -392,6 +396,10 @@ export function LiveAudioTunerPane({
     triggerLightHaptic(tunerHapticsEnabled)
     setDroneOpen(false)
     setTranspositionOpen(false)
+    if (!plus.active) {
+      showPlus('insights', () => setInsightsOpen(true))
+      return
+    }
     setInsightsOpen(true)
   }
 
@@ -576,7 +584,7 @@ export function LiveAudioTunerPane({
         ) : null}
       </div>
 
-      {audioToolsEnabled && insightsEnabled ? (
+      {audioToolsEnabled && insightsEnabled && plus.active ? (
         <PitchInsightsScreen
           isOpen={insightsOpen}
           onClose={() => {

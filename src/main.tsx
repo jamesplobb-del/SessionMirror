@@ -16,6 +16,8 @@ import './styles/tablet.css'
 // shared state transitions and theme contrast, never structural layout.
 import './styles/interaction-polish.css'
 import RootRouter from './RootRouter.tsx'
+import PlusPaywall from './plus/PlusPaywall'
+import { initializePlusAccess } from './plus/plusAccess'
 import AppErrorBoundary from './components/ui/AppErrorBoundary.tsx'
 import { primeWebStatusBarChrome } from './utils/nativeStatusBar'
 import { registerAppForegroundLifecycle } from './utils/appForeground'
@@ -45,6 +47,7 @@ async function bootstrap() {
 
   primeWebStatusBarChrome()
   registerAppForegroundLifecycle()
+  initializePlusAccess()
   // Not awaited — a routine tapped in Messages surfaces through its own
   // store once ready, and shouldn't hold up first paint.
   void initializeRoutineFileOpen()
@@ -56,6 +59,7 @@ async function bootstrap() {
       <AppErrorBoundary>
         <MotionConfig reducedMotion="user">
           <RootRouter />
+          <PlusPaywall />
         </MotionConfig>
       </AppErrorBoundary>
     </StrictMode>,

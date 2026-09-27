@@ -3120,6 +3120,19 @@ export function useCameraSession({
   }, [cancelAutoPreRollCapture, stopNativeAudioRecordingSession, stopNativeExperimentalRecording])
 
   const toggleRecording = useCallback(() => {
+    if (autoPreRollActiveRef.current && !autoPerformanceActiveRef.current && !isRecordingRef.current) {
+      // Hidden pre-roll is an idle recorder, not a visible take to stop. A
+      // deliberate tap promotes it without consulting room-noise calibration.
+      const captureEpoch = captureSessionEpochRef.current
+      const takeId = activeTakeIdRef.current
+      void (async () => {
+        if (nativeStartSettleRef.current) await nativeStartSettleRef.current
+        if (captureEpoch !== captureSessionEpochRef.current || takeId !== activeTakeIdRef.current ||
+            !autoPreRollActiveRef.current || isRecordingRef.current) return
+        if (tryMarkAutoPerformanceStart() === 'started') await startRecording()
+      })().catch(() => setError('Recording could not start. Please tap Record to try again.'))
+      return
+    }
     // Gate on the ref, not the async React state: audio recording starts inside
     // an async IIFE, so isRecordingRef flips true before the isRecording state
     // commits. Using the stale state here caused a "stop" tap to be read as a
@@ -3129,7 +3142,7 @@ export function useCameraSession({
     } else {
       void startRecording()
     }
-  }, [startRecording, stopRecording])
+  }, [startRecording, stopRecording, tryMarkAutoPerformanceStart])
 
   const changeRecordingMode = useCallback(
     (mode: RecordingMode) => {

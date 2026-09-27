@@ -1,3 +1,5 @@
+import { Share } from '@capacitor/share'
+import { requirePlus } from '../plus/plusAccess'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { CHARTS_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
@@ -92,6 +94,7 @@ export async function loadPracticeChart(projectId: string): Promise<PracticeChar
 }
 
 export async function savePracticeChart(projectId: string, file: File): Promise<PracticeChart> {
+  if (!requirePlus('music')) throw new Error('Unlock Plus to import music.')
   if (!Object.hasOwn(extensions, file.type)) throw new Error('Choose a PDF, JPEG, PNG, or WebP image.')
   const old = charts.get(projectId)
   const bytes = new Uint8Array(await file.arrayBuffer())
@@ -207,4 +210,20 @@ function decodeBase64(data: string): Uint8Array {
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
+/** File retrieval stays free after a trial, even while the practice reader is locked. */
+export async function exportPracticeChart(projectId: string): Promise<void> {
+  const chart = await loadPracticeChart(projectId)
+  if (!chart) throw new Error('This music file is no longer available.')
+  if (Capacitor.isNativePlatform()) {
+    const { uri } = await Filesystem.getUri({ path: chart.filePath, directory: Directory.Data })
+    await Share.share({ title: chart.fileName, files: [uri] })
+    return
+  }
+  const url = chart.bytes ? URL.createObjectURL(new Blob([toArrayBuffer(chart.bytes)], { type: chart.mimeType })) : chart.objectUrl
+  const anchor = document.createElement('a')
+  anchor.href = url; anchor.download = chart.fileName
+  document.body.appendChild(anchor); anchor.click(); anchor.remove()
+  if (chart.bytes) window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

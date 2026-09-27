@@ -11,7 +11,7 @@ import {
   MAX_ROUTINE_NAME,
   type Routine,
 } from './practiceRoutines'
-import { storeLibraryRoutine } from './routineLibrary'
+import { SHARED_ROUTINE_IDS_KEY, storeLibraryRoutine } from './routineLibrary'
 import { hasPracticeChart, practiceChartName } from './practiceChartStorage'
 
 /** Shared practice plans carry their exercise checklist and attached metronome
@@ -168,13 +168,13 @@ export function parsePracticePlanFile(text: string): PracticePlanParseResult {
 export function importPracticePlanFromText(text: string): PracticePlanParseResult {
   const result = parsePracticePlanFile(text)
   if (result.ok) {
-    const keys = ['besttake:practice-timelines','besttake:practice-timeline-active','besttake:routine-library:v1']
+    const keys = ['besttake:practice-timelines','besttake:practice-timeline-active','besttake:routine-library:v1', SHARED_ROUTINE_IDS_KEY]
     const previous = keys.map(key => localStorage.getItem(key))
     try {
       for (const program of result.programs) saveTimeline(program)
       // Importing a practice plan must not change the currently selected standalone program.
       if (previous[1] === null) localStorage.removeItem(keys[1]); else localStorage.setItem(keys[1],previous[1])
-      storeLibraryRoutine(result.routine)
+      storeLibraryRoutine(result.routine, { shared: true })
     } catch {
       keys.forEach((key,index) => { try { const value=previous[index]; if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value) } catch { /* Keep original storage error. */ } })
       return {ok:false,error:'Could not save this routine and its programs. Please check available storage and try again.'}

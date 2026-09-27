@@ -1,3 +1,4 @@
+import { requirePlus } from '../plus/plusAccess'
 import { blankDesk, createStep, MAX_STEP_TITLE, type RoutineStep } from './practiceRoutines'
 import { normalizeDeskMetronome } from './deskMetronome'
 import { loadMusicScoreSettings, loadMusicSetup } from './musicLibrary'
@@ -37,6 +38,7 @@ export function reuseMusicExercise(step: RoutineStep): RoutineStep {
 
 /** iOS Files can provide an empty MIME type. Validate before creating a folder. */
 export async function prepareRoutineMusicFile(file: File): Promise<File> {
+  if (!requirePlus('music')) throw new Error('Unlock Plus to import music.')
   const byExtension: Record<string, string> = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
   const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
   const mime = file.type && file.type !== 'application/octet-stream' ? file.type : byExtension[extension]

@@ -19,7 +19,7 @@
 .music-routine-builder .music-routine-primary{display:flex;align-items:center;justify-content:center;gap:9px;min-height:49px;padding:12px 18px;width:100%;background:var(--mr-blue);color:white;border-radius:14px;font-size:14px;font-weight:600}
 html.app-dark-mode .music-routine-builder .music-routine-primary{color:#142b43}
 .music-routine-primary svg{width:17px;height:17px}
-.music-routine-import-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.music-routine-import-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:10px}
 .music-routine-builder .music-routine-import-actions>button{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:47px;padding:10px 8px;border:1px solid var(--mr-line);border-radius:13px;background:var(--mr-panel);color:var(--mr-ink);font-size:12px;font-weight:600}
 .music-routine-import-actions svg{width:16px;height:16px;flex:none;color:var(--mr-blue)}
 .music-routine-start-actions>p{font-size:11px;color:var(--mr-muted);margin:10px 0 0;text-align:center}

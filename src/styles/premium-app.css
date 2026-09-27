@@ -55,8 +55,8 @@ html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-
 html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-section-tabs {border-radius:18px!important;padding:4px!important;}
 html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .vault-section-tabs button {border-radius:14px!important;}
 html#lens-design-system.lens-system.premium-app:not([data-game-concept]) :is(.metronome-widget,.drone-widget) {border-radius:24px!important;background:var(--ls-glass)!important;backdrop-filter:blur(24px);box-shadow:0 16px 50px #152b4926!important;border-color:var(--ls-line)!important;}
-/* Camera widgets retain pale controls, so their surface must stay dark even
-   when the premium finish uses a light glass surface elsewhere. */
+/* Camera widgets use their own light/dark palette so controls and panel keep
+   matching when the premium finish changes the rest of the app. */
 html#lens-design-system.lens-system.premium-app:not([data-game-concept]) .lens-camera :is(.metronome-widget,.drone-widget) {background:var(--widget-surface)!important;border-color:var(--widget-border)!important;box-shadow:0 16px 42px #06192866!important;}
 html#lens-design-system.lens-system.premium-app:not([data-game-concept]) button:focus-visible {outline:2px solid var(--ls-blue);outline-offset:4px;}
 @media(prefers-reduced-motion:no-preference) {

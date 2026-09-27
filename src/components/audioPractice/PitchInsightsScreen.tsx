@@ -1026,7 +1026,7 @@ function PracticeDaysScreen({
   )
 }
 
-export default function PitchInsightsScreen({
+function PitchInsightsContent({
   isOpen,
   onClose,
   transpositionId = 'concert',
@@ -1701,3 +1701,5 @@ export default function PitchInsightsScreen({
     </AnimatedBottomSheet>
   )
 }
+
+export default PitchInsightsContent

@@ -295,7 +295,7 @@ export interface AutoRecordProfile {
   noiseMargin: number
   /** Peak must exceed effective gate by this factor for attack path. */
   attackPeakRatio: number
-  /** Cap adaptive gate relative to user gate — prevents runaway sensitivity loss. */
+  /** Bound added noise headroom relative to the user gate, not the room floor. */
   gateCapMultiplier: number
   /** Silence stop threshold as fraction of user gate. */
   stopGateRatio: number

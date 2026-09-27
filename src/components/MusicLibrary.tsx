@@ -1,8 +1,11 @@
+import { usePlus } from '../plus/usePlus'
+import { PlusLocked } from '../plus/PlusPaywall'
+import { requirePlus } from '../plus/plusAccess'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { ArrowLeft, Check, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, Pencil, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import type { Project } from '../db'
-import { deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart, PRACTICE_CHART_CHANGED } from '../utils/practiceChartStorage'
+import { exportPracticeChart, deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart, PRACTICE_CHART_CHANGED } from '../utils/practiceChartStorage'
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import { clearMusicScoreSettings, loadMusicOrder, loadMusicOrganization, loadMusicScoreSettings, loadMusicSetup, orderMusic, saveMusicOrder, saveMusicOrganization, saveMusicScoreSettings, saveMusicSetup, type MusicOrganization } from '../utils/musicLibrary'
 import { loadExerciseLibrary } from '../utils/routineLibrary'
@@ -46,6 +49,7 @@ function setupLabel(id: string): string {
 
 /** Folders organize the library; a score's recordings stay in its practice item. */
 export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported }: Props) {
+  const plus = usePlus()
   const input = useRef<HTMLInputElement>(null)
   const scroll = useRef<HTMLElement>(null)
   const working = useRef(false)
@@ -91,6 +95,7 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
       programId: metadata ? metadata.programId : fromExercise?.programId ?? null }
   }
   const updateScoreSetup = (item: Project, patch: Partial<RoutineStep>) => {
+    if (!requirePlus('music')) return
     const next = { ...scoreStep(item), ...patch }
     try {
       saveMusicScoreSettings(item.id, { referenceQuery: next.referenceQuery,
@@ -111,6 +116,7 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
     } catch { setError('Could not save your music layout. Please try again.') }
   }
   const importFiles = async (files: File[]) => {
+    if (!requirePlus('music')) return
     if (!files.length || working.current || disabled) return
     working.current = true
     setError('')
@@ -137,6 +143,7 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
     } finally { working.current = false; setBusy('') }
   }
   const open = async (id: string) => {
+    if (!requirePlus('music', () => { void open(id) })) return
     if (working.current || disabled) return
     working.current = true; setBusy('Opening music…'); setError('')
     try { await onOpen(id) }
@@ -303,6 +310,7 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
     {selecting && music.length > 0 && <div className="music-library__selection"><span>{selectedCount} of {music.length} selected</span><button type="button" disabled={Boolean(busy) || disabled} onClick={() => setSelectedIds(allSelected ? [] : music.map(item => item.id))}>{allSelected ? 'Deselect all' : 'Select all music'}</button><button type="button" className="music-library__delete-selected" disabled={!selectedCount || Boolean(busy) || disabled} onClick={() => setDeleteIds(selectedIds)}><Trash2 aria-hidden />{allSelected ? 'Delete all' : 'Delete selected'}</button></div>}
     {music.length > 0 && !selecting && <div className="music-library__count">{visible.length} {visible.length === 1 ? 'score' : 'scores'}<span>Drag scores to reorder or add them to a folder</span></div>}
     {deleteIds && <div className="music-library__delete-confirm" role="alert" aria-label="Delete music"><strong>{deleteIds.length === 1 ? `Delete “${music.find(item => item.id === deleteIds[0])?.name ?? 'this score'}”?` : `Delete ${deleteIds.length} scores?`}</strong><p>The music files and markings will be removed. Recordings in these practice items will stay. Routines using this music will need a replacement score.</p><div><button type="button" disabled={Boolean(busy)} onClick={() => setDeleteIds(null)}>Cancel</button><button type="button" className="music-library__delete-confirm-action" disabled={Boolean(busy) || disabled} onClick={() => void confirmDelete()}>{deleteIds.length === music.length ? 'Delete all music' : 'Delete music'}</button></div></div>}
+    {!plus.active && <PlusLocked feature="music"><p>Your saved music stays here. Open Tools to export or delete an original file.</p></PlusLocked>}
     {visible.length > 0 && <ol className="music-library__list">{visible.map(item => <li key={item.id} className={`${drag?.target === `score:${item.id}` ? 'music-library__drop-target ' : ''}${setupId === item.id ? 'music-library__score-open' : ''}${selectedIds.includes(item.id) ? ' music-library__score-selected' : ''}`} data-music-drop={`score:${item.id}`}>
       <div className="music-library__row">
         <button type="button" className="music-library__score" disabled={disabled || Boolean(busy)} aria-pressed={selecting ? selectedIds.includes(item.id) : undefined} onClick={() => selecting ? setSelectedIds(current => current.includes(item.id) ? current.filter(id => id !== item.id) : [...current, item.id]) : void open(item.id)}>{selecting && <span className="music-library__select-mark" aria-hidden>{selectedIds.includes(item.id) && <Check />}</span>}<ScoreThumbnail projectId={item.id} revision={revision} /><span className="music-library__copy"><strong>{item.name}</strong><small>{setupLabel(item.id)}</small></span>{!selecting && item.id === activeProjectId && <span className="music-library__current">On stand</span>}{!selecting && <ChevronRight aria-hidden />}</button>
@@ -326,6 +334,11 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
         }}><input autoFocus aria-label="Score name" maxLength={80} value={renameValue} onChange={event => setRenameValue(event.target.value)} /><button type="submit" disabled={!renameValue.trim() || Boolean(busy)}>Save</button><button type="button" onClick={() => setRenamingId(null)}>Cancel</button></form>
           : <button type="button" className="music-library__rename-score" onClick={() => { setRenamingId(item.id); setRenameValue(item.name) }}><Pencil aria-hidden /> Rename score</button>}
         <MusicToolSetup step={scoreStep(item)} instrumentId={instrumentId} onChange={patch => updateScoreSetup(item, patch)} />
+        <button type="button" className="music-library__rename-score" disabled={disabled || Boolean(busy)} onClick={() => {
+          if (working.current) return
+          working.current = true; setBusy('Preparing music file…'); setError('')
+          void exportPracticeChart(item.id).catch(cause => setError(cause instanceof Error ? cause.message : 'Could not export this music.')).finally(() => { working.current = false; setBusy('') })
+        }}><Upload aria-hidden /> Export original music</button>
         <button type="button" className="music-library__remove-score" disabled={disabled || Boolean(busy)} onClick={() => setDeleteIds([item.id])}><Trash2 aria-hidden /> Delete music</button>
         <PremiumDisclosure className="music-routine-more"><summary>More options</summary>
           <label className="music-routine-check"><input type="checkbox" checked={Boolean(scoreStep(item).desk?.autoSoundRecording)}

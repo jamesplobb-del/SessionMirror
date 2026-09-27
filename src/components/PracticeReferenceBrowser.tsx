@@ -1,3 +1,5 @@
+import { PlusGate } from '../plus/PlusPaywall'
+import type { ComponentProps } from 'react'
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { Play, Search, Trash2 } from 'lucide-react'
 import { PracticeReferenceContext } from '../context/PracticeReferenceContext'
@@ -12,7 +14,7 @@ const decode = (text: string) => text.replace(/&amp;/g, '&').replace(/&#39;/g, "
  * row to load it. This used to be two tabs plus a separate paste form with its
  * own submit button, which meant four ways in and no obvious one.
  */
-export default function PracticeReferenceBrowser({ onSelect, placeholder, selectionHelp, suggestedQuery, useContextSuggestion = true }: {
+function PracticeReferenceBrowserContent({ onSelect, placeholder, selectionHelp, suggestedQuery, useContextSuggestion = true }: {
   onSelect: (url: string) => void
   suggestedQuery?: string
   placeholder?: string
@@ -133,4 +135,8 @@ export default function PracticeReferenceBrowser({ onSelect, placeholder, select
       <div className="focus-reference-results">{sortedSaved.map(item => row(item, true))}</div>
     </div>}
   </section>
+}
+
+export default function PracticeReferenceBrowser(props: ComponentProps<typeof PracticeReferenceBrowserContent>) {
+  return <PlusGate feature="youtube"><PracticeReferenceBrowserContent {...props} /></PlusGate>
 }

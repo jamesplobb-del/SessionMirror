@@ -1,62 +1,47 @@
-# BestTake promo codes
+# BestTake Plus purchases and promo codes
 
-## Implemented September 13, 2026
+Implemented September 27, 2026. StoreKit is the authority for iOS entitlements. The existing `OfferCodes` Capacitor bridge now handles purchase, trial, restore, transaction updates, refunds/revocations, and redemption. Dismissing Apple's code sheet never grants access.
 
-Settings → Help → Promo codes → Redeem a code opens Apple's native offer-code
-sheet on iOS 16.3+. Browser builds explain that redemption requires the iOS app.
-Duplicate taps are guarded. Opening or dismissing the sheet never grants access.
-Apple handles code entry, eligibility, expiration, and any payment confirmation.
+## Product setup required in App Store Connect
 
-This is the redemption entry point, not a completed purchase/entitlement system.
-No live offers have been created. No paywalls or character unlock rules changed.
+| Product ID | Type | Display name | US price |
+| --- | --- | --- | --- |
+| `com.besttake.app.plus.lifetime` | Non-consumable | BestTake Plus | $9.99 |
+| `com.besttake.app.plus.trial7days` | Non-consumable | 7-day Trial | $0.00 |
 
-Validation: TypeScript/production web build and native iOS Simulator compilation
-passed. The optional Sentry source-map upload failed because sentry.io could not
-be resolved. No app installation, UI interaction, or real redemption was tested.
+Enable Family Sharing for the lifetime product. Supply descriptions, review screenshots, availability, and review notes, then submit the products with the app. Prices in the UI come from StoreKit, never a hardcoded purchase amount. The purchase button stays disabled when Apple has not returned the product.
 
-## Offers to configure
+The trial starts only when the user confirms the free trial transaction. Its verified original purchase date fixes the seven-day window across reinstalls and restores. It never renews or charges automatically. Apple requires a $0 non-consumable for a time-limited trial in a non-subscription app: [App Review Guidelines, 3.1.1](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
 
-- Full app: non-consumable purchase, regular US price $9.99, no subscription.
-- Financial assistance: free offer for the same full-app product. Privately
-  distribute unique one-time codes; recipients need no assistance label in-app.
-- Beta thank-you: discounted offer for that same product, proposed $4.99 pending
-  owner choice. Use individual codes for a closed group, or a custom code with a
-  redemption limit and expiry. A TestFlight purchase is a sandbox transaction,
-  not a permanent production purchase. The offer is for the released app.
-- Optional character pack: separate non-consumable product with a free offer.
-  Add one or two new cosmetic characters rather than removing existing earned
-  characters. Artwork, character identities, and product pricing remain undecided.
-  Cosmetics should not affect game scores or musical difficulty.
+## Testers: `alpha`
 
-## Required before distributing working codes
+In a Debug build, a verified TestFlight/sandbox installation, or a Vite development preview:
 
-1. Create the full-app product in App Store Connect and configure offers there.
-   Production codes require the app to be Ready for Distribution and the product
-   approved. Sandbox codes can be prepared before launch.
-2. Implement StoreKit verified entitlements for the exact approved product IDs,
-   transaction updates (including redemption outside the app), restoration,
-   revocation/refunds, and startup/foreground refresh. Finish transactions only
-   after delivering their content. Do not use local booleans or embedded master
-   codes as purchase authority.
-3. Connect the full entitlement to the free/paid feature boundaries in
-   `BESTTAKE_PLUS.md`. Preserve playback/export access to existing recordings.
-   Do not lock compare, recording, live tuner, hands-free, or opening a
-   shared routine. Caps keep existing items; never cut off a take in progress.
-4. If adding the character pack, connect its verified entitlement to character
-   selection and both game renderers. Preserve all existing earned unlocks.
-5. Verify on a physical device with sandbox accounts: free and discounted
-   redemption, cancellation, invalid/expired/already-used codes, interrupted
-   redemption, out-of-app redemption, reinstall/restore, and revoked purchases.
+1. Open Settings → Help → Promo codes (also available on the Plus screen).
+2. Enter `alpha` in **Test code** and tap **Unlock**.
+3. Plus stays unlocked on that installation. Whitespace and capitalization are ignored.
 
-Codes are generated in App Store Connect, not in the customer's Settings screen.
-Custom marketing names are examples until actually configured with Apple.
+The native shortcut is gated by `#if DEBUG` or Apple's verified `AppTransaction` sandbox environment. A public release ignores the locally saved alpha flag. Browser production builds ignore development entitlement storage. Test and production trial caches are separate. Test alpha is intentionally uncapped; it is not the public offer-code campaign.
 
-## Apple references
+## Public release: capped `ALPHA`
 
-- https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/create-offer-codes-for-in-app-purchases
-- https://developer.apple.com/documentation/storekit/appstore/presentoffercoderedeemsheet(in:)
-- https://developer.apple.com/app-store/review/guidelines/#in-app-purchase
+Create a **free offer** for the lifetime product, then a **custom code** named `ALPHA`, in App Store Connect. Set the desired redemption quantity and optional expiry there. Include new users and users with prior purchases, so customers who already redeemed the $0 trial remain eligible. No public code or redemption count has been created by this implementation.
 
-Apple supports free and discounted offers for non-consumable purchases. Its
-guidelines restrict custom mechanisms that unlock digital content; use the
-StoreKit route for these offers rather than a home-grown license-key bypass.
+Customers open Settings → Help → Promo codes → **Redeem App Store code** and enter `ALPHA` in Apple's sheet. StoreKit verifies the redemption and grants the same permanent lifetime entitlement. The app cannot prefill Apple's sheet. Apple enforces the campaign cap across devices and accounts; there is no client-side usage counter.
+
+Custom codes require the app to be Ready for Distribution and the IAP approved. Apple's current limit is up to 25,000 redemptions per custom-code batch. Sandbox redemption uses separately generated sandbox codes. See [Apple's IAP offer-code setup](https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/create-offer-codes-for-in-app-purchases).
+
+## Verification before release
+
+Automated checks: `node scripts/verify-plus-access.mjs`, `node scripts/verify-handsfree-monitor.mjs`, and `npm run build`.
+
+On an iOS sandbox device, with both products configured, verify:
+
+- Confirm/cancel the $0 trial; only a verified purchase starts access. Restore preserves the original expiry.
+- Confirm/cancel the lifetime purchase; pending approval stays locked, then unlocks through the transaction listener.
+- Restore on another device; check Family Sharing and refund/revocation.
+- Redeem a sandbox offer, dismiss without redeeming, and try an invalid code.
+- In a public Release installation, a saved test alpha flag must not unlock Plus; redeem the configured public ALPHA through Apple instead.
+- Expire the trial between takes: complete the current recording and listen-back; block the next hands-free take. Keep manual recording, Learn, Balance, recordings/export, original-score export/delete, and non-music shared routines usable.
+
+These device/StoreKit checks require Apple's product setup and have not been substituted by the local JavaScript tests.
