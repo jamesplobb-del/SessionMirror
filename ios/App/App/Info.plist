@@ -33,7 +33,9 @@
 		<dict>
 			<key>CFBundleTypeName</key><string>PDF Sheet Music</string>
 			<key>CFBundleTypeRole</key><string>Viewer</string>
-			<key>LSHandlerRank</key><string>Alternate</string>
+			<!-- Default (not Alternate) lets Files and Quick Look offer a one-tap
+			     "Open in BestTake" button next to Share, as forScore does. -->
+			<key>LSHandlerRank</key><string>Default</string>
 			<key>LSItemContentTypes</key><array><string>com.adobe.pdf</string></array>
 		</dict>
 		<dict>

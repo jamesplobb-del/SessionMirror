@@ -28,8 +28,8 @@ export function PromoCodePanel() {
   return <div className="plus-promo">
     {plus.canRedeemAlpha && <form onSubmit={event => { event.preventDefault(); void redeem(true) }}>
       <label htmlFor={codeId}>Test build code</label>
-      <div className="plus-promo__input"><input id={codeId} autoCapitalize="none" autoCorrect="off" spellCheck={false} value={code} onChange={event => setCode(event.target.value)} placeholder="Enter alpha" disabled={busy} maxLength={64} /><button type="submit" disabled={busy || !code.trim()}>Unlock</button></div>
-      <small>Enter alpha here for development or TestFlight. Apple’s code sheet below only accepts App Store offer codes.</small>
+      <div className="plus-promo__input"><input id={codeId} autoCapitalize="none" autoCorrect="off" spellCheck={false} value={code} onChange={event => setCode(event.target.value)} placeholder="Enter code" disabled={busy} maxLength={64} /><button type="submit" disabled={busy || !code.trim()}>Unlock</button></div>
+      <small>Have a BestTake access code? Enter it here. Apple’s code sheet below only accepts App Store offer codes.</small>
     </form>}
     <button className="plus-link plus-promo__store" type="button" disabled={busy} onClick={() => void redeem(false)}>{busy ? 'Please wait…' : 'Redeem App Store offer code'}</button>
     {plus.alphaUnlocked && <p role="status">Plus is unlocked for testing.</p>}

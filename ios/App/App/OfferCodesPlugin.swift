@@ -179,7 +179,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func redeemAlpha(_ call: CAPPluginCall) {
         Task { @MainActor in
             guard await testEnvironment() else {
-                call.reject("Redeem ALPHA with the App Store in this release. Apple verifies the code and its redemption limit."); return
+                call.reject("Redeem your code with the App Store using Redeem App Store code below. Apple verifies it."); return
             }
             guard call.getString("code")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "alpha" else {
                 call.reject("That test code is not valid."); return
