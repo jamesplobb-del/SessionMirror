@@ -1,4 +1,4 @@
-import { tunerInputAdvice, type TunerInputAdvice } from '../utils/tunerInputAdvice'
+import { createAdviceWindow, tunerInputAdvice, updateAdviceWindow, type TunerInputAdvice } from '../utils/tunerInputAdvice'
 import { appendTunerTrace, tunerTracePoints, type TunerTrace } from '../utils/tunerTrace'
 import { subscribeNativeTunerPitch, type NativeTunerPitch } from '../utils/nativeTunerPitch'
 import { drawSilkTuner, silkTunerGeometry, silkPitchColor } from '../utils/reactiveSilkTuner'
@@ -1800,7 +1800,9 @@ export function useLivePitchTracker(
   onAcceptedPitchFrameRef.current = options.onAcceptedPitchFrame
   const inputAdviceCallbackRef = useRef(options.onInputAdvice)
   inputAdviceCallbackRef.current = options.onInputAdvice
-  const inputAdviceRef = useRef<{ kind: TunerInputAdvice; since: number; sent: boolean }>({ kind: null, since: 0, sent: false })
+  const inputAdviceRef = useRef(createAdviceWindow())
+  /** How far below the floor a steady tone still counts as "playing too softly". */
+  const QUIET_ADVICE_BAND_DB = 14
   const profile = getTunerProfile(tunerInstrument)
   const profileRef = useRef(profile)
   profileRef.current = profile
@@ -2897,16 +2899,20 @@ export function useLivePitchTracker(
         if (source === 'microphone' && inputAdviceCallbackRef.current) {
           const level = nativeTap?.nativePitchOnly
             ? nativeTap.estimate?.rmsDb ?? -160 : bufferRmsDb(graph.buffer)
-          const advice = tunerInputAdvice(level, rmsGate, rawPitch, clarity, clarityMin)
-          const previous = inputAdviceRef.current
-          if (advice !== previous.kind) {
-            inputAdviceRef.current = { kind: advice, since: now, sent: false }
-            inputAdviceCallbackRef.current(null)
+          let adviceHz = rawPitch
+          let adviceClarity = clarity
+          // Below the loudness floor the tracker skips pitch detection, which
+          // hid exactly the case to explain: a real note, just too soft to
+          // register. Look for a pitch there (advice only) so the player hears
+          // why nothing is happening. Native frames already carry an estimate.
+          if (!signalStrong && !nativeTap?.nativePitchOnly && level > rmsGate - QUIET_ADVICE_BAND_DB) {
+            const detected = graph.detector.findPitch(graph.buffer, analysisSampleRate)
+            adviceHz = detected[0]
+            adviceClarity = detected[1]
           }
-          else if (advice && !previous.sent && now - previous.since >= 5000) {
-            previous.sent = true
-            inputAdviceCallbackRef.current(advice)
-          }
+          const advice = tunerInputAdvice(level, rmsGate, adviceHz, adviceClarity, clarityMin)
+          const next = updateAdviceWindow(inputAdviceRef.current, advice, now)
+          if (next !== undefined) inputAdviceCallbackRef.current(next)
         }
 
         if (!signalStrong) {

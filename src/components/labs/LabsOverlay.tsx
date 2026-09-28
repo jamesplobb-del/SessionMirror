@@ -10,6 +10,7 @@ import StaffJumperScreen from '../../labs/staffJumper/StaffJumperScreen'
 import { releaseGameAudioContext } from '../../labs/gameAudioContext'
 import { syncPracticeGamesWithHomeInstrument } from '../../labs/practiceGameInstrument'
 import LabsMenu from './LabsMenu'
+import { GameMicAdviceBanner } from './GameMicAdvice'
 
 const BalanceScreen = lazy(() => import('../../labs/balance/BalanceScreen'))
 const LearnInstrumentScreen = lazy(
@@ -196,6 +197,7 @@ export default function LabsOverlay({
           aria-modal="true"
           aria-label="Practice Games"
         >
+          {route !== 'menu' && <GameMicAdviceBanner />}
           {route === 'menu' ? (
             <LabsMenu
               hapticFeedback={hapticFeedback}

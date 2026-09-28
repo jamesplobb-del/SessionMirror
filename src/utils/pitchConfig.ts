@@ -146,12 +146,14 @@ export const TUNER_INSTRUMENTS: TunerInstrument[] = ['voice', 'strings', 'winds'
 
 /**
  * Tablet microphones need a lower loudness floor for quiet playing at a stand.
- * The existing 8 dB tablet adjustment is retained; profiles stay user-selected.
+ * A tablet's mic is usually farther from the player than a phone's. Give it
+ * enough headroom to hear a normal voice at a music stand, while preserving
+ * each instrument's relative loudness gate and the phone's existing behavior.
  * Keep pitch clarity, frequency bounds and silence expiry unchanged so lowering
  * the floor does not turn unpitched room noise into accepted notes.
  * The widget, live tuner and games all receive this same cached profile.
  */
-const TABLET_MIC_GATE_RELIEF_DB = 8
+const TABLET_MIC_GATE_RELIEF_DB = 18
 
 /*
  * Cached per profile so the returned object keeps its identity — the profile is

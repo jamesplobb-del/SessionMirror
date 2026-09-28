@@ -13,9 +13,10 @@ export function confirmFeatureAction(text: string): void {
 export const GUIDANCE_EVENT = 'besttake:feature-action'
 export const GUIDANCE_PREFERENCES_EVENT = 'besttake:feature-help-preferences'
 const STORAGE_KEY = 'besttake:feature-help:v1'
-export const GUIDE_COOLDOWN_MS = 90_000
+export const GUIDE_SKIP_COOLDOWN_MS = 25_000
+export const GUIDE_CONTINUE_GAP_MS = 250
 export const GUIDE_EXPIRY_MS = 120_000
-export const GUIDE_SESSION_LIMIT = 2
+export const GUIDE_SESSION_LIMIT = 4
 
 export interface GuidancePreferences { enabled: boolean; seen: FeatureGuideId[] }
 let fallback: GuidancePreferences = { enabled: true, seen: [] }
@@ -97,9 +98,10 @@ export interface GuidanceState {
   pending: { id: FeatureGuideId; expires: number }[]
   shown: number
   lastEnded: number | null
+  lastEndDelay: number
 }
 export function createGuidanceState(preferences = readGuidancePreferences()): GuidanceState {
-  return { preferences, active: null, pending: [], shown: 0, lastEnded: null }
+  return { preferences, active: null, pending: [], shown: 0, lastEnded: null, lastEndDelay: 0 }
 }
 
 type GuidanceUpdate =
@@ -111,7 +113,7 @@ type GuidanceUpdate =
   | { type: 'learned'; id: FeatureGuideId; now: number }
   | { type: 'preferences'; preferences: GuidancePreferences; reset: boolean }
 
-function finish(state: GuidanceState, id: FeatureGuideId, now: number): GuidanceState {
+function finish(state: GuidanceState, id: FeatureGuideId, now: number, delay = GUIDE_CONTINUE_GAP_MS): GuidanceState {
   const wasActive = state.active?.id === id
   return {
     ...state,
@@ -119,6 +121,7 @@ function finish(state: GuidanceState, id: FeatureGuideId, now: number): Guidance
     active: wasActive ? null : state.active,
     pending: state.pending.filter(item => item.id !== id),
     lastEnded: wasActive ? now : state.lastEnded,
+    lastEndDelay: wasActive ? delay : state.lastEndDelay,
   }
 }
 
@@ -134,7 +137,7 @@ export function guidanceReducer(state: GuidanceState, update: GuidanceUpdate): G
     return pending.length === state.pending.length ? state : { ...state, pending }
   }
   if (update.type === 'learned') return finish(state, update.id, update.now)
-  if (update.type === 'dismiss') return state.active ? finish(state, state.active.id, update.now) : state
+  if (update.type === 'dismiss') return state.active ? finish(state, state.active.id, update.now, GUIDE_SKIP_COOLDOWN_MS) : state
   if (update.type === 'advance') {
     if (!state.active) return state
     if (state.active.step + 1 >= FEATURE_GUIDES[state.active.id].length) return finish(state, state.active.id, update.now)
@@ -147,7 +150,7 @@ export function guidanceReducer(state: GuidanceState, update: GuidanceUpdate): G
       { id: update.id, expires: update.now + GUIDE_EXPIRY_MS }] }
   }
   if (state.active || state.shown >= GUIDE_SESSION_LIMIT ||
-    (state.lastEnded !== null && update.now - state.lastEnded < GUIDE_COOLDOWN_MS)) return state
+    (state.lastEnded !== null && update.now - state.lastEnded < state.lastEndDelay)) return state
   const pending = state.pending.find(item => item.id === update.id && item.expires > update.now)
   if (!pending) return state
   return { ...state, preferences: { ...state.preferences, seen: [...state.preferences.seen, update.id] }, active: { id: update.id, step: 0, expires: pending.expires },

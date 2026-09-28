@@ -21,6 +21,11 @@ interface Props {
   feedbackError?: string | null
   onDismissFeedbackError?: () => void
 }
+/** How long a tip's target may be missing before the tip hides. */
+const TARGET_LOST_HIDE_MS = 1200
+const FLASH_WINDOW_MS = 4000
+const FLASH_FLIP_LIMIT = 6
+
 interface Position { left: number; top: number; width: number; maxHeight: number; target: DOMRect }
 
 /** Never scroll the app or cover the control being explained. */
@@ -31,7 +36,9 @@ function findTarget(selector: string): HTMLElement | undefined {
     const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
     return Boolean(hit && element.contains(hit)) && !element.closest('[inert], [aria-hidden="true"]') && style.visibility !== 'hidden' &&
       style.display !== 'none' && Number(style.opacity) > 0 && rect.width > 12 && rect.height > 12 &&
-      rect.top >= 0 && rect.bottom <= window.innerHeight && rect.right > 0 && rect.left < window.innerWidth
+      // Sub-pixel layout can put a control flush with the screen edge a fraction
+      // of a pixel past it; that control is still fully visible.
+      rect.top >= -2 && rect.bottom <= window.innerHeight + 2 && rect.right > 0 && rect.left < window.innerWidth
   })
 }
 
@@ -151,12 +158,11 @@ export default function FeatureGuidance(props: Props) {
   }, [])
 
   useEffect(() => {
-    if (props.paused || !props.recordingReady) return
+    if (props.paused || (props.surface === 'recording' && !props.recordingReady)) return
     const id: FeatureGuideId | null = props.surface === 'music' ? 'music-tools'
       : props.surface === 'recording' ? (props.hasTakes ? 'navigation' : 'recording') : null
     if (!id) return
-    const timer = window.setTimeout(() => dispatch({ type: 'request', id, now: Date.now() }), 5000)
-    return () => window.clearTimeout(timer)
+    dispatch({ type: 'request', id, now: Date.now() })
   }, [props.paused, props.recordingReady, props.surface, props.hasTakes])
 
   useEffect(() => {
@@ -179,8 +185,10 @@ export default function FeatureGuidance(props: Props) {
       const time = Date.now()
       if (document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
       dispatch({ type: 'expire', now: time })
-      // The success message gets its own moment before any teaching appears.
-      if (confirmation && confirmation.expires + 700 > time) return
+      // A saved take's guide is its immediate next step; other confirmations
+      // get a brief moment before teaching resumes.
+      if (confirmation && confirmation.expires > time &&
+        !state.pending.some(item => item.id === 'best-take')) return
       const candidate = state.pending.find(item => {
         if (item.expires <= time ||
           (item.id === 'music-tools' && props.surface !== 'music') ||
@@ -193,19 +201,36 @@ export default function FeatureGuidance(props: Props) {
       })
       if (candidate) dispatch({ type: 'start', id: candidate.id, now: time })
     }
-    const timer = window.setTimeout(considerGuide, 1000)
-    const retry = window.setInterval(considerGuide, 1500)
-    return () => { window.clearTimeout(timer); window.clearInterval(retry) }
+    considerGuide()
+    const retry = window.setInterval(considerGuide, 300)
+    return () => window.clearInterval(retry)
   }, [paused, active, state.pending, state.preferences.enabled, props.workspaceOpen, props.handsFreeEnabled, props.surface, confirmation])
 
   useLayoutEffect(() => {
     setPosition(null)
     if (!step || !active || paused) return
+    let missingSince: number | null = null
+    let placed = false
     const update = () => {
       if (Date.now() > active.expires) { dispatch({ type: 'dismiss', now: Date.now() }); return }
       const target = findTarget(step.selector)
-      const height = Math.max(cardRef.current?.scrollHeight ?? 0, 202)
-      setPosition(target ? positionCard(target.getBoundingClientRect(), height) : null)
+      // Measure only a placed card: an unplaced one has no width, wraps
+      // differently and would feed back a different height every tick.
+      const height = placed ? Math.max(cardRef.current?.scrollHeight ?? 0, 202) : 202
+      const next = target ? positionCard(target.getBoundingClientRect(), height) : null
+      if (next) {
+        missingSince = null
+        placed = true
+        setPosition(current => (current && Math.abs(current.left - next.left) < 1 && Math.abs(current.top - next.top) < 1 &&
+          current.width === next.width && Math.abs(current.target.top - next.target.top) < 1 &&
+          Math.abs(current.target.left - next.target.left) < 1 ? current : next))
+        return
+      }
+      // A target that blinks out for a moment (an animation, a sheet passing
+      // over it) must not hide and re-show the card: that is the flashing.
+      const now = Date.now()
+      missingSince ??= now
+      if (!placed || now - missingSince >= TARGET_LOST_HIDE_MS) { placed = false; setPosition(null) }
     }
     update()
     const observer = new ResizeObserver(update)
@@ -223,6 +248,19 @@ export default function FeatureGuidance(props: Props) {
       window.visualViewport?.removeEventListener('scroll', update)
     }
   }, [step, active, paused])
+
+  // Last line of defence against a strobing tip: if the card keeps appearing
+  // and disappearing, retire it for good rather than flash at the player.
+  const flips = useRef<number[]>([])
+  useEffect(() => {
+    if (!active) { flips.current = []; return }
+    const now = Date.now()
+    flips.current = [...flips.current.filter(time => now - time < FLASH_WINDOW_MS), now]
+    if (flips.current.length > FLASH_FLIP_LIMIT) {
+      flips.current = []
+      dispatch({ type: 'dismiss', now })
+    }
+  }, [visible, active])
 
   useEffect(() => {
     if (!visible) return

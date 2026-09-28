@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useGameMicAdviceReporter } from '../../components/labs/GameMicAdvice'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import { GAME_TEST_INPUT_AVAILABLE } from '../gameTestInput'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Mic, Play, RotateCcw, Settings } from 'lucide-react'
@@ -113,6 +114,7 @@ export default function LearnInstrumentScreen({
     permissionPending: micPermissionPending,
   })
 
+  const reportMicAdvice = useGameMicAdviceReporter()
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
@@ -132,6 +134,7 @@ export default function LearnInstrumentScreen({
       allowStandaloneMicFallback: true,
       onSourceHealthChange: setSourceHealth,
       onAcceptedPitchFrame: game.handleAcceptedPitchFrame,
+      onInputAdvice: reportMicAdvice,
     },
   )
 

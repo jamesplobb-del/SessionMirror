@@ -1,4 +1,5 @@
 import { getInstrumentProfile } from '../../utils/instrumentProfiles'
+import { useGameMicAdviceReporter } from '../../components/labs/GameMicAdvice'
 import { recordPlannedGame, type DailyChallengePlan } from '../../utils/dailyChallengePlan'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
@@ -402,6 +403,7 @@ export default function StaffJumperScreen({
     permissionPending: micPermissionPending,
   })
 
+  const reportMicAdvice = useGameMicAdviceReporter()
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
@@ -419,6 +421,7 @@ export default function StaffJumperScreen({
       nativePitchProcessing: true,
       retryNativeTapOnInteractiveRecovery: true,
       allowStandaloneMicFallback: true,
+      onInputAdvice: reportMicAdvice,
     },
   )
 

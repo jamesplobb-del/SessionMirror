@@ -1,7 +1,6 @@
 import { PremiumMotionDiv, PremiumMotionSection } from './ui/PremiumMotionSurface'
 import { premiumMotion } from '../utils/premiumMotion'
-import type { TunerInputAdvice } from '../utils/tunerInputAdvice'
-import { reportFeatureAction } from '../utils/featureGuidance'
+import { tunerAdvicePrompt, type TunerInputAdvice } from '../utils/tunerInputAdvice'
 import { createTunerTrace, type TunerTrace } from '../utils/tunerTrace'
 import TunerHistory from './audioPractice/TunerHistory'
 import { appendTunerHistory, type TunerHistorySample } from '../utils/tunerHistory'
@@ -704,6 +703,8 @@ function LivePitchTunerAudio({
   nativePitchProcessing?: boolean
 }) {
   const [inputAdvice, setInputAdvice] = useState<TunerInputAdvice>(null)
+  const [dismissedAdvice, setDismissedAdvice] = useState<TunerInputAdvice[]>([])
+  const advicePrompt = tunerAdvicePrompt(inputAdvice, tunerInstrument)
   useEffect(() => { setInputAdvice(null) }, [tunerInstrument, enabled])
   const pitchHistoryRef = useRef<TunerHistorySample[]>([])
   const visualTraceRef = useRef<TunerTrace>(createTunerTrace())
@@ -860,10 +861,8 @@ function LivePitchTunerAudio({
       preferNativeAudioTap: true,
       retryNativeTapOnInteractiveRecovery: liveMicOnly,
       onSourceHealthChange: onLiveSourceHealthChange,
-      onInputAdvice: (advice: TunerInputAdvice) => {
-        setInputAdvice(advice)
-        if (advice) reportFeatureAction(`tuner-input-${advice}`)
-      },
+      // The inline prompt below handles detection trouble; no separate tip.
+      onInputAdvice: (advice: TunerInputAdvice) => setInputAdvice(advice),
       onAcceptedPitchFrame: liveMicOnly ? handleAcceptedPitchFrame : undefined,
     }),
     [
@@ -919,10 +918,15 @@ function LivePitchTunerAudio({
 
   return (
     <div className="pitch-tuner pitch-tuner--audio flex h-full min-h-0 w-full flex-col">
-      {enabled && inputAdvice === 'unpitched' && tunerInstrument === 'winds' && (
+      {enabled && advicePrompt && !dismissedAdvice.includes(inputAdvice) && (
         <div className="tuner-input-advice" role="status">
-          <span>Sound detected, but no steady pitch. Singing? Try Voice mode.</span>
-          {onTunerInstrumentChange && <button type="button" onClick={() => onTunerInstrumentChange('voice')}>Use Voice</button>}
+          <span>{advicePrompt.message}</span>
+          {advicePrompt.switchTo && onTunerInstrumentChange && (
+            <button type="button" onClick={() => { onTunerInstrumentChange(advicePrompt.switchTo!); setInputAdvice(null) }}>
+              Use {advicePrompt.switchTo === 'voice' ? 'Voice' : advicePrompt.switchTo === 'winds' ? 'Winds' : 'Strings'}
+            </button>
+          )}
+          <button type="button" aria-label="Dismiss tuner tip" onClick={() => setDismissedAdvice(list => [...list, inputAdvice])}>✕</button>
         </div>
       )}
       <AnimatePresence mode="wait" initial={false}>

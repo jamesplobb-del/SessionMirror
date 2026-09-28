@@ -3172,7 +3172,10 @@ func estimateNativeTunerPitch(_ input: [Float], sampleRate: Double) -> NativeTun
     var power: Float = 0
     vDSP_measqv(samples, 1, &power, vDSP_Length(samples.count))
     let rmsDb = 10 * log10(max(Double(power), 1e-16))
-    guard rmsDb.isFinite, rmsDb > -65 else { return NativeTunerEstimate(frequency: 0, confidence: 0, rmsDb: rmsDb.isFinite ? rmsDb : -160) }
+    // The iPad's voice gate can be lower than -65 dB when the player is at a
+    // music stand. This is only the detector's work floor: the shared JS
+    // profile still decides whether the pitch is loud and clear enough to use.
+    guard rmsDb.isFinite, rmsDb > -72 else { return NativeTunerEstimate(frequency: 0, confidence: 0, rmsDb: rmsDb.isFinite ? rmsDb : -160) }
     let n = samples.count, maxLag = min(n / 2, Int(sampleRate / 38))
     var energy = [Double](repeating: 0, count: n+1)
     for i in 0..<n { energy[i+1] = energy[i]+Double(samples[i])*Double(samples[i]) }

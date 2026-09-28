@@ -1,4 +1,5 @@
 import type { DailyChallengePlan } from '../../utils/dailyChallengePlan'
+import { useGameMicAdviceReporter } from '../../components/labs/GameMicAdvice'
 import {
   useCallback,
   useEffect,
@@ -116,6 +117,7 @@ export default function BalanceScreen({
     permissionPending: micPermissionPending,
   })
 
+  const reportMicAdvice = useGameMicAdviceReporter()
   const { readout } = useLivePitchTracker(
     mediaRef,
     pitchEnabled,
@@ -134,6 +136,7 @@ export default function BalanceScreen({
       retryNativeTapOnInteractiveRecovery: true,
       allowStandaloneMicFallback: true,
       suppressUntilRef: game.suppressUntilRef,
+      onInputAdvice: reportMicAdvice,
       onSourceHealthChange: setSourceHealth,
       onAcceptedPitchFrame: game.handleAcceptedPitchFrame,
     },

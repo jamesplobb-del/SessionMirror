@@ -7,7 +7,7 @@ globalThis.localStorage = {
 }
 const bundle = await build({ entryPoints: ['src/utils/featureGuidance.ts'], bundle: true,
   write: false, format: 'esm', platform: 'node' })
-const { createGuidanceState, guidanceReducer: reduce, GUIDE_COOLDOWN_MS, GUIDE_EXPIRY_MS,
+const { createGuidanceState, guidanceReducer: reduce, GUIDE_SKIP_COOLDOWN_MS, GUIDE_CONTINUE_GAP_MS, GUIDE_EXPIRY_MS,
   readGuidancePreferences, writeGuidancePreferences } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`)
 const fresh = () => createGuidanceState({ enabled: true, seen: [] })
@@ -21,6 +21,12 @@ assert.equal(state.active.step, 1, 'Next must advance without requiring an actio
 state = reduce(state, { type: 'advance', now: 4000 })
 assert.equal(state.active, null)
 assert.deepEqual(state.preferences.seen, ['workspace'])
+state = request(state, 'navigation', 4000)
+assert.equal(start(state, 'navigation', 4000 + GUIDE_CONTINUE_GAP_MS - 1).active, null,
+  'The next workflow tip waits only for the brief transition gap')
+state = start(state, 'navigation', 4000 + GUIDE_CONTINUE_GAP_MS)
+assert.equal(state.active?.id, 'navigation', 'The next workflow tip starts promptly after completion')
+state = reduce(state, { type: 'dismiss', now: 5000 })
 assert.equal(start(request(state, 'workspace', 60000), 'workspace', 62000).active, null,
   'Completed guides must never restart automatically')
 
@@ -30,11 +36,17 @@ assert.equal(state.active, null)
 assert(state.preferences.seen.includes('best-take'), 'Skip must persist for that feature')
 state = request(state, 'hands-free', 3500)
 assert.equal(start(state, 'hands-free', 4000).active, null, 'Skip must not cause an immediate next tutorial')
-state = start(state, 'hands-free', 3000 + GUIDE_COOLDOWN_MS)
+state = start(state, 'hands-free', 3000 + GUIDE_SKIP_COOLDOWN_MS)
 assert.equal(state.active.id, 'hands-free', 'Skipping one feature must not disable all others')
 state = reduce(state, { type: 'dismiss', now: 50000 })
 state = start(request(state, 'workspace', 100000), 'workspace', 102000)
-assert.equal(state.active, null, 'At most two automatic guides per mounted session')
+assert.equal(state.active?.id, 'workspace', 'A third guide may follow after the cooldown')
+state = reduce(state, { type: 'dismiss', now: 110000 })
+state = start(request(state, 'recording', 140000), 'recording', 142000)
+assert.equal(state.active?.id, 'recording', 'A fourth guide may follow after the cooldown')
+state = reduce(state, { type: 'dismiss', now: 150000 })
+state = start(request(state, 'navigation', 180000), 'navigation', 182000)
+assert.equal(state.active, null, 'At most four automatic guides per mounted session')
 
 state = request(fresh(), 'workspace')
 state = reduce(state, { type: 'learned', id: 'workspace', now: 1500 })

@@ -552,3 +552,5 @@ html#lens-design-system .quick-tuner-instrument-picker button[aria-pressed='true
 .quick-tools-screen .quick-tuner-screen { grid-template-rows:auto minmax(0,1fr) auto; }
 .quick-tools-screen .quick-metronome-screen { grid-template-rows:minmax(0,1fr); }
 .quick-tools-screen .quick-metronome-stage { margin-top:0; }
+/* Practice games: the same microphone tip, floating above whichever game is open. */
+.tuner-input-advice--game { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 64px); left: 50%; right: auto; transform: translateX(-50%); width: min(420px, calc(100vw - 32px)); z-index: 200; }
