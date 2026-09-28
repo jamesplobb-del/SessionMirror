@@ -595,7 +595,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [guidedTakeId, setGuidedTakeId] = useState<string | null>(null)
   const [guidedAudioBothTakeId, setGuidedAudioBothTakeId] = useState<string | null>(null)
-  const [guidedVideoRaisedTakeId, setGuidedVideoRaisedTakeId] = useState<string | null>(null)
   const [guidedNextFocus, setGuidedNextFocus] = useState<string | null>(null)
   const [challengerId, setChallengerId] = useState<string | null>(bootSnapshot.challengerId)
   const [libraryItems, setLibraryItems] = useState<HydratedLibraryItem[]>(bootSnapshot.libraryItems)
@@ -848,7 +847,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     ) => void
   >(() => {})
   const refreshCameraSessionRef = useRef<() => Promise<void>>(async () => {})
-  const suspendCameraForBackgroundRef = useRef<() => void>(() => {})
+  const suspendCameraForBackgroundRef = useRef<() => void | Promise<void>>(() => {})
   const recordDeleteDropRef = useRef<HTMLDivElement>(null)
   const [autoRecordStartSuppressed, setAutoRecordStartSuppressed] = useState(false)
   const [handsFreePlaybackPending, setHandsFreePlaybackPending] = useState(false)
@@ -1197,12 +1196,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       // A lost bridge/media callback must never leave hands-free waiting forever.
       autoPlaybackStartTimerRef.current = window.setTimeout(failPlayback, 15000)
 
-      // Vault can play the same saved take through WebKit on iPad. Prefer that
-      // proven speaker path for the automatic replay; the native player is a
-      // fallback only when this screen has no mounted audio element.
+      // Use the same native player as manual Audio and Vault playback. The
+      // shared controller falls back to WebKit if native startup fails.
       const useNativeAudioPlayback =
         Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios' &&
-        Boolean(filePath) && !autoPlaybackAudioRef.current
+        Boolean(filePath)
 
       if (useNativeAudioPlayback) {
         autoPlaybackUsesNativeRef.current = true
@@ -1367,7 +1365,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           if (Capacitor.isNativePlatform()) {
             // Mirror camera hands-free: release live capture before route prep
             // so headphone playback is not fighting the mic capture session.
-            suspendCameraForBackgroundRef.current()
+            await suspendCameraForBackgroundRef.current()
             await waitMs(AUDIO_PLAYBACK_CAPTURE_SUSPEND_MS)
             await preparePlaybackRoute({ suspendCamera: false })
           }
@@ -1910,7 +1908,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         if (!multitrackRecordingActiveRef.current) {
           setGuidedNextFocus(null)
           setGuidedAudioBothTakeId(null)
-          setGuidedVideoRaisedTakeId(mediaType === 'video' ? takeId : null)
           if (!shouldAutoPlay) setGuidedTakeId(takeId)
         }
       }
@@ -2439,9 +2436,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       await waitMs(AUDIO_PLAYBACK_RECORDING_STOP_SETTLE_MS)
     }
     if (!Capacitor.isNativePlatform()) return
-    // Native AVPlayer cannot share output with a live WebRTC mic session — release
-    // capture before playback, then refresh after (speaker and headphones).
-    console.info('[AudioModePlayback] releasing WebRTC capture before native AVPlayer playback')
+    // Both WebKit and native take playback can go silent against a live WebRTC
+    // mic session. Release capture before playback, then refresh it afterward.
+    console.info('[AudioModePlayback] releasing WebRTC capture before take playback')
     await suspendAudioCaptureForPlayback()
     // Music's live pitch monitor owns a separate native capture lease. Wait
     // for it to release before AVAudioEngine takes the speaker route.
@@ -5092,6 +5089,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         })
         return id
       })
+      // Pinning from full-screen review keeps the player on the take they were
+      // studying: it just moved into the Best slot, so the review follows it.
+      setReviewSlot((slot) => (slot === null ? null : 'benchmark'))
       // A pinned reference recording takes priority — don't clobber it with
       // the newly-starred take.
       if (focusedPractice && benchmarkBinding?.source !== 'library') {
@@ -6700,6 +6700,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   requesting={cameraPermissionRequestInFlight}
                   blocked={cameraPermissionBlocked}
                   onRequestPermission={requestCameraAccess}
+                  onUseAudioOnly={() => handleRecordingModeChange('audio')}
                   onOpenSettings={() => {
                     void BestTakeAudioPlugin.openAppSettings().catch((error) => {
                       console.warn('Could not open iOS Settings', error)
@@ -6737,6 +6738,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                             !autoPlaybackPlaying
                           }
                           micStreamRef={streamRef}
+                          micPermissionBlocked={cameraPermissionBlocked}
                           layoutRegion="main"
                           liveMicOnly={mainAudioPitchSource.liveMicOnly === true}
                           tunerInstrument={settings.tunerInstrument}
@@ -7294,8 +7296,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         focus={guidedNextFocus}
                         mode="video"
                         playbackActive={takePlaybackActive}
-                        videoBoxesRaised={guidedVideoRaisedTakeId === challengerTake.id}
-                        onReleaseVideoBoxes={() => setGuidedVideoRaisedTakeId(null)}
                         onFocusChange={setGuidedNextFocus}
                         onSaveNote={(id, notes) => handleUpdateTake(id, { notes })}
                         onRecordAgain={handleToggleRecord}

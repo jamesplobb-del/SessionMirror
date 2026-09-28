@@ -318,6 +318,7 @@ export default function DraggableDroneWidget({
           <DroneSoundWheel
             compact
             activeNotes={drone.activeNotes}
+            lastPitchClass={drone.lastPitchClass}
             octave={drone.octave}
             onToggleNote={drone.toggleNote}
             onGlissNote={drone.glissNote}

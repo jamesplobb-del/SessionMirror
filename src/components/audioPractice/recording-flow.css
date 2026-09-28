@@ -25,10 +25,33 @@
   width:auto!important; min-width:80px; padding-inline:9px; gap:5px; border-radius:999px;
   background:#fff0bd!important; color:#75510b!important; border:1px solid #dba72d!important;
 }
+.audio-mode-home--inplace .audio-mode-take-card--current .audio-mode-take-card__chrome {
+  flex-wrap:wrap;
+  column-gap:8px;
+  row-gap:2px;
+}
+.audio-mode-home--inplace .audio-mode-take-card--current .audio-mode-take-card__pill {
+  flex:none;
+  white-space:nowrap;
+}
+.audio-mode-home--inplace .audio-mode-take-card--current .audio-mode-take-card__actions {
+  flex:none;
+  margin-left:auto;
+}
 .audio-mode-take-card__mini-btn--best span { font-size:10px; font-weight:650; white-space:nowrap; }
+html#lens-design-system.lens-system .audio-mode-home--inplace .audio-mode-take-card__mini-btn--best {
+  background:#fff0bd!important;
+  color:#75510b!important;
+  border-color:#dba72d!important;
+}
 @media(max-height:540px) { .audio-first-take { gap:15px; } .audio-first-take__brand { flex-direction:row; } .audio-first-take__brand img { width:44px; height:44px; } }
 
 html.app-dark-mode .audio-mode-home--inplace .audio-mode-take-card__mini-btn--best { background:#493c1e!important; color:#ffdc7b!important; }
+html#lens-design-system.lens-system.app-dark-mode .audio-mode-home--inplace .audio-mode-take-card__mini-btn--best {
+  background:#493c1e!important;
+  color:#ffdc7b!important;
+  border-color:#9b7932!important;
+}
 
 .audio-mode-take-card--draggable { cursor:grab; -webkit-touch-callout:none; }
 .audio-mode-take-card--dragging { cursor:grabbing; }

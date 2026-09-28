@@ -148,6 +148,10 @@ export default function LearnInstrumentScreen({
   }, [game.state.phase, onReleaseMicStream])
 
   const hasPitch = readout.noteName !== '—' && readout.frequencyHz > 0
+  // The detector hears concert pitch; name it in the pitch the student reads.
+  const heardName = hasPitch
+    ? heardAsWritten(Math.round(69 + 12 * Math.log2(readout.frequencyHz / 440)), game.selectedInstrument.transpositionSemitones) ?? readout.noteName
+    : '—'
   const micTrouble = micPermissionBlocked || sourceHealth === 'stalled'
   const micConnecting = micPermissionPending || sourceHealth === 'connecting'
 
@@ -214,7 +218,7 @@ export default function LearnInstrumentScreen({
         : sourceHealth === 'stalled'
           ? 'Microphone unavailable — tap to retry'
           : hasPitch
-            ? `Hearing ${readout.noteName}`
+            ? `Hearing ${heardName}`
             : 'Play a note to test your microphone'
 
     return (
@@ -250,7 +254,7 @@ export default function LearnInstrumentScreen({
                   {game.totalTargetCount} notes · {game.selectedCourse.description}
                 </small>
               </span>
-              <strong>{hasPitch ? readout.noteName : '—'}</strong>
+              <strong>{heardName}</strong>
             </Pressable>
           </div>
         }

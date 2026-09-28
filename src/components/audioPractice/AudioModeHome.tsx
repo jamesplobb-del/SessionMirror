@@ -205,7 +205,7 @@ function AudioWaveform({
   active: boolean
   peaks: number[]
   progress: number
-  playerRef: RefObject<HTMLAudioElement | null>
+  playerRef?: RefObject<HTMLAudioElement | null>
   onScrub: (progress: number, phase: ScrubPhase) => void
   disabled?: boolean
   hapticFeedback?: boolean
@@ -252,7 +252,7 @@ function AudioWaveform({
     }
 
     const tick = () => {
-      const player = playerRef.current
+      const player = playerRef?.current ?? null
       if (!analyser && player) {
         analyser = getTakePlaybackSpeakerNodes(player)?.keepAliveAnalyser ?? null
       }
@@ -598,6 +598,7 @@ export function AudioModeTakeCard({
                 onFavorite?.()
               }}
               className="audio-mode-take-card__mini-btn audio-mode-take-card__mini-btn--best"
+              data-tutorial="pin-current-as-best"
               aria-label="Pin Current Take as Best Take"
             >
               <Pin className="h-3.5 w-3.5" aria-hidden /><span>Make Best</span>
@@ -658,6 +659,7 @@ export function AudioModeTakeCard({
           onPointerCancel={handlePlayPointerEnd}
           onPointerLeave={handlePlayPointerEnd}
           className={`audio-mode-take-card__play${cue.emphasis ? ' take-guidance-emphasis' : ''}`}
+          data-tutorial={playable ? tone === 'current' ? 'challenger-card' : 'best-take-box' : undefined}
           aria-label={
             isPreparing
               ? 'Preparing take playback'
@@ -714,7 +716,7 @@ export function AudioModeTakeCard({
               active={isPlaying}
               peaks={displayPeaks}
               progress={playable ? waveformProgress : 0}
-              playerRef={audioPlayback.playerRef}
+              playerRef={audioPlayback.state.playerExists ? audioPlayback.playerRef : undefined}
               onScrub={handleWaveformScrub}
               disabled={!playable}
               hapticFeedback={hapticFeedback}

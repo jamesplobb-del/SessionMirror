@@ -26,6 +26,7 @@ html.app-dark-mode .plus-sheet,html.app-dark-mode .plus-locked{--plus-text:#f4f7
 .plus-promo__input input{min-width:0;flex:1;background:rgba(127,127,127,.08);border:1px solid rgba(127,127,127,.3);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;color:inherit}
 .plus-promo__input button{padding:10px 14px;background:#c69845;color:#161c27;border:0;border-radius:10px;font:inherit;font-weight:700}
 .plus-promo small{display:block;opacity:.65}
+.plus-promo__store{display:block;margin-top:10px;text-align:left}
 .plus-error{color:#a92c26!important;opacity:1!important}
 html.app-dark-mode .plus-error{color:#ff9b91!important}
 .plus-locked{width:min(100%,460px);margin:auto;padding:32px 24px;text-align:center}

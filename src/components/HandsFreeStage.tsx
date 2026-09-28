@@ -137,6 +137,9 @@ function HandsFreeStage({
       aria-live="polite"
       aria-atomic
       aria-hidden={!phase || fold.collapsed}
+      // aria-hidden alone leaves the buttons focusable, so VoiceOver and
+      // keyboard focus could still land on controls for an idle hands-free.
+      inert={!phase || fold.collapsed}
       data-phase={phase ?? 'off'}
     >
       <div className="hands-free-stage__wash" aria-hidden />

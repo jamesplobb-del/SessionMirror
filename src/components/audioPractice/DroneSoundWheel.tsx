@@ -34,6 +34,8 @@ type ChordQuality = keyof typeof CHORD_INTERVALS
 
 export interface DroneSoundWheelProps {
   activeNotes: number[]
+  /** The last note played, so a stopped drone reopens where the player left it. */
+  lastPitchClass?: number | null
   octave: number
   onToggleNote: (pitchClass: number) => void
   onGlissNote: (pitchClass: number, octave: number) => void
@@ -90,6 +92,7 @@ const RIBBON_PITCHES = buildRibbonPitches()
 
 function DroneSoundWheel({
   activeNotes,
+  lastPitchClass = null,
   octave,
   onToggleNote,
   onGlissNote,
@@ -108,7 +111,7 @@ function DroneSoundWheel({
   const userScrollingRef = useRef(false)
   const lastGlissAbsoluteRef = useRef<number | null>(null)
   const [rootPitchClass, setRootPitchClass] = useState<number | null>(
-    activeNotes[0] ?? null,
+    activeNotes[0] ?? lastPitchClass ?? null,
   )
   const [glissAbsolute, setGlissAbsolute] = useState<number | null>(null)
   /*
@@ -135,7 +138,7 @@ function DroneSoundWheel({
     return () => observer.disconnect()
   }, [compact])
 
-  const root = rootPitchClass ?? activeNotes[0] ?? 0
+  const root = rootPitchClass ?? activeNotes[0] ?? lastPitchClass ?? 0
   const enabled = activeNotes.length > 0
   const majorActive = enabled && sameNotes(activeNotes, triadFor(root, 'major'))
   const minorActive = enabled && sameNotes(activeNotes, triadFor(root, 'minor'))

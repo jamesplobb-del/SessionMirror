@@ -7,6 +7,8 @@ interface CameraPermissionPromptProps {
   blocked: boolean
   onRequestPermission: () => void
   onOpenSettings: () => void
+  /** Video mode only: lets a player who declined just the camera keep recording audio. */
+  onUseAudioOnly?: () => void
 }
 
 export default function CameraPermissionPrompt({
@@ -15,6 +17,7 @@ export default function CameraPermissionPrompt({
   blocked,
   onRequestPermission,
   onOpenSettings,
+  onUseAudioOnly,
 }: CameraPermissionPromptProps) {
   const isAudioMode = recordingMode === 'audio'
   const PermissionIcon = isAudioMode ? Mic : Camera
@@ -29,10 +32,10 @@ export default function CameraPermissionPrompt({
           {blocked
             ? isAudioMode
               ? 'Microphone access is off. Enable it in iOS Settings to record audio.'
-              : 'Camera or microphone access is off. Enable recording access in iOS Settings.'
+              : 'Video takes need both the camera and microphone. Turn on whichever is off in iOS Settings, or record audio only.'
             : isAudioMode
             ? 'Microphone access is required to record audio takes.'
-            : 'Camera and microphone access are required to record takes.'}
+            : 'Video takes need the camera and microphone. You can also record audio only.'}
         </p>
         <button
           type="button"
@@ -54,6 +57,16 @@ export default function CameraPermissionPrompt({
             className="camera-permission-gate__retry"
           >
             Try Again
+          </button>
+        )}
+        {!isAudioMode && onUseAudioOnly && (
+          <button
+            type="button"
+            disabled={requesting}
+            onClick={onUseAudioOnly}
+            className="camera-permission-gate__retry"
+          >
+            Record audio only
           </button>
         )}
       </div>

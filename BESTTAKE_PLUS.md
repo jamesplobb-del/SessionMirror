@@ -41,17 +41,11 @@ Pitch observations continue to be recorded while Plus is inactive so a later pur
 
 **Free**
 
-- Play the game
-- Major keys: C, G, F, D, Bb, Eb
-- 1 octave
-- Easy and medium
+- Easy level with any instrument, key, scale, or range
 
 **Plus**
 
-- Other major keys and minor keys
-- Custom / build-your-own scale
-- 2-octave range
-- Hard
+- Medium and Hard levels
 
 Learn and Balance stay fully free. Do not gate earned characters or add a separate character paywall at launch.
 

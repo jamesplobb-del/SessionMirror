@@ -12,11 +12,11 @@ export function silkPitchColor(cents: number): string {
   const blend = t * t * (3 - 2 * t)
   return '#' + from.map((value, i) => Math.round(value + (to[i] - value) * blend).toString(16).padStart(2, '0')).join('')
 }
-/** Vibrant Flow palette, shared by the pitch line and full-screen tint. */
+/** Readable tuning colors shared by the trace, live point, and soft page tint. */
 export function silkFlowColor(cents: number, dark = false): string {
-  const green = dark ? [45, 245, 168] : [0, 220, 125]
-  const amber = dark ? [255, 204, 36] : [255, 185, 0]
-  const red = dark ? [255, 88, 119] : [255, 66, 76]
+  const green = dark ? [43, 250, 151] : [0, 210, 105]
+  const amber = dark ? [255, 204, 76] : [224, 148, 0]
+  const red = dark ? [255, 109, 130] : [231, 70, 96]
   const distance = Math.abs(cents)
   const lower = distance < 10
   const from = lower ? green : amber, to = lower ? amber : red
@@ -91,9 +91,17 @@ function silkGradient(
 function drawSilkRun(ctx: CanvasRenderingContext2D, run: IndexedSilkPoint[], totalPoints: number, air = false, dark = false) {
   if (run.length < 2) return
   if (air) {
-    // The approved Clean line: constant width and opacity, centered on the
-    // measured trace. Keep timing, pitch values, and real silence gaps intact.
-    ctx.strokeStyle = silkGradient(ctx, run, totalPoints, .92, .92, false, dark)
+    // The page echoes the tuning color, but a contrasting edge keeps the
+    // measured trace readable even when it crosses the target band.
+    ctx.strokeStyle = dark ? '#132d36' : '#ffffff'
+    ctx.lineWidth = 8
+    ctx.beginPath()
+    ctx.moveTo(run[0].point.x, run[0].point.y)
+    for (let index = 1; index < run.length; index += 1) {
+      ctx.lineTo(run[index].point.x, run[index].point.y)
+    }
+    ctx.stroke()
+    ctx.strokeStyle = silkGradient(ctx, run, totalPoints, .96, .96, false, dark)
     ctx.lineWidth = 6
     ctx.beginPath()
     ctx.moveTo(run[0].point.x, run[0].point.y)
@@ -134,11 +142,11 @@ export function drawSilkTuner(
 ): string {
   const g = silkTunerGeometry(width, height)
   ctx.save()
-  ctx.fillStyle = air ? '#20ed7817' : '#20ed782e'
+  ctx.fillStyle = air ? (dark ? '#3aef9727' : '#00be652b') : '#20ed782e'
   ctx.fillRect(air ? 14 : 10, g.centsToY(5), width - (air ? 28 : 20), g.bandBottom - g.centsToY(5))
-  ctx.strokeStyle = '#00d85a59'; ctx.lineWidth = 1
-  for (const y of air ? [] : [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
-  ctx.strokeStyle = dark ? '#adcfcf44' : '#567b8333'
+  ctx.strokeStyle = air ? (dark ? '#69f2ae8a' : '#009d5480') : '#00d85a59'; ctx.lineWidth = 1
+  for (const y of [g.centsToY(5), g.bandBottom]) { ctx.beginPath(); ctx.moveTo(16,y);ctx.lineTo(width-16,y);ctx.stroke() }
+  ctx.strokeStyle = dark ? '#adcfcf66' : '#567b835e'
   ctx.beginPath();ctx.moveTo(14,g.center);ctx.lineTo(width-14,g.center);ctx.stroke()
   // No Sharp / Flat / TARGET captions. The green band already says where in
   // tune is, and up/down needs no caption once the trace is moving. Geometry
@@ -186,8 +194,8 @@ export function drawSilkTuner(
     halo.addColorStop(0,color+'b3');halo.addColorStop(.38,color+'57');halo.addColorStop(1,color+'00')
     ctx.fillStyle=halo;ctx.beginPath();ctx.arc(last.x,last.y,33,0,Math.PI*2);ctx.fill()
     }
-    ctx.fillStyle=color;ctx.beginPath();ctx.arc(last.x,last.y,air ? 6 : 8,0,Math.PI*2);ctx.fill()
-    if (!air) {ctx.strokeStyle='#ffffffd9';ctx.lineWidth=1.7;ctx.stroke()}
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(last.x,last.y,air ? 6.5 : 8,0,Math.PI*2);ctx.fill()
+    ctx.strokeStyle=dark ? '#1d303a' : '#ffffff';ctx.lineWidth=air ? 2 : 1.7;ctx.stroke()
     if (!air) {ctx.fillStyle='white';ctx.beginPath();ctx.arc(last.x,last.y,2.4,0,Math.PI*2);ctx.fill()}
   }
   if (air) ctx.restore()

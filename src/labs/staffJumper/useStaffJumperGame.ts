@@ -589,7 +589,7 @@ export function useStaffJumperGame(
   }, [])
 
   const start = useCallback((config: StaffJumperConfig) => {
-    if (!isFreeStaffJumperSetup({ key: config.key, mode: config.scaleMode, range: config.range, difficulty: config.difficulty, customScale: config.customPitchClasses, rangeLowMidi: config.rangeLowMidi, rangeHighMidi: config.rangeHighMidi, instrumentId: config.instrumentId }) && !requirePlus('staffJumper')) return
+    if (!isFreeStaffJumperSetup({ difficulty: config.difficulty }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
@@ -603,7 +603,7 @@ export function useStaffJumperGame(
 
   const restart = useCallback(() => {
     const previous = stateRef.current.config
-    if (previous && !isFreeStaffJumperSetup({ key: previous.key, mode: previous.scaleMode, range: previous.range, difficulty: previous.difficulty, customScale: previous.customPitchClasses, rangeLowMidi: previous.rangeLowMidi, rangeHighMidi: previous.rangeHighMidi, instrumentId: previous.instrumentId }) && !requirePlus('staffJumper')) return
+    if (previous && !isFreeStaffJumperSetup({ difficulty: previous.difficulty }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
@@ -754,6 +754,8 @@ export function useStaffJumperGame(
     /** Attack settled — accepted, or given up on when its window closed. */
     let attackResolved = false
     let attackAccepted = false
+    /** When the pitch last came inside the tolerance band without leaving it. */
+    let inToleranceSince: number | null = null
     /** A wrong note already cost a heart here; the closing window must not cost another. */
     let heartLostOnThisNote = false
     let attackWallMs = 0
@@ -915,14 +917,21 @@ export function useStaffJumperGame(
           }
           const isReleasingPreviousNote = releasingPitchClassRef.current != null
 
-          if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
+          const inTolerance = isReadoutCorrectPitch(readoutNow, target, current.config)
+          if (!inTolerance) inToleranceSince = null
+          else if (inToleranceSince == null) inToleranceSince = now
+          if (inTolerance) {
             wrongStableMs = 0
             wrongPitchClassRef.current = null
             // A held repeated pitch must earn stability within this slot; its
             // old onset must not instantly score every subsequent repeated note.
-            const soundingForMs = isReleasingPreviousNote
+            const pitchSoundingMs = isReleasingPreviousNote
               ? Math.min(now - pitchOnsetRef.current.startedAt, Math.max(0, gridMs - slotOnsetMs - PITCH_DETECTION_LATENCY_MS))
               : now - pitchOnsetRef.current.startedAt
+            // The note name can hold while the tuning drifts out of the band;
+            // only time spent continuously in tune counts, so one in-tune
+            // flicker at the attack cannot pass a note held 30 cents off.
+            const soundingForMs = Math.min(pitchSoundingMs, now - (inToleranceSince ?? now))
             const requiredMs = isReleasingPreviousNote
               ? Math.min(REPEATED_NOTE_HOLD_MS, writtenMs * 0.35) : timing.correctMs
             if (soundingForMs >= requiredMs) {

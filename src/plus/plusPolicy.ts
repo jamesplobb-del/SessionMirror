@@ -1,5 +1,3 @@
-import { difficultyRangeFor } from '../labs/staffJumper/staffJumperDifficultyRanges'
-
 export const PLUS_TRIAL_MS = 7 * 24 * 60 * 60 * 1000
 export const FREE_ROUTINE_LIMIT = 1
 export const FREE_MULTITRACK_BOXES = 2
@@ -12,7 +10,7 @@ export const PLUS_FEATURES: Record<PlusFeature, { title: string; detail: string 
   insights: { title: 'Pitch Insights', detail: 'See your pitch history and note tendencies.' },
   routines: { title: 'More routines', detail: 'Save as many routines as you like. One saved routine is free.' },
   multitrack: { title: 'More multitrack boxes', detail: 'Add a third box or more to a multitrack project.' },
-  staffJumper: { title: 'More Staff Jumper options', detail: 'Use every key, custom scales, two octaves, and hard difficulty.' },
+  staffJumper: { title: 'More Staff Jumper levels', detail: 'Easy is free. Unlock Medium and Hard with BestTake Plus.' },
 }
 
 export interface PlusEntitlement {
@@ -29,13 +27,6 @@ export function hasPlusAccess(entitlement: PlusEntitlement, now: number): boolea
       now >= entitlement.trialStartedAt && now < entitlement.trialExpiresAt)
 }
 
-export function isFreeStaffJumperSetup(setup: { key?: string; mode?: string; range?: string; difficulty?: string; customScale?: unknown; rangeLowMidi?: number; rangeHighMidi?: number; instrumentId?: string | null }): boolean {
-  const graded = difficultyRangeFor(setup.instrumentId ?? null, setup.difficulty === 'medium' ? 'medium' : 'easy')
-  const isGradedRange = graded !== null && setup.rangeLowMidi === graded.lowMidi && setup.rangeHighMidi === graded.highMidi
-  const span = setup.rangeLowMidi !== undefined && setup.rangeHighMidi !== undefined
-    ? Math.abs(setup.rangeHighMidi - setup.rangeLowMidi) : 0
-  const isSingleOctave = setup.range === '1-octave' && span <= 12
-  return ['C', 'G', 'F', 'D', 'Bb', 'Eb'].includes(setup.key ?? '') &&
-    setup.mode === 'major' && setup.difficulty !== 'hard' && !setup.customScale &&
-    (isGradedRange || isSingleOctave)
+export function isFreeStaffJumperSetup(setup: { difficulty?: string }): boolean {
+  return setup.difficulty === 'easy'
 }

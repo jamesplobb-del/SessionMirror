@@ -48,7 +48,7 @@ export interface AudioModePlaybackItem {
   mediaUrl: string
   mimeType: string
   takeId?: string
-  /** Reserved for the hands-free loop; ordinary Audio-tab takes stay on WebKit playback. */
+  /** Set false only when retrying a failed native start through WebKit. */
   nativePlayback?: boolean
   /** Native hands-free playback applies this measured, limiter-protected gain. */
   playbackGainDb?: number
@@ -106,8 +106,8 @@ function sourceKeyFor(item: Pick<AudioModePlaybackItem, 'filePath' | 'mediaUrl'>
   return item.filePath ? `file:${item.filePath}` : `url:${item.mediaUrl || ''}`
 }
 
-function usesNativeHandsFreePlayback(item: AudioModePlaybackItem): boolean {
-  return item.nativePlayback === true && shouldUseAudioModeNativePlayback(item)
+function usesNativeAudioPlayback(item: AudioModePlaybackItem): boolean {
+  return item.nativePlayback !== false && shouldUseAudioModeNativePlayback(item)
 }
 
 function resolveItemSrc(item: AudioModePlaybackItem): string {
@@ -269,6 +269,7 @@ export function AudioModePlaybackProvider({
     onPlaybackActiveChangeRef.current?.(false)
     updateSessionPrepared(false)
     const duration = nativeDurationRef.current
+    nativePlaybackOffsetRef.current = duration
     setState((prev) => ({
       ...prev,
       isPlaying: false,
@@ -294,7 +295,12 @@ export function AudioModePlaybackProvider({
     const nextSrc = resolveItemSrc(item)
     const playerAlreadyExists = Boolean(player.src || player.currentSrc)
 
-    if (currentSourceKeyRef.current === nextSourceKey && (player.src || player.currentSrc)) {
+    if (
+      currentSourceKeyRef.current === nextSourceKey &&
+      ((player.src || player.currentSrc) ||
+        (usesNativeAudioPlayback(item) &&
+          (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current || nativeDurationRef.current > 0)))
+    ) {
       logPlayback('Reusing player', {
         takeId: item.takeId ?? item.id,
         position: player.currentTime,
@@ -319,6 +325,8 @@ export function AudioModePlaybackProvider({
     player.volume = 1
     player.load()
     currentSourceKeyRef.current = nextSourceKey
+    nativePlaybackOffsetRef.current = 0
+    nativeDurationRef.current = 0
     endedListenerSourceKeyRef.current = ''
     setState((prev) => ({
       ...prev,
@@ -442,11 +450,11 @@ export function AudioModePlaybackProvider({
         position: options.startTime ?? 0,
         playerExists: Boolean(playerRef.current),
         sessionPrepared: sessionPreparedRef.current,
-        path: usesNativeHandsFreePlayback(item) ? 'native-avplayer' : 'webkit',
+        path: usesNativeAudioPlayback(item) ? 'native-avplayer' : 'webkit',
       })
       const requestId = ++playbackRequestIdRef.current
 
-      if (usesNativeHandsFreePlayback(item)) {
+      if (usesNativeAudioPlayback(item)) {
         const isCurrentNativeRequest = () =>
           playbackRequestIdRef.current === requestId &&
           desiredPlayingRef.current &&
@@ -457,10 +465,19 @@ export function AudioModePlaybackProvider({
           externalNativePlaybackEndedRef.current = null
           onFailed?.()
         }
-        const startTime =
+        const sameSource = currentSourceKeyRef.current === sourceKeyFor(item)
+        if (!sameSource) {
+          nativePlaybackOffsetRef.current = 0
+          nativeDurationRef.current = 0
+        }
+        const requestedStartTime =
           typeof options.startTime === 'number' && Number.isFinite(options.startTime)
             ? Math.max(0, options.startTime)
-            : 0
+            : nativePlaybackOffsetRef.current
+        const knownDuration = nativeDurationRef.current
+        const startTime = knownDuration > 0 && requestedStartTime >= knownDuration - 0.05
+          ? 0
+          : requestedStartTime
         nativePlaybackStartingRef.current = true
         desiredPlayingRef.current = true
         externalNativePlaybackEndedRef.current = options.onEnded ?? null
@@ -524,6 +541,16 @@ export function AudioModePlaybackProvider({
             if (playbackRequestIdRef.current !== requestId) return
             nativePlaybackActiveRef.current = false
             nativePlaybackStartingRef.current = false
+            if (audioModePlaybackControlsRef.play) {
+              externalNativePlaybackEndedRef.current = null
+              externalNativePlaybackFailedRef.current = null
+              logPlayback('Native playback unavailable; retrying through WebKit', {
+                takeId: item.takeId ?? item.id,
+                error: error instanceof Error ? error.message : String(error),
+              })
+              audioModePlaybackControlsRef.play({ ...item, nativePlayback: false }, options)
+              return
+            }
             onPlaybackActiveChangeRef.current?.(false)
             desiredPlayingRef.current = false
             logPlayback('Playback intercepted', {
@@ -575,6 +602,8 @@ export function AudioModePlaybackProvider({
           path: 'audio-mode-context',
         })
         try {
+          await onBeforePlayRef.current?.()
+          if (!isCurrentRequest()) return
           await logAudioSessionSnapshot('audio-mode-before-session-prep', sessionId)
           await prepareSessionOnce(item)
           if (!isCurrentRequest()) return
@@ -624,11 +653,14 @@ export function AudioModePlaybackProvider({
           setState((prev) => ({ ...prev, duration }))
           if (pendingStartTimeRef.current !== null) {
             try {
-              player.currentTime = Math.max(0, Math.min(pendingStartTimeRef.current, duration))
+              const requestedTime = Math.max(0, pendingStartTimeRef.current)
+              player.currentTime = requestedTime >= duration - 0.05 ? 0 : requestedTime
             } catch {
               /* ignore */
             }
             pendingStartTimeRef.current = null
+          } else if (player.ended || player.currentTime >= duration - 0.05) {
+            player.currentTime = 0
           }
           logPlayback('[Diag] calling playTakeMediaAudible', {
             takeId: item.takeId ?? item.id,
@@ -664,6 +696,12 @@ export function AudioModePlaybackProvider({
             isPlaying: true,
             playerExists: true,
           }))
+          options.onStarted?.(duration)
+          if (options.onEnded) {
+            player.addEventListener('ended', () => {
+              if (playbackRequestIdRef.current === requestId) options.onEnded?.()
+            }, { once: true })
+          }
         } catch (error) {
           if (!isCurrentRequest()) return
           pipelineDetachRef.current?.()
@@ -814,8 +852,8 @@ export function AudioModePlaybackProvider({
   const toggle = useCallback(
     (item: AudioModePlaybackItem) => {
       const sameSource = currentSourceKeyRef.current === sourceKeyFor(item)
-      if (usesNativeHandsFreePlayback(item)) {
-        if (sameSource && nativePlaybackActiveRef.current) {
+      if (usesNativeAudioPlayback(item)) {
+        if (sameSource && (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current)) {
           pause()
           return
         }
@@ -838,7 +876,7 @@ export function AudioModePlaybackProvider({
 
   const seek = useCallback(
     (time: number) => {
-      if (nativePlaybackActiveRef.current && state.currentItem) {
+      if (state.currentItem && usesNativeAudioPlayback(state.currentItem)) {
         const duration = nativeDurationRef.current
         const nextTime = Math.max(0, Math.min(time, duration > 0 ? duration : time))
         const wasPlaying = desiredPlayingRef.current

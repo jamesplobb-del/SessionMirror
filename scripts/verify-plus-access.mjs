@@ -36,10 +36,12 @@ try {
   assert.equal(policy.hasPlusAccess(trial,100),true)
   assert.equal(policy.hasPlusAccess(trial,199),true)
   assert.equal(policy.hasPlusAccess(trial,200),false)
-  for (const key of ['C','G','F','D','Bb','Eb']) assert.equal(policy.isFreeStaffJumperSetup({key,mode:'major',range:'1-octave',difficulty:'medium'}),true)
-  assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'2-octaves',difficulty:'easy',rangeLowMidi:58,rangeHighMidi:72,instrumentId:'trumpet'}),true,'The graded trumpet Easy range is free even when it spans more than 12 semitones')
-  assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'2-octaves',difficulty:'easy',rangeLowMidi:57,rangeHighMidi:72,instrumentId:'trumpet'}),false,'A wider custom range still needs Plus')
-  for (const patch of [{key:'B'},{mode:'minor'},{range:'2-octaves'},{difficulty:'hard'},{customScale:[0,2,4]}]) assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'1-octave',difficulty:'easy',...patch}),false)
+  for (const setup of [
+    {difficulty:'easy',key:'C',mode:'major',range:'1-octave'},
+    {difficulty:'easy',key:'B',mode:'minor',range:'2-octaves',customScale:[0,2,4]},
+    {difficulty:'easy',key:'C',rangeLowMidi:57,rangeHighMidi:72,instrumentId:'trumpet'},
+  ]) assert.equal(policy.isFreeStaffJumperSetup(setup),true,'Every Easy setup remains free')
+  for (const difficulty of ['medium','hard']) assert.equal(policy.isFreeStaffJumperSetup({difficulty}),false,`${difficulty} requires Plus`)
 
   const dev = await load('src/plus/plusAccess.ts',{dev:true})
   await dev.refreshPlusAccess()
@@ -114,5 +116,5 @@ try {
   memory.clear();activeRoutine=first
   assert.equal(routines.canSaveRoutine(second),false,'Today’s unshelved routine counts toward limit')
   assert.ok(prompts>0)
-  console.log('PASS: Plus entitlements, trial boundaries, alpha environment isolation, pending/cancelled purchases, restore/revocation, and routine limits.')
+  console.log('PASS: Plus entitlements, Staff Jumper Easy/paid levels, trial boundaries, alpha isolation, purchases, restore/revocation, and routine limits.')
 } finally { globalThis.setTimeout=nativeSetTimeout; globalThis.clearTimeout=nativeClearTimeout }

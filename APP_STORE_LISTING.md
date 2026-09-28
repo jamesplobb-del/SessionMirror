@@ -75,7 +75,7 @@ ALSO INSIDE
 - Practice Games: sight-reading and long-tone games you play with your instrument, not your thumbs
 - Quick Tuner and Quick Metronome in Control Center
 
-Core recording, playback, tuner, metronome, one saved routine, and two multitrack boxes are free. BestTake Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, more routines and multitrack boxes, and expanded Staff Jumper options. Plus is available through an in-app purchase; an eligible seven-day trial is offered in the app.
+Core recording, playback, tuner, metronome, one saved routine, and two multitrack boxes are free. BestTake Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, more routines and multitrack boxes, and Medium and Hard Staff Jumper levels. Plus is available through an in-app purchase; an eligible seven-day trial is offered in the app.
 
 Your takes are stored on your device, not uploaded to a server. No account required.
 ```
@@ -114,7 +114,7 @@ record control and can be played back and compared against a second take.
 The Practice Games section requires microphone input to control gameplay (pitch detection).
 The YouTube play-along feature loads standard YouTube embeds for user-supplied URLs.
 
-BestTake Plus is an optional in-app purchase. A seven-day trial is offered to eligible users. Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, additional routines and multitrack boxes, and expanded Staff Jumper options. The free app includes recording/playback, tuner, metronome, one saved routine, and two multitrack boxes. The Plus product identifiers are com.besttake.app.plus.lifetime and com.besttake.app.plus.trial7days.
+BestTake Plus is an optional in-app purchase. A seven-day trial is offered to eligible users. Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium and Hard Staff Jumper levels. The free app includes recording/playback, tuner, metronome, one saved routine, and two multitrack boxes. The Plus product identifiers are com.besttake.app.plus.lifetime and com.besttake.app.plus.trial7days.
 ```
 
 ## Still needed before submit

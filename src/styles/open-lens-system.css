@@ -2,15 +2,15 @@
    Every selector is opt-in; review and app will use this same file, not a recreation.
    No pitch, audio, recording, or timing logic lives here. */
 html#lens-design-system.lens-system {
-  --ls-bg:#ffffff; --ls-panel:#ffffff; --ls-soft:#f5faff; --ls-ink:#142b43;
-  --ls-muted:#49647d; --ls-blue:#0075dc; --ls-line:#d8e6f2; --ls-radius:22px;
+  --ls-bg:#fbfdff; --ls-panel:#ffffff; --ls-soft:#edf5ff; --ls-ink:#142b43;
+  --ls-muted:#49647d; --ls-blue:#006fe8; --ls-line:#cbdff0; --ls-radius:22px;
   --ls-shadow:0 4px 18px #24577b05; --ls-glass:#fffffff5;
   --guide-ink:var(--ls-ink); --guide-muted:var(--ls-muted); --guide-line:var(--ls-line);
   --guide-panel:var(--ls-panel); color-scheme:light;
 }
 html#lens-design-system.lens-system.app-dark-mode {
-  --ls-bg:#182b3e; --ls-panel:#243c52; --ls-soft:#2b4861; --ls-ink:#edf5fc;
-  --ls-muted:#b8cddd; --ls-blue:#8dd6ff; --ls-line:#45627a; --ls-glass:#243c52f5;
+  --ls-bg:#172b40; --ls-panel:#243d56; --ls-soft:#294b6c; --ls-ink:#edf5fc;
+  --ls-muted:#b8cddd; --ls-blue:#80d5ff; --ls-line:#456b8c; --ls-glass:#243c52f5;
   --ls-shadow:0 8px 24px #030c141a; color-scheme:dark;
 }
 html#lens-design-system.lens-system[data-lens-finish='studio'] { --ls-bg:#f6faff; --ls-panel:#ffffff; --ls-blue:#0075dc; --ls-line:#d4e3f1; --ls-radius:16px; --ls-shadow:none; }
@@ -23,7 +23,8 @@ html#lens-design-system.lens-system .app-ui-overlay::before,html#lens-design-sys
 html#lens-design-system.lens-system .open-lens-header { height:62px; padding:8px 20px; }
 html#lens-design-system.lens-system .open-lens-modes { padding:4px; background:var(--ls-soft); border:1px solid var(--ls-line); border-radius:28px; }
 html#lens-design-system.lens-system .open-lens-modes button { min-height:34px; min-width:80px; font-weight:500; }
-html#lens-design-system.lens-system .open-lens-modes button[aria-pressed=true] { color:var(--ls-blue); background:var(--ls-panel); box-shadow:0 2px 6px #1932490b; }
+html#lens-design-system.lens-system .open-lens-modes button[aria-pressed=true] { color:#005cce; background:linear-gradient(135deg,#ffffff,#dff0ff); box-shadow:0 2px 9px #006fe829; }
+html#lens-design-system.lens-system.app-dark-mode .open-lens-modes button[aria-pressed=true] { color:#e8f8ff; background:linear-gradient(135deg,#1263b5,#1485b2); }
 html#lens-design-system.lens-system .open-lens-settings { color:var(--ls-ink); background:transparent; right:13px; }
 html#lens-design-system.lens-system .open-lens-settings svg { width:21px; height:21px; }
 html#lens-design-system.lens-system .open-lens-dock { max-width:480px; min-height:86px; gap:0; grid-template-columns:repeat(2,minmax(0,1fr)) 78px repeat(2,minmax(0,1fr)); }
@@ -32,7 +33,7 @@ html#lens-design-system .open-lens-dock .control-deck__record-stack { width:78px
 html#lens-design-system .open-lens-dock .record-delete-drop { width:72px; margin-inline:auto; }
 html#lens-design-system.lens-system .open-lens-deck { padding:0 12px!important; }
 html#lens-design-system.lens-system .open-lens-dock-action { font-size:10px; font-weight:500; letter-spacing:0; gap:7px; color:var(--ls-blue); text-shadow:none; }
-html#lens-design-system.lens-system .open-lens-dock-action span { color:var(--ls-muted); }
+html#lens-design-system.lens-system .open-lens-dock-action span { color:var(--ls-blue); font-weight:600; }
 html#lens-design-system.lens-system .open-lens-dock-action svg { stroke-width:1.6; width:24px; height:24px; }
 html#lens-design-system.lens-system .record-carousel-slot--active { box-shadow:none!important; }
 html#lens-design-system.lens-system .open-lens-dock .record-carousel-slot--active { background:var(--ls-panel)!important; border:1.5px solid var(--ls-line)!important; box-shadow:0 0 0 4px color-mix(in srgb,var(--ls-panel) 55%,transparent)!important; }
@@ -55,6 +56,10 @@ html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button:is(.is-primary,.is-quick) { padding:23px; align-items:center; border-radius:var(--ls-radius); background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; box-shadow:var(--ls-shadow)!important; }
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { min-height:186px; }
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { min-height:128px; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { background:linear-gradient(145deg,#e3f2ff,#ffffff 78%)!important; border-color:#b8daf7!important; }
+html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { background:linear-gradient(145deg,#e8faf7,#ffffff 78%)!important; border-color:#bce8e0!important; }
+html#lens-design-system.app-dark-mode .practice-menu-card--electric-edge .practice-home-launch-button.is-primary { background:linear-gradient(145deg,#28577b,#243d56 80%)!important; border-color:#477ca3!important; }
+html#lens-design-system.app-dark-mode .practice-menu-card--electric-edge .practice-home-launch-button.is-quick { background:linear-gradient(145deg,#255e66,#243d56 80%)!important; border-color:#468f90!important; }
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-button > svg:not(.practice-home-signal-detail) { position:static; width:22px; height:22px; color:var(--ls-blue); }
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-copy { width:auto; gap:10px; }
 html#lens-design-system .practice-menu-card--electric-edge .practice-home-launch-copy strong { font-size:clamp(23px,6.3vw,29px); line-height:1.12; font-weight:600; color:var(--ls-ink)!important; }
@@ -86,7 +91,11 @@ html#lens-design-system.lens-system .audio-mode-take-stack { gap:14px!important;
 html#lens-design-system.lens-system .audio-mode-home--inplace .audio-mode-take-card { border-radius:var(--ls-radius)!important; padding:18px!important; background:var(--ls-panel)!important; box-shadow:var(--ls-shadow)!important; border:1px solid var(--ls-line)!important; }
 html#lens-design-system.lens-system .audio-mode-take-card__pill { font-size:12px; font-weight:550; letter-spacing:0; text-transform:none; padding:0; }
 html#lens-design-system.lens-system .audio-mode-take-card__mini-btn { background:transparent!important; border:0!important; color:var(--ls-muted)!important; }
-html#lens-design-system.lens-system .audio-mode-take-card__mini-btn--best { color:var(--ls-blue)!important; }
+html#lens-design-system.lens-system .audio-mode-take-card__mini-btn--best {
+  color:var(--take-best)!important;
+  background:color-mix(in srgb,var(--take-best) 10%,var(--ls-panel))!important;
+  border:1px solid color-mix(in srgb,var(--take-best) 30%,var(--ls-line))!important;
+}
 html#lens-design-system.lens-system .audio-mode-take-card__name-line { color:var(--ls-ink); }
 html#lens-design-system.lens-system .audio-mode-take-card__play { width:43px; height:43px; background:var(--ls-soft)!important; color:var(--ls-blue)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; }
 html#lens-design-system.lens-system .audio-mode-take-card__playback-column { color:var(--ls-muted); }
@@ -100,11 +109,12 @@ html#lens-design-system.lens-system .audio-first-take__record { background:var(-
 
 /* Full-size tools sit in the same shell. Color carries information on the stage. */
 /* Preserve the original icon-over-label sliding tabs; only the palette changes. */
-html#lens-design-system.lens-system .audio-practice-top-tabs { margin:10px auto 14px!important; width:min(calc(100% - 1.35rem),30rem); padding:5px!important; height:62px; min-height:62px; flex-shrink:0; gap:0; background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; border-radius:32px!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs { margin:10px auto 14px!important; width:min(calc(100% - 1.35rem),30rem); padding:5px!important; height:62px; min-height:62px; flex-shrink:0; gap:0; background:color-mix(in srgb,var(--ls-soft) 80%,var(--ls-panel))!important; border:1px solid color-mix(in srgb,var(--ls-blue) 18%,var(--ls-line))!important; box-shadow:0 4px 18px #006fe813!important; border-radius:32px!important; }
 html#lens-design-system.lens-system .audio-practice-top-tabs::before { content:none!important; }
-html#lens-design-system.lens-system .audio-practice-top-tabs::after { inset-block:5px; left:5px; height:auto; border-radius:26px; background:var(--ls-blue)!important; box-shadow:0 2px 5px #1b385511!important; border:0; }
-html#lens-design-system.lens-system .audio-practice-top-tabs__btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:5px 2px!important; height:50px; min-height:50px; font-size:10px; font-weight:550; color:var(--ls-muted)!important; background:transparent!important; border:0!important; box-shadow:none!important; }
-html#lens-design-system.lens-system .audio-practice-top-tabs__btn--active { color:var(--ls-panel)!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs::after { inset-block:5px; left:5px; height:auto; border-radius:26px; background:linear-gradient(135deg,#0069e9,#08a5dc)!important; box-shadow:0 4px 12px #0075dc40,inset 0 1px #ffffff66!important; border:0; }
+html#lens-design-system.lens-system.app-dark-mode .audio-practice-top-tabs::after { background:linear-gradient(135deg,#116de1,#0d9fcd)!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs__btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:5px 2px!important; height:50px; min-height:50px; font-size:10px; font-weight:550; color:color-mix(in srgb,var(--ls-blue) 38%,var(--ls-muted))!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+html#lens-design-system.lens-system .audio-practice-top-tabs__btn--active { color:#ffffff!important; }
 html#lens-design-system.lens-system .audio-practice-top-tabs__beta { display:none; }
 html#lens-design-system.lens-system .pitch-audio-stage,html#lens-design-system.lens-system .pitch-living-canvas { background:transparent!important; box-shadow:none!important; border:0!important; }
 html#lens-design-system.lens-system .pitch-audio-stage::before,html#lens-design-system.lens-system .pitch-audio-stage::after,html#lens-design-system.lens-system .pitch-living-canvas::before,html#lens-design-system.lens-system .pitch-living-canvas::after { content:none!important; }
@@ -216,7 +226,8 @@ html#lens-design-system .compact-take-caption__label::before { content:''; width
 html#lens-design-system .native-bottom-sheet--vault { --vault-ink:var(--ls-ink); --vault-muted:var(--ls-muted); --vault-blue:var(--ls-blue); --vault-bg:var(--ls-bg); }
 html#lens-design-system .vault-section-tabs { background:var(--ls-soft)!important; border:1px solid var(--ls-line)!important; box-shadow:none!important; }
 html#lens-design-system .vault-section-tabs button { color:var(--ls-muted)!important; }
-html#lens-design-system .vault-section-tabs button[aria-selected=true] { background:var(--ls-panel)!important; color:var(--ls-blue)!important; box-shadow:none!important; }
+html#lens-design-system .vault-section-tabs button[aria-selected=true] { background:linear-gradient(135deg,#e6f2ff,#d5ecff)!important; color:#005bc7!important; box-shadow:0 2px 7px #0075dc1f!important; }
+html#lens-design-system.app-dark-mode .vault-section-tabs button[aria-selected=true] { background:linear-gradient(135deg,#195d98,#177b9e)!important; color:#ffffff!important; }
 html#lens-design-system .vault-session-bar { background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:16px; box-shadow:none!important; }
 html#lens-design-system .vault-take-row { background:var(--ls-panel)!important; border:1px solid var(--ls-line)!important; border-radius:16px!important; box-shadow:none!important; color:var(--ls-ink); }
 html#lens-design-system .vault-take-row--benchmark { border-color:color-mix(in srgb,var(--take-best) 25%,var(--ls-line))!important; }
@@ -498,8 +509,8 @@ html#lens-design-system .app-ui-overlay:not(.app-ui-overlay--audio-mode):not(.ap
   flex-direction:column;
 }
 html#lens-design-system .app-ui-overlay:not(.app-ui-overlay--audio-mode):not(.app-ui-overlay--split-open) .app-pip-row-wrap--camera.app-pip-row-wrap--compact {
-  position:relative;
-  inset:auto;
+  position:relative!important;
+  inset:auto!important;
   width:100%!important;
   margin:0 auto;
   padding:0 0 6px!important;
@@ -712,14 +723,29 @@ html#lens-design-system .practice-timeline__hero-sub { color:var(--ls-muted); }
 html#lens-design-system .practice-timeline__hero-name svg { color:var(--ls-blue); }
 html#lens-design-system .practice-timeline__section-count { color:var(--ls-blue); background:var(--ls-soft); }
 html#lens-design-system .practice-timeline__hero-rename { color:var(--ls-ink); background:var(--ls-soft); border-color:var(--ls-line); }
-/* Approved Clean line. --silk-wash remains non-inheriting: the registered
-   property is consumed ONLY on the overlay, never on its descendants. */
+/* Echo the measured pitch clearly while keeping the trace distinct. */
 html#lens-design-system.lens-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
-  /* Keep the base opaque even when the pitch wash fades to transparent. */
-  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 72%,transparent),color-mix(in srgb,var(--silk-wash) 72%,transparent)),var(--ls-bg)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--silk-wash) 24%,transparent),color-mix(in srgb,var(--silk-wash) 32%,transparent)),linear-gradient(180deg,#f3f9ff,#e5f2f8)!important;
 }
 html#lens-design-system.lens-system.app-dark-mode .app-ui-overlay.app-ui-overlay--audio-practice-tuner {
-  background:linear-gradient(color-mix(in srgb,var(--silk-wash) 46%,transparent),color-mix(in srgb,var(--silk-wash) 46%,transparent)),var(--ls-bg)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--silk-wash) 23%,transparent),color-mix(in srgb,var(--silk-wash) 29%,transparent)),linear-gradient(180deg,#1c344a,#142b3e)!important;
+}
+html#lens-design-system.lens-system .audio-practice-tuner-shell .pitch-living-canvas__direction {
+  display:flex!important;
+  left:16px;
+  right:auto;
+  color:#4d6974!important;
+  font-size:11px;
+  font-weight:650;
+}
+html#lens-design-system.lens-system .audio-practice-tuner-shell .pitch-living-canvas__direction span:nth-child(2) {
+  color:#29764f!important;
+}
+html#lens-design-system.lens-system.app-dark-mode .audio-practice-tuner-shell .pitch-living-canvas__direction {
+  color:#c1d4dc!important;
+}
+html#lens-design-system.lens-system.app-dark-mode .audio-practice-tuner-shell .pitch-living-canvas__direction span:nth-child(2) {
+  color:#9dd3b2!important;
 }
 html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout { top:20px!important; display:flex; flex-direction:column; align-items:center; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__note,
@@ -730,12 +756,10 @@ html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pi
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-readout__coach { order:-1; margin:0 0 14px; padding:0; border:0!important; background:transparent!important; font-size:11px; line-height:1.5; color:var(--ls-muted)!important; }
 html#lens-design-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail { margin-top:6px; font-size:11px; }
 html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button,
-html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button svg { color:var(--ls-ink)!important; }
+html#lens-design-system .app-ui-overlay.app-ui-overlay--audio-practice-tuner .pitch-living-tool-rail > button svg { color:var(--ls-blue)!important; }
 
-/* Silk's controls use the same color family as its ribbon and screen. The
-   animated --silk-wash stays on the overlay; --silk-live is not animated. */
-html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs { background:color-mix(in srgb,var(--ls-bg) 68%,transparent)!important; }
-html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs::after { background:var(--ls-blue)!important; }
+/* Keep the tab glass legible over the live pitch color. */
+html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .audio-practice-top-tabs { background:color-mix(in srgb,var(--ls-bg) 78%,transparent)!important; }
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .pitch-living-readout__detail strong,
 html#lens-design-system.lens-system .app-ui-overlay--audio-practice-tuner .open-lens-dock-action { color:var(--ls-ink)!important; }
 

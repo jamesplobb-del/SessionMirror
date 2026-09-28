@@ -70,9 +70,11 @@ export const FEATURE_GUIDES: Record<FeatureGuideId, GuideStep[]> = {
   'music-tools': [{ title: 'Bring your tools onto the page', body: 'Open Workspace for Takes, References, Pitch, Metronome or Drone. The Music widget separates Read from Mark up; More options holds file controls.', selector: '[data-guidance="music-workspace"], [data-tutorial="overlays-button"]' }],
   multitrack: [{ title: 'Record a part over another', body: 'Multitrack lets you build a performance one part at a time. Use headphones to hear earlier parts as you record.', selector: '[data-tutorial="multitrack-button"]' }],
   'best-take': [
+    { title: 'Your new take', body: 'Each recording appears in Current Take. Tap it to play before deciding what to keep.',
+      selector: '[data-tutorial="challenger-card"]' },
     { title: 'Keep your best take', body: 'Tap the pin to keep this take beside your next recording.',
       selector: '[data-tutorial="pin-current-as-best"]', action: 'current-take-pinned' },
-    { title: 'Hear the difference', body: 'Your Best Take stays here. Record another take, then listen to each to compare.',
+    { title: 'Compare and improve', body: 'Best Take stays here as you record again. Play either take to compare. In Camera, drag one take label onto the other to swap them.',
       selector: '[data-tutorial="best-take-box"]' },
   ],
   workspace: [

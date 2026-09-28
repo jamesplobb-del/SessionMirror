@@ -1,6 +1,6 @@
 import { getInstrumentProfile } from '../../utils/instrumentProfiles'
 import { recordPlannedGame, type DailyChallengePlan } from '../../utils/dailyChallengePlan'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react'
 import { useGameMicRecovery, type GameMicRequest } from '../useGameMicRecovery'
 import {
   ChevronDown,
@@ -72,6 +72,7 @@ import StaffJumperRangePicker from './StaffJumperRangePicker'
 import { difficultyRangeFor } from './staffJumperDifficultyRanges'
 import StaffPreview from './StaffPreview'
 import { loadStaffJumperSetupPrefs, saveStaffJumperSetupPrefs } from './staffJumperSetupPrefs'
+import { canUsePlus, subscribePlus } from '../../plus/plusAccess'
 
 /** Every tempo the game plays, for the Tempo chip's picker wheel. */
 const TEMPO_OPTIONS = Array.from(
@@ -315,9 +316,16 @@ export default function StaffJumperScreen({
     if (range) setDraftRange(range.highMidi - range.lowMidi > 12 ? '2-octaves' : '1-octave')
   }
 
+  const plusUnlocked = useSyncExternalStore(subscribePlus, canUsePlus, canUsePlus)
+
   const chooseDifficulty = (difficulty: StaffJumperDifficulty) => {
-    setDraftDifficulty(difficulty)
-    applyDifficultyRange(draftInstrumentId, difficulty)
+    const select = () => {
+      setDraftDifficulty(difficulty)
+      applyDifficultyRange(draftInstrumentId, difficulty)
+    }
+    // Anyone can look at Medium and Hard: the range and pace update so a free
+    // player sees what they are. Play is where Plus is asked for.
+    select()
   }
 
   const chooseInstrument = (id: string) => {
@@ -724,7 +732,7 @@ export default function StaffJumperScreen({
           )}
           <ArcadeCycleChip
             label="Level"
-            value={DIFFICULTY_LABELS[draftDifficulty]}
+            value={`${DIFFICULTY_LABELS[draftDifficulty]}${draftDifficulty !== 'easy' && !plusUnlocked ? ' · Plus' : ''}`}
             step={Math.max(0, difficultyIndex)}
             stepCount={STAFF_JUMPER_DIFFICULTIES.length}
             hapticFeedback={hapticFeedback}
@@ -855,7 +863,7 @@ export default function StaffJumperScreen({
               }))}
               hapticFeedback={hapticFeedback}
             />
-            <p className="sj-field__note">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]}</p>
+            <p className="sj-field__note">{DIFFICULTY_DESCRIPTIONS[draftDifficulty]} Easy is free; Medium and Hard need Plus.</p>
           </div>
         </OptionsPanel>
 

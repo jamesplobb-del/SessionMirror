@@ -17,7 +17,7 @@ import {
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import Pressable from '../../components/ui/Pressable'
-import { writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
+import { transposePitchReadout, writtenMidiToConcertMidi } from '../../utils/tunerTransposition'
 import {
   BALANCE_DIRECTION_LABELS,
   BALANCE_INSTRUMENTS,
@@ -145,7 +145,7 @@ export default function BalanceSetup({
     : permissionPending || sourceHealth === 'connecting'
       ? 'Connecting microphone…'
       : hasPitch
-        ? `Hearing ${readout.noteName}`
+        ? `Hearing ${transposePitchReadout(readout, instrument.transposition).noteName}`
         : sourceHealth === 'stalled'
           ? 'Microphone unavailable'
           : 'Play a note to check your mic'

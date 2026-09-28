@@ -48,7 +48,6 @@ html .open-lens-recording .compact-take-caption__name { font-size:10px; line-hei
 html .open-lens-recording .compact-take-caption__source { font-size:8px; }
 /* A clean live camera while recording; capture and Stop remain mounted. */
 .open-lens-capturing .open-lens-header,
-.open-lens-capturing .app-pip-row-wrap,
 .open-lens-capturing .open-lens-dock-action,
 .open-lens-capturing .reference-widget-live,
 .open-lens-capturing .metronome-display-layer,

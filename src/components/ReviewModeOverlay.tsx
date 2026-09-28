@@ -703,10 +703,11 @@ export default function ReviewModeOverlay({
       if (displayIsPlaying) {
         audioPlayback.pause()
       } else {
+        const playbackEnd = hasTrimWindow ? trimEnd : displayDuration
         const nextStartTime =
-          hasTrimWindow &&
-          (displayCurrentTime < trimStart || displayCurrentTime >= trimEnd - 0.015)
-            ? trimStart
+          (hasTrimWindow && displayCurrentTime < trimStart) ||
+          (playbackEnd > 0 && displayCurrentTime >= playbackEnd - 0.05)
+            ? (hasTrimWindow ? trimStart : 0)
             : displayCurrentTime
         audioPlayback.play(activeAudioPlaybackItem, { startTime: nextStartTime })
       }
@@ -1735,7 +1736,9 @@ export default function ReviewModeOverlay({
                     onPlayPause={togglePlayPause}
                     mediaFilePath={activeTimelineFilePath}
                     mediaUrl={activeTimelineUrl}
-                    mediaRef={activeAudioPlaybackItem ? audioPlayback.playerRef : activePitchMediaRef}
+                    mediaRef={activeAudioPlaybackItem
+                      ? (audioPlayback.state.playerExists ? audioPlayback.playerRef : undefined)
+                      : activePitchMediaRef}
                     trimAvailable={trimAvailable}
                     trimActive={trimMode}
                     trimStart={safeTrimStart}

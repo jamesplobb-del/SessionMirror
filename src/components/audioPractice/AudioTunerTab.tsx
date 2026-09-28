@@ -108,6 +108,7 @@ export default function AudioTunerTab({
   const droneKeyboard = useMemo(
     () => ({
       activeNotes: drone.activeNotes,
+      lastPitchClass: drone.lastPitchClass,
       octave: drone.octave,
       onToggleNote: drone.toggleNote,
       onGlissNote: drone.glissNote,
@@ -118,6 +119,7 @@ export default function AudioTunerTab({
     }),
     [
       drone.activeNotes,
+      drone.lastPitchClass,
       drone.decrementOctave,
       drone.incrementOctave,
       drone.glissNote,

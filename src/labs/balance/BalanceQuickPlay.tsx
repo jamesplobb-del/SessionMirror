@@ -5,6 +5,7 @@ import ArcadePickerChip from '../../components/labs/ArcadePickerChip'
 import Pressable from '../../components/ui/Pressable'
 import type { PitchSourceHealth } from '../../hooks/useLivePitchTracker'
 import type { PitchReadout } from '../../utils/pitchUtils'
+import { transposePitchReadout } from '../../utils/tunerTransposition'
 import BalanceArcadeShell from './BalanceArcadeShell'
 import BalanceScene from './BalanceScene'
 import { balanceDifficultyLabel } from './balanceLevels'
@@ -82,6 +83,8 @@ export default function BalanceQuickPlay({
    * there it stays a label.
    */
   const instrument = getBalanceInstrument(settings.instrumentId)
+  // The detector hears concert pitch; the player reads their written part.
+  const heard = transposePitchReadout(readout, instrument.transposition)
   const noteMidi =
     settings.routineType === 'scale' ? settings.scale.rootWrittenMidi : settings.single.writtenMidi
   const noteCanChange =
@@ -110,7 +113,7 @@ export default function BalanceQuickPlay({
     : permissionPending || sourceHealth === 'connecting'
       ? 'Connecting microphone…'
       : hasPitch
-        ? `Hearing ${readout.noteName}`
+        ? `Hearing ${heard.noteName}`
         : sourceHealth === 'stalled'
           ? 'Microphone unavailable'
           : 'Play a note to check your mic'
@@ -208,7 +211,7 @@ export default function BalanceQuickPlay({
           </span>
           <strong>
             {hasPitch
-              ? `${readout.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢`
+              ? `${heard.noteName} ${Math.round(readout.cents) >= 0 ? '+' : ''}${Math.round(readout.cents)}¢`
               : '—'}
           </strong>
         </Pressable>

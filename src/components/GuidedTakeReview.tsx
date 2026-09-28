@@ -19,8 +19,6 @@ interface GuidedTakeReviewProps {
   voiceEnabled?: boolean
   audioShowBoth?: boolean
   onToggleAudioView?: () => void
-  videoBoxesRaised?: boolean
-  onReleaseVideoBoxes?: () => void
   onFocusChange: (focus: string | null) => void
   onSaveNote: (takeId: string, note: string) => void
   onRecordAgain: () => void
@@ -31,7 +29,7 @@ interface GuidedTakeReviewProps {
 /** Reflection is an invitation beside the take, not another screen to get past. */
 export default function GuidedTakeReview({
   takeId, initialNote, focus, mode, playbackActive = false, voiceEnabled = true,
-  audioShowBoth = false, onToggleAudioView, videoBoxesRaised, onReleaseVideoBoxes,
+  audioShowBoth = false, onToggleAudioView,
   onFocusChange, onSaveNote, onRecordAgain, onCompare, recordDisabled,
 }: GuidedTakeReviewProps) {
   const [open, setOpen] = useState(false)
@@ -41,8 +39,6 @@ export default function GuidedTakeReview({
   const [note, setNote] = useState(initialNote)
   const [listening, setListening] = useState(false)
   const [voiceError, setVoiceError] = useState('')
-  const [localVideoBoxesRaised, setLocalVideoBoxesRaised] = useState(true)
-  const boxesRaised = videoBoxesRaised ?? localVideoBoxesRaised
   const triggerRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -52,17 +48,9 @@ export default function GuidedTakeReview({
   const listeningRef = useRef(false)
   saveNoteRef.current = onSaveNote
   noteRef.current = note
-  const releaseVideoBoxes = () => {
-    if (mode !== 'video') return
-    setLocalVideoBoxesRaised(false)
-    onReleaseVideoBoxes?.()
-  }
-  const releaseVideoBoxesRef = useRef(releaseVideoBoxes)
-  releaseVideoBoxesRef.current = releaseVideoBoxes
-
   useEffect(() => {
     const complete = (tone: 'current' | 'best') => {
-      if (tone === 'current') { setHeard(true); releaseVideoBoxesRef.current() }
+      if (tone === 'current') setHeard(true)
     }
     const played = (event: Event) => {
       if (event.target instanceof HTMLMediaElement) setLocalPlaying(true)
@@ -74,7 +62,6 @@ export default function GuidedTakeReview({
       if (event.target instanceof HTMLMediaElement) {
         setLocalPlaying(false)
         setHeard(true)
-        releaseVideoBoxesRef.current()
       }
     }
     const unsubscribe = subscribeTakeBoxCompletion(complete)
@@ -115,7 +102,6 @@ export default function GuidedTakeReview({
   }
   const close = () => {
     commitNote()
-    releaseVideoBoxes()
     if (listeningRef.current) void stopSpokenFeedback()
     setListeningState(false)
     setOpen(false)
@@ -187,7 +173,7 @@ export default function GuidedTakeReview({
   const customFocus = focus && !PRACTICE_FOCUSES.includes(focus as typeof PRACTICE_FOCUSES[number]) ? focus : ''
 
   return <>
-    <div className={`guided-reflection-entry guided-reflection-entry--${mode}${playbackActive || localPlaying ? ' guided-reflection-entry--playing' : ''}`} data-boxes-raised={mode === 'video' && boxesRaised}>
+    <div className={`guided-reflection-entry guided-reflection-entry--${mode}${playbackActive || localPlaying ? ' guided-reflection-entry--playing' : ''}`}>
       <button ref={triggerRef} type="button" className="guided-reflection-entry__button" aria-haspopup="dialog" aria-expanded={open}
         onClick={() => setOpen(true)}>
         <span className="guided-reflection-entry__mark" aria-hidden="true">{focus ? <Check size={14} /> : '↗'}</span>

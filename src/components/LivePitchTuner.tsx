@@ -80,6 +80,8 @@ interface LivePitchTunerProps {
   pitchSource?: 'media' | 'microphone'
   /** Audio mode: analyze live mic stream (recording or idle tuner). */
   liveMicOnly?: boolean
+  /** iOS microphone permission was denied, so the idle hint should point to iOS Settings. */
+  micPermissionBlocked?: boolean
   /** Reports whether a live microphone source is actually arriving. */
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
   /** Audio tuner: show Drone, Transpose, and Pitch Insights controls. */
@@ -87,6 +89,7 @@ interface LivePitchTunerProps {
   /** Multi-select drone keyboard (audio tuner tab). */
   drone?: {
     activeNotes: number[]
+    lastPitchClass?: number | null
     octave: number
     onToggleNote: (pitchClass: number) => void
     onGlissNote: (pitchClass: number, octave: number) => void
@@ -433,6 +436,7 @@ export function LiveAudioTunerPane({
             {pitchHistory && visualTrace && <TunerHistory key={`${tunerInstrument}-${tunerTransposition}`} samples={pitchHistory} trace={visualTrace} transposition={tunerTransposition} />}
             <div className="pitch-living-canvas__direction" aria-hidden>
               <span>Sharp</span>
+              <span>In tune</span>
               <span>Flat</span>
             </div>
           </>
@@ -546,6 +550,7 @@ export function LiveAudioTunerPane({
                 >
                   <DroneSoundWheel
                     activeNotes={drone.activeNotes}
+                    lastPitchClass={drone.lastPitchClass}
                     octave={drone.octave}
                     onToggleNote={drone.onToggleNote}
                     onGlissNote={drone.onGlissNote}
@@ -651,6 +656,7 @@ export function LivingPitchWidgetPane({
 
         <div className="pitch-living-canvas__direction" aria-hidden>
           <span>Sharp</span>
+          <span>In tune</span>
           <span>Flat</span>
         </div>
       </div>
@@ -672,6 +678,7 @@ function LivePitchTunerAudio({
   onTunerInstrumentChange,
   hapticsEnabled,
   liveMicOnly = false,
+  micPermissionBlocked = false,
   drone,
   onLiveSourceHealthChange,
   audioToolsEnabled = true,
@@ -690,6 +697,7 @@ function LivePitchTunerAudio({
   onTunerInstrumentChange?: (value: TunerInstrument) => void
   hapticsEnabled?: boolean
   liveMicOnly?: boolean
+  micPermissionBlocked?: boolean
   drone?: LivePitchTunerProps['drone']
   onLiveSourceHealthChange?: (health: PitchSourceHealth) => void
   audioToolsEnabled?: boolean
@@ -973,8 +981,9 @@ function LivePitchTunerAudio({
             <div className="pitch-audio-idle-pane pitch-audio-idle-pane--polished flex flex-1 flex-col items-center justify-center px-6 text-center">
               <p className="pitch-audio-idle-pane__title">Pitch Analysis</p>
               <p className="pitch-audio-idle-pane__copy">
-                Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to
-                analyze this take.
+                {micPermissionBlocked
+                  ? 'Microphone access is off. Turn it on in iOS Settings to use the live tuner, or press play to analyze this take.'
+                  : 'Enable Live Mic Tuner in Settings to practice with a live tuner, or press play to analyze this take.'}
               </p>
             </div>
           )}
@@ -1002,6 +1011,7 @@ export default function LivePitchTuner({
   hapticsEnabled,
   pitchSource = 'media',
   liveMicOnly = false,
+  micPermissionBlocked = false,
   drone,
   onLiveSourceHealthChange,
   audioToolsEnabled = true,
@@ -1054,6 +1064,7 @@ export default function LivePitchTuner({
         onTunerInstrumentChange={onTunerInstrumentChange}
         hapticsEnabled={hapticsEnabled}
         liveMicOnly={liveMicOnly}
+        micPermissionBlocked={micPermissionBlocked}
         drone={drone}
         onLiveSourceHealthChange={onLiveSourceHealthChange}
         audioToolsEnabled={audioToolsEnabled}

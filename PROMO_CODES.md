@@ -18,7 +18,7 @@ The trial starts only when the user confirms the free trial transaction. Its ver
 In a Debug build, a verified TestFlight/sandbox installation, or a Vite development preview:
 
 1. Open Settings → Help → Promo codes (also available on the Plus screen).
-2. Enter `alpha` in **Test code** and tap **Unlock**.
+2. Enter `alpha` in **Test build code** and tap **Unlock**. Do not use **Redeem App Store offer code** for the test shortcut; Apple's sheet cannot redeem a code that exists only inside BestTake.
 3. Plus stays unlocked on that installation. Whitespace and capitalization are ignored.
 
 The native shortcut is gated by `#if DEBUG` or Apple's verified `AppTransaction` sandbox environment. A public release ignores the locally saved alpha flag. Browser production builds ignore development entitlement storage. Test and production trial caches are separate. Test alpha is intentionally uncapped; it is not the public offer-code campaign.
@@ -27,7 +27,7 @@ The native shortcut is gated by `#if DEBUG` or Apple's verified `AppTransaction`
 
 Create a **free offer** for the lifetime product, then a **custom code** named `ALPHA`, in App Store Connect. Set the desired redemption quantity and optional expiry there. Include new users and users with prior purchases, so customers who already redeemed the $0 trial remain eligible. No public code or redemption count has been created by this implementation.
 
-Customers open Settings → Help → Promo codes → **Redeem App Store code** and enter `ALPHA` in Apple's sheet. StoreKit verifies the redemption and grants the same permanent lifetime entitlement. The app cannot prefill Apple's sheet. Apple enforces the campaign cap across devices and accounts; there is no client-side usage counter.
+Customers open Settings → Help → Promo codes → **Redeem App Store offer code** and enter `ALPHA` in Apple's sheet. StoreKit verifies the redemption and grants the same permanent lifetime entitlement. The app cannot prefill Apple's sheet. Apple enforces the campaign cap across devices and accounts; there is no client-side usage counter.
 
 Custom codes require the app to be Ready for Distribution and the IAP approved. Apple's current limit is up to 25,000 redemptions per custom-code batch. Sandbox redemption uses separately generated sandbox codes. See [Apple's IAP offer-code setup](https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/create-offer-codes-for-in-app-purchases).
 
