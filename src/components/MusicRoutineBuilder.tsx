@@ -43,6 +43,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const [legacy, setLegacy] = useState<'edit' | null>(null)
   const [musicEditorOpen, setMusicEditorOpen] = useState(false)
   const [musicEditorOrigin, setMusicEditorOrigin] = useState<'new' | 'saved' | null>(null)
+  const [musicBackTarget, setMusicBackTarget] = useState<'landing' | 'lineup'>('landing')
   const [exerciseLibrary, setExerciseLibrary] = useState(loadExerciseLibrary)
   const [revision, setRevision] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -163,6 +164,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     setChooseFromLibraryId(null)
     setError('')
     setScreen('music')
+    setMusicBackTarget('landing')
     setMusicEditorOrigin('new')
     setMusicEditorOpen(true)
   }
@@ -215,7 +217,8 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     if (event.key === 'Escape') { event.stopPropagation(); if (!busyRef.current) props.onCancel() }
   }}>
     <nav className="music-routine-nav"><button type="button" disabled={busy} aria-label="Back" onClick={() => {
-      if (screen === 'lineup' && musicEditorOrigin === 'new') setScreen('music')
+      if (screen === 'music' && musicBackTarget === 'lineup') setScreen('lineup')
+      else if (screen === 'lineup' && musicEditorOrigin === 'new') { setMusicBackTarget('landing'); setScreen('music') }
       else if (musicEditorOpen) setMusicEditorOpen(false)
       else props.onCancel()
     }}><ArrowLeft /></button><span>BESTTAKE <i /> YOUR ROUTINE</span><button type="button" disabled={busy} aria-label="Close routine builder" onClick={props.onCancel}><X /></button></nav>
@@ -267,7 +270,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
               </PremiumReveal>
             </li>
           })}</ol>
-          <button type="button" className="music-routine-add" onClick={() => setScreen('music')}><Plus /> Choose music</button>
+          <button type="button" className="music-routine-add" onClick={() => { setMusicBackTarget('lineup'); setScreen('music') }}><Plus /> Choose music</button>
           <button type="button" className="music-routine-text" disabled={draft.steps.length >= MAX_ROUTINE_STEPS} onClick={() => setShowExercise(value => !value)}>Add an exercise without music</button>
           {showExercise && <form className="music-routine-exercise-entry" onSubmit={event => { event.preventDefault(); addExercise() }}><input autoFocus aria-label="New exercise name" maxLength={MAX_STEP_TITLE} placeholder="Long tones, warm-up…" value={exerciseName} onChange={event => setExerciseName(event.target.value)} /><button type="submit" aria-label="Add exercise" disabled={!exerciseName.trim()}><Plus /></button></form>}
           <PremiumDisclosure className="music-routine-plan-options"><summary>Routine options</summary><button type="button" disabled={!draft.steps.length} onClick={() => setSharing(true)}><Share2 /> Share routine file</button><button type="button" onClick={() => setLegacy('edit')}>Full routine editor</button>{props.routine?.id === draft.id && <button type="button" onClick={() => { try { storeLibraryRoutine(draft); props.onDelete() } catch { setError('Could not save a copy of this routine.') } }}>Remove from today · keep in library</button>}</PremiumDisclosure>

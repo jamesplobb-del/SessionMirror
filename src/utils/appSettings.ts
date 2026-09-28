@@ -93,6 +93,18 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   backUpTakesToIcloud: false,
 }
 
+/** Reset preferences without changing the musician's chosen written pitch or instrument. */
+export function createResetAppSettings(current: AppSettings): AppSettings {
+  const profile = getInstrumentProfile(loadPreferredInstrumentId() ?? '')
+  return {
+    ...DEFAULT_APP_SETTINGS,
+    audioEnhancerSettings: cloneAudioEnhancerSettings(DEFAULT_AUDIO_ENHANCER_SETTINGS),
+    tunerInstrument: current.tunerInstrument,
+    tunerTransposition: current.tunerTransposition,
+    soundVolumeThreshold: profile?.soundVolumeThreshold ?? DEFAULT_APP_SETTINGS.soundVolumeThreshold,
+  }
+}
+
 function parseDroneWaveform(value: unknown): DroneWaveform {
   if (value === 'triangle' || value === 'organ' || value === 'warmSynth') return value
   return DEFAULT_APP_SETTINGS.droneWaveform

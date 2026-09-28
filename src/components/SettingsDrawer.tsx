@@ -39,6 +39,7 @@ import { PromoCodePanel } from '../plus/PlusPaywall'
 import { showPlus } from '../plus/plusAccess'
 import { usePlus } from '../plus/usePlus'
 import BugReportLink from './BugReportLink'
+import { PRIVACY_CONTACT_EMAIL } from '../utils/privacyPolicy'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -573,6 +574,7 @@ function SettingsDrawer({
   }, [])
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<HelpTopicId | null>(null)
   const [privacyPolicyOpen, setPrivacyPolicyOpen] = useState(false)
+  const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false)
   const [activeQuickFunctionSetup, setActiveQuickFunctionSetup] =
     useState<QuickFunctionSetup | null>(null)
   const [quickFunctionsAccessOpen, setQuickFunctionsAccessOpen] = useState(false)
@@ -597,6 +599,7 @@ function SettingsDrawer({
   useEffect(() => {
     if (!isOpen) {
       setPrivacyPolicyOpen(false)
+      setResetConfirmationOpen(false)
       setActiveQuickFunctionSetup(null)
       setQuickFunctionsAccessOpen(false)
       setQuickAccessDestination('tuner')
@@ -979,8 +982,8 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="help" title="Help">
-            <SettingsGroup title="Support" footer="Report a bug opens an email draft for you to review and send. If your email app doesn’t open, email jamesplobb@gmail.com.">
-              <BugReportLink email="jamesplobb@gmail.com" instrument={activeInstrument.label} />
+            <SettingsGroup title="Support" footer={`Report a bug opens an email draft for you to review and send. If your email app doesn’t open, email ${PRIVACY_CONTACT_EMAIL}.`}>
+              <BugReportLink email={PRIVACY_CONTACT_EMAIL} instrument={activeInstrument.label} />
               <LinkRow
                 icon={ShieldCheck}
                 tint={TINT.green}
@@ -1057,7 +1060,7 @@ function SettingsDrawer({
                 type="button"
                 intensity="soft"
                 haptic="warning"
-                onClick={onReset}
+                onClick={() => setResetConfirmationOpen(true)}
                 className="set-row set-row--center set-row--destructive"
               >
                 <RotateCcw className="h-4 w-4" aria-hidden />
@@ -1071,6 +1074,24 @@ function SettingsDrawer({
       </AnimatedBottomSheet>
       <HelpSheet topic={activeHelpTopic} onClose={() => setActiveHelpTopicId(null)} />
       <PrivacyPolicySheet isOpen={privacyPolicyOpen} onClose={() => setPrivacyPolicyOpen(false)} />
+      <AnimatedBottomSheet
+        isOpen={resetConfirmationOpen}
+        onClose={() => setResetConfirmationOpen(false)}
+        ariaLabel="Confirm reset all settings"
+        elevated
+        elevatedLight
+        maxHeightClass="max-h-[min(55vh,24rem)]"
+        zClass={{ backdrop: 'z-[110]', sheet: 'z-[120]' }}
+      >
+        <div className="settings-sheet px-5 pb-7 pt-5">
+          <h2 className="native-sheet-title">Reset all settings?</h2>
+          <p className="native-sheet-subtitle mt-3">This resets your app preferences. Your chosen instrument and written-pitch setting will stay the same.</p>
+          <div className="mt-6 flex gap-3">
+            <Pressable type="button" intensity="soft" haptic="light" onClick={() => setResetConfirmationOpen(false)} className="min-h-12 flex-1 rounded-2xl bg-white/70 px-4 text-stone-700 ring-1 ring-stone-200/70">Cancel</Pressable>
+            <Pressable type="button" intensity="soft" haptic="warning" onClick={() => { onReset(); setResetConfirmationOpen(false) }} className="min-h-12 flex-1 rounded-2xl bg-red-600 px-4 font-semibold text-white">Reset settings</Pressable>
+          </div>
+        </div>
+      </AnimatedBottomSheet>
       <AnimatedBottomSheet
         isOpen={activeQuickFunctionSetup !== null}
         onClose={handleCloseQuickFunctionSetup}

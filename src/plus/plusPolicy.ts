@@ -1,3 +1,5 @@
+import { difficultyRangeFor } from '../labs/staffJumper/staffJumperDifficultyRanges'
+
 export const PLUS_TRIAL_MS = 7 * 24 * 60 * 60 * 1000
 export const FREE_ROUTINE_LIMIT = 1
 export const FREE_MULTITRACK_BOXES = 2
@@ -27,8 +29,13 @@ export function hasPlusAccess(entitlement: PlusEntitlement, now: number): boolea
       now >= entitlement.trialStartedAt && now < entitlement.trialExpiresAt)
 }
 
-export function isFreeStaffJumperSetup(setup: { key?: string; mode?: string; range?: string; difficulty?: string; customScale?: unknown; rangeLowMidi?: number; rangeHighMidi?: number }): boolean {
+export function isFreeStaffJumperSetup(setup: { key?: string; mode?: string; range?: string; difficulty?: string; customScale?: unknown; rangeLowMidi?: number; rangeHighMidi?: number; instrumentId?: string | null }): boolean {
+  const graded = difficultyRangeFor(setup.instrumentId ?? null, setup.difficulty === 'medium' ? 'medium' : 'easy')
+  const isGradedRange = graded !== null && setup.rangeLowMidi === graded.lowMidi && setup.rangeHighMidi === graded.highMidi
+  const span = setup.rangeLowMidi !== undefined && setup.rangeHighMidi !== undefined
+    ? Math.abs(setup.rangeHighMidi - setup.rangeLowMidi) : 0
+  const isSingleOctave = setup.range === '1-octave' && span <= 12
   return ['C', 'G', 'F', 'D', 'Bb', 'Eb'].includes(setup.key ?? '') &&
-    setup.mode === 'major' && setup.range === '1-octave' && setup.difficulty !== 'hard' && !setup.customScale &&
-    (setup.rangeLowMidi === undefined || setup.rangeHighMidi === undefined || Math.abs(setup.rangeHighMidi - setup.rangeLowMidi) <= 12)
+    setup.mode === 'major' && setup.difficulty !== 'hard' && !setup.customScale &&
+    (isGradedRange || isSingleOctave)
 }

@@ -47,6 +47,7 @@ const html = `<!doctype html>
 ${sections}
 <h2>Contact</h2>
 <p>Questions about privacy: <a href="mailto:${policy.PRIVACY_CONTACT_EMAIL}">${policy.PRIVACY_CONTACT_EMAIL}</a></p>
+<p>For help with the app, visit <a href="/support.html">BestTake Support</a>.</p>
 </main>
 </body>
 </html>

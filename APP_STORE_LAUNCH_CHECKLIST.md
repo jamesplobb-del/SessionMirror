@@ -59,10 +59,12 @@ __besttakeSentryTest.native()
 
 ### 4. Finish App Store Connect and review metadata
 
-- Privacy policy URL and support URL.
+- Verify `BestTakeSupport@gmail.com` receives a test message before publishing the support and privacy pages. The support page, privacy policy, and in-app bug-report link use this dedicated address.
+- Review and deploy `netlify-youtube-proxy/privacy.html` and `netlify-youtube-proxy/support.html`, then enter their live URLs in App Store Connect.
 - A privacy-policy link inside the app; Apple requires the policy to be easily accessible in-app as well as in App Store Connect.
 - At least one 6.9-inch iPhone screenshot and one 13-inch iPad screenshot. Apple scales those down for the smaller supported sizes.
 - App description, subtitle, keywords, category, copyright, and review notes.
+- Submit both BestTake Plus in-app purchase products with this app version (`com.besttake.app.plus.lifetime` and `com.besttake.app.plus.trial7days`).
 - Updated age-rating questionnaire.
 - App Privacy: Diagnostics → Crash Data; not linked to identity; not used for tracking; purpose App Functionality.
 - EU Digital Services Act trader-status declaration if distributing in the EU.

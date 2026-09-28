@@ -8,7 +8,7 @@
  */
 
 export const PRIVACY_POLICY_URL = 'https://stalwart-salamander-9451ab.netlify.app/privacy.html'
-export const PRIVACY_CONTACT_EMAIL = 'jamesplobb@gmail.com'
+export const PRIVACY_CONTACT_EMAIL = 'BestTakeSupport@gmail.com'
 export const PRIVACY_EFFECTIVE_DATE = 'September 22, 2026'
 
 export interface PrivacySection {

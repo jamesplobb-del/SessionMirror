@@ -25,4 +25,13 @@ const metroOnStand = placePanel(820, 1180, 288, 176, { x: 266, y: 138 },
 assert.equal(intersects({ ...metroOnStand, width: 288, height: 176 }, tray), false)
 assert.equal(intersects({ ...metroOnStand, width: 288, height: 176 },
   { ...pitchOnStand, width: 288, height: 220 }), false, 'Stand panels cannot cover each other')
+const phoneTray = { x: 40, y: 85, width: 322, height: 165 }
+const phonePanels = [
+  { width: 288, height: 210 }, { width: 288, height: 176 }, { width: 288, height: 155 },
+].reduce((placed, size) => {
+  const position = placePanel(402, 874, size.width, size.height, { x: 60, y: 105 }, placed, [phoneTray])
+  assert.equal(intersects({ ...position, ...size }, phoneTray), false, 'A panel must leave the phone Workspace tray tappable')
+  return [...placed, { ...position, ...size }]
+}, [])
+assert.equal(phonePanels.length, 3)
 console.log('Widget placement: balls and expanded panels avoid each other and the stand tray.')

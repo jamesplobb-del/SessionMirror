@@ -12,6 +12,7 @@ import {
 } from '../utils/practiceChartStorage'
 import MusicWidget from './practiceChart/MusicWidget'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
+import { WIDGET_CONTROL_LAYOUT_EVENT } from '../utils/floatingWidgetLayout'
 
 
 import {
@@ -147,6 +148,11 @@ export default function PracticeChartLayer({
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [pageToolsRequested, setPageToolsRequested] = useState(false)
   const [chromeOff, setChromeOff] = useState(false)
+  useLayoutEffect(() => {
+    if (!active) return
+    const frame = requestAnimationFrame(() => window.dispatchEvent(new Event(WIDGET_CONTROL_LAYOUT_EVENT)))
+    return () => cancelAnimationFrame(frame)
+  }, [active, workspaceOpen, chromeOff])
   // Full screen is for the page. The tool row waits behind Workspace, closed,
   // every time the player steps in.
   useEffect(() => { if (chromeOff) setWorkspaceOpen(false) }, [chromeOff])

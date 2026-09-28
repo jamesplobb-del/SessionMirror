@@ -37,6 +37,8 @@ try {
   assert.equal(policy.hasPlusAccess(trial,199),true)
   assert.equal(policy.hasPlusAccess(trial,200),false)
   for (const key of ['C','G','F','D','Bb','Eb']) assert.equal(policy.isFreeStaffJumperSetup({key,mode:'major',range:'1-octave',difficulty:'medium'}),true)
+  assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'2-octaves',difficulty:'easy',rangeLowMidi:58,rangeHighMidi:72,instrumentId:'trumpet'}),true,'The graded trumpet Easy range is free even when it spans more than 12 semitones')
+  assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'2-octaves',difficulty:'easy',rangeLowMidi:57,rangeHighMidi:72,instrumentId:'trumpet'}),false,'A wider custom range still needs Plus')
   for (const patch of [{key:'B'},{mode:'minor'},{range:'2-octaves'},{difficulty:'hard'},{customScale:[0,2,4]}]) assert.equal(policy.isFreeStaffJumperSetup({key:'C',mode:'major',range:'1-octave',difficulty:'easy',...patch}),false)
 
   const dev = await load('src/plus/plusAccess.ts',{dev:true})

@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { createPortal } from 'react-dom'
 import { animate, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
 import { iosDragRelease } from '../utils/motionPresets'
-import { findAvailableWidgetBallPosition, findAvailableWidgetPanelPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, type WidgetPosition, type WidgetRect } from '../utils/floatingWidgetLayout'
+import { findAvailableWidgetBallPosition, findAvailableWidgetPanelPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, WIDGET_CONTROL_LAYOUT_EVENT, type WidgetPosition, type WidgetRect } from '../utils/floatingWidgetLayout'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
 import './widget-ball.css'
@@ -124,14 +124,15 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
           height: otherWidget.offsetHeight * otherScaleY / scaleY,
         }]
       })
+    const protectedControls: WidgetRect[] = []
     for (const selector of ['#music-workspace-tools', '.practice-chart-topbar']) {
       const protectedControl = bounds.querySelector<HTMLElement>(selector)
       if (protectedControl && protectedControl.getClientRects().length) {
-        occupied.push(localRect(protectedControl.getBoundingClientRect()))
+        protectedControls.push(localRect(protectedControl.getBoundingClientRect()))
       }
     }
     return findAvailableWidgetPanelPosition(bounds.clientWidth, bounds.clientHeight,
-      widget.offsetWidth, widget.offsetHeight, desired, occupied)
+      widget.offsetWidth, widget.offsetHeight, desired, occupied, protectedControls)
   }
 
   useLayoutEffect(() => {
@@ -179,15 +180,20 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
 
   useLayoutEffect(() => {
     const id = placementId.current
-    if (!collapsed && visible && present && widgetRef.current && boundaryRef.current) {
+    const reposition = () => {
+      if (!widgetRef.current || !boundaryRef.current) return
       const next = placeExpandedPanel({ x: x.get(), y: y.get() })
       x.set(next.x)
       y.set(next.y)
       panelPlacements.set(id, { boundary: boundaryRef, widget: widgetRef, x, y })
       saveWidgetPosition(positionId, next.x, next.y)
       onRestore?.(next)
+    }
+    if (!collapsed && visible && present && widgetRef.current && boundaryRef.current) {
+      reposition()
+      window.addEventListener(WIDGET_CONTROL_LAYOUT_EVENT, reposition)
     } else panelPlacements.delete(id)
-    return () => { panelPlacements.delete(id) }
+    return () => { window.removeEventListener(WIDGET_CONTROL_LAYOUT_EVENT, reposition); panelPlacements.delete(id) }
     // Place once when expanded or moved into a new boundary, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, visible, present, portalHost, boundaryRef, positionId])

@@ -183,7 +183,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>BestTake needs the camera to record practice takes.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BestTake needs the microphone to record audio with your takes.</string>
+	<string>BestTake uses the microphone to record takes and to hear your playing in the tuner, hands-free mode, and practice games.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>BestTake uses speech recognition when you choose to dictate a note for your next take.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

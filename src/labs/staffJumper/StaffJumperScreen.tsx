@@ -569,9 +569,11 @@ export default function StaffJumperScreen({
         <p>{dailyChallenge.game.objective}</p>
         <button className="balance-cta" disabled={!instrument} onClick={() => {
           if (!instrument) return
+          const challengeRange = difficultyRangeFor(instrument.id, 'easy')
           onRequestMicStream()
           start({ ...draftConfig, tunerInstrument: challengeTunerInstrument, instrumentId: instrument.id, clef: instrument.clef, transposition: instrument.transposition,
             key: dailyChallenge.game.key, scaleMode: 'major', range: '1-octave', difficulty: 'easy', lives: false,
+            customPitchClasses: undefined, rangeLowMidi: challengeRange?.lowMidi, rangeHighMidi: challengeRange?.highMidi,
             metronome: false, drone: false })
         }}>Start challenge</button>
         <small>Play at your own pace. Your normal game settings stay saved.</small>

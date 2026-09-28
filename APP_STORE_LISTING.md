@@ -56,13 +56,13 @@ BestTake was built by a trumpet player who got tired of that.
 TAKE BOXES, NOT A CAMERA ROLL
 Every take lands in a box next to the one before it. Play two back to back, mark the keeper, drop a marker on the bar you keep missing. Your takes stay in one place, in order, with the context that makes them worth reviewing.
 
-HANDS-FREE PRACTICE
+HANDS-FREE PRACTICE WITH BESTTAKE PLUS
 Set the phone down and play. BestTake listens, records, plays your take back, and gets ready for the next one without you touching the screen. The record-listen-repeat loop, with the phone out of your hands and your instrument in them.
 
-ONE DEVICE INSTEAD OF THREE
+ONE DEVICE INSTEAD OF THREE WITH BESTTAKE PLUS
 Playing along used to mean a phone to record, a tablet for the music, and a laptop for the backing track. BestTake holds all three. Pull up a PDF or photo of your part, load a backing track or a YouTube play-along, and record over it.
 
-SEE WHETHER YOU ARE ACTUALLY IMPROVING
+SEE WHETHER YOU ARE ACTUALLY IMPROVING WITH BESTTAKE PLUS
 The tuner remembers every note you hold. Pitch Insights shows your median cents by day, your least centered notes, and how both change over weeks, so "am I getting better" stops being a feeling.
 
 BUILT FOR YOUR INSTRUMENT
@@ -72,8 +72,10 @@ ALSO INSIDE
 - Metronome with time signatures, subdivisions, and a tuning drone
 - Programmable practice sessions you can plan, save, and share
 - Multitrack layering to record harmony with yourself
-- Practice Games (beta): sight-reading and long-tone games you play with your instrument, not your thumbs
+- Practice Games: sight-reading and long-tone games you play with your instrument, not your thumbs
 - Quick Tuner and Quick Metronome in Control Center
+
+Core recording, playback, tuner, metronome, one saved routine, and two multitrack boxes are free. BestTake Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, more routines and multitrack boxes, and expanded Staff Jumper options. Plus is available through an in-app purchase; an eligible seven-day trial is offered in the app.
 
 Your takes are stored on your device, not uploaded to a server. No account required.
 ```
@@ -87,13 +89,13 @@ Order matters more than polish — most people see only the first two.
 1. **Take boxes.** The hero. Two takes side by side, one marked as the keeper.
    Caption: *Your takes, not your camera roll.*
 2. **One device instead of three.** Sheet music + backing track + record armed on one
-   screen. Caption: *Sheet music, backing track, and recording in one place.*
-3. **Hands-free.** Phone on a stand, "Listening — play when you're ready."
-   Caption: *Record, listen, repeat. Never touch the screen.*
-4. **Pitch Insights.** The multi-week chart. Caption: *See whether you're improving.*
+   screen. Caption: *Sheet music and backing tracks with BestTake Plus.*
+3. **Hands-free.** Phone on a stand, with the actual "Your turn" state visible.
+   Caption: *Hands-free recording with BestTake Plus.*
+4. **Pitch Insights.** The multi-week chart. Caption: *See your progress with BestTake Plus.*
 5. **Tuner.** Transposition visible. Caption: *A tuner that knows your part.*
 6. **Practice Games.** Caption: *Practice that doesn't feel like practice.*
-7. **Multitrack.** Caption: *Record every part yourself.*
+7. **Multitrack.** Caption: *More recording layers with BestTake Plus.*
 
 Required sizes: one 6.9-inch iPhone and one 13-inch iPad. Apple scales down from there.
 
@@ -102,8 +104,8 @@ Required sizes: one 6.9-inch iPhone and one 13-inch iPad. Apple scales down from
 ```
 BestTake records practice sessions for musicians.
 
-Microphone and camera are required to record takes; the app is non-functional without them.
-Photo library access is only used when the user explicitly saves a take to Photos.
+Microphone permission is needed to record audio and for sound-driven features such as the tuner and games. Camera permission is needed only for video takes. If either permission is denied, Home, Settings, the metronome, saved takes, and other features that do not need that permission remain available. The app offers a way to open iOS Settings from the recording surface.
+Photo library access is requested only when the user explicitly saves a take to Photos.
 
 To test core functionality: grant mic access, tap record on the audio mode home screen,
 play or speak for a few seconds, and stop. The take appears in the take box below the
@@ -111,11 +113,14 @@ record control and can be played back and compared against a second take.
 
 The Practice Games section requires microphone input to control gameplay (pitch detection).
 The YouTube play-along feature loads standard YouTube embeds for user-supplied URLs.
+
+BestTake Plus is an optional in-app purchase. A seven-day trial is offered to eligible users. Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, additional routines and multitrack boxes, and expanded Staff Jumper options. The free app includes recording/playback, tuner, metronome, one saved routine, and two multitrack boxes. The Plus product identifiers are com.besttake.app.plus.lifetime and com.besttake.app.plus.trial7days.
 ```
 
 ## Still needed before submit
 
-- Privacy policy URL and support URL (also linked in-app — Apple requires both).
+- Review the drafted [privacy policy](netlify-youtube-proxy/privacy.html) and [support page](netlify-youtube-proxy/support.html), then deploy them and enter their live URLs in App Store Connect.
+- Submit both Plus products with the app version: `com.besttake.app.plus.lifetime` and `com.besttake.app.plus.trial7days`.
 - Category: Music. Secondary: Education.
 - Age rating questionnaire.
 - App Privacy: Diagnostics → Crash Data, not linked to identity, not used for tracking.

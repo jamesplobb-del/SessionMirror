@@ -1,7 +1,7 @@
 import { requirePlus } from '../plus/plusAccess'
 import { useCallback, useState } from 'react'
 import {
-  DEFAULT_APP_SETTINGS,
+  createResetAppSettings,
   loadAppSettingsForSessionStart,
   saveAppSettings,
   type AppSettings,
@@ -21,8 +21,11 @@ export function useAppSettings() {
   }, [])
 
   const resetSettings = useCallback(() => {
-    setSettings({ ...DEFAULT_APP_SETTINGS })
-    saveAppSettings(DEFAULT_APP_SETTINGS)
+    setSettings((current) => {
+      const next = createResetAppSettings(current)
+      saveAppSettings(next)
+      return next
+    })
   }, [])
 
   return { settings, updateSettings, resetSettings }

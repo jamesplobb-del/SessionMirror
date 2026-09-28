@@ -3762,13 +3762,19 @@ html:not(.app-dark-mode) .hands-free-stage--on-light.hands-free-stage--preparing
 
 .camera-permission-gate {
   position: fixed;
-  inset: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 5rem);
+  left: 50%;
   z-index: 50;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  background: rgba(0, 0, 0, 0.92);
+  width: min(calc(100vw - 2rem), 22rem);
+  padding: 1rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 1.25rem;
+  background: rgba(16, 23, 35, 0.94);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
   pointer-events: auto;
 }
 

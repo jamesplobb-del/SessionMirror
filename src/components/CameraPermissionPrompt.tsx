@@ -20,14 +20,16 @@ export default function CameraPermissionPrompt({
   const PermissionIcon = isAudioMode ? Mic : Camera
 
   return (
-    <div className="camera-permission-gate" role="dialog" aria-modal="true">
+    <div className="camera-permission-gate" role="region" aria-label="Recording permissions">
       <div className="camera-permission-gate__panel">
         <div className="camera-permission-gate__icon-wrap">
           <PermissionIcon className="h-7 w-7 text-white/80" aria-hidden />
         </div>
         <p className="camera-permission-gate__message">
           {blocked
-            ? 'Access is turned off for BestTake. Enable Camera and Microphone in iOS Settings.'
+            ? isAudioMode
+              ? 'Microphone access is off. Enable it in iOS Settings to record audio.'
+              : 'Camera or microphone access is off. Enable recording access in iOS Settings.'
             : isAudioMode
             ? 'Microphone access is required to record audio takes.'
             : 'Camera and microphone access are required to record takes.'}
@@ -42,7 +44,7 @@ export default function CameraPermissionPrompt({
             ? 'Requesting access…'
             : blocked
               ? 'Open iOS Settings'
-              : 'Tap to Enable Camera/Microphone'}
+              : isAudioMode ? 'Enable Microphone' : 'Enable Camera/Microphone'}
         </button>
         {blocked && (
           <button

@@ -589,7 +589,7 @@ export function useStaffJumperGame(
   }, [])
 
   const start = useCallback((config: StaffJumperConfig) => {
-    if (!isFreeStaffJumperSetup({ key: config.key, mode: config.scaleMode, range: config.range, difficulty: config.difficulty, customScale: config.customPitchClasses, rangeLowMidi: config.rangeLowMidi, rangeHighMidi: config.rangeHighMidi }) && !requirePlus('staffJumper')) return
+    if (!isFreeStaffJumperSetup({ key: config.key, mode: config.scaleMode, range: config.range, difficulty: config.difficulty, customScale: config.customPitchClasses, rangeLowMidi: config.rangeLowMidi, rangeHighMidi: config.rangeHighMidi, instrumentId: config.instrumentId }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null
@@ -603,7 +603,7 @@ export function useStaffJumperGame(
 
   const restart = useCallback(() => {
     const previous = stateRef.current.config
-    if (previous && !isFreeStaffJumperSetup({ key: previous.key, mode: previous.scaleMode, range: previous.range, difficulty: previous.difficulty, customScale: previous.customPitchClasses, rangeLowMidi: previous.rangeLowMidi, rangeHighMidi: previous.rangeHighMidi }) && !requirePlus('staffJumper')) return
+    if (previous && !isFreeStaffJumperSetup({ key: previous.key, mode: previous.scaleMode, range: previous.range, difficulty: previous.difficulty, customScale: previous.customPitchClasses, rangeLowMidi: previous.rangeLowMidi, rangeHighMidi: previous.rangeHighMidi, instrumentId: previous.instrumentId }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
     wrongPitchClassRef.current = null
     releasingPitchClassRef.current = null

@@ -2,6 +2,7 @@ const EDGE_INSET = 12
 const POSITION_STORAGE_PREFIX = 'sessionmirror:widget-pos:'
 const PERSISTENT_POSITION_STORAGE_PREFIX = 'sessionmirror:persistent-widget-pos:'
 const SIZE_STORAGE_PREFIX = 'sessionmirror:widget-size:'
+export const WIDGET_CONTROL_LAYOUT_EVENT = 'besttake:widget-controls-layout'
 
 export interface WidgetPosition {
   x: number
@@ -16,14 +17,15 @@ export interface WidgetRect extends WidgetPosition {
 /** Place a full widget near its ball without covering another panel or an open tray. */
 export function findAvailableWidgetPanelPosition(
   boundsWidth: number, boundsHeight: number, widgetWidth: number, widgetHeight: number,
-  desired: WidgetPosition, occupied: WidgetRect[],
+  desired: WidgetPosition, occupied: WidgetRect[], protectedControls: WidgetRect[] = [],
 ): WidgetPosition {
   const gap = 12
   const start = clampWidgetPosition(boundsWidth, boundsHeight, widgetWidth, widgetHeight, desired.x, desired.y)
   const maxX = Math.max(gap, boundsWidth - widgetWidth - gap)
   const maxY = Math.max(gap, boundsHeight - widgetHeight - gap)
-  const xs = [start.x, gap, maxX, ...occupied.flatMap(rect => [rect.x - widgetWidth - gap, rect.x + rect.width + gap])]
-  const ys = [start.y, gap, maxY, ...occupied.flatMap(rect => [rect.y - widgetHeight - gap, rect.y + rect.height + gap])]
+  const obstacles = [...occupied, ...protectedControls]
+  const xs = [start.x, gap, maxX, ...obstacles.flatMap(rect => [rect.x - widgetWidth - gap, rect.x + rect.width + gap])]
+  const ys = [start.y, gap, maxY, ...obstacles.flatMap(rect => [rect.y - widgetHeight - gap, rect.y + rect.height + gap])]
   const candidates = xs.flatMap(x => ys.map(y => clampWidgetPosition(boundsWidth, boundsHeight,
     widgetWidth, widgetHeight, x, y)))
   const overlap = (position: WidgetPosition, rect: WidgetRect) =>
@@ -31,6 +33,7 @@ export function findAvailableWidgetPanelPosition(
     Math.max(0, Math.min(position.y + widgetHeight + gap, rect.y + rect.height + gap) - Math.max(position.y, rect.y))
   candidates.sort((a, b) => {
     const score = (position: WidgetPosition) =>
+      protectedControls.reduce((area, rect) => area + overlap(position, rect), 0) * 1_000_000 +
       occupied.reduce((area, rect) => area + overlap(position, rect), 0) * 1000 +
       (position.x - start.x) ** 2 + (position.y - start.y) ** 2
     return score(a) - score(b)

@@ -592,9 +592,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(
     bootSnapshot.activeProjectId
   )
-  useEffect(() => {
-    if (activeProjectId) rememberActiveProjectId(activeProjectId)
-  }, [activeProjectId])
   const [benchmarkId, setBenchmarkId] = useState<string | null>(bootSnapshot.benchmarkId)
   const [guidedTakeId, setGuidedTakeId] = useState<string | null>(null)
   const [guidedAudioBothTakeId, setGuidedAudioBothTakeId] = useState<string | null>(null)
@@ -709,6 +706,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [cameraTakeCardsExpanded] = useState(false)
   const [showOnboardingTutorial, setShowOnboardingTutorial] = useState(false)
   const [showDeveloperNote, setShowDeveloperNote] = useState(() => isOnboardingComplete() && !hasSeenDeveloperNote())
+  const pendingDeveloperNoteRef = useRef(false)
   const [tutorialTourEnabled, setTutorialTourEnabled] = useState(false)
 
   /* ---- Daily routine ------------------------------------------------------
@@ -739,6 +737,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const [pendingTakeSaves, setPendingTakeSaves] = useState(0)
   const routineRef = useRef<Routine | null>(routine)
   routineRef.current = routine
+  useEffect(() => {
+    // A one-minute daily challenge can open a temporary folder. Keep the
+    // musician's last real folder for the next launch instead.
+    if (activeProjectId && !isChallengeRoutine(routineRef.current)) rememberActiveProjectId(activeProjectId)
+  }, [activeProjectId])
   const routineDayRef = useRef<RoutineDay | null>(routineDay)
   routineDayRef.current = routineDay
 
@@ -905,8 +908,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setShowOnboardingTutorial(false)
     setTutorialTourEnabled(false)
     setIsPracticeHubOpen(true)
-    // Let onboarding release its focus and inert state before the note takes over.
-    if (!hasSeenDeveloperNote()) window.setTimeout(() => setShowDeveloperNote(true), 0)
+    // The note must wait for AnimatePresence to finish removing onboarding.
+    pendingDeveloperNoteRef.current = !hasSeenDeveloperNote()
   }, [])
 
   const closeDeveloperNote = useCallback(() => {
@@ -3478,11 +3481,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   }, [])
 
   const challengeReturnProjectIdRef = useRef<string | null>(null)
-  const restoreChallengeProject = useCallback(() => {
+  const restoreChallengeProject = useCallback(async () => {
     const projectId = challengeReturnProjectIdRef.current
     challengeReturnProjectIdRef.current = null
     if (projectId && projectId !== activeProjectIdRef.current) {
-      void handleSelectProject(projectId).catch(error => {
+      await handleSelectProject(projectId).catch(error => {
         console.warn('[Routine] could not restore the previous folder', error)
       })
     }
@@ -3503,7 +3506,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     focusedPracticeSessionIdRef.current = null
     setFocusedPractice(null)
     setFocusedPracticeSessionId(null)
-    restoreChallengeProject()
+    void restoreChallengeProject()
   }, [commitRoutineDay, restoreChallengeProject])
 
   useEffect(() => {
@@ -5904,7 +5907,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     if (!desk?.showMusic) updateSettings({ showMusic: false })
     if (step.kind !== 'game' && step.kind !== 'free') {
       const existing = await findRoutinePracticeProject(target.id, step.id, itemProjectId)
-      const project = existing ?? await createProject(step.title)
+      const project = existing ?? await createProject(isChallengeRoutine(target) ? `${step.title} · Daily challenge` : step.title)
       itemProjectId = project.id
       if (!existing) setProjects(current => [project, ...current])
       if (step.projectId !== project.id) {
@@ -6062,7 +6065,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
           routineRef.current = saved
           setRoutine(saved)
           commitRoutineDay(saved ? loadRoutineDay(saved) : null)
-          restoreChallengeProject()
+          await restoreChallengeProject()
         }
         handleOpenRoutineToday()
       }
@@ -6688,7 +6691,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {musicRoomActive && <MusicWidgetDrawer open={musicWidgetDrawerOpen} onOpenChange={setMusicWidgetDrawerOpen} />}
 
-              {cameraNeedsPermission && !SKIP_MEDIA_PERMISSION_GATE && (
+              {cameraNeedsPermission && !SKIP_MEDIA_PERMISSION_GATE && onRecordSurface &&
+                !musicRoomActive && !isVaultOpen && !isSettingsOpen && !isReviewOpen &&
+                !isExperimentalOpen && !isPracticeHubOpen && focusPanel === null &&
+                !showOnboardingTutorial && (
                 <CameraPermissionPrompt
                   recordingMode={recordingMode}
                   requesting={cameraPermissionRequestInFlight}
@@ -7587,7 +7593,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 </Suspense>
 
                 <Suspense fallback={null}>
-                  <AnimatePresence>
+                  <AnimatePresence onExitComplete={() => {
+                    if (!pendingDeveloperNoteRef.current) return
+                    pendingDeveloperNoteRef.current = false
+                    setShowDeveloperNote(true)
+                  }}>
                     {showOnboardingTutorial && (
                       <OnboardingTutorial
                         key="onboarding-tutorial"
