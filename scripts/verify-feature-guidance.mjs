@@ -59,6 +59,9 @@ assert.equal(state.active, null, 'Starting a hands-free take must stop its guide
 state = request(fresh(), 'best-take')
 assert.equal(start(state, 'best-take', GUIDE_EXPIRY_MS + 2000).active, null,
   'A stale recording event must not produce an unrelated tutorial much later')
+state = request(request(fresh(), 'navigation'), 'best-take')
+assert.equal(state.pending[0]?.id, 'best-take',
+  'A newly stopped take takes priority over earlier pending navigation tips')
 state = reduce(state, { type: 'expire', now: GUIDE_EXPIRY_MS + 2000 })
 assert.equal(state.pending.length, 0, 'Expired requests must stop background polling')
 state = start(request(fresh(), 'workspace'), 'workspace')

@@ -1943,6 +1943,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         return [...prev, savedTake]
       })
 
+      // The Current Take is on screen now; guide it without waiting for vault
+      // persistence or media preparation to finish.
+      if (showTakeCardsRef.current && !shouldAutoPlay && !multitrackRecordingActiveRef.current) {
+        reportFeatureAction('take-stopped')
+      }
+
       if (multitrackRecordingActiveRef.current) {
         multitrackRecordingActiveRef.current = false
         setMultitrackPendingRecordingTakeId(takeId)
@@ -5012,8 +5018,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     applyDroneFromDesk(null, getDroneSnapshot().octave)
   }, [recordingMode, updateSettings])
 
-  /* ---- "Again": one breath of Record when Current finishes playing back --- */
-  const currentPlaybackActive = autoPlaybackPlaying || challengerPipPlaying
+  /* ---- "Again": one breath of Record after hands-free replay. Manual Take
+   * Box playback can stop on pause, so it must not animate the Record button. */
+  const currentPlaybackActive = autoPlaybackPlaying
   const currentPlaybackWasActiveRef = useRef(currentPlaybackActive)
   useEffect(() => {
     const wasActive = currentPlaybackWasActiveRef.current
@@ -5220,12 +5227,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setReferenceExpanded(false)
     }
   }, [hasSelectedReference, referenceSurfaceKey])
-
-  // An empty References panel is available when the user opens it, but its
-  // collapsed chip should not linger in a workspace with no selected media.
-  useEffect(() => {
-    if (!hasSelectedReference && !referenceExpanded) setReferenceVisible(false)
-  }, [hasSelectedReference, referenceExpanded])
 
   // A selected reference belongs on the music stand in regular practice and
   // routines. Never auto-show an empty widget when a score is opened.
@@ -6333,7 +6334,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         paused={showOnboardingTutorial || !isOnboardingComplete() || isPracticeHubOpen ||
           isSettingsOpen || isVaultOpen || isReviewOpen || isLabsOpen || multitrackOpen ||
           isExperimentalOpen || focusPanel !== null ||
-          isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
+          isRecording || isStopping || takePlaybackActive ||
           handsFreePlaybackPending || practiceSessionActive || pipDragState.isDragging || Boolean(takeDeleteError)}
         feedbackPaused={showOnboardingTutorial || isRecording || isStopping || pendingTakeSaves > 0 || takePlaybackActive ||
           handsFreePlaybackPending || isLabsOpen || Boolean(takeDeleteError)}
@@ -7246,6 +7247,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         >
                           <PipCompareRow
                             compact={!cameraTakeCardsExpanded}
+                            positioningActive={!isPracticeHubOpen && !isSettingsOpen && !isVaultOpen &&
+                              !isReviewOpen && !isLabsOpen && !isExperimentalOpen && !multitrackOpen &&
+                              !musicPageVisible && !showOnboardingTutorial && !quickSettingsOpen && focusPanel === null}
                             boundaryRef={appShellRef}
                             benchmarkTake={benchmarkTake}
                             libraryBenchmarkPlayback={libraryBenchmarkPlayback}
@@ -7295,7 +7299,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         initialNote={challengerTake.notes}
                         focus={guidedNextFocus}
                         mode="video"
-                        playbackActive={takePlaybackActive}
+                        playbackActive={challengerPipPlaying}
+                        currentVideoRef={challengerPipVideoRef}
                         onFocusChange={setGuidedNextFocus}
                         onSaveNote={(id, notes) => handleUpdateTake(id, { notes })}
                         onRecordAgain={handleToggleRecord}

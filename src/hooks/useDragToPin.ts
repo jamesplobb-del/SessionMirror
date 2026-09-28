@@ -17,7 +17,7 @@ import {
 const LONG_PRESS_MS = 200
 const DRAG_THRESHOLD_PX = 8
 const MOVEMENT_CANCEL_PX = 12
-const DROP_TARGET_SLOP_PX = 8
+const DROP_TARGET_SLOP_PX = 18
 
 function pointInRect(x: number, y: number, rect: DOMRect, slop = 0): boolean {
   return (
@@ -54,6 +54,7 @@ interface UseDragToPinOptions {
   dragThresholdPx?: number
   commitHaptic?: boolean
   hapticFeedback?: boolean
+  allowMediaButtonDrag?: boolean
 }
 
 export function useDragToPin({
@@ -69,11 +70,14 @@ export function useDragToPin({
   dragThresholdPx = DRAG_THRESHOLD_PX,
   commitHaptic = false,
   hapticFeedback = true,
+  allowMediaButtonDrag = false,
 }: UseDragToPinOptions) {
   const draggingRef = useRef(false)
   const armedRef = useRef(false)
   const startRef = useRef({ x: 0, y: 0 })
   const pointerIdRef = useRef<number | null>(null)
+  const startedOnMediaButtonRef = useRef(false)
+  const suppressClickRef = useRef(false)
   const longPressTimerRef = useRef<number | null>(null)
   const ghostFrameRef = useRef<number | null>(null)
   const pendingGhostRef = useRef<DragGhostState | null>(null)
@@ -143,6 +147,7 @@ export function useDragToPin({
     draggingRef.current = false
     armedRef.current = false
     pointerIdRef.current = null
+    startedOnMediaButtonRef.current = false
     dropZoneRef.current = null
     setIsArming(false)
     setGhost(null)
@@ -227,7 +232,10 @@ export function useDragToPin({
       const interactiveAncestor = (event.target as HTMLElement).closest(
         'button, a, label, input, [role="button"], [data-drag-ignore]',
       )
-      if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return
+      const mediaButton = allowMediaButtonDrag && Boolean(
+        (event.target as HTMLElement).closest('[data-take-media-drag]'),
+      )
+      if (interactiveAncestor && interactiveAncestor !== event.currentTarget && !mediaButton) return
 
       clearLongPressTimer()
       if (hapticFeedback) {
@@ -235,14 +243,18 @@ export function useDragToPin({
       }
       startRef.current = { x: event.clientX, y: event.clientY }
       pointerIdRef.current = event.pointerId
+      startedOnMediaButtonRef.current = mediaButton
+      suppressClickRef.current = false
       draggingRef.current = false
       armedRef.current = false
       setIsArming(false)
 
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId)
-      } catch {
-        /* pointer capture can fail if the press target leaves the tree */
+      if (!mediaButton) {
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId)
+        } catch {
+          /* pointer capture can fail if the press target leaves the tree */
+        }
       }
 
       if (activationMode === 'hold') {
@@ -258,6 +270,7 @@ export function useDragToPin({
     },
     [
       activationMode,
+      allowMediaButtonDrag,
       clearLongPressTimer,
       emitDragState,
       enabled,
@@ -292,6 +305,13 @@ export function useDragToPin({
         draggingRef.current = true
         setIsArming(false)
         event.preventDefault()
+        if (startedOnMediaButtonRef.current) {
+          try {
+            event.currentTarget.setPointerCapture(event.pointerId)
+          } catch {
+            /* pointer capture can fail if the press target leaves the tree */
+          }
+        }
         if (hapticFeedback) {
           void triggerDragStartHaptic()
         }
@@ -354,6 +374,7 @@ export function useDragToPin({
       const distance = Math.hypot(deltaX, deltaY)
 
       if (draggingRef.current && sourceTakeId) {
+        suppressClickRef.current = true
         const { overPin, overDelete } = resolveDropTargets(
           event.clientX,
           event.clientY,
@@ -371,7 +392,7 @@ export function useDragToPin({
         !draggingRef.current &&
         distance < DRAG_THRESHOLD_PX
       ) {
-        if (onTap) {
+        if (onTap && !startedOnMediaButtonRef.current) {
           // The drag-layer variant (role="button" div) has no Pressable
           // wrapper to supply tap haptics, unlike the plain-onExpand fallback
           // — give the tap-to-open-fullscreen gesture the same feedback here.
@@ -415,6 +436,11 @@ export function useDragToPin({
     isDragging: ghost !== null,
     isArming,
     cancelDrag: reset,
+    consumeSuppressedClick: () => {
+      const suppressed = suppressClickRef.current
+      suppressClickRef.current = false
+      return suppressed
+    },
     dragSourceProps: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,

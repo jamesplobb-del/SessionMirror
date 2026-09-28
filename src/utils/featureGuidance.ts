@@ -1,6 +1,6 @@
 /** First-use help has its own history; skipping Welcome does not dismiss it. */
 export type FeatureGuideId = 'best-take' | 'workspace' | 'hands-free' | 'recording' | 'navigation' | 'take-library' | 'music-tools' | 'multitrack' | 'tuner-quiet' | 'tuner-loud'
-export type FeatureAction = 'take-saved' | 'best-take-pinned' | 'current-take-pinned'
+export type FeatureAction = 'take-stopped' | 'take-saved' | 'best-take-pinned' | 'current-take-pinned'
   | 'overlays-opened' | 'overlays-closed' | 'branch-widget-selected'
   | 'hands-free-enabled' | 'hands-free-disabled' | 'hands-free-settings-opened'
   | 'hands-free-recorded' | 'take-card-transfer-completed' | 'widget-expanded' | 'take-library-opened' | 'tuner-input-quiet' | 'tuner-input-loud'
@@ -146,8 +146,9 @@ export function guidanceReducer(state: GuidanceState, update: GuidanceUpdate): G
   if (!state.preferences.enabled || state.preferences.seen.includes(update.id)) return state
   if (update.type === 'request') {
     if (state.active?.id === update.id || state.shown >= GUIDE_SESSION_LIMIT) return state
-    return { ...state, pending: [...state.pending.filter(item => item.id !== update.id && item.expires > update.now),
-      { id: update.id, expires: update.now + GUIDE_EXPIRY_MS }] }
+    const pending = state.pending.filter(item => item.id !== update.id && item.expires > update.now)
+    const requested = { id: update.id, expires: update.now + GUIDE_EXPIRY_MS }
+    return { ...state, pending: update.id === 'best-take' ? [requested, ...pending] : [...pending, requested] }
   }
   if (state.active || state.shown >= GUIDE_SESSION_LIMIT ||
     (state.lastEnded !== null && update.now - state.lastEnded < state.lastEndDelay)) return state

@@ -72,6 +72,7 @@ export interface PipCompareRowProps {
   challengerAutoPlayRequestId?: string | null
   onChallengerAutoPlayComplete?: () => void
   hapticFeedback?: boolean
+  positioningActive?: boolean
   showPinCurrentAsBest?: boolean
   onPinCurrentAsBest?: () => void
   onYoutubeHostChange?: (el: HTMLDivElement | null) => void
@@ -165,7 +166,7 @@ function CompactTakeCaption({
         tabIndex={0}
         className={captionClassName}
         data-tutorial={dataTutorial}
-        aria-label={`Drag ${label} directly to the other card, or tap for full-screen playback. Long press the card to reposition it.`}
+        aria-label={`Drag ${label} directly to the other card, or tap for full-screen playback. Long press this caption to reposition the card.`}
         onKeyDown={handleKeyDown}
         {...dragSourceProps}
       >
@@ -197,6 +198,10 @@ const TAKE_CARD_MOVE_HOLD_MS = 425
 const TAKE_CARD_MOVE_CANCEL_PX = 12
 const TAKE_CARD_BOUNDARY_INSET = 8
 const TAKE_CARD_DRAG_COMPLETION_PX = 3
+const viewportChangedEnoughToReposition = (
+  previous: { width: number; height: number },
+  next: { width: number; height: number },
+) => Math.abs(next.width - previous.width) > 80 || Math.abs(next.height - previous.height) > 200
 
 function MovableTakeSlot({
   movable,
@@ -209,6 +214,9 @@ function MovableTakeSlot({
   positionId,
   boundaryRef,
   dropRef,
+  positioningActive,
+  transferDragSourceProps,
+  consumeTransferClick,
   className,
   dataTutorial,
   hapticFeedback,
@@ -224,6 +232,14 @@ function MovableTakeSlot({
   positionId: string
   boundaryRef: RefObject<HTMLElement | null>
   dropRef: RefObject<HTMLDivElement | null>
+  positioningActive: boolean
+  transferDragSourceProps?: {
+    onPointerDown: (event: PointerEvent<HTMLElement>) => void
+    onPointerMove: (event: PointerEvent<HTMLElement>) => void
+    onPointerUp: (event: PointerEvent<HTMLElement>) => void
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => void
+  }
+  consumeTransferClick?: () => boolean
   className: string
   dataTutorial?: string
   hapticFeedback: boolean
@@ -235,7 +251,7 @@ function MovableTakeSlot({
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
   const [cardScale, setCardScale] = useState(() => loadTakeCardScale(positionId))
   const resizeRef = useRef<{ x: number; y: number; scale: number; width: number; height: number } | null>(null)
-  const layoutReady = useRef(false)
+  const lastViewportSize = useRef({ width: window.innerWidth, height: window.innerHeight })
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
   const dragY = useMotionValue(savedPosition.current?.y ?? 0)
   const handledResetNonceRef = useRef(resetNonce)
@@ -255,7 +271,7 @@ function MovableTakeSlot({
   const [dragging, setDragging] = useState(false)
 
   const clampPositionToBoundary = useCallback(() => {
-    if (!layoutReady.current || !movable || editing || draggingRef.current) return
+    if (!positioningActive || !movable || editing || draggingRef.current) return
     // Dialog/keyboard geometry is temporary, not a new position for the cards.
     if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
     const node = slotNodeRef.current
@@ -294,46 +310,41 @@ function MovableTakeSlot({
     dragX.set(nextX)
     dragY.set(nextY)
     // Viewport correction is temporary; only a deliberate drag is persisted.
-  }, [boundaryRef, cardScale, dragX, dragY, editing, movable, positionId])
+  }, [boundaryRef, cardScale, dragX, dragY, editing, movable, positioningActive])
 
   useLayoutEffect(() => {
+    if (!positioningActive) return
+    if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
+    const size = { width: window.innerWidth, height: window.innerHeight }
+    if (!viewportChangedEnoughToReposition(lastViewportSize.current, size)) return
+    lastViewportSize.current = size
     clampPositionToBoundary()
-  }, [clampPositionToBoundary])
+  }, [clampPositionToBoundary, positioningActive])
 
   useEffect(() => {
-    const node = slotNodeRef.current
-    const boundary = boundaryRef.current
     let frame: number | null = null
     const scheduleClamp = () => {
+      if (!positioningActive) return
+      if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
+      const size = { width: window.innerWidth, height: window.innerHeight }
+      if (!viewportChangedEnoughToReposition(lastViewportSize.current, size)) return
+      lastViewportSize.current = size
       if (frame !== null) window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
         frame = null
         clampPositionToBoundary()
       })
     }
-    const visualViewport = window.visualViewport
 
     window.addEventListener('resize', scheduleClamp)
     window.addEventListener('orientationchange', scheduleClamp)
-    visualViewport?.addEventListener('resize', scheduleClamp)
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleClamp)
-    if (node) observer?.observe(node)
-    if (boundary) observer?.observe(boundary)
-    scheduleClamp()
-    // The camera row enters with a short y-axis animation. Re-clamp once its
-    // parent transform has settled so a restored edge position stays reachable.
-    const settledClampTimer = window.setTimeout(() => { layoutReady.current = true; scheduleClamp() }, 360)
 
     return () => {
       window.removeEventListener('resize', scheduleClamp)
       window.removeEventListener('orientationchange', scheduleClamp)
-      visualViewport?.removeEventListener('resize', scheduleClamp)
-      observer?.disconnect()
-      window.clearTimeout(settledClampTimer)
       if (frame !== null) window.cancelAnimationFrame(frame)
     }
-  }, [boundaryRef, clampPositionToBoundary])
+  }, [clampPositionToBoundary, positioningActive])
 
   useEffect(() => {
     if (handledResetNonceRef.current === resetNonce) return
@@ -409,6 +420,9 @@ function MovableTakeSlot({
       // React portal events still bubble through this card, even outside its DOM.
       if (!slotNodeRef.current?.contains(target)) return
       if (target.closest('button, a, input, textarea, select, [contenteditable="true"], [data-card-move-ignore]') && !target.closest('.compact-take-caption')) return
+      // The card body transfers a take on movement; only its caption arms
+      // layout editing on a long press so a slow media drag cannot move the box.
+      if (transferDragSourceProps && !target.closest('.compact-take-caption, .compact-take-caption__label')) return
 
       clearHoldTimer()
       if (hapticFeedback) warmHaptics()
@@ -447,6 +461,7 @@ function MovableTakeSlot({
       hapticFeedback,
       movable,
       onEnterEditing,
+      transferDragSourceProps,
     ],
   )
 
@@ -502,6 +517,7 @@ function MovableTakeSlot({
 
   return (
     <motion.div
+      initial={false}
       ref={assignDropRef}
       className={`${className} ${
         movable ? 'compact-take-slot--movable' : ''
@@ -518,10 +534,29 @@ function MovableTakeSlot({
       dragConstraints={boundaryRef}
       dragElastic={0}
       dragMomentum={false}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={(event) => finishPress(event.pointerId)}
-      onPointerCancel={(event) => finishPress(event.pointerId)}
+      onPointerDownCapture={(event) => {
+        if ((event.target as HTMLElement).closest('[data-take-media-drag]')) {
+          transferDragSourceProps?.onPointerDown(event)
+        }
+      }}
+      onPointerDown={(event) => {
+        handlePointerDown(event)
+        if (!(event.target as HTMLElement).closest('.compact-take-caption')) {
+          transferDragSourceProps?.onPointerDown(event)
+        }
+      }}
+      onPointerMove={(event) => {
+        handlePointerMove(event)
+        transferDragSourceProps?.onPointerMove(event)
+      }}
+      onPointerUp={(event) => {
+        transferDragSourceProps?.onPointerUp(event)
+        finishPress(event.pointerId)
+      }}
+      onPointerCancel={(event) => {
+        transferDragSourceProps?.onPointerCancel(event)
+        finishPress(event.pointerId)
+      }}
       onDragStart={handleDragStart}
       onDrag={(_event, info) => {
         dragTravelRef.current = Math.max(
@@ -531,12 +566,17 @@ function MovableTakeSlot({
       }}
       onDragEnd={handleDragEnd}
       onClickCapture={(event) => {
+        if (consumeTransferClick?.()) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
         if (!suppressClickRef.current) {
-          // Captions own their tap (including transfer-hook pointer taps).
-          // Skip them here so a label drag-tap does not also open fullscreen.
+          // Transfer surfaces own their tap as well as their drag gesture.
           const target = event.target as HTMLElement
+          if (transferDragSourceProps && !target.closest('button, a, input, [data-card-move-ignore]')) return
           if (movable && !editing && slotNodeRef.current?.contains(target) &&
-              !target.closest('.compact-take-caption, button, a, input, [data-card-move-ignore]')) onOpenFullScreen()
+              !target.closest('.compact-take-caption, .pip-drag-layer, button, a, input, [data-card-move-ignore]')) onOpenFullScreen()
           return
         }
         event.preventDefault()
@@ -850,6 +890,7 @@ export default memo(function PipCompareRow({
   challengerAutoPlayRequestId = null,
   onChallengerAutoPlayComplete,
   hapticFeedback = true,
+  positioningActive = true,
   showPinCurrentAsBest = false,
   onPinCurrentAsBest,
   onYoutubeHostChange,
@@ -966,6 +1007,7 @@ export default memo(function PipCompareRow({
     isDragging: challengerDragging,
     isArming: challengerArming,
     dragSourceProps: challengerDragSourceProps,
+    consumeSuppressedClick: consumeChallengerClick,
     cancelDrag: cancelChallengerDrag,
   } = useDragToPin({
     sourceTakeId: challengerTake?.id ?? null,
@@ -977,7 +1019,8 @@ export default memo(function PipCompareRow({
     onDragStateChange,
     enabled: challengerTransferEnabled,
     activationMode: compact ? 'move' : 'hold',
-    dragThresholdPx: compact ? 16 : undefined,
+    dragThresholdPx: compact ? 8 : undefined,
+    allowMediaButtonDrag: compact,
     hapticFeedback,
   })
 
@@ -986,6 +1029,7 @@ export default memo(function PipCompareRow({
     isDragging: benchmarkDragging,
     isArming: benchmarkArming,
     dragSourceProps: benchmarkDragSourceProps,
+    consumeSuppressedClick: consumeBenchmarkClick,
     cancelDrag: cancelBenchmarkDrag,
   } = useDragToPin({
     sourceTakeId: libraryBenchmarkPlayback || youtubeEmbedUrl ? null : benchmarkTake?.id ?? null,
@@ -998,7 +1042,8 @@ export default memo(function PipCompareRow({
       !libraryBenchmarkPlayback &&
       !youtubeEmbedUrl,
     activationMode: compact ? 'move' : 'hold',
-    dragThresholdPx: compact ? 16 : undefined,
+    dragThresholdPx: compact ? 8 : undefined,
+    allowMediaButtonDrag: compact,
     commitHaptic: !challengerTake,
     hapticFeedback,
   })
@@ -1041,6 +1086,10 @@ export default memo(function PipCompareRow({
           positionId="camera-best-take-card-v2"
           boundaryRef={boundaryRef}
           dropRef={benchmarkDropRef}
+          positioningActive={positioningActive}
+          transferDragSourceProps={compact && !layoutEditing && takeHasPlaybackMedia(benchmarkTake) &&
+            benchmarkAcceptsTakeTransfer ? benchmarkDragSourceProps : undefined}
+          consumeTransferClick={consumeBenchmarkClick}
           hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--best' : ''
@@ -1156,6 +1205,9 @@ export default memo(function PipCompareRow({
           positionId="camera-current-take-card-v2"
           boundaryRef={boundaryRef}
           dropRef={challengerDropRef}
+          positioningActive={positioningActive}
+          transferDragSourceProps={compact && challengerTransferEnabled ? challengerDragSourceProps : undefined}
+          consumeTransferClick={consumeChallengerClick}
           hapticFeedback={hapticFeedback}
           className={`app-pip-slot pointer-events-auto ${
             compact ? 'compact-take-slot compact-take-slot--current' : ''

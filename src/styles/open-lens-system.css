@@ -284,6 +284,12 @@ html#lens-design-system .reference-widget-panel header span { margin-right:auto;
 html#lens-design-system .reference-widget-panel header button { width:32px; height:32px; padding:5px; color:var(--widget-muted); }
 html#lens-design-system .reference-widget-media { height:150px; }
 html#lens-design-system .reference-widget-media .pip-empty-state { background:transparent!important; }
+html#lens-design-system:not(.app-dark-mode) .reference-widget-media .group.relative:has(.pip-empty-state),
+html#lens-design-system:not(.app-dark-mode) .reference-widget-media .group.relative:has(.take-audio-surface),
+html#lens-design-system:not(.app-dark-mode) .reference-widget-media .bg-black:has(.pip-empty-state) {
+  background:#fff!important;
+  background-image:none!important;
+}
 html#lens-design-system .reference-widget-media .pip-empty-action { color:var(--widget-ink)!important; background:var(--widget-control); border-color:var(--widget-border); }
 html#lens-design-system .reference-widget-chip { color:var(--widget-ink)!important; background:var(--widget-surface)!important; border:1px solid var(--widget-border)!important; }
 html#lens-design-system .hands-free-stage__center { padding-top:35px!important; }

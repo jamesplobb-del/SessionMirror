@@ -460,7 +460,7 @@ export function AudioModeTakeCard({
     dropTargetRef: bestTargetRef,
     enabled: canDrag,
     activationMode: 'move',
-    dragThresholdPx: 16,
+    dragThresholdPx: 8,
     hapticFeedback,
     onPin: () => onFavorite?.(),
     onTap: () => { if (onOpen) openTake(onOpen) },

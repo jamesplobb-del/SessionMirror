@@ -680,6 +680,7 @@ function PipWindow({
                 squish={false}
                 haptic="light"
                 data-card-move-ignore
+                data-take-media-drag={compact ? 'true' : undefined}
                 onPointerDown={stopEventBubble}
                 onTouchStart={stopEventBubble}
                 onTouchEnd={stopEventBubble}

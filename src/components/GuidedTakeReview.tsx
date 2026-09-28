@@ -2,7 +2,7 @@ import { AnimatePresence, useReducedMotion } from 'framer-motion'
 import { PremiumMotionDiv, PremiumMotionSection } from './ui/PremiumMotionSurface'
 import { premiumMotion } from '../utils/premiumMotion'
 import '../styles/premium-recording.css'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronRight, Mic, Square, X } from 'lucide-react'
 import { PRACTICE_FOCUSES, matchSpokenPracticeFocus } from '../utils/practiceGoals'
@@ -16,6 +16,7 @@ interface GuidedTakeReviewProps {
   focus: string | null
   mode: 'audio' | 'video'
   playbackActive?: boolean
+  currentVideoRef?: RefObject<HTMLMediaElement | null>
   voiceEnabled?: boolean
   audioShowBoth?: boolean
   onToggleAudioView?: () => void
@@ -28,7 +29,7 @@ interface GuidedTakeReviewProps {
 
 /** Reflection is an invitation beside the take, not another screen to get past. */
 export default function GuidedTakeReview({
-  takeId, initialNote, focus, mode, playbackActive = false, voiceEnabled = true,
+  takeId, initialNote, focus, mode, playbackActive = false, currentVideoRef, voiceEnabled = true,
   audioShowBoth = false, onToggleAudioView,
   onFocusChange, onSaveNote, onRecordAgain, onCompare, recordDisabled,
 }: GuidedTakeReviewProps) {
@@ -52,14 +53,16 @@ export default function GuidedTakeReview({
     const complete = (tone: 'current' | 'best') => {
       if (tone === 'current') setHeard(true)
     }
+    const relevantMedia = (target: EventTarget | null) =>
+      target instanceof HTMLMediaElement && (mode === 'audio' || target === currentVideoRef?.current)
     const played = (event: Event) => {
-      if (event.target instanceof HTMLMediaElement) setLocalPlaying(true)
+      if (relevantMedia(event.target)) setLocalPlaying(true)
     }
     const paused = (event: Event) => {
-      if (event.target instanceof HTMLMediaElement) setLocalPlaying(false)
+      if (relevantMedia(event.target)) setLocalPlaying(false)
     }
     const ended = (event: Event) => {
-      if (event.target instanceof HTMLMediaElement) {
+      if (relevantMedia(event.target)) {
         setLocalPlaying(false)
         setHeard(true)
       }
@@ -74,7 +77,7 @@ export default function GuidedTakeReview({
       document.removeEventListener('pause', paused, true)
       document.removeEventListener('ended', ended, true)
     }
-  }, [])
+  }, [currentVideoRef, mode])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -173,7 +176,7 @@ export default function GuidedTakeReview({
   const customFocus = focus && !PRACTICE_FOCUSES.includes(focus as typeof PRACTICE_FOCUSES[number]) ? focus : ''
 
   return <>
-    <div className={`guided-reflection-entry guided-reflection-entry--${mode}${playbackActive || localPlaying ? ' guided-reflection-entry--playing' : ''}`}>
+    {(mode === 'audio' || heard) && <div className={`guided-reflection-entry guided-reflection-entry--${mode}${playbackActive || localPlaying ? ' guided-reflection-entry--playing' : ''}`}>
       <button ref={triggerRef} type="button" className="guided-reflection-entry__button" aria-haspopup="dialog" aria-expanded={open}
         onClick={() => setOpen(true)}>
         <span className="guided-reflection-entry__mark" aria-hidden="true">{focus ? <Check size={14} /> : '↗'}</span>
@@ -182,7 +185,7 @@ export default function GuidedTakeReview({
       </button>
       {mode === 'audio' && onToggleAudioView && <button type="button" className="guided-reflection-entry__view" onClick={onToggleAudioView}
         aria-label={audioShowBoth ? 'Focus on current take' : 'Show both takes'}>{audioShowBoth ? 'Focus take' : 'Both takes'}</button>}
-    </div>
+    </div>}
     {createPortal(<AnimatePresence>{open && <PremiumMotionDiv className="guided-reflection-modal" role="presentation" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={premiumMotion({duration:.1}, 'backdrop')}>
       <button type="button" className="guided-reflection-modal__scrim" aria-label="Close reflection" onClick={close} />
       <PremiumMotionSection initial={{y:reduced?0:42,scale:reduced?1:.98}} animate={{y:0,scale:1}} exit={{y:reduced?0:24,scale:reduced?1:.985}} transition={premiumMotion({duration:.1}, 'panel')} ref={sheetRef} className="guided-reflection-sheet" role="dialog" aria-modal="true" aria-labelledby={`guided-title-${takeId}`}>

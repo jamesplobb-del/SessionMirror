@@ -115,10 +115,15 @@ export default function FeatureGuidance(props: Props) {
       const currentStep = current.active ? FEATURE_GUIDES[current.active.id][current.active.step] : null
       if (currentStep?.action === action) dispatch({ type: 'advance', now: time })
       switch (action) {
-        case 'take-saved':
-          confirm('Take saved')
+        case 'take-stopped':
+          // A pre-recording tip may still be active but hidden while capturing.
+          // Retire it so the new take's guide can appear as soon as the card does.
+          if (current.active && current.active.id !== 'best-take') learned(current.active.id)
           learned('recording')
           request('best-take')
+          break
+        case 'take-saved':
+          confirm('Take saved')
           request('take-library')
           if (currentProps.handsFreeEnabled) learned('hands-free')
           break
