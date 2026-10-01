@@ -3,6 +3,7 @@ import { requirePlus } from '../plus/plusAccess'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
 import { CHARTS_DIR, initAppFilesystem, isFilesystemMissingError } from './filesystemInit'
+import { deleteWebPracticeChart, loadWebPracticeChart, saveWebPracticeChart } from './webPracticeChartStorage'
 
 /**
  * The music for one practice item, kept beside that item's takes.
@@ -60,7 +61,7 @@ function metadata(id: string): Omit<PracticeChart, 'projectId' | 'objectUrl' | '
  */
 export function hasPracticeChart(projectId: string): boolean {
   if (charts.has(projectId)) return true
-  return Capacitor.isNativePlatform() && metadata(projectId) !== null
+  return metadata(projectId) !== null
 }
 
 export function practiceChartName(projectId: string): string | null {
@@ -69,9 +70,27 @@ export function practiceChartName(projectId: string): string | null {
 
 export async function loadPracticeChart(projectId: string): Promise<PracticeChart | null> {
   if (charts.has(projectId)) return charts.get(projectId)!
-  if (!Capacitor.isNativePlatform()) return null
   const saved = metadata(projectId)
   if (!saved) return null
+  if (!Capacitor.isNativePlatform()) {
+    const record = await loadWebPracticeChart(projectId)
+    if (!record || record.mimeType !== saved.mimeType || !(record.blob instanceof Blob)) {
+      localStorage.removeItem(metadataKey(projectId))
+      notifyChartChanged(projectId)
+      return null
+    }
+    const bytes = new Uint8Array(await record.blob.arrayBuffer())
+    const chart: PracticeChart = {
+      ...saved,
+      projectId,
+      bytes: saved.mimeType === 'application/pdf' ? bytes : null,
+      objectUrl: saved.mimeType === 'application/pdf'
+        ? ''
+        : URL.createObjectURL(new Blob([toArrayBuffer(bytes)], { type: saved.mimeType })),
+    }
+    charts.set(projectId, chart)
+    return chart
+  }
   try {
     const { data } = await Filesystem.readFile({ path: saved.filePath, directory: Directory.Data })
     const bytes = typeof data === 'string'
@@ -98,15 +117,32 @@ export async function savePracticeChart(projectId: string, file: File): Promise<
   if (!Object.hasOwn(extensions, file.type)) throw new Error('Choose a PDF, JPEG, PNG, or WebP image.')
   const old = charts.get(projectId)
   const bytes = new Uint8Array(await file.arrayBuffer())
-  let filePath = ''
+  let filePath = `${CHARTS_DIR}/${encodeURIComponent(projectId)}.${extensions[file.type]}`
   if (Capacitor.isNativePlatform()) {
     await initAppFilesystem()
     const previous = metadata(projectId)
-    filePath = `${CHARTS_DIR}/${encodeURIComponent(projectId)}.${extensions[file.type]}`
     await Filesystem.writeFile({ path: filePath, data: encodeBase64(bytes), directory: Directory.Data })
     localStorage.setItem(metadataKey(projectId), JSON.stringify({ filePath, mimeType: file.type, fileName: file.name }))
     if (previous && previous.filePath !== filePath) {
       await Filesystem.deleteFile({ path: previous.filePath, directory: Directory.Data }).catch(() => {})
+    }
+  } else {
+    const previous = await loadWebPracticeChart(projectId)
+    await saveWebPracticeChart(projectId, {
+      blob: new Blob([toArrayBuffer(bytes)], { type: file.type }),
+      mimeType: file.type as PracticeChart['mimeType'],
+      fileName: file.name,
+    })
+    try {
+      localStorage.setItem(metadataKey(projectId), JSON.stringify({ filePath, mimeType: file.type, fileName: file.name }))
+    } catch (error) {
+      try {
+        if (previous) await saveWebPracticeChart(projectId, previous)
+        else await deleteWebPracticeChart(projectId)
+      } catch {
+        throw new Error('Music could not be saved, and its previous version could not be restored.')
+      }
+      throw error
     }
   }
   const chart: PracticeChart = {
@@ -119,7 +155,8 @@ export async function savePracticeChart(projectId: string, file: File): Promise<
   }
   charts.set(projectId, chart)
   if (old?.objectUrl) URL.revokeObjectURL(old.objectUrl)
-  setChartVisible(projectId, true)
+  try { setChartVisible(projectId, true) }
+  catch { /* Visibility is optional; the imported score is already durable. */ }
   // New music is a new part: start at the first page rather than wherever the
   // player had scrolled the one it replaced.
   saveChartView(projectId, { ...loadChartView(projectId), fraction: 0 })
@@ -134,10 +171,25 @@ export async function deletePracticeChart(projectId: string): Promise<void> {
       try { await Filesystem.deleteFile({ path: saved.filePath, directory: Directory.Data }) }
       catch (error) { if (!isFilesystemMissingError(error)) throw error }
     }
+    localStorage.removeItem(metadataKey(projectId))
+  } else {
+    const previousMetadata = localStorage.getItem(metadataKey(projectId))
+    localStorage.removeItem(metadataKey(projectId))
+    try { await deleteWebPracticeChart(projectId) }
+    catch (error) {
+      if (previousMetadata !== null) {
+        try { localStorage.setItem(metadataKey(projectId), previousMetadata) }
+        catch {
+          throw new Error('Music is still stored on this device, but its library entry could not be restored. Keep this page open and retry the delete; the loaded score remains available.')
+        }
+      }
+      throw error
+    }
   }
-  localStorage.removeItem(metadataKey(projectId))
-  localStorage.removeItem(viewKey(projectId))
-  setChartVisible(projectId, true)
+  try { localStorage.removeItem(viewKey(projectId)) }
+  catch { /* The durable score is gone; a stale reading position is harmless. */ }
+  try { setChartVisible(projectId, true) }
+  catch { /* Visibility is optional and must not retain a deleted chart in memory. */ }
   const old = charts.get(projectId)
   if (old?.objectUrl) URL.revokeObjectURL(old.objectUrl)
   charts.delete(projectId)

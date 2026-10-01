@@ -133,6 +133,7 @@ export default function PracticeChartLayer({
   const [loadFailed, setLoadFailed] = useState(false)
   const [spreadAvailable, setSpreadAvailable] = useState(false)
   const [strokes, setStrokes] = useState<InkStroke[]>([])
+  const [inkSaveFailed, setInkSaveFailed] = useState(false)
   /*
    * The marker is picked up for a moment and put down again, so it is not
    * remembered: a part must never open in marking mode, where the first tap
@@ -168,6 +169,7 @@ export default function PracticeChartLayer({
     setLoadFailed(false)
     setView(loadChartView(projectId))
     setStrokes(loadInkStrokes(projectId))
+    setInkSaveFailed(false)
     setMarker(null)
     setChromeOff(false)
     setPaperVisible(true)
@@ -384,14 +386,6 @@ export default function PracticeChartLayer({
     setSpreadAvailable(available)
   }, [])
 
-  const handleStroke = useCallback((stroke: InkStroke) => {
-    setStrokes(current => {
-      const next = [...current, stroke]
-      saveInkStrokes(projectId, next)
-      return next
-    })
-  }, [projectId])
-
   /*
    * The eraser moves faster than React re-renders, so it works from a mirror
    * of the list rather than from `strokes`: erasing off the last rendered
@@ -399,28 +393,31 @@ export default function PracticeChartLayer({
    */
   const strokesRef = useRef(strokes)
   strokesRef.current = strokes
+  const persistStrokes = useCallback((next: InkStroke[]) => {
+    strokesRef.current = next
+    setStrokes(next)
+    setInkSaveFailed(!saveInkStrokes(projectId, next))
+  }, [projectId])
+  const handleStroke = useCallback((stroke: InkStroke) => {
+    persistStrokes([...strokesRef.current, stroke])
+  }, [persistStrokes])
   const eraseAt = useCallback((
     page: number, x: number, y: number, radiusX: number, radiusY: number,
   ) => {
     const next = eraseStrokesAt(strokesRef.current, page, x, y, radiusX, radiusY)
     if (!next) return
-    strokesRef.current = next
-    saveInkStrokes(projectId, next)
-    setStrokes(next)
-  }, [projectId])
+    persistStrokes(next)
+  }, [persistStrokes])
 
   const undoStroke = useCallback(() => {
-    setStrokes(current => {
-      if (current.length === 0) return current
-      const next = current.slice(0, -1)
-      saveInkStrokes(projectId, next)
-      return next
-    })
-  }, [projectId])
+    if (strokesRef.current.length) persistStrokes(strokesRef.current.slice(0, -1))
+  }, [persistStrokes])
 
   const clearMarks = useCallback(() => {
-    clearInkStrokes(projectId)
+    if (!clearInkStrokes(projectId)) { setInkSaveFailed(true); return }
+    strokesRef.current = []
     setStrokes([])
+    setInkSaveFailed(false)
   }, [projectId])
 
   const saveMarked = useCallback(async () => {
@@ -704,6 +701,12 @@ export default function PracticeChartLayer({
         </div>
       </div>
     )}
+
+    {active && inkSaveFailed && <div className="practice-chart-ink-warning" role="alert">
+      <p>Your marking changes could not be saved. Keep this score open and save a PDF copy before leaving.</p>
+      <button type="button" disabled={saving} onClick={() => void saveMarked()}>{saving ? 'Saving…' : 'Save PDF copy'}</button>
+      <button type="button" onClick={() => setInkSaveFailed(!saveInkStrokes(projectId, strokesRef.current))}>Retry saving markings</button>
+    </div>}
 
     <MusicWidget
       boundaryRef={boundaryRef}

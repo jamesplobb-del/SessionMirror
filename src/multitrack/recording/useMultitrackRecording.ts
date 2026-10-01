@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
 import type { MultitrackRecordingPhase } from '../types'
+import { recordingCountInBars } from './multitrackCountIn'
 
 function recordingErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message
@@ -150,7 +151,7 @@ export function useMultitrackRecording(options: {
   }) => {
     if (activeRef.current) return
     const bpm = Math.max(40, Math.min(300, Math.round(settings?.bpm ?? 120)))
-    const countInBars = Math.max(0, Math.min(8, Math.round(settings?.countInBars ?? 1)))
+    const countInBars = recordingCountInBars(settings?.countInBars)
     const clickEnabled = settings?.clickEnabled !== false
 
     const generation = ++generationRef.current

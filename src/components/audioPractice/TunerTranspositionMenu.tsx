@@ -1,13 +1,17 @@
 import { Check, X } from 'lucide-react'
-import { memo, useEffect, useRef } from 'react'
+import { memo } from 'react'
 import {
-  TUNER_TRANSPOSITION_GROUPS,
-  TUNER_TRANSPOSITION_OPTIONS,
+  TUNER_KEY_OPTIONS,
+  getTunerKeyOption,
+  getTunerOctaveOptions,
+  tunerOctaveLabel,
   type TunerTranspositionId,
 } from '../../utils/tunerTransposition'
-import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../../utils/pitchConfig'
+import type { TunerInstrument } from '../../utils/pitchConfig'
+import TunerSensitivityControl from './TunerSensitivityControl'
 
-interface TunerTranspositionMenuProps {
+export interface TunerTranspositionMenuProps {
+  error?: string
   concertOnly?: boolean
   value: TunerTranspositionId
   onChange: (value: TunerTranspositionId) => void
@@ -18,6 +22,7 @@ interface TunerTranspositionMenuProps {
 }
 
 function TunerTranspositionMenu({
+  error,
   concertOnly = false,
   value,
   onChange,
@@ -25,12 +30,8 @@ function TunerTranspositionMenu({
   instrument,
   onInstrumentChange,
 }: TunerTranspositionMenuProps) {
-  const selectedRef = useRef<HTMLButtonElement | null>(null)
-
-  useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [])
-
+  const key = getTunerKeyOption(value)
+  const octaveOptions = getTunerOctaveOptions(value)
   return (
     <section className="tuner-transposition-menu" aria-label="Tuner settings">
       <header className="tuner-transposition-menu__header">
@@ -43,62 +44,33 @@ function TunerTranspositionMenu({
         </button>
       </header>
 
+      <div className="tuner-transposition-menu__body">
+      {error && <p className="tuner-key-error" role="alert">{error}</p>}
       {instrument && onInstrumentChange ? (
-        <div className="tuner-settings-source" data-guidance="tuner-profile">
-          <p className="tuner-settings-source__label">Instrument</p>
-          <div role="radiogroup" aria-label="Instrument">
-            {TUNER_INSTRUMENTS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                role="radio"
-                aria-checked={id === instrument}
-                className={id === instrument ? 'is-selected' : ''}
-                onClick={() => onInstrumentChange(id)}
-              >
-                {getTunerProfile(id).label}
-              </button>
-            ))}
-          </div>
-          <p className="tuner-settings-source__help">Choose what you’re playing. Voice, Strings and Winds listen differently. If a quiet note won’t register, check this first, then move closer. If the input is too loud, move back or lower your mic’s gain.</p>
+        <div className="tuner-settings-source">
+          <TunerSensitivityControl value={instrument} onChange={onInstrumentChange} />
         </div>
       ) : null}
 
-      {!concertOnly && <div className="tuner-transposition-menu__list" role="radiogroup" aria-label="Instrument">
-        {TUNER_TRANSPOSITION_GROUPS.map((group) => (
-          <div className="tuner-transposition-menu__group" key={group}>
-            <p>{group}</p>
-            <div>
-              {TUNER_TRANSPOSITION_OPTIONS.filter((option) => option.group === group).map(
-                (option) => {
-                  const selected = option.id === value
-                  return (
-                    <button
-                      key={option.id}
-                      ref={selected ? selectedRef : undefined}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      className={selected ? 'tuner-transposition-menu__option--selected' : ''}
-                      onClick={() => onChange(option.id)}
-                    >
-                      <span className="tuner-transposition-menu__key" aria-hidden>
-                        {option.keyLabel}
-                      </span>
-                      <span className="tuner-transposition-menu__copy">
-                        <strong>{option.label}</strong>
-                      </span>
-                      <span className="tuner-transposition-menu__check" aria-hidden>
-                        {selected ? <Check /> : null}
-                      </span>
-                    </button>
-                  )
-                },
-              )}
-            </div>
-          </div>
-        ))}
-      </div>}
+      {!concertOnly && <section className="tuner-key-settings" aria-label="Tuning key">
+        <h3>Key</h3>
+        <div className="tuner-key-options" role="group" aria-label="Instrument key">
+          {TUNER_KEY_OPTIONS.map(option => <button key={option.id} type="button"
+            aria-label={option.keyLabel} aria-pressed={option.id === key.id}
+            onClick={() => onChange(option.id === key.id ? value : option.id)}>
+            {option.keyLabel}{option.id === key.id && <Check aria-hidden />}
+          </button>)}
+        </div>
+        {octaveOptions.length > 1 && <details className="tuner-key-octave" key={key.id}>
+          <summary>Octave adjustment{value !== key.id ? ` · ${tunerOctaveLabel(value)}` : ''}</summary>
+          <label>Written part
+            <select aria-label="Written octave" value={value} onChange={event => onChange(event.currentTarget.value as TunerTranspositionId)}>
+              {octaveOptions.map(option => <option key={option.id} value={option.id}>{tunerOctaveLabel(option.id)}</option>)}
+            </select>
+          </label>
+        </details>}
+      </section>}
+      </div>
     </section>
   )
 }

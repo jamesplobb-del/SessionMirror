@@ -12,6 +12,7 @@ import {
   importPracticePlanFileFromText,
   isPracticePlanFileName,
 } from '../../utils/practiceRoutineShare'
+import { ROUTINE_APP_LINK_PREFIX, decodeRoutineLink } from '../../utils/routineLink'
 import type { PracticeTimeline } from '../types'
 import type { Routine } from '../../utils/practiceRoutines'
 
@@ -142,7 +143,39 @@ async function discardInboxCopy(url: string): Promise<void> {
   }
 }
 
+/** One place a received routine lands, whether it came as a file or a link. */
+async function acceptPracticePlanText(text: string): Promise<void> {
+  const plan = await importPracticePlanFileFromText(text)
+  if (plan.ok) {
+    pendingPracticePlan = plan.routine
+    for (const subscriber of practicePlanSubscribers) subscriber()
+  }
+  announce(
+    plan.ok
+      ? {
+          title: 'Routine Added',
+          message: plan.routine.steps.some(step => step.sharedScoreName)
+            ? `"${plan.routine.name}" is ready to set up. Add your music to its score slots, then start practicing.`
+            : `"${plan.routine.name}" is in your routines and ready to start.`,
+          tone: 'success',
+        }
+      : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },
+  )
+}
+
 async function handleIncomingUrl(url: string): Promise<void> {
+  // A routine sent as a link (Messages makes these tappable; files it can't open).
+  if (url.startsWith(ROUTINE_APP_LINK_PREFIX)) {
+    if (handledUrls.has(url)) return
+    handledUrls.add(url)
+    const text = await decodeRoutineLink(url)
+    if (text === null) {
+      announce({ title: "Couldn't Open Routine", message: 'That routine link is incomplete. Ask for it to be sent again.', tone: 'error' })
+      return
+    }
+    await acceptPracticePlanText(text)
+    return
+  }
   if (!url || !looksLikeFileUrl(url) || handledUrls.has(url)) return
 
   const name = fileNameFromUrl(url)
@@ -167,21 +200,8 @@ async function handleIncomingUrl(url: string): Promise<void> {
   }
 
   if (isPracticePlan) {
-    const plan = await importPracticePlanFileFromText(text)
     void discardInboxCopy(url)
-    if (plan.ok) {
-      pendingPracticePlan = plan.routine
-      for (const subscriber of practicePlanSubscribers) subscriber()
-    }
-    announce(
-      plan.ok
-        ? {
-            title: 'Routine Added',
-            message: `"${plan.routine.name}" is ready to set up. Add your music to its score slots, then start practicing.`,
-            tone: 'success',
-          }
-        : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },
-    )
+    await acceptPracticePlanText(text)
     return
   }
 

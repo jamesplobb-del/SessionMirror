@@ -49,3 +49,45 @@ export function loadExerciseLibrary(): SavedExercise[] {
 export function storeLibraryExercise(exercise: SavedExercise): void {
   localStorage.setItem(EXERCISES, JSON.stringify([exercise, ...loadExerciseLibrary().filter(item => item.step.id !== exercise.step.id)]))
 }
+
+export class RoutineLibraryRecoveryError extends Error {}
+
+/** Save one builder draft and its reusable exercises together, preserving the prior library on failure. */
+export function storeLibraryRoutineWithExercises(routine: Routine, previousRoutine?: Routine | null): void {
+  if (!canSaveRoutine(routine)) throw new Error('Plus is required to save another routine.')
+  let routines = loadRoutineLibrary()
+  // A stale Today copy must not overwrite the newer routine or its exercise setups.
+  if (routines.some(item => item.id === routine.id && item.updatedAt > routine.updatedAt)) return
+  const previous = previousRoutine?.id !== routine.id ? previousRoutine : null
+  if (previous && !canSaveRoutine(previous)) throw new Error('Plus is required to save another routine.')
+  for (const next of previous ? [previous, routine] : [routine]) {
+    if (!routines.some(item => item.id === next.id && item.updatedAt > next.updatedAt)) {
+      routines = [next, ...routines.filter(item => item.id !== next.id)]
+    }
+  }
+  let exercises = loadExerciseLibrary()
+  for (const step of routine.steps) {
+    exercises = [{ instrumentId: routine.instrumentId, step }, ...exercises.filter(item => item.step.id !== step.id)]
+  }
+  const snapshots = new Map([ROUTINES, EXERCISES].map(key => [key, localStorage.getItem(key)]))
+  const writes = [[EXERCISES, JSON.stringify(exercises)], [ROUTINES, JSON.stringify(routines)]]
+  const mutated: string[] = []
+  try {
+    for (const [key, value] of writes) {
+      if (snapshots.get(key) === value) continue
+      localStorage.setItem(key, value)
+      mutated.push(key)
+    }
+  } catch (cause) {
+    let rollbackFailed = false
+    for (const key of mutated.reverse()) {
+      try {
+        const value = snapshots.get(key)
+        if (value == null) localStorage.removeItem(key)
+        else localStorage.setItem(key, value)
+      } catch { rollbackFailed = true }
+    }
+    if (rollbackFailed) throw new RoutineLibraryRecoveryError('Saving failed, and some previous library data could not be restored. Your draft is still here; keep this screen open and try saving again.')
+    throw cause
+  }
+}

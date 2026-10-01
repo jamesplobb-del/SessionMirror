@@ -9,7 +9,7 @@
 
 export const PRIVACY_POLICY_URL = 'https://stalwart-salamander-9451ab.netlify.app/privacy.html'
 export const PRIVACY_CONTACT_EMAIL = 'BestTakeSupport@gmail.com'
-export const PRIVACY_EFFECTIVE_DATE = 'September 22, 2026'
+export const PRIVACY_EFFECTIVE_DATE = 'September 30, 2026'
 
 export interface PrivacySection {
   title: string
@@ -18,7 +18,7 @@ export interface PrivacySection {
 }
 
 export const PRIVACY_SUMMARY =
-  'BestTake has no accounts, no ads, no analytics, and no tracking. Your recordings, music, routines, and practice history stay on your device. The developer never sees them.'
+  'BestTake has no accounts and does not sell your data or track you across apps. Your recordings, music, routines, and practice history stay on your device unless you choose to share them. Technical diagnostics help us fix bugs. Optional YouTube references use Google’s privacy-enhanced player and may include non-personalized ads.'
 
 export const PRIVACY_SECTIONS: PrivacySection[] = [
   {
@@ -50,10 +50,11 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
       'A few features need the internet. This is everything that is sent, and why:',
     ],
     bullets: [
-      'Crash reports. If the app crashes or hits an error, a technical report is sent to Sentry, the service we use to find and fix bugs. It contains the device model, iOS and app version, and what the app was doing when it failed. It never contains your recordings, sheet music, names, or email address, and file names are removed before it is sent. Reports are not linked to your identity, not used for tracking, and are deleted automatically after a limited period.',
-      'YouTube search. When you search for a reference recording, the words you type are sent to BestTake’s search server, which asks YouTube for matching videos. Searches are kept in memory for up to 15 minutes so repeat searches are fast, and are not saved. Your network address is used only briefly to limit how often searches can be made. Our host, Netlify, may keep standard server logs for security.',
-      'YouTube playback. Reference videos play in YouTube’s own embedded player, so YouTube (Google) may collect information under Google’s privacy policy while a video is loaded.',
+      'Technical diagnostics. Crash reports, app-hang and performance information, and other technical diagnostics are sent to Sentry, the service we use to find and fix bugs. It contains the device model, iOS and app version, and what the app was doing when it failed. It never contains your recordings, sheet music, names, or email address, and file names are removed before it is sent. Reports are not linked to your identity, not used for tracking, and are deleted automatically after a limited period.',
+      'YouTube search. When you search for a reference recording, the words you type are sent to BestTake’s search server, which asks YouTube for matching videos. Search results and their query are cached in memory for up to 15 minutes so repeat searches are fast. We do not maintain a personal search history. Your network address is used only briefly to limit how often searches can be made. Our host, Netlify, may keep standard server logs for security.',
+      'YouTube playback. Reference videos use YouTube’s privacy-enhanced embedded player. Google may still collect video and ad interactions, browser or device identifiers, technical information, and your IP address, which can indicate approximate location, under Google’s privacy policy (https://policies.google.com/privacy). Privacy-enhanced mode does not mean no data is collected. Google says these embedded views do not personalize your YouTube browsing experience or ads outside BestTake, and any ads in this player are non-personalized. Leaving the player for YouTube or another website is covered by that service’s own privacy practices.',
       'Things you choose to send. When you share a take, share a routine, save to Photos, or email a bug report, it goes only where you send it.',
+      'Routine links. A shared routine link opens a page on BestTake’s website that hands the routine to the app. The routine is stored inside the link itself, after the # sign, which browsers never send to the website, so BestTake never receives it.',
       'iCloud backup. Takes are left out of your device’s iCloud backup unless you turn on “Include Takes in iCloud Backup” in Settings. Backups are handled by Apple.',
       'Purchases and promo codes are handled entirely by Apple. BestTake never receives your payment details.',
     ],

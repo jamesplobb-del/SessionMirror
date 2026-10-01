@@ -126,6 +126,7 @@ const TOPICS: readonly RoutineTopic[] = [
 const GAME_ROUTES: readonly LabsRoute[] = ['menu', 'staff-jumper', 'balance', 'learn-instrument']
 
 export const MAX_ROUTINE_STEPS = 12
+export const MAX_STEP_MINUTES = 180
 export const MAX_STEP_TITLE = 40
 export const MAX_ROUTINE_NAME = 28
 
@@ -207,7 +208,7 @@ export function createRoutine(name: string, steps: RoutineStep[], instrumentId: 
 
 export function clampMinutes(value: number): number {
   if (!Number.isFinite(value)) return 5
-  return Math.max(0, Math.min(60, Math.round(value)))
+  return Math.max(0, Math.min(MAX_STEP_MINUTES, Math.round(value)))
 }
 
 /* ---- Parsing ------------------------------------------------------------ */

@@ -4,9 +4,11 @@ import { useActionSheet } from '../../context/ActionSheetContext'
 import IOSSwitch from '../../components/ui/IOSSwitch'
 import Pressable from '../../components/ui/Pressable'
 import MultitrackClickSettings from './MultitrackClickSettings'
+import { recordingCountInBars } from '../recording/multitrackCountIn'
 export default function MultitrackCountInControls({ practice, onChange, hasBacking = false }: { practice: MultitrackPracticeSettings; onChange: (patch: Partial<MultitrackPracticeSettings>) => void; hasBacking?: boolean }) {
   const headphonesConnected = useHeadphoneOutput()
   const { showAlert } = useActionSheet()
+  const countInBars = recordingCountInBars(practice.countInBars)
   return (
           <div className="multitrack-countin-sheet">
             <label className="multitrack-countin-sheet__row">
@@ -44,21 +46,24 @@ export default function MultitrackCountInControls({ practice, onChange, hasBacki
                   type="button"
                   intensity="icon"
                   aria-label="Decrease count-in bars"
-                  onClick={() => onChange({ countInBars: Math.max(0, practice.countInBars - 1) })}
+                  disabled={countInBars <= 1}
+                  onClick={() => onChange({ countInBars: Math.max(1, countInBars - 1) })}
                 >
                   -
                 </Pressable>
-                <strong>{practice.countInBars}</strong>
+                <strong>{countInBars}</strong>
                 <Pressable
                   type="button"
                   intensity="icon"
                   aria-label="Increase count-in bars"
-                  onClick={() => onChange({ countInBars: Math.min(8, practice.countInBars + 1) })}
+                  disabled={countInBars >= 8}
+                  onClick={() => onChange({ countInBars: Math.min(8, countInBars + 1) })}
                 >
                   +
                 </Pressable>
               </div>
             </label>
+            <p className="multitrack-countin-sheet__hint">Every recording starts with a count-in. The click switch only changes what plays after it.</p>
             <MultitrackClickSettings
               practice={practice}
               onChange={onChange}

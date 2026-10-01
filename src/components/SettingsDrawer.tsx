@@ -21,7 +21,8 @@ import { motion } from 'framer-motion'
 import type { AppSettings } from '../utils/appSettings'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { describeHandsFreeGate } from '../utils/instrumentProfiles'
-import { getTunerProfile, TUNER_INSTRUMENTS, type TunerInstrument } from '../utils/pitchConfig'
+import TunerSensitivityControl from './audioPractice/TunerSensitivityControl'
+import { getTunerProfile } from '../utils/pitchConfig'
 import { DRONE_WAVEFORM_OPTIONS, type DroneWaveform } from '../utils/droneEngine'
 import AnimatedBottomSheet from './ui/AnimatedBottomSheet'
 import AnimatedExpand from './ui/AnimatedExpand'
@@ -594,7 +595,6 @@ function SettingsDrawer({
   const activeHelpTopic: HelpTopic | null = activeHelpTopicId
     ? helpTopicById.get(activeHelpTopicId) ?? null
     : null
-  const activeInstrument = getTunerProfile(settings.tunerInstrument)
 
   useEffect(() => {
     if (!isOpen) {
@@ -836,21 +836,9 @@ function SettingsDrawer({
           </SettingsSection>
 
           <SettingsSection id="tuner" title="Tuner">
-            <SettingsGroup
-              plain
-              footer={activeInstrument.description}
-            >
-              <SegmentBlock
-                label="Source Instrument"
-                hint="Tunes pitch detection and trace smoothing for the Tuner tab and pitch analysis."
-                value={settings.tunerInstrument}
-                layoutId="settings-instrument-segment"
-                onChange={(tunerInstrument: TunerInstrument) => onUpdate({ tunerInstrument })}
-                segments={TUNER_INSTRUMENTS.map((instrument) => ({
-                  id: instrument,
-                  label: getTunerProfile(instrument).label,
-                }))}
-              />
+            <SettingsGroup plain>
+              <TunerSensitivityControl value={settings.tunerInstrument}
+                onChange={tunerInstrument => onUpdate({ tunerInstrument })} />
             </SettingsGroup>
 
             <SettingsGroup footer="The Tuner tab always listens. This adds the same live readout to Audio Mode and Review between takes.">
@@ -983,7 +971,7 @@ function SettingsDrawer({
 
           <SettingsSection id="help" title="Help">
             <SettingsGroup title="Support" footer={`Report a bug opens an email draft for you to review and send. If your email app doesn’t open, email ${PRIVACY_CONTACT_EMAIL}.`}>
-              <BugReportLink email={PRIVACY_CONTACT_EMAIL} instrument={activeInstrument.label} />
+              <BugReportLink email={PRIVACY_CONTACT_EMAIL} instrument={getTunerProfile(settings.tunerInstrument).label} />
               <LinkRow
                 icon={ShieldCheck}
                 tint={TINT.green}

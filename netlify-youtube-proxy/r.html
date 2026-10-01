@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>BestTake Routine</title>
+  <meta property="og:title" content="A BestTake practice routine">
+  <meta property="og:description" content="Tap to open it in BestTake.">
+  <!-- The routine is in the link's #fragment, which browsers never send to this
+       server. This page only reads it locally and hands it to the app. -->
+  <style>
+    :root { color-scheme: light dark; --ink: #0f172a; --body: #334155; --muted: #64748b; --bg: #f8fbff; --panel: #ffffff; --line: #d8e6f2; --link: #0071e3; }
+    @media (prefers-color-scheme: dark) { :root { --ink: #f8fafc; --body: #cbd5e1; --muted: #94a3b8; --bg: #0b1220; --panel: #111a2c; --line: #24324a; --link: #4da3ff; } }
+    body { margin: 0; background: var(--bg); color: var(--body); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 32rem; margin: 0 auto; padding: 3rem 1rem 4rem; }
+    .eyebrow { color: var(--muted); font-size: .75rem; font-weight: 600; letter-spacing: .12em; }
+    h1 { color: var(--ink); font-size: 2rem; line-height: 1.2; margin: .4rem 0 .5rem; overflow-wrap: anywhere; }
+    ol { margin: 1.25rem 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+    li { display: flex; gap: .75rem; padding: .6rem 0; border-bottom: 1px solid var(--line); color: var(--ink); }
+    li span { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .open { display: block; margin: 2rem 0 .75rem; padding: 1rem; border-radius: 14px; background: #0071e3; color: #fff; font-weight: 600; text-align: center; text-decoration: none; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    a { color: var(--link); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">BESTTAKE ROUTINE</div>
+  <h1 id="name">Practice routine</h1>
+  <p id="summary" class="muted"></p>
+  <ol id="steps"></ol>
+  <a id="open" class="open" href="#">Open in BestTake</a>
+  <p class="muted">Don’t have BestTake? <a href="https://apps.apple.com/app/id6786522172">Get it on the App Store</a>, then come back and tap Open in BestTake.</p>
+  <p id="error" class="muted" hidden>This link looks incomplete. Ask for the routine to be sent again.</p>
+</main>
+<script>
+  (async () => {
+    const fragment = location.hash.slice(1)
+    const open = document.getElementById('open')
+    if (!fragment.startsWith('v1.')) {
+      open.hidden = true
+      document.getElementById('error').hidden = false
+      return
+    }
+    open.href = 'besttake://routine#' + fragment
+    // Show what's inside before the tap. Purely local; failure just skips it.
+    try {
+      const b64 = fragment.slice(3).replace(/-/g, '+').replace(/_/g, '/')
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+      const plan = JSON.parse(await new Response(stream).text())
+      const routine = plan.routine || {}
+      const steps = Array.isArray(routine.steps) ? routine.steps : []
+      if (routine.name) { document.getElementById('name').textContent = routine.name; document.title = routine.name + ' · BestTake' }
+      const minutes = steps.reduce((sum, step) => sum + (Number(step.minutes) || 0), 0)
+      document.getElementById('summary').textContent = steps.length + (steps.length === 1 ? ' exercise' : ' exercises') + (minutes ? ' · about ' + minutes + ' min' : '')
+      const list = document.getElementById('steps')
+      steps.slice(0, 20).forEach((step, index) => {
+        const item = document.createElement('li')
+        const number = document.createElement('span')
+        number.textContent = String(index + 1).padStart(2, '0')
+        item.append(number, document.createTextNode(String(step.title || 'Exercise')))
+        list.append(item)
+      })
+    } catch { /* The app does the real import; the preview is optional. */ }
+  })()
+</script>
+</body>
+</html>

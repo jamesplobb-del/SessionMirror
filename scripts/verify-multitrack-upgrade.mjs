@@ -178,7 +178,8 @@ try {
   await build({stdin:{contents:"export * from './src/multitrack/recording/useMultitrackRecording'; export * from './src/multitrack/state/useMultitrackSession'",resolveDir:process.cwd(),loader:'ts'},outfile:join(lifecycleDir,'recording.mjs'),bundle:true,platform:'node',format:'esm',plugins:[{name:'recording-boundaries',setup(b){
     b.onResolve({filter:/^react$/},()=>({path:'react',namespace:'harness'}))
     b.onResolve({filter:/sharedMetronomeEngine$/},()=>({path:'click',namespace:'harness'}))
-    b.onLoad({filter:/.*/,namespace:'harness'},({path})=>({contents:path==='react' ? `export const useRef=v=>({current:v}); export const useCallback=f=>f; export const useEffect=()=>{}; export const useMemo=f=>f(); export const useState=v=>[typeof v==='function'?v():v,n=>globalThis.recordingStates.push(n)];` : 'export const sharedMetronomeEngine={stop(){}}',loader:'js'}))
+    b.onResolve({filter:/plusAccess$/},()=>({path:'plus',namespace:'harness'}))
+    b.onLoad({filter:/.*/,namespace:'harness'},({path})=>({contents:path==='react' ? `export const useRef=v=>({current:v}); export const useCallback=f=>f; export const useEffect=()=>{}; export const useMemo=f=>f(); export const useState=v=>[typeof v==='function'?v():v,n=>globalThis.recordingStates.push(n)];` : path==='plus' ? 'export const requirePlus=()=>true' : 'export const sharedMetronomeEngine={stop(){}}',loader:'js'}))
   }}]})
   const {useMultitrackRecording,useMultitrackSession}=await import(pathToFileURL(join(lifecycleDir,'recording.mjs')))
   const flush=()=>new Promise(r=>setTimeout(r,5))

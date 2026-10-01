@@ -74,7 +74,7 @@
 		<dict>
 			<key>UTTypeIdentifier</key><string>com.besttake.app.multitrack</string>
 			<key>UTTypeDescription</key><string>BestTake Multitrack Project</string>
-			<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+			<key>UTTypeConformsTo</key><array><string>public.data</string><string>public.content</string></array>
 			<key>UTTypeTagSpecification</key><dict>
 				<key>public.filename-extension</key><array><string>btmulti</string></array>
 			<key>public.mime-type</key><string>application/vnd.besttake.multitrack</string>
@@ -88,6 +88,7 @@
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
+				<string>public.content</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
@@ -109,6 +110,7 @@
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
+				<string>public.content</string>
 			</array>
 			<key>UTTypeTagSpecification</key>
 			<dict>
@@ -123,9 +125,11 @@
 			</dict>
 		</dict>
 	</array>
-	<!-- Copy the file into our Inbox rather than editing the sender's copy in place. -->
+	<!-- True so Files and Messages offer a one-tap "Open in BestTake" beside Share
+	     (as forScore does). The sender's file is never edited: AppDelegate copies
+	     it into the app while it holds the security-scoped access. -->
 	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<false/>
+	<true/>
 	<key>UIApplicationShortcutItems</key>
 	<array>
 		<dict>

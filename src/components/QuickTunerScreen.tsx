@@ -13,7 +13,8 @@ import {
   saveAppSettings,
   type AppSettings,
 } from '../utils/appSettings'
-import { getTunerProfile, TUNER_INSTRUMENTS } from '../utils/pitchConfig'
+import { getTunerProfile } from '../utils/pitchConfig'
+import TunerSensitivityControl from './audioPractice/TunerSensitivityControl'
 import { getTunerTransposition } from '../utils/tunerTransposition'
 import {
   isAppInForeground,
@@ -356,18 +357,7 @@ export default function QuickTunerScreen({ request, onExit, embedded = false }: 
       </section>
 
       <footer className="quick-tuner-footer">
-        <div className="quick-tuner-instrument-picker" aria-label="Source instrument">
-          {TUNER_INSTRUMENTS.map((instrument) => (
-            <button
-              key={instrument}
-              type="button"
-              aria-pressed={settings.tunerInstrument === instrument}
-              onClick={() => updateInstrument(instrument)}
-            >
-              {getTunerProfile(instrument).label}
-            </button>
-          ))}
-        </div>
+        <TunerSensitivityControl value={settings.tunerInstrument} onChange={updateInstrument} />
         {!embedded && <button type="button" className="quick-tuner-return" onClick={handleExit}>
           Return to BestTake
         </button>}

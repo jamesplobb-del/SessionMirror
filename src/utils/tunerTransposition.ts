@@ -184,6 +184,28 @@ export const TUNER_TRANSPOSITION_GROUPS: readonly TunerTranspositionGroup[] = [
   'Other keys',
 ]
 
+/** One visible choice per key; octave variants retain their existing stored IDs. */
+export const TUNER_KEY_OPTIONS: readonly TunerTranspositionOption[] =
+  (['concert', 'd_high', 'eb', 'f', 'g', 'a', 'bb'] as const).map(id => TRANSPOSITION_BY_ID.get(id)!)
+
+export function getTunerKeyOption(id: TunerTranspositionId): TunerTranspositionOption {
+  const option = getTunerTransposition(id)
+  return TUNER_KEY_OPTIONS.find(key => key.keyLabel === option.keyLabel) ?? TUNER_KEY_OPTIONS[0]
+}
+
+export function getTunerOctaveOptions(id: TunerTranspositionId): readonly TunerTranspositionOption[] {
+  const key = getTunerKeyOption(id)
+  return TUNER_TRANSPOSITION_OPTIONS.filter(option => option.keyLabel === key.keyLabel)
+    .sort((a, b) => a.writtenOffsetSemitones - b.writtenOffsetSemitones)
+}
+
+export function tunerOctaveLabel(id: TunerTranspositionId): string {
+  const option = getTunerTransposition(id)
+  const shift = (option.writtenOffsetSemitones - getTunerKeyOption(id).writtenOffsetSemitones) / 12
+  return shift === 0 ? 'Standard for this key'
+    : `Written ${Math.abs(shift) === 1 ? 'one octave' : 'two octaves'} ${shift < 0 ? 'lower' : 'higher'}`
+}
+
 export function isTunerTranspositionId(value: unknown): value is TunerTranspositionId {
   return typeof value === 'string' && TRANSPOSITION_BY_ID.has(value as TunerTranspositionId)
 }

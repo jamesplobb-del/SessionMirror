@@ -7,8 +7,20 @@ import {pathToFileURL} from 'node:url'
 const dir=await mkdtemp(join(tmpdir(),'program-share-'))
 const data=new Map()
 globalThis.localStorage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)}
+// Keep the real chart storage/metadata code; replace only its browser-only IndexedDB adapter.
+// The real IndexedDB persistence boundary is covered by the browser reload regression.
+const webCharts=new Map()
+globalThis.__programShareWebCharts=webCharts
+const webStoreFixture={name:'program-share-web-store',setup(b){
+ b.onResolve({filter:/\/webPracticeChartStorage$/},()=>({path:'web-store',namespace:'program-share-fixture'}))
+ b.onLoad({filter:/.*/,namespace:'program-share-fixture'},()=>({contents:`
+  export async function loadWebPracticeChart(id){return structuredClone(globalThis.__programShareWebCharts.get(id)??null)}
+  export async function saveWebPracticeChart(id,record){globalThis.__programShareWebCharts.set(id,structuredClone(record))}
+  export async function deleteWebPracticeChart(id){globalThis.__programShareWebCharts.delete(id)}
+ `}))
+}}
 try {
- await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/utils/practiceChartStorage'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage'; export * from './src/practiceTimeline/storage/routineFile';`,resolveDir:process.cwd()},bundle:true,plugins:[{name:'plus-entitled-fixture',setup(b){b.onResolve({filter:/\/plusAccess$/},()=>({path:'plus',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const canUsePlus=()=>true, requirePlus=()=>true'}))}}],format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
+ await build({stdin:{contents:`export * from './src/utils/practiceRoutineShare'; export * from './src/utils/practiceRoutines'; export * from './src/utils/practiceChartStorage'; export * from './src/practiceTimeline/sectionDefaults'; export * from './src/practiceTimeline/storage/timelineStorage'; export * from './src/practiceTimeline/storage/routineFile';`,resolveDir:process.cwd()},bundle:true,plugins:[webStoreFixture,{name:'plus-entitled-fixture',setup(b){b.onResolve({filter:/\/plusAccess$/},()=>({path:'plus',namespace:'fixture'}));b.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const canUsePlus=()=>true, requirePlus=()=>true'}))}}],format:'esm',platform:'node',outfile:join(dir,'test.mjs')})
  const m=await import(pathToFileURL(join(dir,'test.mjs')))
  const program=m.saveTimeline({...m.createEmptyTimeline('Tempo ladder'),sections:[m.createDefaultSection({bpm:92,meter:'6/8',bars:8}),m.createDefaultSection({bpm:112,meter:'4/4',bars:4})]})
  const routine=m.createRoutine('Warm up',[m.createStep({title:'Long tones',kind:'metro',programId:program.id}),m.createStep({title:'Repeat',kind:'metro',programId:program.id})],null)
@@ -32,6 +44,8 @@ try {
  const scoreId='sender-score'
  const scoreBytes=new Uint8Array([37,80,68,70,45,49,46,55,10])
  await m.savePracticeChart(scoreId,new File([scoreBytes],'Etude.pdf',{type:'application/pdf'}))
+ assert.deepEqual(new Uint8Array(await webCharts.get(scoreId).blob.arrayBuffer()),scoreBytes,'Actual chart storage writes score bytes through its adapter')
+ assert.equal(m.practiceChartName(scoreId),'Etude.pdf','Chart metadata remains available to routine sharing')
  const musicPlan=m.createRoutine('Music practice',[m.createStep({title:'Etude',kind:'record',projectId:scoreId,desk:{...m.blankDesk('audio'),showMusic:true}})],null)
  const layout=m.buildPracticePlanFile(musicPlan)
  assert.equal(JSON.parse(layout).scores,undefined,'Layout must not contain music bytes')
@@ -59,4 +73,4 @@ try {
    }
  }
  console.log('PASS: linked programs, score placeholders, fresh IDs, meter/tempo pins, active program, legacy and malformed files')
-}finally{await rm(dir,{recursive:true,force:true})}
+}finally{delete globalThis.__programShareWebCharts;await rm(dir,{recursive:true,force:true})}

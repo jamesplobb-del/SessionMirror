@@ -12,6 +12,7 @@ import {
   type NotePitchInsight,
 } from '../utils/pitchInsightsAnalytics'
 import type { TunerTranspositionId } from '../utils/tunerTransposition'
+import { usePitchInstrumentProfiles } from './usePitchInstrumentProfiles'
 
 /** Wait until the live note has settled before speaking. Hunting should stay quiet. */
 const LIVE_COACH_HOLD_MS = 560
@@ -31,6 +32,8 @@ export function useLivePitchCoach({
   suppressed: boolean
 }): string | null {
   const [observations, setObservations] = useState<PitchObservation[]>([])
+  const { activeProfile } = usePitchInstrumentProfiles()
+  const instrumentProfileId = activeProfile?.id ?? null
   const [holdReady, setHoldReady] = useState(false)
   const activeRef = useRef(false)
 
@@ -43,12 +46,16 @@ export function useLivePitchCoach({
     }
 
     activeRef.current = true
+    setObservations([])
+    setHoldReady(false)
     let cancelled = false
+    let loadSequence = 0
 
     const load = async () => {
+      const sequence = ++loadSequence
       try {
-        const rows = await listPitchObservations({ transpositionId, limit: LIVE_COACH_OBSERVATION_LIMIT })
-        if (!cancelled && activeRef.current) setObservations(rows)
+        const rows = await listPitchObservations({ transpositionId, instrumentProfileId, limit: LIVE_COACH_OBSERVATION_LIMIT })
+        if (!cancelled && activeRef.current && sequence === loadSequence) setObservations(rows)
       } catch (error) {
         console.warn('[LivePitchCoach] Failed to load pitch history', error)
       }
@@ -62,6 +69,7 @@ export function useLivePitchCoach({
 
       if (detail?.kind === 'saved') {
         if (detail.observation.transpositionId !== transpositionId) return
+        if ((detail.observation.instrumentProfileId ?? null) !== instrumentProfileId) return
         setObservations((current) => {
           if (current.some((observation) => observation.id === detail.observation.id)) {
             return current
@@ -72,11 +80,15 @@ export function useLivePitchCoach({
       }
 
       if (detail?.kind === 'cleared') {
+        loadSequence += 1
         setObservations([])
         return
       }
 
       if (detail?.kind === 'range-deleted') {
+        if (detail.transpositionId != null && detail.transpositionId !== transpositionId) return
+        if (detail.instrumentProfileId !== undefined && detail.instrumentProfileId !== instrumentProfileId) return
+        loadSequence += 1
         setObservations((current) =>
           current.filter(
             (observation) =>
@@ -96,7 +108,7 @@ export function useLivePitchCoach({
       activeRef.current = false
       window.removeEventListener(PITCH_INSIGHTS_UPDATED_EVENT, handleUpdate)
     }
-  }, [enabled, transpositionId])
+  }, [enabled, transpositionId, instrumentProfileId])
 
   useEffect(() => {
     if (!enabled || suppressed || concertMidi == null) {
@@ -107,15 +119,16 @@ export function useLivePitchCoach({
     setHoldReady(false)
     const timer = window.setTimeout(() => setHoldReady(true), LIVE_COACH_HOLD_MS)
     return () => window.clearTimeout(timer)
-  }, [concertMidi, enabled, suppressed])
+  }, [concertMidi, enabled, suppressed, transpositionId, instrumentProfileId])
 
   const insightByMidi = useMemo(() => {
     const map = new Map<number, NotePitchInsight>()
-    for (const insight of aggregatePitchInsights(observations)) {
+    for (const insight of aggregatePitchInsights(observations.filter(observation =>
+      observation.transpositionId === transpositionId && (observation.instrumentProfileId ?? null) === instrumentProfileId))) {
       map.set(insight.midiNote, insight)
     }
     return map
-  }, [observations])
+  }, [observations, transpositionId, instrumentProfileId])
 
   if (!enabled || suppressed || !holdReady || concertMidi == null) return null
 

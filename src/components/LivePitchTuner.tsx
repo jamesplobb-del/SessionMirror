@@ -15,10 +15,12 @@ import {
 } from '../hooks/useLivePitchTracker'
 import DroneSoundWheel from './audioPractice/DroneSoundWheel'
 import PitchInsightsScreen from './audioPractice/PitchInsightsScreen'
-import TunerTranspositionMenu from './audioPractice/TunerTranspositionMenu'
+import TunerSettingsDialog from './audioPractice/TunerSettingsDialog'
 import TuningGauge from './audioPractice/TuningGauge'
 import { useTunerWash } from '../hooks/useTunerWash'
 import { useLivePitchCoach } from '../hooks/useLivePitchCoach'
+import { usePitchInstrumentProfiles } from '../hooks/usePitchInstrumentProfiles'
+import { changePitchInstrumentKey } from '../utils/pitchInstrumentProfiles'
 import { triggerLightHaptic } from '../utils/haptics'
 import {
   formatDisplayCents,
@@ -26,7 +28,6 @@ import {
   getIntonationColor,
   getIntonationZone,
   isInTune,
-  midiToNoteName,
   type PitchReadout,
 } from '../utils/pitchUtils'
 import type { PitchCanvasTheme, TunerInstrument } from '../utils/pitchConfig'
@@ -38,7 +39,12 @@ import {
   transposePitchReadout,
   type TunerTranspositionId,
 } from '../utils/tunerTransposition'
-import { deletePitchObservationsForSessionRange, savePitchObservation } from '../db/pitchInsightsRepository'
+import {
+  deletePitchObservationsForSessionRange,
+  PITCH_INSIGHTS_RESET_EVENT,
+  savePitchObservation,
+  type PitchInsightsResetDetail,
+} from '../db/pitchInsightsRepository'
 import { StableNoteTracker } from '../utils/stableNoteTracker'
 import {
   loadPitchInsightsCaptureEnabled,
@@ -54,7 +60,12 @@ import { showPlus } from '../plus/plusAccess'
 import { usePlus } from '../plus/usePlus'
 import '../styles/pitch-insights-capture.css'
 
-type NoisyActivityPrompt = NoisyPitchWindow & { status: 'suggested' | 'deleting' | 'failed' }
+type NoisyActivityPrompt = NoisyPitchWindow & {
+  status: 'suggested' | 'deleting' | 'failed'
+  sessionId: string
+  transpositionId: string
+  instrumentProfileId: string | null
+}
 
 interface LivePitchTunerProps {
   nativePitchProcessing?: boolean
@@ -262,6 +273,7 @@ export function LiveAudioTunerPane({
   noisyActivityPrompt,
   onKeepInsightsOn,
   onTurnOffAndClearRecent,
+  transpositionError,
 }: {
   readout: PitchReadout
   canvasRef: RefObject<HTMLCanvasElement | null>
@@ -269,7 +281,7 @@ export function LiveAudioTunerPane({
   onDroneInteraction?: () => void
   tunerInstrument?: TunerInstrument
   tunerTransposition: TunerTranspositionId
-  onTunerTranspositionChange?: (value: TunerTranspositionId) => void
+  onTunerTranspositionChange?: (value: TunerTranspositionId) => void | boolean
   onTunerInstrumentChange?: (value: TunerInstrument) => void
   hapticsEnabled?: boolean
   insightsEnabled?: boolean
@@ -283,6 +295,7 @@ export function LiveAudioTunerPane({
   noisyActivityPrompt?: NoisyActivityPrompt | null
   onKeepInsightsOn?: () => void
   onTurnOffAndClearRecent?: () => void
+  transpositionError?: string
 }) {
   const notifyTutorial = useTutorialAction()
   const plus = usePlus()
@@ -390,7 +403,7 @@ export function LiveAudioTunerPane({
 
   const selectTransposition = (value: TunerTranspositionId) => {
     triggerLightHaptic(tunerHapticsEnabled)
-    onTunerTranspositionChange?.(value)
+    if (onTunerTranspositionChange?.(value) === false) return
     setTranspositionOpen(false)
   }
 
@@ -565,23 +578,15 @@ export function LiveAudioTunerPane({
               ) : null}
 
               {transpositionOpen && onTunerTranspositionChange ? (
-                <PremiumMotionSection
+                <TunerSettingsDialog
                   key="transposition-panel"
-                  id="pitch-living-transposition-panel"
-                  className="pitch-living-transposition-panel"
-                  initial={{ y: '105%', opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: '105%', opacity: 0, transitionEnd: motionExitHide }}
-                  transition={premiumMotion({type:"spring",stiffness:390,damping:36}, 'panel')}
-                >
-                  <TunerTranspositionMenu
                     value={tunerTransposition}
                     onChange={selectTransposition}
                     onClose={toggleTransposition}
                     instrument={tunerInstrument}
                     onInstrumentChange={onTunerInstrumentChange}
-                  />
-                </PremiumMotionSection>
+                    error={transpositionError}
+                />
               ) : null}
             </AnimatePresence>
           </>
@@ -595,12 +600,8 @@ export function LiveAudioTunerPane({
             setInsightsOpen(false)
           }}
           transpositionId={tunerTransposition}
+          onLegacyTranspositionChange={onTunerTranspositionChange}
           tunerInstrument={tunerInstrument}
-          formatNoteName={(midiNote) =>
-            midiToNoteName(
-              midiNote + getTunerTransposition(tunerTransposition).writtenOffsetSemitones,
-            )
-          }
           hapticFeedback={tunerHapticsEnabled}
           captureEnabled={insightsCaptureEnabled}
           onCaptureEnabledChange={onInsightsCaptureChange}
@@ -672,8 +673,8 @@ function LivePitchTunerAudio({
   liveMicEnabled,
   micStreamRef,
   tunerInstrument = 'voice',
-  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
-  onTunerTranspositionChange,
+  tunerTransposition: suppliedTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  onTunerTranspositionChange: persistTransposition,
   onTunerInstrumentChange,
   hapticsEnabled,
   liveMicOnly = false,
@@ -702,13 +703,26 @@ function LivePitchTunerAudio({
   audioToolsEnabled?: boolean
   nativePitchProcessing?: boolean
 }) {
+  const { activeProfile } = usePitchInstrumentProfiles()
+  const tunerTransposition = activeProfile?.transpositionId ?? suppliedTransposition
+  const [transpositionError, setTranspositionError] = useState('')
+  const onTunerTranspositionChange = useCallback((value: TunerTranspositionId) => {
+    try {
+      changePitchInstrumentKey(value, persistTransposition, suppliedTransposition)
+      setTranspositionError('')
+      return true
+    } catch {
+      setTranspositionError('Could not change the instrument key on this device. Your previous selection remains. Please try again.')
+      return false
+    }
+  }, [persistTransposition, suppliedTransposition])
   const [inputAdvice, setInputAdvice] = useState<TunerInputAdvice>(null)
   const [dismissedAdvice, setDismissedAdvice] = useState<TunerInputAdvice[]>([])
   const advicePrompt = tunerAdvicePrompt(inputAdvice, tunerInstrument)
   useEffect(() => { setInputAdvice(null) }, [tunerInstrument, enabled])
   const pitchHistoryRef = useRef<TunerHistorySample[]>([])
   const visualTraceRef = useRef<TunerTrace>(createTunerTrace())
-  useEffect(() => { pitchHistoryRef.current = []; visualTraceRef.current = createTunerTrace() }, [tunerInstrument, tunerTransposition])
+  useEffect(() => { pitchHistoryRef.current = []; visualTraceRef.current = createTunerTrace() }, [tunerInstrument, tunerTransposition, activeProfile?.id])
   const liveCanvasRef = useRef<HTMLCanvasElement>(null)
   const playbackCanvasRef = useRef<HTMLCanvasElement>(null)
   const droneAnalysisSuppressUntilRef = useRef(0)
@@ -720,11 +734,15 @@ function LivePitchTunerAudio({
     tunerInstrument,
     transpositionId: tunerTransposition,
     sessionId: insightsSessionIdRef.current,
+    instrumentProfileId: activeProfile?.id ?? null,
+    instrumentProfileName: activeProfile?.name ?? null,
   })
   insightsContextRef.current = {
     ...insightsContextRef.current,
     tunerInstrument,
     transpositionId: tunerTransposition,
+    instrumentProfileId: activeProfile?.id ?? null,
+    instrumentProfileName: activeProfile?.name ?? null,
   }
   const [insightsCaptureEnabled, setInsightsCaptureEnabled] = useState(loadPitchInsightsCaptureEnabled)
   const insightsCaptureEnabledRef = useRef(insightsCaptureEnabled)
@@ -742,6 +760,18 @@ function LivePitchTunerAudio({
       })
     })
   }
+  useLayoutEffect(() => {
+    stableNoteTrackerRef.current?.finish()
+    activityDetectorRef.current.reset()
+  }, [activeProfile?.id, tunerTransposition])
+  useLayoutEffect(() => {
+    const handleReset = (event: Event) => {
+      const detail = (event as CustomEvent<PitchInsightsResetDetail>).detail
+      if (detail) stableNoteTrackerRef.current?.reset(detail)
+    }
+    window.addEventListener(PITCH_INSIGHTS_RESET_EVENT, handleReset)
+    return () => window.removeEventListener(PITCH_INSIGHTS_RESET_EVENT, handleReset)
+  }, [])
   // A sustained in-app drone is valid tuner context, but it is not reliable
   // evidence of the musician's own pitch. With music capture processing the
   // speaker can bleed into the microphone, so keep the live readout running
@@ -760,7 +790,9 @@ function LivePitchTunerAudio({
       return
     }
     if (!frame || insightsSuppressedRef.current) {
-      tracker.finish()
+      // Silence also releases a reset-discarded held note, so a fresh attempt
+      // at the same pitch can be collected normally.
+      tracker.ingest(null, insightsContextRef.current)
       activityDetectorRef.current.observe(null, frame?.timestamp ?? Date.now())
       return
     }
@@ -768,7 +800,11 @@ function LivePitchTunerAudio({
     if (noisyWindow) {
       insightsPausedForPromptRef.current = true
       tracker.discard()
-      setNoisyActivityPrompt({ ...noisyWindow, status: 'suggested' })
+      setNoisyActivityPrompt({
+        ...noisyWindow, status: 'suggested', sessionId: insightsSessionIdRef.current!,
+        transpositionId: insightsContextRef.current.transpositionId,
+        instrumentProfileId: insightsContextRef.current.instrumentProfileId ?? null,
+      })
       return
     }
     tracker.ingest(
@@ -835,7 +871,8 @@ function LivePitchTunerAudio({
     stableNoteTrackerRef.current?.discard()
     setNoisyActivityPrompt({ ...noisyActivityPrompt, status: 'deleting' })
     void deletePitchObservationsForSessionRange(
-      insightsSessionIdRef.current!, noisyActivityPrompt.startAt, noisyActivityPrompt.endAt,
+      noisyActivityPrompt.sessionId, noisyActivityPrompt.startAt, noisyActivityPrompt.endAt,
+      { transpositionId: noisyActivityPrompt.transpositionId, instrumentProfileId: noisyActivityPrompt.instrumentProfileId },
     ).then(() => {
       insightsPausedForPromptRef.current = false
       activityDetectorRef.current.reset()
@@ -947,6 +984,7 @@ function LivePitchTunerAudio({
               tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
+              transpositionError={transpositionError}
               onTunerInstrumentChange={onTunerInstrumentChange}
               hapticsEnabled={hapticsEnabled}
               insightsEnabled={audioToolsEnabled && liveMicOnly}
@@ -967,6 +1005,7 @@ function LivePitchTunerAudio({
               tunerInstrument={tunerInstrument}
               tunerTransposition={tunerTransposition}
               onTunerTranspositionChange={onTunerTranspositionChange}
+              transpositionError={transpositionError}
               onTunerInstrumentChange={onTunerInstrumentChange}
               hapticsEnabled={hapticsEnabled}
               insightsEnabled={audioToolsEnabled && liveMicOnly}
@@ -1009,7 +1048,7 @@ export default function LivePitchTuner({
   micStreamRef,
   persistWhenPaused = false,
   tunerInstrument = 'voice',
-  tunerTransposition = DEFAULT_TUNER_TRANSPOSITION,
+  tunerTransposition: suppliedTransposition = DEFAULT_TUNER_TRANSPOSITION,
   onTunerTranspositionChange,
   onTunerInstrumentChange,
   hapticsEnabled,
@@ -1021,6 +1060,8 @@ export default function LivePitchTuner({
   audioToolsEnabled = true,
   nativePitchProcessing = false,
 }: LivePitchTunerProps) {
+  const { activeProfile } = usePitchInstrumentProfiles()
+  const tunerTransposition = activeProfile?.transpositionId ?? suppliedTransposition
   const isPanel = variant === 'panel'
   const isWidget = variant === 'widget'
   const isAudio = variant === 'audio'

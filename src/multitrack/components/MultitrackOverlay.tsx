@@ -38,6 +38,7 @@ import { isHeadphoneOutputActive } from '../../utils/headphoneOutput'
 import { useHeadphoneOutput } from '../../hooks/useHeadphoneOutput'
 import { useActionSheet } from '../../context/ActionSheetContext'
 import { useMultitrackSession } from '../state/useMultitrackSession'
+import { missingMultitrackFiles, missingMultitrackMessage } from '../state/multitrackReadiness'
 import { useMultitrackSync } from '../synchronization/useMultitrackSync'
 import { useMultitrackRecording } from '../recording/useMultitrackRecording'
 import BestTakeAudioPlugin from '../../utils/audioSessionRoute'
@@ -226,6 +227,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   useEffect(() => { setRenderedVideo(null) }, [session])
   const sync = useMultitrackSync()
   const { showAlert, showConfirm } = useActionSheet()
+  const missingFiles = missingMultitrackFiles(session)
+  const recoveryMessage = missingFiles.length > 0 ? missingMultitrackMessage(missingFiles) : null
+  // File recovery is derived from the current session, so reconnecting or
+  // excluding a part clears its warning without hiding unrelated save errors.
+  const workspaceNotice = persistenceNotice === session.recoveryNotice ? null : persistenceNotice
   const [projectFileBusy, setProjectFileBusy] = useState(false)
   const projectFileBusyRef = useRef(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
@@ -426,6 +432,10 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
   const startBackingPlayback = useCallback(async () => {
     const backing = session.backing
     if (backing.kind === 'none') return false
+    if (backing.kind === 'audio' && backing.missing) {
+      void showAlert({ message: `${backing.fileName} needs reconnecting. Open Tools → Backing to choose the file again.`, tone: 'error' })
+      return false
+    }
     const stopAt = session.endSec ?? null
 
     if (backing.kind === 'audio') {
@@ -451,7 +461,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     // loading. Its onLoad handler will start it once the player is ready.
     setBackingPlaying(true)
     return iframe !== null
-  }, [session.backing, session.endSec])
+  }, [session.backing, session.endSec, showAlert])
 
   const scheduleYoutubeBackingStart = useCallback(async (performanceEpochMs: number) => {
     clearYoutubeStartSchedule()
@@ -484,6 +494,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
 
   const handleExport = useCallback((destination: 'share' | 'vault' | 'preview') => {
     if (exportLock.current) return
+    const missing = missingMultitrackFiles(session)
+    if (missing.length > 0) {
+      void showAlert({ message: missingMultitrackMessage(missing), tone: 'error' })
+      return
+    }
     exportLock.current = true
     setIsExporting(true)
     setExportProgress(0)
@@ -554,6 +569,9 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         that only exists later in the song. */
     startAtSec = 0,
   ): Promise<MultitrackMonitorSource[]> => {
+    const missing = missingMultitrackFiles(session, { targetPanelId,
+      monitorMutes: respectRecordingMonitorMutes ? monitorMutesRef.current : undefined })
+    if (missing.length > 0) throw new Error(missingMultitrackMessage(missing))
     const sources: MultitrackMonitorSource[] = []
     const startSec = startAtSec
 
@@ -639,9 +657,15 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     }
 
     return sources
-  }, [session.backing, session.panels, session.endSec, session.practice.bpm, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
+  }, [session.backing, session.sheetMusic, session.panels, session.endSec, session.practice.bpm, sync.getPanelTimelineSettings, sync.getPanelMediaDuration])
 
-  const playAllFromStart = useCallback(async (requestedStart = 0) => {
+  const playAllFromStartRef = useRef<(requestedStart?: number, isRetry?: boolean) => Promise<boolean>>(async () => false)
+  const playAllFromStart = useCallback(async (requestedStart = 0, isRetry = false): Promise<boolean> => {
+    const missing = missingMultitrackFiles(session)
+    if (missing.length > 0) {
+      void showAlert({ message: missingMultitrackMessage(missing), tone: 'error' })
+      return false
+    }
     if (session.backing.kind === 'audio' && backingAudioRef.current) {
       await waitForMediaReady(backingAudioRef.current, 2500)
       sync.setBackingDurationSec(backingAudioRef.current.duration)
@@ -736,6 +760,16 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       sync.pause()
       pauseBacking()
       await stopNativeGridPlayback()
+      // A project opened moments ago (a shared file, a fresh launch) can fail
+      // its first mix while iOS is still preparing the new recordings and the
+      // audio session; the same Play All succeeds a moment later. Retry thrown
+      // startup errors once before showing an error, unless playback was stopped.
+      if (!isRetry) {
+        const retryGeneration = nativeGridPlaybackGenerationRef.current
+        await new Promise(resolve => window.setTimeout(resolve, 800))
+        if (retryGeneration !== nativeGridPlaybackGenerationRef.current) return false
+        return playAllFromStartRef.current(requestedStart, true)
+      }
       void showAlert({
         message: error instanceof Error
           ? error.message
@@ -755,12 +789,13 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
     prepareBackingAtStart,
     scheduleYoutubeBackingStart,
     startBackingPlayback,
-    session.backing.kind, session.endSec, session.panels,
+    session.backing, session.sheetMusic, session.endSec, session.panels,
     session.practice.bpm, session.practice.meter, session.practice.clickSound,
     showAlert,
     stopNativeGridPlayback,
     sync,
   ])
+  playAllFromStartRef.current = playAllFromStart
 
   useEffect(() => {
     const audio = backingAudioRef.current
@@ -839,6 +874,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       onStopRecording()
     },
     onArmPlayback: async (panelId) => {
+      const missing = missingMultitrackFiles(session, { targetPanelId: panelId, monitorMutes: monitorMutesRef.current })
+      if (missing.length > 0) throw new Error(missingMultitrackMessage(missing))
       await restoreRecordingReadiness()
       if (session.backing.kind === 'youtube') {
         await prepareBackingAtStart()
@@ -1584,7 +1621,8 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               </Pressable>
             </header>
             {isRestoring && !persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">Opening workspace…</p> : null}
-            {persistenceNotice ? <p role="status" className="px-4 py-2 text-sm">{persistenceNotice}</p> : null}
+            {workspaceNotice ? <p role="status" className="px-4 py-2 text-sm">{workspaceNotice}</p> : null}
+            {recoveryMessage ? <p role="status" className="px-4 py-2 text-sm">{recoveryMessage}</p> : null}
             <div inert={isRestoring || isExporting} className={`multitrack-overlay__body ${alignStageOpen ? 'multitrack-overlay__body--editing' : ''}`}>
               {layoutEditing && <>
                 <div className="multitrack-studio-actions multitrack-arrange-actions">
@@ -1821,7 +1859,7 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
         if (takePickerPanelId) {
           const panel = session.panels.find(p => p.id === takePickerPanelId)
           assignTakeToPanel(takePickerPanelId, take)
-          if (panel?.kind === 'performance' && panel.overlay) {
+          if (panel?.kind === 'performance' && panel.overlay && panel.missingTakeId !== take.id) {
             const start = panel.sectionStartSec ?? 0
             const sourceIn = Math.max(0, timelineOffsetMsForTake(take, session.practice.bpm) / 1000)
             updatePanel(panel.id, { timelineOffsetMs: -start * 1000, trimStartSec: sourceIn,
@@ -2116,8 +2154,11 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
       >
         <div className="multitrack-sheet">
           <p className="multitrack-sheet__title">
-            {tileSheetTake ? tileSheetTake.name || 'Part options' : 'Add a part'}
+            {tileSheetTake ? tileSheetTake.name || 'Part options' : tileSheetPanel?.kind === 'performance' && tileSheetPanel.missingTakeId ? 'Reconnect missing recording' : 'Add a part'}
           </p>
+          {tileSheetPanel?.kind === 'performance' && tileSheetPanel.missingTakeId && !tileSheetTake ? (
+            <p role="status">Choose the recording from Take Vault, record a replacement, or exclude this part until you reconnect it.</p>
+          ) : null}
           <div className="multitrack-sheet__primary-row">
             <Pressable
               type="button"
@@ -2146,6 +2187,12 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
           </div>
           {!tileSheetTake ? (
             <div className="multitrack-sheet__more-row">
+              {tileSheetPanel?.kind === 'performance' && tileSheetPanel.missingTakeId ? (
+                <Pressable type="button" intensity="soft" className="multitrack-sheet__more" onClick={() => {
+                  updatePanel(tileSheetPanel.id, { hidden: true })
+                  setTileSheetPanelId(null)
+                }}>Exclude this part for now</Pressable>
+              ) : null}
               <Pressable
                 type="button"
                 intensity="soft"
@@ -2328,6 +2375,18 @@ export default function MultitrackOverlay(props: MultitrackOverlayProps) {
               Save to Take Vault
             </Pressable>
           </div>
+          {/* The editable project, not the rendered video: someone else can add a
+              part and send it back. The same action lives in Projects. */}
+          <Pressable
+            type="button"
+            intensity="soft"
+            className="multitrack-sheet__primary"
+            disabled={projectFileBusy || isExporting}
+            onClick={() => void handleProjectFile()}
+          >
+            <Share2 className="h-6 w-6" />
+            {projectFileBusy ? 'Working…' : 'Share project'}
+          </Pressable>
         </div>
       </AnimatedBottomSheet>
 

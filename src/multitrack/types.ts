@@ -4,6 +4,8 @@ export type MultitrackPanelKind = 'performance' | 'sheet-music'
 
 export interface SheetMusicAsset {
   src: string
+  /** Retains the durable source and layout until the player reconnects/removes it. */
+  missing?: boolean
   mimeType: string
   fileName: string
   x: number
@@ -108,7 +110,7 @@ export interface MultitrackPracticeSettings {
 
 export type MultitrackBackingTrack =
   | { kind: 'none'; volume: number }
-  | { kind: 'audio'; src: string; fileName: string; mimeType: string; volume: number }
+  | { kind: 'audio'; src: string; fileName: string; mimeType: string; volume: number; missing?: boolean }
   | { kind: 'youtube'; embedUrl: string; label: string; volume: number }
 
 export type MultitrackAspectRatio = '9:16' | '16:9' | '1:1'

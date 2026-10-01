@@ -19,6 +19,11 @@ export function normalizePassage(value: unknown): PracticePassage {
   return { startSeconds: start, endSeconds: validEnd, positionSeconds: seconds(raw.positionSeconds) ?? 0,
     loop: raw.loop === true && start !== null && validEnd !== null }
 }
+export function passageExceedsDuration(passage: PracticePassage, duration: number | null): boolean {
+  return duration !== null && Number.isFinite(duration) && duration > 0 &&
+    ((passage.startSeconds !== null && passage.startSeconds > duration) ||
+      (passage.endSeconds !== null && passage.endSeconds > duration))
+}
 function key(projectId: string, sourceId: string): string { return PREFIX + encodeURIComponent(projectId) + ':' + encodeURIComponent(sourceId) }
 export function loadPracticePassage(projectId: string, sourceId: string): PracticePassage {
   try { return normalizePassage(JSON.parse(localStorage.getItem(key(projectId, sourceId)) ?? 'null')) }

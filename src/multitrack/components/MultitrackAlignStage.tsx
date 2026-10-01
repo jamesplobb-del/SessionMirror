@@ -1045,7 +1045,7 @@ export default function MultitrackAlignStage({
                         onPointerUp={window.isBase ? undefined : endImageDrag}
                         onPointerCancel={window.isBase ? undefined : () => { imageDragRef.current = null; setImageDrag(null) }}
                       >
-                        {window.asset.mimeType === 'application/pdf' ? null : (
+                        {window.asset.missing || window.asset.mimeType === 'application/pdf' ? null : (
                           <img
                             src={window.asset.src}
                             alt=""
@@ -1054,7 +1054,7 @@ export default function MultitrackAlignStage({
                           />
                         )}
                         <span className="multitrack-align-stage__image-name">
-                          {window.asset.fileName}
+                          {window.asset.fileName}{window.asset.missing ? ' · file missing' : ''}
                         </span>
                       </div>
                     )

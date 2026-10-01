@@ -32,6 +32,11 @@ import {
   savePersistentWidgetPosition,
 } from '../utils/floatingWidgetLayout'
 import {
+  clampTakeCardTranslation,
+  hasUsableTakeCardBounds,
+  takeCardBoundsAreStable,
+} from '../utils/takeCardLayout'
+import {
   triggerConfirmedLongPressHaptic,
   triggerDragStartHaptic,
   triggerLightHaptic,
@@ -198,10 +203,6 @@ const TAKE_CARD_MOVE_HOLD_MS = 425
 const TAKE_CARD_MOVE_CANCEL_PX = 12
 const TAKE_CARD_BOUNDARY_INSET = 8
 const TAKE_CARD_DRAG_COMPLETION_PX = 3
-const viewportChangedEnoughToReposition = (
-  previous: { width: number; height: number },
-  next: { width: number; height: number },
-) => Math.abs(next.width - previous.width) > 80 || Math.abs(next.height - previous.height) > 200
 
 function MovableTakeSlot({
   movable,
@@ -251,7 +252,6 @@ function MovableTakeSlot({
   const savedPosition = useRef(loadPersistentWidgetPosition(positionId))
   const [cardScale, setCardScale] = useState(() => loadTakeCardScale(positionId))
   const resizeRef = useRef<{ x: number; y: number; scale: number; width: number; height: number } | null>(null)
-  const lastViewportSize = useRef({ width: window.innerWidth, height: window.innerHeight })
   const dragX = useMotionValue(savedPosition.current?.x ?? 0)
   const dragY = useMotionValue(savedPosition.current?.y ?? 0)
   const handledResetNonceRef = useRef(resetNonce)
@@ -270,8 +270,15 @@ function MovableTakeSlot({
   const [armed, setArmed] = useState(false)
   const [dragging, setDragging] = useState(false)
 
+  const currentBoundsAreUsable = useCallback(() => {
+    const rect = boundaryRef.current?.getBoundingClientRect()
+    return Boolean(rect && hasUsableTakeCardBounds({
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+    }))
+  }, [boundaryRef])
+
   const clampPositionToBoundary = useCallback(() => {
-    if (!positioningActive || !movable || editing || draggingRef.current) return
+    if (!positioningActive || !movable || editing || draggingRef.current || resizeRef.current) return
     // Dialog/keyboard geometry is temporary, not a new position for the cards.
     if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
     const node = slotNodeRef.current
@@ -280,29 +287,21 @@ function MovableTakeSlot({
 
     const currentX = dragX.get()
     const currentY = dragY.get()
-    if (!savedPosition.current && currentX === 0 && currentY === 0) return
     const rect = node.getBoundingClientRect()
     const bounds = boundary.getBoundingClientRect()
-    if (rect.width <= 0 || rect.height <= 0 || bounds.width <= 0 || bounds.height <= 0) {
-      return
-    }
-
-    const centerX = (rect.left + rect.right) / 2 - currentX
-    const centerY = (rect.top + rect.bottom) / 2 - currentY
-    const baseLeft = centerX - node.offsetWidth * cardScale / 2
-    const baseRight = centerX + node.offsetWidth * cardScale / 2
-    const baseTop = centerY - node.offsetHeight * cardScale / 2
-    const baseBottom = centerY + node.offsetHeight * cardScale / 2
-    const minX = bounds.left + TAKE_CARD_BOUNDARY_INSET - baseLeft
-    const maxX = bounds.right - TAKE_CARD_BOUNDARY_INSET - baseRight
-    const minY = bounds.top + TAKE_CARD_BOUNDARY_INSET - baseTop
-    const maxY = bounds.bottom - TAKE_CARD_BOUNDARY_INSET - baseBottom
-    const clampAxis = (value: number, min: number, max: number) =>
-      min <= max
-        ? Math.min(max, Math.max(min, value))
-        : (min + max) / 2
-    const nextX = clampAxis(currentX, minX, maxX)
-    const nextY = clampAxis(currentY, minY, maxY)
+    const next = clampTakeCardTranslation({
+      bounds: { left: bounds.left, top: bounds.top, width: bounds.width, height: bounds.height },
+      card: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      width: node.offsetWidth,
+      height: node.offsetHeight,
+      scale: cardScale,
+      position: savedPosition.current ?? { x: 0, y: 0 },
+      renderedPosition: { x: currentX, y: currentY },
+      inset: TAKE_CARD_BOUNDARY_INSET,
+    })
+    if (!next) return
+    const nextX = next.x
+    const nextY = next.y
     if (Math.abs(nextX - currentX) < 0.5 && Math.abs(nextY - currentY) < 0.5) {
       return
     }
@@ -314,37 +313,53 @@ function MovableTakeSlot({
 
   useLayoutEffect(() => {
     if (!positioningActive) return
-    if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
-    const size = { width: window.innerWidth, height: window.innerHeight }
-    if (!viewportChangedEnoughToReposition(lastViewportSize.current, size)) return
-    lastViewportSize.current = size
-    clampPositionToBoundary()
-  }, [clampPositionToBoundary, positioningActive])
+    const boundary = boundaryRef.current
+    const node = slotNodeRef.current
+    if (!boundary || !node) return
 
-  useEffect(() => {
     let frame: number | null = null
-    const scheduleClamp = () => {
-      if (!positioningActive) return
+    let previousBounds: { left: number; top: number; width: number; height: number } | null = null
+    let attempts = 0
+    const sampleUntilStable = () => {
+      frame = null
       if (isYoutubeDialogOpen() || document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')) return
-      const size = { width: window.innerWidth, height: window.innerHeight }
-      if (!viewportChangedEnoughToReposition(lastViewportSize.current, size)) return
-      lastViewportSize.current = size
-      if (frame !== null) window.cancelAnimationFrame(frame)
-      frame = window.requestAnimationFrame(() => {
-        frame = null
+      const rect = boundary.getBoundingClientRect()
+      const nextBounds = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      attempts += 1
+      if (!hasUsableTakeCardBounds(nextBounds)) {
+        previousBounds = null
+      } else if (takeCardBoundsAreStable(previousBounds, nextBounds)) {
         clampPositionToBoundary()
-      })
+        previousBounds = null
+        attempts = 0
+        return
+      } else {
+        previousBounds = nextBounds
+      }
+      // Hidden overlays can report zero-sized bounds. Stop sampling after a
+      // short settle window; ResizeObserver will wake us when the shell returns.
+      if (attempts < 24) frame = window.requestAnimationFrame(sampleUntilStable)
     }
-
+    const scheduleClamp = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      previousBounds = null
+      attempts = 0
+      frame = window.requestAnimationFrame(sampleUntilStable)
+    }
+    const observer = new ResizeObserver(scheduleClamp)
+    observer.observe(boundary)
+    observer.observe(node)
     window.addEventListener('resize', scheduleClamp)
     window.addEventListener('orientationchange', scheduleClamp)
+    scheduleClamp()
 
     return () => {
+      observer.disconnect()
       window.removeEventListener('resize', scheduleClamp)
       window.removeEventListener('orientationchange', scheduleClamp)
       if (frame !== null) window.cancelAnimationFrame(frame)
     }
-  }, [clampPositionToBoundary, positioningActive])
+  }, [boundaryRef, clampPositionToBoundary, positioningActive])
 
   useEffect(() => {
     if (handledResetNonceRef.current === resetNonce) return
@@ -494,7 +509,7 @@ function MovableTakeSlot({
 
   const handleDragEnd = useCallback(() => {
     const completedLayoutDrag = dragTravelRef.current >= TAKE_CARD_DRAG_COMPLETION_PX
-    if (completedLayoutDrag) {
+    if (completedLayoutDrag && currentBoundsAreUsable()) {
       savedPosition.current = { x: dragX.get(), y: dragY.get() }
       savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
     }
@@ -505,7 +520,7 @@ function MovableTakeSlot({
     releaseClickSuppressionSoon()
     dragTravelRef.current = 0
     if (completedLayoutDrag) onLayoutDragCompleted()
-  }, [dragX, dragY, onLayoutDragCompleted, positionId, releaseClickSuppressionSoon])
+  }, [currentBoundsAreUsable, dragX, dragY, onLayoutDragCompleted, positionId, releaseClickSuppressionSoon])
 
   const assignDropRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -622,7 +637,7 @@ function MovableTakeSlot({
           const start = resizeRef.current
           const node = slotNodeRef.current
           const boundary = boundaryRef.current
-          if (!start || !node || !boundary) return
+          if (!start || !node || !boundary || !currentBoundsAreUsable()) return
           event.stopPropagation()
           const rect = node.getBoundingClientRect(), bounds = boundary.getBoundingClientRect()
           const cx = (rect.left + rect.right)/2, cy = (rect.top + rect.bottom)/2
@@ -633,9 +648,11 @@ function MovableTakeSlot({
         onPointerUp={event => {
           if (!resizeRef.current) return
           event.stopPropagation(); resizeRef.current = null
-          saveTakeCardScale(positionId, cardScale)
-          savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
-          savedPosition.current = {x:dragX.get(),y:dragY.get()}
+          if (currentBoundsAreUsable()) {
+            saveTakeCardScale(positionId, cardScale)
+            savePersistentWidgetPosition(positionId, dragX.get(), dragY.get())
+            savedPosition.current = {x:dragX.get(),y:dragY.get()}
+          }
           onLayoutDragCompleted(); releaseClickSuppressionSoon()
           event.currentTarget.releasePointerCapture(event.pointerId)
         }}

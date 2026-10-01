@@ -18,7 +18,9 @@ export function withOverlayLeadIn(
   trimStart: number,
   offsetMs: number,
 ): { trimStart: number; offsetMs: number; leadIn: number } {
-  const leadIn = overlayLeadInSec(panel, bpm)
+  // Only expose footage that actually precedes the retained source. Changing
+  // trim and offset by different amounts moves the performance itself.
+  const leadIn = Math.min(overlayLeadInSec(panel, bpm), Math.max(0, trimStart))
   if (!leadIn) return { trimStart, offsetMs, leadIn: 0 }
   return {
     trimStart: Math.max(0, trimStart - leadIn),

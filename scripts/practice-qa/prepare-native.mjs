@@ -6,7 +6,13 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const destination = path.join(root, 'scripts/practice-qa/results/native-workspace')
+const argumentsList = process.argv.slice(2)
+if (argumentsList.length && (argumentsList.length !== 2 || argumentsList[0] !== '--name')) {
+  throw new Error('Usage: node scripts/practice-qa/prepare-native.mjs [--name workspace-name]')
+}
+const workspaceName = argumentsList[1] ?? 'native-workspace'
+if (!/^[a-z0-9][a-z0-9-]*$/.test(workspaceName)) throw new Error('Use a simple lowercase workspace name.')
+const destination = path.join(root, 'scripts/practice-qa/results', workspaceName)
 if (fs.existsSync(destination)) throw new Error('Native QA workspace already exists; use it or archive it before preparing another.')
 if (!fs.existsSync(path.join(root, 'dist/index.html'))) throw new Error('Build the current web app first.')
 fs.mkdirSync(path.join(destination, 'scripts'), { recursive: true })

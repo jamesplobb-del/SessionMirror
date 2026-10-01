@@ -33,7 +33,7 @@ export function MultitrackBackingMediaHost({
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    if (backing.kind !== 'audio') {
+    if (backing.kind !== 'audio' || backing.missing) {
       audio.pause()
       audio.removeAttribute('src')
       audio.load()
@@ -45,7 +45,7 @@ export function MultitrackBackingMediaHost({
     audio.volume = backing.volume
     audio.preload = 'auto'
     audio.load()
-  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, onAudioDurationChange])
+  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, backing.kind === 'audio' && backing.missing, onAudioDurationChange])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -118,6 +118,7 @@ export default function MultitrackBackingTrackPanel({
   const [stageOffset, setStageOffset] = useState({ x: 0, y: 0 })
   const volume = backing.volume
   const hasBacking = backing.kind !== 'none'
+  const missingBacking = backing.kind === 'audio' && backing.missing === true
 
   useEffect(() => {
     if (backing.kind !== 'youtube') return
@@ -129,7 +130,7 @@ export default function MultitrackBackingTrackPanel({
     const audio = audioRef.current
     if (!audio) return
 
-    if (backing.kind !== 'audio') {
+    if (backing.kind !== 'audio' || backing.missing) {
       audio.pause()
       audio.removeAttribute('src')
       audio.load()
@@ -139,7 +140,7 @@ export default function MultitrackBackingTrackPanel({
     audio.src = backing.src
     audio.preload = 'auto'
     audio.load()
-  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, renderMedia])
+  }, [audioRef, backing.kind, backing.kind === 'audio' ? backing.src : null, backing.kind === 'audio' && backing.missing, renderMedia])
 
   useEffect(() => {
     if (!renderMedia) return
@@ -285,12 +286,12 @@ export default function MultitrackBackingTrackPanel({
               {backing.kind === 'none'
                 ? 'Import audio to record and export with your parts'
                 : backing.kind === 'audio'
-                  ? 'Synced with every recording'
+                  ? missingBacking ? 'File missing · reconnect to keep your mix settings' : 'Synced with every recording'
                   : 'Practice reference · approximate timing · excluded from export'}
             </span>
           </div>
         </div>
-        <Pressable type="button" intensity="icon" onClick={onTogglePlayback} disabled={!hasBacking} className="multitrack-backing-strip__play" aria-label={isPlaying ? 'Pause backing track' : 'Play backing track'}>
+        <Pressable type="button" intensity="icon" onClick={onTogglePlayback} disabled={!hasBacking || missingBacking} className="multitrack-backing-strip__play" aria-label={isPlaying ? 'Pause backing track' : 'Play backing track'}>
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Pressable>
       </div>
@@ -298,7 +299,7 @@ export default function MultitrackBackingTrackPanel({
       <div className="multitrack-backing-strip__controls">
         <Pressable type="button" intensity="soft" onClick={() => fileInputRef.current?.click()} className="multitrack-backing-strip__chip">
           <Upload className="h-3.5 w-3.5" />
-          Import audio
+          {missingBacking ? 'Reconnect audio' : 'Import audio'}
         </Pressable>
         <label className="multitrack-backing-strip__volume">
           <span>Vol</span>

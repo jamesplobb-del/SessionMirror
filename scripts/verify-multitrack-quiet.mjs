@@ -18,7 +18,7 @@ assert.equal(relaid.panels[0].frame,undefined,'choosing another layout clears th
 assert.deepEqual(relaid.panels.slice(0,2).map(p=>p.take),takes.slice(0,2),'changing layouts preserves recordings')
 assert.notDeepEqual(m.compositionRects(relaid,m.getLayoutPreset('three'),0).panelRects.a,moved.panels[0].frame,'the new preset controls visible geometry')
 let raw={xPercent:40,yPercent:40,widthPercent:32,heightPercent:28}
-for(let i=0;i<20;i++){raw=m.transformBox(raw,'move',i%2?1:-1,0);const shown=m.spacedLayoutRect(raw,original.layoutStyle);assert.ok(shown.widthPercent<32);assert.equal(raw.widthPercent,32,'repeated dragging does not accumulate spacing shrink')}
+for(let i=0;i<20;i++){raw=m.transformBox(raw,'move',i%2?1:-1,0);const shown=m.spacedLayoutRect(raw,original.layoutStyle);assert.deepEqual(shown,raw,'legacy spacing cannot inset boxes or accumulate shrink during dragging')}
 assert.equal(raw.xPercent,40)
 const clip={trimStart:1,trimEnd:20,duration:30,offsetMs:-3000}
 for(const delta of [-100,-1,.05,2,100]){
@@ -34,7 +34,7 @@ const storage=new Map();globalThis.localStorage={getItem:k=>storage.get(k)??null
 globalThis.window={localStorage:globalThis.localStorage}
 await m.saveMultitrackSession(draft)
 const restored=await m.loadMultitrackSession(takes,draft.projectId)
-assert.deepEqual(restored.layoutStyle,original.layoutStyle)
+assert.deepEqual(restored.layoutStyle,{gap:0,cornerRadius:12},'reopening removes legacy spacing and retains rounded corners')
 assert.equal(restored.panels.filter(p=>p.overlay).length,4)
 assert.deepEqual(restored.panels.map(p=>p.take?.id),draft.panels.map(p=>p.take?.id))
 assert.deepEqual(m.compositionRects(restored,m.getLayoutPreset('two'),0),m.compositionRects(draft,m.getLayoutPreset('two'),0),'reopening preserves visible geometry')

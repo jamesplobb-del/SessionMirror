@@ -1049,7 +1049,7 @@ export function pitchClassesMatch(detected: number, target: number): boolean {
  */
 
 export function readoutToConcertPitchClass(readout: PitchReadout): number | null {
-  if (!Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null
+  if (!Number.isFinite(readout.midi) || !Number.isFinite(readout.frequencyHz) || readout.frequencyHz < MIN_GAMEPLAY_HZ) return null
   if (readout.frequencyHz > MAX_GAMEPLAY_HZ) return null
   if (!readout.noteName || readout.noteName === '—') return null
   return ((Math.round(readout.midi) % 12) + 12) % 12
@@ -1067,25 +1067,33 @@ export function getDetectedPitchClass(
   return ((concertPitchClass + writtenOffset) % 12 + 12) % 12
 }
 
+export function getDetectedWrittenMidi(
+  readout: PitchReadout,
+  config: Pick<StaffJumperConfig, 'transposition'>,
+): number | null {
+  if (readoutToConcertPitchClass(readout) == null) return null
+  return Math.round(readout.midi) + getTunerTransposition(config.transposition).writtenOffsetSemitones
+}
+
 export function isReadoutCorrectPitch(
   readout: PitchReadout,
-  targetPitchClass: number,
+  targetWrittenMidi: number,
   config: Pick<StaffJumperConfig, 'difficulty' | 'transposition'>,
 ): boolean {
-  const detected = getDetectedPitchClass(readout, config)
+  const detected = getDetectedWrittenMidi(readout, config)
   if (detected == null) return false
-  if (!pitchClassesMatch(detected, targetPitchClass)) return false
+  if (detected !== targetWrittenMidi) return false
   return config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20
 }
 
 export function isReadoutWrongPitch(
   readout: PitchReadout,
-  targetPitchClass: number,
+  targetWrittenMidi: number,
   config: Pick<StaffJumperConfig, 'difficulty' | 'transposition'>,
 ): boolean {
-  const detected = getDetectedPitchClass(readout, config)
+  const detected = getDetectedWrittenMidi(readout, config)
   if (detected == null) return false
-  return !pitchClassesMatch(detected, targetPitchClass)
+  return detected !== targetWrittenMidi
 }
 
 export function loadBestScore(): number {

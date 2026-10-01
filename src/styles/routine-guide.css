@@ -461,7 +461,6 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
 .routine-guide-editor .routine-tool { border-color: var(--guide-line); padding-block: 12px; }
 .routine-guide-editor .practice-menu-eyebrow { color: var(--guide-accent); font-size: 10px; letter-spacing: .12em; }
 .routine-guide-editor .routine-item-page-heading { color: var(--guide-muted); margin: 0 0 18px; }
-.routine-goal-entry { margin-bottom: 28px; }
 .routine-swipe-hint { font-size: 12px; color: var(--guide-muted); margin: 0 0 12px; }
 .routine-guide :is(.routine-guide-lineup, .routine-guide-custom-list) > .routine-swipe-row { position: relative; display: block; overflow: hidden; padding: 0; border: 1px solid var(--guide-line); border-radius: 16px; background: #a3263b; }
 .routine-guide .routine-swipe-row > .routine-swipe-content { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 12px; background: var(--guide-panel); }

@@ -1169,6 +1169,13 @@ html.app-dark-mode .pitch-insights-screen {
   height: 0.95rem;
 }
 
+.pitch-insights-profile-form { display: grid; gap: 12px; padding: 16px; margin: 12px 0; border: 1px solid var(--pi-border); border-radius: 14px; background: var(--pi-surface); }
+.pitch-insights-profile-form label { display: grid; gap: 6px; color: var(--pi-text-secondary); font-size: 12px; font-weight: 600; }
+.pitch-insights-profile-form input, .pitch-insights-profile-form select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--pi-border-strong); border-radius: 10px; background: var(--pi-bg); color: var(--pi-text-primary); font: inherit; font-size: 16px; }
+.pitch-insights-profile-form button[type='submit'] { min-height: 44px; border: 1px solid var(--pi-border); border-radius: 10px; background: var(--pi-text-primary); color: var(--pi-bg); font-size: 14px; font-weight: 600; }
+.pitch-insights-profile-form button:disabled { opacity: .45; }
+.pitch-insights-profile-form p { margin: 0; color: var(--pi-text-secondary); font-size: 12px; line-height: 1.5; }
+
 .pitch-insights-instrument-picker {
   margin-top: 0.75rem;
   overflow: hidden;

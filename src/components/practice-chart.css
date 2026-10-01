@@ -1057,3 +1057,22 @@ html.app-dark-mode .takes-widget .audio-mode-take-card__mini-btn--best {
   visibility: hidden;
   pointer-events: none;
 }
+
+.practice-chart-ink-warning {
+  position: fixed;
+  z-index: 150;
+  top: calc(max(12px, env(safe-area-inset-top)) + 52px);
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  max-width: 520px;
+  margin-inline: auto;
+  padding: 12px;
+  border: 1px solid #e8b66b;
+  border-radius: 14px;
+  background: #fff8e9;
+  color: #563c13;
+  box-shadow: 0 6px 24px #0002;
+  pointer-events: auto;
+}
+.practice-chart-ink-warning p { margin: 0 0 8px; font-size: 13px; line-height: 1.4; }
+.practice-chart-ink-warning button { padding: 8px; border: 0; border-radius: 8px; background: #f6e4bd; color: inherit; font: inherit; font-size: 12px; margin: 0 8px 4px 0; }

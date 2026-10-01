@@ -21,6 +21,7 @@ import {
   getFloatingWidgetTopCenter,
   loadWidgetPosition,
   saveWidgetPosition,
+  settleClearOfMusicRail,
 } from '../utils/floatingWidgetLayout'
 import { triggerLightHaptic } from '../utils/haptics'
 import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
@@ -138,8 +139,9 @@ export default function DraggableDroneWidget({
   }, [boundaryRef, defaultTopOffset, dragX, dragY, positionId])
 
   const persistPosition = useCallback(() => {
+    settleClearOfMusicRail(dragX, widgetRef.current, boundaryRef.current)
     saveWidgetPosition(positionId, dragX.get(), dragY.get())
-  }, [dragX, dragY, positionId])
+  }, [boundaryRef, dragX, dragY, positionId])
 
   const reclampPosition = useCallback(() => {
     const bounds = boundaryRef.current
@@ -217,6 +219,7 @@ export default function DraggableDroneWidget({
       dragConstraints={boundaryRef}
       onPointerDown={handleShellPointerDown}
       onDragEnd={persistPosition}
+      onDragTransitionEnd={persistPosition}
       className={`drone-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${
         sounding ? 'drone-widget-draggable--sounding' : ''
       }`}

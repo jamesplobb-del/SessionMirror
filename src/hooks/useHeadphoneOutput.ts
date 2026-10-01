@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import { isHeadphoneOutputActive, subscribeHeadphoneOutput } from '../utils/headphoneOutput'
+import { isConfirmedHeadphoneOutputActive, isHeadphoneOutputActive, needsBluetoothHeadphoneConfirmation, subscribeConfirmedHeadphoneOutput, subscribeHeadphoneOutput } from '../utils/headphoneOutput'
 
 /**
  * Live headphone-output state (wired or Bluetooth), for UI that must not send
@@ -8,4 +8,14 @@ import { isHeadphoneOutputActive, subscribeHeadphoneOutput } from '../utils/head
  */
 export function useHeadphoneOutput(): boolean {
   return useSyncExternalStore(subscribeHeadphoneOutput, isHeadphoneOutputActive, () => false)
+}
+
+/** Private output confirmed from the native route; unknown and AirPlay are excluded. */
+export function useConfirmedHeadphoneOutput(): boolean {
+  return useSyncExternalStore(subscribeConfirmedHeadphoneOutput, isConfirmedHeadphoneOutputActive, () => false)
+}
+
+/** Bluetooth outputs can be speakers; require the player to confirm headphones. */
+export function useBluetoothHeadphoneConfirmation(): boolean {
+  return useSyncExternalStore(subscribeConfirmedHeadphoneOutput, needsBluetoothHeadphoneConfirmation, () => false)
 }

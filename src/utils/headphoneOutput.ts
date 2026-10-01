@@ -16,6 +16,54 @@ const HEADPHONE_OUTPUT_PORTS = new Set([
   'BluetoothHFP',
   'AirPlay',
 ])
+const BLUETOOTH_HEADPHONE_PORTS = new Set([
+  'BluetoothA2DPOutput',
+  'BluetoothA2DP',
+  'BluetoothLE',
+  'BluetoothHFP',
+])
+
+// A Bluetooth route may be a speaker. Require the musician to identify that
+// device as headphones; wired headphones are identified by the native port.
+export function hasConfirmedHeadphoneOutput(snapshot: AudioRouteSnapshot, bluetoothConfirmed = false): boolean {
+  const output = snapshot.outputPort ?? snapshot.portType
+  return output === 'Headphones' || (bluetoothConfirmed && output != null && BLUETOOTH_HEADPHONE_PORTS.has(output))
+}
+
+let latestSnapshot: AudioRouteSnapshot | null = null
+let bluetoothAcknowledged = false
+let bluetoothConfirmationNeeded = false
+let confirmedHeadphonesConnected = false
+const confirmedListeners = new Set<(connected: boolean) => void>()
+
+export function isConfirmedHeadphoneOutputActive(): boolean {
+  return confirmedHeadphonesConnected
+}
+
+export function needsBluetoothHeadphoneConfirmation(): boolean {
+  return bluetoothConfirmationNeeded
+}
+
+function refreshConfirmedSnapshot(): void {
+  const output = latestSnapshot?.outputPort ?? latestSnapshot?.portType
+  const needsConfirmation = output != null && BLUETOOTH_HEADPHONE_PORTS.has(output) && !bluetoothAcknowledged
+  const confirmed = latestSnapshot != null && hasConfirmedHeadphoneOutput(latestSnapshot, bluetoothAcknowledged)
+  if (confirmed === confirmedHeadphonesConnected && needsConfirmation === bluetoothConfirmationNeeded) return
+  confirmedHeadphonesConnected = confirmed
+  bluetoothConfirmationNeeded = needsConfirmation
+  for (const listener of confirmedListeners) listener(confirmed)
+}
+
+export function confirmBluetoothHeadphones(): void {
+  if (!bluetoothConfirmationNeeded) return
+  bluetoothAcknowledged = true
+  refreshConfirmedSnapshot()
+}
+
+export function subscribeConfirmedHeadphoneOutput(listener: (connected: boolean) => void): () => void {
+  confirmedListeners.add(listener)
+  return () => confirmedListeners.delete(listener)
+}
 
 let headphonesConnected = false
 let detectionInstalled = false
@@ -29,7 +77,18 @@ function snapshotHasHeadphones(snapshot: AudioRouteSnapshot): boolean {
   return output ? HEADPHONE_OUTPUT_PORTS.has(output) : false
 }
 
-function setHeadphonesConnected(next: boolean): void {
+function updateHeadphoneSnapshot(snapshot: AudioRouteSnapshot, routeEvent = false): void {
+  const previousPort = latestSnapshot?.outputPort ?? latestSnapshot?.portType
+  const outputPort = snapshot.outputPort ?? snapshot.portType
+  const previousUID = latestSnapshot?.outputUID || null
+  const outputUID = snapshot.outputUID || null
+  if (previousPort !== outputPort || previousUID !== outputUID || (routeEvent && (!previousUID || !outputUID))) {
+    bluetoothAcknowledged = false
+  }
+  latestSnapshot = { ...snapshot }
+  refreshConfirmedSnapshot()
+  // The broad playback gain hint remains independent of game confirmation.
+  const next = snapshotHasHeadphones(snapshot)
   if (next === headphonesConnected) return
   headphonesConnected = next
   for (const listener of listeners) listener(next)
@@ -55,11 +114,11 @@ export function initHeadphoneOutputDetection(): void {
   let routeEventObserved = false
   void BestTakeAudioPlugin.addListener('audioRouteChanged', (snapshot) => {
     routeEventObserved = true
-    setHeadphonesConnected(snapshotHasHeadphones(snapshot))
+    updateHeadphoneSnapshot(snapshot, true)
   })
     .then(() => BestTakeAudioPlugin.getPlaybackOutputProfile())
     .then((snapshot) => {
-      if (!routeEventObserved) setHeadphonesConnected(snapshotHasHeadphones(snapshot))
+      if (!routeEventObserved) updateHeadphoneSnapshot(snapshot)
     })
     .catch(() => {
       /* read-only probe — ignore if unavailable */

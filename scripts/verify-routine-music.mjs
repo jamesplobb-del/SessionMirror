@@ -1,5 +1,6 @@
 // Run: node scripts/verify-routine-music.mjs
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { build } from 'esbuild'
 
 const result = await build({
@@ -24,6 +25,20 @@ assert.equal(first.minutes, 0, 'Import should not require a duration')
 assert.equal(first.desk.mode, 'audio')
 assert.equal(first.desk.showMusic, true, 'New music must launch the existing reader')
 assert.notEqual(first.id, second.id)
+// Execute the actual builder's derived count: unscored practice items are not selected library rows.
+const builderSource = await readFile('src/components/MusicRoutineBuilder.tsx', 'utf8')
+const countExpression = builderSource.match(/const selectedMusicCount = ([^\n]+)/)?.[1]
+assert.ok(countExpression, 'Builder must derive its visible music selection count')
+assert.match(builderSource, /<span>\{selectedMusicCount\} selected<\/span>/)
+const countMusic = new Function('music', 'draft', `return ${countExpression}`)
+const visibleMusic = [{ step: first }, { step: second }]
+const oldPractice = [{ projectId: 'unscored-a' }, { projectId: 'unscored-b' }]
+assert.equal(countMusic([{ step: first }], { steps: oldPractice }), 0, 'Two old practice items cannot count as selected when the sole visible score is unchecked')
+const mixedSteps = [...oldPractice, first, { ...first, id: 'repeat-piece' }]
+const beforeCount = JSON.stringify(mixedSteps)
+assert.equal(countMusic(visibleMusic, { steps: mixedSteps }), 1, 'Repeated occurrences count as one selected library row')
+assert.equal(countMusic(visibleMusic, { steps: [...mixedSteps, second] }), 2)
+assert.equal(JSON.stringify(mixedSteps), beforeCount, 'Counting must preserve every draft item')
 first.referenceVideoId = 'dQw4w9WgXcQ'
 first.desk.showMetronome = true
 first.desk.pitchTrackerEnabled = true
@@ -71,4 +86,4 @@ const game = api.createStep({ kind: 'game', title: 'Game' })
 assert.equal(api.copyExerciseTools(first, game), game, 'Copy cannot change non-workspace exercises')
 await assert.rejects(api.prepareRoutineMusicFile(new File([], 'empty.pdf', { type: 'application/pdf' })), /empty/)
 await assert.rejects(api.prepareRoutineMusicFile(new File(['text'], 'notes.txt', { type: 'text/plain' })), /Choose a PDF/)
-console.log('PASS: empty library; individual imported scores; advanced settings persistence; reuse isolation; selective tool copying; invalid/empty files')
+console.log('PASS: empty library; selected score-row count; individual imported scores; advanced settings persistence; reuse isolation; selective tool copying; invalid/empty files')

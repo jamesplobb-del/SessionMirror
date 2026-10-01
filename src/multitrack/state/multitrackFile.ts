@@ -7,6 +7,8 @@ import type { Take } from '../../types'
 import type { MultitrackSession, PerformancePanelState, SheetMusicAsset } from '../types'
 import { MULTITRACK_LAYOUT_PRESETS } from '../layout/layoutPresets'
 import { deleteTakeFile, persistUploadedVideo, resolveTakePlaybackUrl } from '../../utils/takeStorage'
+import { missingImportedAssetNames } from './multitrackAssetRecovery'
+import { recordingCountInBars } from '../recording/multitrackCountIn'
 
 export const MULTITRACK_FILE_EXTENSION = '.btmulti'
 const MAGIC = 'BTMULTI1'
@@ -18,10 +20,13 @@ type AssetEntry = { size: number; type: string }
 
 /** Length-prefixed JSON followed by original media bytes; no base64 expansion. */
 export async function buildMultitrackFile(session: MultitrackSession): Promise<Blob> {
+  const missingAssets = missingImportedAssetNames(session)
+  if (missingAssets.length) throw new Error(`Reconnect or remove missing files before sharing: ${missingAssets.join(', ')}.`)
   if (session.panels.some(p => p.kind === 'performance' && p.missingTakeId && !p.take)) {
     throw new Error('Replace missing recordings before sharing this project.')
   }
   const copy = structuredClone(session)
+  copy.practice.countInBars = recordingCountInBars(copy.practice.countInBars)
   const blobs: Blob[] = []
   const entries: AssetEntry[] = []
   const sources = new Map<string, string>()
@@ -136,7 +141,7 @@ export async function readMultitrackFile(file: Blob): Promise<{ session: Multitr
     return panel
   })
   if (panels.filter(p => !p.overlay).length > 12 || panels.filter(p => p.overlay).length > 4) throw new Error('Too many boxes in this project.')
-  const session: MultitrackSession = { projectId: crypto.randomUUID(), name: text(s.name, 'Shared performance'), layoutId: s.layoutId, layoutStyle: normalizeLayoutStyle(s.layoutStyle), aspectRatio: '9:16', endSec: typeof s.endSec === 'number' ? number(s.endSec, 1, .1) : undefined, panels, practice: { bpm: number(practice.bpm,120,40,300), meter: /^(?:[1-9]|1[0-2])\/(?:2|4|8|16)$/.test(practice.meter) ? practice.meter : '4/4', clickSound: text(practice.clickSound,'classic'), countInBars: Math.round(number(practice.countInBars,1,0,8)), showMetronome: practice.showMetronome === true, showPitch: practice.showPitch === true, practiceOverlayEnabled: practice.practiceOverlayEnabled !== false, clickEnabled: practice.clickEnabled !== false }, sheetMusic: { kind: 'sheet-music', id: 'music', asset: sheet.asset ? parseSheet(sheet.asset) : null, cues: [] }, backing: { kind: 'none', volume: number(backing.volume,.85,0,1) } }
+  const session: MultitrackSession = { projectId: crypto.randomUUID(), name: text(s.name, 'Shared performance'), layoutId: s.layoutId, layoutStyle: normalizeLayoutStyle(s.layoutStyle), aspectRatio: '9:16', endSec: typeof s.endSec === 'number' ? number(s.endSec, 1, .1) : undefined, panels, practice: { bpm: number(practice.bpm,120,40,300), meter: /^(?:[1-9]|1[0-2])\/(?:2|4|8|16)$/.test(practice.meter) ? practice.meter : '4/4', clickSound: text(practice.clickSound,'classic'), countInBars: recordingCountInBars(practice.countInBars), showMetronome: practice.showMetronome === true, showPitch: practice.showPitch === true, practiceOverlayEnabled: practice.practiceOverlayEnabled !== false, clickEnabled: practice.clickEnabled !== false }, sheetMusic: { kind: 'sheet-music', id: 'music', asset: sheet.asset ? parseSheet(sheet.asset) : null, cues: [] }, backing: { kind: 'none', volume: number(backing.volume,.85,0,1) } }
   if (sheet.cues != null && (!Array.isArray(sheet.cues) || sheet.cues.length > 100)) throw new Error('Invalid sheet music cues.')
   session.sheetMusic.cues = (sheet.cues ?? []).map((value: unknown) => { const c = record(value); return { id: crypto.randomUUID(), startSec: number(c.startSec,0), asset: parseSheet(c.asset) } })
   if (backing.kind === 'audio') { assetIndex(backing.src); session.backing = { kind: 'audio', src: backing.src, fileName: text(backing.fileName,'Backing audio'), mimeType: text(backing.mimeType,'audio/mp4'), volume: number(backing.volume,.85,0,1) } }

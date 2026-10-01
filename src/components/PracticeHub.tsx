@@ -224,8 +224,8 @@ export default function PracticeHub({
     setLaunchError('')
     try {
       await onStartRoutineStep(stepId)
-    } catch {
-      setLaunchError('Could not open this step. Please try again.')
+    } catch (cause) {
+      setLaunchError(cause instanceof Error ? cause.message : 'Could not open this step. Please try again.')
     } finally {
       setStartingRoutineStepId(null)
     }
@@ -247,9 +247,6 @@ export default function PracticeHub({
     setLaunchError('')
     try {
       await onSaveAndStartRoutine(next)
-    } catch {
-      setPage('home')
-      setLaunchError('Your routine is saved, but it could not start. Open Today’s routine to try again.')
     } finally {
       startingSavedRoutineRef.current = false
     }
@@ -421,7 +418,7 @@ export default function PracticeHub({
                     transition={{ duration: reducedMotion ? 0 : .558, ease: [.22, 1, .36, 1] }}
                   >
                     <MusicRoutineBuilder
-                      key={routine?.id ?? 'new-routine'}
+                      key={routineBuilderRequest}
                       mode={routineBuilderRequest}
                       routine={routine}
                       instrumentId={instrumentId}

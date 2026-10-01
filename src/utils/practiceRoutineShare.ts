@@ -13,6 +13,7 @@ import {
 } from './practiceRoutines'
 import { SHARED_ROUTINE_IDS_KEY, storeLibraryRoutine } from './routineLibrary'
 import { hasPracticeChart, practiceChartName } from './practiceChartStorage'
+import { buildRoutineLink } from './routineLink'
 
 /** Shared practice plans carry their exercise checklist and attached metronome
  * programs. Standalone programs still use their own .btroutine file type. */
@@ -272,5 +273,33 @@ export async function sharePracticeRoutine(routine: Routine): Promise<SharePract
     console.warn('[PracticeRoutine] share failed', error)
     return { ok: false, error: /too large|attached metronome program/i.test(message)
       ? message : 'Could not share that routine.' }
+  }
+}
+
+/**
+ * Shares the routine as a link. Messages can't open a .btplan attachment, but
+ * it makes links tappable, and the link works in Mail, AirDrop and chat apps
+ * too. Very large routines don't fit in a link and go out as a file instead.
+ */
+export async function sharePracticeRoutineLink(routine: Routine): Promise<SharePracticePlanResult> {
+  if (routine.steps.length === 0) {
+    return { ok: false, error: 'Add at least one exercise before sharing this routine.' }
+  }
+  try {
+    const json = buildPracticePlanFile(routine, __APP_VERSION__)
+    const link = await buildRoutineLink(json)
+    if (!link) return sharePracticeRoutine(routine)
+    const name = routine.name.slice(0, MAX_ROUTINE_NAME)
+    if (Capacitor.isNativePlatform()) {
+      await Share.share({ title: name, text: `${name} · a BestTake routine`, url: link, dialogTitle: 'Share Routine' })
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(link)
+    }
+    return { ok: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/cancel|dismiss|abort/i.test(message)) return { ok: true }
+    console.warn('[PracticeRoutine] link share failed', error)
+    return { ok: false, error: /attached metronome program/i.test(message) ? message : 'Could not share that routine.' }
   }
 }

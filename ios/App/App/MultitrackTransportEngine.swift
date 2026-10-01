@@ -198,7 +198,9 @@ final class MultitrackTransportEngine {
 
             let clampedBpm = max(40, min(300, bpm))
             let safeBeatsPerBar = max(1, min(12, beatsPerBar))
-            let safeCountInBars = max(0, min(8, countInBars))
+            // Recording always gets a lead-in, including older projects saved
+            // with zero bars. Playback may resume without repeating a count-off.
+            let safeCountInBars = max(playbackCountOff ? 0 : 1, min(8, countInBars))
             let countInBeats = safeBeatsPerBar * safeCountInBars
             let beatDurationSec = 60.0 / clampedBpm
             let nowHostTime = mach_absolute_time()

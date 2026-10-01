@@ -199,7 +199,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         ) {
             return true
         }
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        return ApplicationDelegateProxy.shared.application(app, open: Self.localCopyIfOpenedInPlace(url), options: options)
+    }
+
+    /// With LSSupportsOpeningDocumentsInPlace, Files and Messages can offer a
+    /// one-tap "Open in BestTake" for shared routines, projects and PDFs, but
+    /// then hand over the original file where it lives (iCloud, another app's
+    /// folder) behind a security scope. The web importers expect a readable
+    /// local file, so copy it in while access is held. A file already inside
+    /// the app (the classic Inbox copy) needs no scope and passes through.
+    private static func localCopyIfOpenedInPlace(_ url: URL) -> URL {
+        guard url.isFileURL, url.startAccessingSecurityScopedResource() else { return url }
+        defer { url.stopAccessingSecurityScopedResource() }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("Opened", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent("\(UUID().uuidString)-\(url.lastPathComponent)")
+        var copied = false
+        var coordinationError: NSError?
+        // Coordinated read so an iCloud file is downloaded before it is copied.
+        NSFileCoordinator().coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinationError) { readableURL in
+            copied = (try? FileManager.default.copyItem(at: readableURL, to: destination)) != nil
+        }
+        if !copied { print("[OpenIn] could not copy opened file: \(coordinationError?.localizedDescription ?? "copy failed")") }
+        return copied ? destination : url
     }
 
     func application(

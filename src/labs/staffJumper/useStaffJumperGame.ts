@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { PitchReadout } from '../../utils/pitchUtils'
 import {
   getConcertTonicPitchClass,
-  getDetectedPitchClass,
+  getDetectedWrittenMidi,
   getRhythmForStep,
   getTargetNoteAtStep,
   DIFFICULTY_TIMEOUT_SECONDS,
@@ -13,7 +13,6 @@ import {
   isRhythmMode,
   loadBestScore,
   measureStartStep,
-  pitchClassesMatch,
   saveBestScore,
   type StaffJumperConfig,
   type StaffJumperFeedback,
@@ -44,9 +43,11 @@ import {
   type DroneHandle,
 } from './staffJumperAudio'
 import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
+import { isConfirmedHeadphoneOutputActive, subscribeConfirmedHeadphoneOutput } from '../../utils/headphoneOutput'
+import { canUseStaffJumperAudio } from './staffJumperAudioPolicy'
 
 /**
- * `wrongMs` is how long one wrong pitch class has to keep sounding, steadily,
+ * `wrongMs` is how long one wrong written pitch has to keep sounding, steadily,
  * before it is charged as a miss.
  *
  * These are generous on purpose. The front of a note is the least reliable
@@ -55,7 +56,7 @@ import { triggerSuccessHaptic, triggerWarningHaptic } from '../../utils/haptics'
  * the player meant it. Judging that as a wrong note marked people wrong for
  * notes they went on to play correctly, so the window is now wide enough that
  * an attack has to lose its argument with the horn outright before it counts.
- * The clock still restarts every time the sounding pitch class moves, so a
+ * The clock still restarts every time the sounding written pitch moves, so a
  * wandering front never accumulates toward a miss — only a wrong note the
  * player actually settles on does.
  */
@@ -69,7 +70,7 @@ const DIFFICULTY_TIMING = {
  * How long the same pitch must keep sounding to count as a deliberately
  * repeated note rather than the decay of the one before it.
  *
- * Only relevant when a pattern happens to land on the same pitch class twice in
+ * Only relevant when a pattern happens to land on the same written pitch twice in
  * a row; every other case clears the release gate as soon as the pitch moves.
  */
 const REPEATED_NOTE_HOLD_MS = 170
@@ -84,16 +85,16 @@ const REPEATED_NOTE_HOLD_MS = 170
  */
 function nextNoteIsBeingPlayed(
   readout: PitchReadout,
-  nextPitchClass: number,
-  currentPitchClass: number,
+  nextWrittenMidi: number,
+  currentWrittenMidi: number,
   config: StaffJumperConfig,
   now: number,
   correctMs: number,
-  onset: { pitchClass: number | null; startedAt: number },
+  onset: { writtenMidi: number | null; startedAt: number },
 ): boolean {
-  if (pitchClassesMatch(nextPitchClass, currentPitchClass)) return false
-  if (!isReadoutCorrectPitch(readout, nextPitchClass, config)) return false
-  if (onset.pitchClass == null || !pitchClassesMatch(onset.pitchClass, nextPitchClass)) return false
+  if (nextWrittenMidi === currentWrittenMidi) return false
+  if (!isReadoutCorrectPitch(readout, nextWrittenMidi, config)) return false
+  if (onset.writtenMidi !== nextWrittenMidi) return false
   return now - onset.startedAt >= correctMs
 }
 
@@ -428,9 +429,9 @@ export function useStaffJumperGame(
   stateRef.current = state
 
   const actionLockUntilRef = useRef(0)
-  const wrongPitchClassRef = useRef<number | null>(null)
+  const wrongWrittenMidiRef = useRef<number | null>(null)
   /**
-   * Pitch class the player is still releasing.
+   * Written MIDI note the player is still releasing.
    *
    * Detection is deliberately fast, so the moment a note is accepted the game
    * moves to the next target while the previous note is still ringing. Without
@@ -438,7 +439,7 @@ export function useStaffJumperGame(
    * player had to clip every note short to avoid losing hearts. It also stops a
    * single held wrong note from burning all three hearts in a row.
    */
-  const releasingPitchClassRef = useRef<number | null>(null)
+  const releasingWrittenMidiRef = useRef<number | null>(null)
   const noteDeadlineAtRef = useRef<number | null>(null)
   const noteRemainingMsRef = useRef(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
 
@@ -464,14 +465,14 @@ export function useStaffJumperGame(
    */
   const gridOriginRef = useRef({ units: 0, unitsIntoMeasure: 0, wallOriginMs: 0 })
   /**
-   * When the pitch class currently sounding first appeared.
+   * When the written pitch currently sounding first appeared.
    *
    * The attack the rhythm is judged on: a pitch that stabilises 30 ms after it
    * first shows up was attacked 30 ms ago, not now, and a pitch that was
    * already sounding when the run reached its note was attacked early.
    */
-  const pitchOnsetRef = useRef<{ pitchClass: number | null; startedAt: number }>({
-    pitchClass: null,
+  const pitchOnsetRef = useRef<{ writtenMidi: number | null; startedAt: number }>({
+    writtenMidi: null,
     startedAt: 0,
   })
   /** Grid time and page position of the last accepted attack, for the spacing between notes. */
@@ -504,13 +505,13 @@ export function useStaffJumperGame(
    */
   const audioGenerationRef = useRef(0)
 
-  const stopAudio = useCallback(() => {
+  const stopAudio = useCallback((restorePreviousDrone = true) => {
     audioGenerationRef.current += 1
     clickRef.current?.stop()
     clickRef.current = null
     const drone = droneRef.current
     droneRef.current = null
-    if (drone) void drone.stop()
+    if (drone) void drone.stop(restorePreviousDrone)
     beatInBarRef.current = null
     setBeatInBar(null)
     travelProgressRef.current = 0
@@ -518,6 +519,7 @@ export function useStaffJumperGame(
 
   const startAudio = useCallback((config: StaffJumperConfig) => {
     stopAudio()
+    if (!canUseStaffJumperAudio(config, isConfirmedHeadphoneOutputActive())) return
     expectedPulseRef.current = 0
 
     const generation = audioGenerationRef.current
@@ -532,7 +534,7 @@ export function useStaffJumperGame(
       audible: config.metronome,
       countInBars: COUNT_IN_BARS,
       meter: config.meter,
-    })
+    }, () => audioGenerationRef.current === generation)
       .then((handle) => {
         if (audioGenerationRef.current !== generation) handle.stop()
         else clickRef.current = handle
@@ -542,9 +544,9 @@ export function useStaffJumperGame(
       })
 
     if (config.drone) {
-      void startDrone(getConcertTonicPitchClass(config))
+      void startDrone(getConcertTonicPitchClass(config), undefined, undefined, () => audioGenerationRef.current === generation)
         .then((handle) => {
-          if (audioGenerationRef.current !== generation) void handle.stop()
+          if (audioGenerationRef.current !== generation) void handle.stop(false)
           else droneRef.current = handle
         })
         .catch(() => {
@@ -584,15 +586,16 @@ export function useStaffJumperGame(
   }, [])
 
   const resetAttackTracking = useCallback(() => {
-    pitchOnsetRef.current = { pitchClass: null, startedAt: 0 }
+    pitchOnsetRef.current = { writtenMidi: null, startedAt: 0 }
     lastAttackRef.current = null
   }, [])
 
   const start = useCallback((config: StaffJumperConfig) => {
+    if (!canUseStaffJumperAudio(config, isConfirmedHeadphoneOutputActive())) return
     if (!isFreeStaffJumperSetup({ difficulty: config.difficulty }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
-    wrongPitchClassRef.current = null
-    releasingPitchClassRef.current = null
+    wrongWrittenMidiRef.current = null
+    releasingWrittenMidiRef.current = null
     resetAttackTracking()
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS[config.difficulty] * 1000)
     // Never inherit the setup preview's seed or a previous run's seed.
@@ -603,10 +606,11 @@ export function useStaffJumperGame(
 
   const restart = useCallback(() => {
     const previous = stateRef.current.config
+    if (previous && !canUseStaffJumperAudio(previous, isConfirmedHeadphoneOutputActive())) return
     if (previous && !isFreeStaffJumperSetup({ difficulty: previous.difficulty }) && !requirePlus('staffJumper')) return
     actionLockUntilRef.current = 0
-    wrongPitchClassRef.current = null
-    releasingPitchClassRef.current = null
+    wrongWrittenMidiRef.current = null
+    releasingWrittenMidiRef.current = null
     resetAttackTracking()
     const config = stateRef.current.config
     resetNoteClock(
@@ -623,8 +627,8 @@ export function useStaffJumperGame(
 
   const backToSetup = useCallback(() => {
     actionLockUntilRef.current = 0
-    wrongPitchClassRef.current = null
-    releasingPitchClassRef.current = null
+    wrongWrittenMidiRef.current = null
+    releasingWrittenMidiRef.current = null
     resetNoteClock(DIFFICULTY_TIMEOUT_SECONDS.medium * 1000)
     stopAudio()
     dispatch({ type: 'BACK_TO_SETUP' })
@@ -650,9 +654,11 @@ export function useStaffJumperGame(
   }, [captureNoteClock, stopAudio])
 
   const resume = useCallback(() => {
+    const currentConfig = stateRef.current.config
+    if (currentConfig && !canUseStaffJumperAudio(currentConfig, isConfirmedHeadphoneOutputActive())) return
     actionLockUntilRef.current = performance.now() + 650
-    wrongPitchClassRef.current = null
-    releasingPitchClassRef.current = null
+    wrongWrittenMidiRef.current = null
+    releasingWrittenMidiRef.current = null
     resetAttackTracking()
     const config = stateRef.current.config
     dispatch({ type: 'RESUME' })
@@ -660,6 +666,18 @@ export function useStaffJumperGame(
     // re-anchors the beat clock so the first note back is judged from zero.
     if (config) startAudio(config)
   }, [resetAttackTracking, startAudio])
+
+  useEffect(() => {
+    const handleHeadphoneChange = (connected: boolean) => {
+      if (connected) return
+      const config = stateRef.current.config
+      if (!config || canUseStaffJumperAudio(config, connected)) return
+      captureNoteClock()
+      stopAudio(false)
+      dispatch({ type: 'PAUSE' })
+    }
+    return subscribeConfirmedHeadphoneOutput(handleHeadphoneChange)
+  }, [captureNoteClock, stopAudio])
 
   useEffect(() => {
     const pauseForVisibilityLoss = () => {
@@ -845,14 +863,23 @@ export function useStaffJumperGame(
         noteDeadlineAtRef.current !== targetDeadlineAt
       ) return
 
+      // Recheck synchronously: a route can disappear before React commits Pause
+      // or a pending Start. No scoring or sound is allowed during that gap.
+      if (!canUseStaffJumperAudio(current.config, isConfirmedHeadphoneOutputActive())) {
+        captureNoteClock()
+        stopAudio(false)
+        dispatch({ type: 'PAUSE' })
+        return
+      }
+
       const dt = Math.min(now - lastTs, 50)
       lastTs = now
 
-      // Note when the sounding pitch class began, count-in included: an attack
+      // Note when the sounding written pitch began, count-in included: an attack
       // just ahead of the first beat is an early first note, not a non-event.
-      const detectedNow = getDetectedPitchClass(readoutRef.current, current.config)
-      if (pitchOnsetRef.current.pitchClass !== detectedNow) {
-        pitchOnsetRef.current = { pitchClass: detectedNow, startedAt: now }
+      const detectedNow = getDetectedWrittenMidi(readoutRef.current, current.config)
+      if (pitchOnsetRef.current.writtenMidi !== detectedNow) {
+        pitchOnsetRef.current = { writtenMidi: detectedNow, startedAt: now }
       }
 
       // Hold everything — pitch, the note clock, the lot — until the count-in
@@ -893,7 +920,7 @@ export function useStaffJumperGame(
         const gridProgress = writtenMs > 0 ? (gridMs - slotOnsetMs) / writtenMs : 1
         const timing = DIFFICULTY_TIMING[current.config.difficulty]
         const readoutNow = readoutRef.current
-        const target = current.targetPitchClass
+        const target = getTargetNoteAtStep(current.config, current.sequenceStep).midi
 
         if (stepRhythm.isRest) {
           // Silence is read, not played: whatever sounds during a rest is
@@ -902,8 +929,8 @@ export function useStaffJumperGame(
           if (!advanced && decisionGridMs >= slotEndMs) {
             advanced = true
             handOver()
-            releasingPitchClassRef.current = null
-            wrongPitchClassRef.current = null
+            releasingWrittenMidiRef.current = null
+            wrongWrittenMidiRef.current = null
             dispatch({ type: 'REST_COMPLETE' })
           }
           rafId = requestAnimationFrame(tick)
@@ -912,17 +939,17 @@ export function useStaffJumperGame(
 
         if (!attackResolved) {
           // The previous note has stopped ringing once the pitch moves or drops out.
-          if (releasingPitchClassRef.current !== detectedNow) {
-            releasingPitchClassRef.current = null
+          if (releasingWrittenMidiRef.current !== detectedNow) {
+            releasingWrittenMidiRef.current = null
           }
-          const isReleasingPreviousNote = releasingPitchClassRef.current != null
+          const isReleasingPreviousNote = releasingWrittenMidiRef.current != null
 
           const inTolerance = isReadoutCorrectPitch(readoutNow, target, current.config)
           if (!inTolerance) inToleranceSince = null
           else if (inToleranceSince == null) inToleranceSince = now
           if (inTolerance) {
             wrongStableMs = 0
-            wrongPitchClassRef.current = null
+            wrongWrittenMidiRef.current = null
             // A held repeated pitch must earn stability within this slot; its
             // old onset must not instantly score every subsequent repeated note.
             const pitchSoundingMs = isReleasingPreviousNote
@@ -961,7 +988,7 @@ export function useStaffJumperGame(
               attackAccepted = true
               attackWallMs = now - soundingForMs
               soundedUntilWallMs = now
-              releasingPitchClassRef.current = detectedNow
+              releasingWrittenMidiRef.current = detectedNow
               dispatch({
                 type: 'NOTE_ACCEPTED',
                 quality: Math.abs(readoutNow.cents) <= 8 ? 'perfect' : 'good',
@@ -975,8 +1002,8 @@ export function useStaffJumperGame(
             isReadoutWrongPitch(readoutNow, target, current.config)
           ) {
             const wrongPc = detectedNow!
-            if (wrongPitchClassRef.current !== wrongPc) {
-              wrongPitchClassRef.current = wrongPc
+            if (wrongWrittenMidiRef.current !== wrongPc) {
+              wrongWrittenMidiRef.current = wrongPc
               wrongStableMs = 0
             }
             wrongStableMs += dt
@@ -985,13 +1012,13 @@ export function useStaffJumperGame(
               // right note can still be found before the beat has gone.
               heartLostOnThisNote = true
               wrongStableMs = 0
-              wrongPitchClassRef.current = null
-              releasingPitchClassRef.current = wrongPc
+              wrongWrittenMidiRef.current = null
+              releasingWrittenMidiRef.current = wrongPc
               dispatch({ type: 'MISS', reason: 'wrong' })
             }
           } else {
             wrongStableMs = 0
-            wrongPitchClassRef.current = null
+            wrongWrittenMidiRef.current = null
           }
 
           // Input delivery is allowed to settle before the window closes.
@@ -1004,11 +1031,11 @@ export function useStaffJumperGame(
             attackResolved = true
             // A wrong note still sounding as the beat passes is a wrong note,
             // not a missed one — that is what the player should be told.
-            const wrongNoteSounding = wrongPitchClassRef.current != null
+            const wrongNoteSounding = wrongWrittenMidiRef.current != null
             wrongStableMs = 0
-            wrongPitchClassRef.current = null
+            wrongWrittenMidiRef.current = null
             // Whatever is sounding now belongs to the note that just went by.
-            releasingPitchClassRef.current = detectedNow
+            releasingWrittenMidiRef.current = detectedNow
             if (!heartLostOnThisNote) {
               heartLostOnThisNote = true
               dispatch({ type: 'MISS', reason: wrongNoteSounding ? 'wrong' : 'missed-beat' })
@@ -1064,8 +1091,8 @@ export function useStaffJumperGame(
           !nextNote.isRest &&
           nextNoteIsBeingPlayed(
             readoutRef.current,
-            nextNote.pitchClass,
-            current.targetPitchClass,
+            nextNote.midi,
+            getTargetNoteAtStep(current.config, current.sequenceStep).midi,
             current.config,
             now,
             DIFFICULTY_TIMING[current.config.difficulty].correctMs,
@@ -1100,8 +1127,8 @@ export function useStaffJumperGame(
             now + DIFFICULTY_TIMING[current.config.difficulty].cooldownMs
           // Silence guarantees the next note is a fresh attack, so nothing is
           // left ringing for the release gate to hold back.
-          releasingPitchClassRef.current = null
-          wrongPitchClassRef.current = null
+          releasingWrittenMidiRef.current = null
+          wrongWrittenMidiRef.current = null
           expectedPulseRef.current += restPulses
           dispatch({ type: 'REST_COMPLETE' })
         }
@@ -1114,8 +1141,8 @@ export function useStaffJumperGame(
           resetTargetDeadline(now)
           correctStableMs = 0
           wrongStableMs = 0
-          wrongPitchClassRef.current = null
-          releasingPitchClassRef.current = getDetectedPitchClass(
+          wrongWrittenMidiRef.current = null
+          releasingWrittenMidiRef.current = getDetectedWrittenMidi(
             readoutRef.current,
             current.config,
           )
@@ -1126,23 +1153,23 @@ export function useStaffJumperGame(
       }
 
       const readoutNow = readoutRef.current
-      const target = current.targetPitchClass
+      const target = getTargetNoteAtStep(current.config, current.sequenceStep).midi
       const timing = DIFFICULTY_TIMING[current.config.difficulty]
-      const detectedPc = getDetectedPitchClass(readoutNow, current.config)
+      const detectedPc = getDetectedWrittenMidi(readoutNow, current.config)
 
       // The previous note has stopped ringing once the pitch moves or drops out.
-      if (releasingPitchClassRef.current !== detectedPc) {
-        releasingPitchClassRef.current = null
+      if (releasingWrittenMidiRef.current !== detectedPc) {
+        releasingWrittenMidiRef.current = null
       }
-      const isReleasingPreviousNote = releasingPitchClassRef.current != null
+      const isReleasingPreviousNote = releasingWrittenMidiRef.current != null
 
       const acceptNote = (quality: 'perfect' | 'good') => {
         correctStableMs = 0
         wrongStableMs = 0
         resetTargetDeadline(now)
         actionLockUntilRef.current = now + timing.cooldownMs
-        wrongPitchClassRef.current = null
-        releasingPitchClassRef.current = detectedPc
+        wrongWrittenMidiRef.current = null
+        releasingWrittenMidiRef.current = detectedPc
 
         // Score the landing against the beat it was written on, then re-anchor
         // the expectation to where the player actually is.
@@ -1180,7 +1207,7 @@ export function useStaffJumperGame(
 
       if (isReadoutCorrectPitch(readoutNow, target, current.config)) {
         wrongStableMs = 0
-        wrongPitchClassRef.current = null
+        wrongWrittenMidiRef.current = null
         correctStableMs += dt
         // A still-ringing note that matches the new target is a repeat, and
         // needs a longer hold before it counts — there was no fresh attack.
@@ -1194,8 +1221,8 @@ export function useStaffJumperGame(
       ) {
         correctStableMs = 0
         const wrongPc = detectedPc!
-        if (wrongPitchClassRef.current !== wrongPc) {
-          wrongPitchClassRef.current = wrongPc
+        if (wrongWrittenMidiRef.current !== wrongPc) {
+          wrongWrittenMidiRef.current = wrongPc
           wrongStableMs = 0
         }
         wrongStableMs += dt
@@ -1203,16 +1230,16 @@ export function useStaffJumperGame(
           wrongStableMs = 0
           resetTargetDeadline(now)
           actionLockUntilRef.current = now + timing.cooldownMs
-          wrongPitchClassRef.current = null
+          wrongWrittenMidiRef.current = null
           // Hold the gate on the offending note so one sustained wrong pitch
           // costs a single heart instead of the whole run.
-          releasingPitchClassRef.current = wrongPc
+          releasingWrittenMidiRef.current = wrongPc
           dispatch({ type: 'MISS', reason: 'wrong' })
         }
       } else {
         correctStableMs = 0
         wrongStableMs = 0
-        wrongPitchClassRef.current = null
+        wrongWrittenMidiRef.current = null
       }
 
       if (now >= targetDeadlineAt) {
@@ -1220,10 +1247,10 @@ export function useStaffJumperGame(
         correctStableMs = 0
         wrongStableMs = 0
         actionLockUntilRef.current = now + timing.cooldownMs
-        wrongPitchClassRef.current = null
+        wrongWrittenMidiRef.current = null
         // Whatever is sounding as the clock runs out belongs to the note that
         // just expired, not to the next one.
-        releasingPitchClassRef.current = detectedPc
+        releasingWrittenMidiRef.current = detectedPc
         dispatch({ type: 'MISS', reason: 'timeout' })
       }
 
@@ -1241,7 +1268,7 @@ export function useStaffJumperGame(
         noteDeadlineAtRef.current = null
       }
     }
-  }, [enabled, state.phase, state.sequenceStep, state.isFalling])
+  }, [enabled, state.phase, state.sequenceStep, state.isFalling, captureNoteClock, stopAudio])
 
   const configuredTimeoutMs = state.config
     ? DIFFICULTY_TIMEOUT_SECONDS[state.config.difficulty] * 1000

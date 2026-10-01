@@ -12,8 +12,8 @@ import GuidedRoutineBuilder from './GuidedRoutineBuilder'
 import MusicToolSetup from './MusicToolSetup'
 import RoutineProgramSetup from './RoutineProgramSetup'
 import RoutineShareDialog from './RoutineShareDialog'
-import { blankDesk, createRoutine, createStep, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, type Routine, type RoutineStep } from '../utils/practiceRoutines'
-import { loadExerciseLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
+import { blankDesk, clampMinutes, createRoutine, createStep, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_MINUTES, MAX_STEP_TITLE, type Routine, type RoutineStep } from '../utils/practiceRoutines'
+import { loadExerciseLibrary, RoutineLibraryRecoveryError, storeLibraryExercise, storeLibraryRoutine, storeLibraryRoutineWithExercises } from '../utils/routineLibrary'
 import { hasPracticeChart, practiceChartName, savePracticeChart } from '../utils/practiceChartStorage'
 import { copyExerciseTools, createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile, reuseMusicExercise } from '../utils/routineMusic'
 import { loadMusicOrder, loadMusicScoreSettings, loadMusicSetup, orderMusic } from '../utils/musicLibrary'
@@ -42,6 +42,8 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [legacy, setLegacy] = useState<'edit' | null>(null)
   const [musicEditorOpen, setMusicEditorOpen] = useState(false)
+  // Where the suggestions builder should reopen when this one is left.
+  const [suggestions, setSuggestions] = useState(false)
   const [musicEditorOrigin, setMusicEditorOrigin] = useState<'new' | 'saved' | null>(null)
   const [musicBackTarget, setMusicBackTarget] = useState<'landing' | 'lineup'>('landing')
   const [exerciseLibrary, setExerciseLibrary] = useState(loadExerciseLibrary)
@@ -86,6 +88,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
         programId: scoreSettings ? scoreSettings.programId : item.step.programId } }
     }), loadMusicOrder())
   }, [exerciseLibrary, props.projects, props.instrumentId, revision])
+  const selectedMusicCount = music.filter(({ step }) => draft.steps.some(item => item.projectId === step.projectId)).length
   const missingMusic = !plus.active ? [] : draft.steps.filter(step => (step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId)))
 
   const openPicker = (id: string | null = null) => {
@@ -165,6 +168,9 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     setError('')
     setScreen('music')
     setMusicBackTarget('landing')
+    // Back from the music screen returns to Your routines; only "Don't have
+    // music?" leaves the suggestions page as the place to come back to.
+    setSuggestions(false)
     setMusicEditorOrigin('new')
     setMusicEditorOpen(true)
   }
@@ -172,6 +178,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     setExerciseLibrary(loadExerciseLibrary())
     setRevision(value => value + 1)
     openRoutine(routine)
+    setSuggestions(false)
     setLegacy(null)
     setShowExercise(false)
     setExerciseName('')
@@ -182,6 +189,9 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const save = async (start: boolean) => {
     if (!canSaveRoutine(draft, () => { void save(start) })) return
     if (!draft.steps.length || busyRef.current) return
+    const plusFeature = draft.steps.some(step => step.sharedScoreName || step.desk?.showMusic) ? 'music'
+      : draft.steps.some(step => step.desk?.autoSoundRecording) ? 'handsfree' : null
+    if (start && plusFeature && !requirePlus(plusFeature, () => { void save(start) })) return
     if (start && missingMusic.length) {
       setExpanded(missingMusic[0].id)
       setError(`Import ${missingMusic[0].sharedScoreName ?? missingMusic[0].title} before starting this routine.`)
@@ -190,13 +200,11 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     busyRef.current = true; setBusy(true); setError('')
     try {
       const next = { ...draft, name: draft.name.trim() || 'My practice', updatedAt: Date.now(), steps: draft.steps.map(step => createStep(step)) }
-      next.steps.forEach(step => storeLibraryExercise({ instrumentId: next.instrumentId, step }))
-      if (props.routine && props.routine.id !== next.id) storeLibraryRoutine(props.routine)
-      storeLibraryRoutine(next)
+      storeLibraryRoutineWithExercises(next, props.routine)
       setDraft(next); setExerciseLibrary(loadExerciseLibrary())
       if (start && props.onSaveAndStart) await props.onSaveAndStart(next)
       else props.onSave(next)
-    } catch { setError('Could not save or start this routine. Your draft is still here; please try again.') }
+    } catch (cause) { if (alive.current) setError(cause instanceof RoutineLibraryRecoveryError ? cause.message : 'Could not save or start this routine. Your draft is still here; please try again.') }
     finally { busyRef.current = false; if (alive.current) setBusy(false) }
   }
   const reorder = (index: number, delta: number) => setDraft(current => {
@@ -208,6 +216,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     mode={legacy === 'edit' ? 'edit' : props.mode}
     routine={legacy === 'edit' ? draft : props.routine}
     onCancel={legacy ? () => setLegacy(null) : props.onCancel}
+    startAtSuggestions={!legacy && suggestions}
     onStartMusicRoutine={startNewRoutine}
     onOpenMusicRoutine={openSavedRoutine}
     onSave={legacy === 'edit' ? next => { openRoutine(next); setLegacy(null) } : props.onSave}
@@ -216,7 +225,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   return <section className="routine-guide music-routine-builder" aria-label="Build your routine" onKeyDown={event => {
     if (event.key === 'Escape') { event.stopPropagation(); if (!busyRef.current) props.onCancel() }
   }}>
-    <nav className="music-routine-nav"><button type="button" disabled={busy} aria-label="Back" onClick={() => {
+    <nav className="routine-guide-nav music-routine-nav"><button type="button" disabled={busy} aria-label="Back" onClick={() => {
       if (screen === 'music' && musicBackTarget === 'lineup') setScreen('lineup')
       else if (screen === 'lineup' && musicEditorOrigin === 'new') { setMusicBackTarget('landing'); setScreen('music') }
       else if (musicEditorOpen) setMusicEditorOpen(false)
@@ -226,18 +235,26 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
       <PremiumFlowPage key={screen} direction={screen === 'music' ? -1 : 1} data-routine-screen={screen}>
       <fieldset className="music-routine-content" disabled={busy}>
         {screen === 'music' ? <>
-          <header className="music-routine-heading"><span>MUSIC</span><h2>Choose music.</h2><p>Add a score to this routine or import a new PDF or photo.</p></header>
+          <header className="music-routine-heading"><span>NEW ROUTINE</span><h2>Start with your music.</h2><p>Import the pieces and études you’re practicing. Each one gets its own tempo and tools.</p></header>
           <div className="music-routine-start-actions">
             <div className="music-routine-import-actions">
-              <button type="button" onClick={() => openPicker()}><FileMusic /> Import PDF</button>
+              <button type="button" className="music-routine-primary" onClick={() => openPicker()}><FileMusic /> Import PDF</button>
             </div>
-            <p>PDFs or photos are saved in your Music Library.</p>
+            <p>{plus.active ? 'PDFs or photos are saved in your Music Library.' : 'Scores are part of BestTake Plus. A routine without music is free.'}</p>
           </div>
-          {music.length > 0 && <section className="music-routine-recent"><div className="music-routine-section-title"><div><h3>Music library</h3><span>{draft.steps.filter(item => item.projectId).length} selected</span></div></div>{music.map(({ step }) => {
+          {music.length > 0 && <section className="music-routine-recent"><div className="music-routine-section-title"><div><h3>Music library</h3><span>{selectedMusicCount} selected</span></div></div>{music.map(({ step }) => {
             const selectedStep = draft.steps.find(item => item.projectId === step.projectId)
             return <button type="button" key={step.projectId ?? step.id} className="music-routine-recent-row" aria-pressed={Boolean(selectedStep)} onClick={() => toggleMusic(step)}><ScoreThumbnail projectId={step.projectId} revision={revision} /><span><strong>{step.title}</strong><small>{exerciseSummary(selectedStep ?? step)}</small></span><span className="music-routine-select" aria-hidden>{selectedStep ? <Check /> : <Plus />}</span></button>
           })}</section>}
-          <button type="button" className="music-routine-text" onClick={() => { setShowExercise(true); setScreen('lineup') }}>Add an exercise without music</button>
+          {props.mode !== 'edit' && !draft.steps.length ? <>
+            {/* The free way in: it has to read as a real choice, not fine print. */}
+            <div className="music-routine-or" aria-hidden><span>or</span></div>
+            <button type="button" className="music-routine-no-music" onClick={() => { setSuggestions(true); setMusicEditorOpen(false) }}>
+              <span className="music-routine-no-music__icon"><Plus aria-hidden /></span>
+              <span><strong>Build a routine without music{!plus.active && <em>Free</em>}</strong><small>Start from Fundamentals or Full practice, or type your own list.</small></span>
+              <ArrowRight aria-hidden />
+            </button>
+          </> : <button type="button" className="music-routine-text" onClick={() => { setShowExercise(true); setScreen('lineup') }}>Add an exercise without music</button>}
         </> : <>
           <header className="music-routine-heading music-routine-heading--compact"><span>ROUTINE</span><h2>Exercises</h2></header>
           <label className="music-routine-name"><span>Routine name</span><input aria-label="Routine name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
@@ -257,7 +274,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
                 {!needsMusic && (!attached || !toolsAllowed) && <button type="button" className="music-routine-attach" onClick={() => openPicker(step.id)}><FileMusic /> Add music to this exercise</button>}
                 <PremiumDisclosure className="music-routine-more"><summary>More options</summary>
                   <label className="music-routine-field">Exercise name<input aria-label="Exercise name" maxLength={MAX_STEP_TITLE} value={step.title} onChange={event => patchStep(step.id, { title: event.target.value })} /></label>
-                  <label className="music-routine-setting"><span>Minutes <small>· optional</small></span><input type="number" aria-label="Exercise minutes" min={0} max={180} value={step.minutes} onChange={event => patchStep(step.id, { minutes: Number(event.target.value) })} /></label>
+                  <label className="music-routine-setting"><span>Minutes <small>· optional</small></span><input type="number" aria-label="Exercise minutes" min={0} max={MAX_STEP_MINUTES} value={step.minutes} onChange={event => patchStep(step.id, { minutes: clampMinutes(Number(event.target.value)) })} /></label>
                   {attached && <div className="music-routine-attached"><FileMusic /><span>{practiceChartName(step.projectId!) ?? 'Sheet music'}</span><button type="button" onClick={() => openPicker(step.id)}>Change file</button></div>}
                   {toolsAllowed && <>
                     <label className="music-routine-check"><input type="checkbox" checked={desk.autoSoundRecording} onChange={event => patchDesk(step, { autoSoundRecording: event.target.checked })} /> Hands-free recording</label>
@@ -273,7 +290,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
           <button type="button" className="music-routine-add" onClick={() => { setMusicBackTarget('lineup'); setScreen('music') }}><Plus /> Choose music</button>
           <button type="button" className="music-routine-text" disabled={draft.steps.length >= MAX_ROUTINE_STEPS} onClick={() => setShowExercise(value => !value)}>Add an exercise without music</button>
           {showExercise && <form className="music-routine-exercise-entry" onSubmit={event => { event.preventDefault(); addExercise() }}><input autoFocus aria-label="New exercise name" maxLength={MAX_STEP_TITLE} placeholder="Long tones, warm-up…" value={exerciseName} onChange={event => setExerciseName(event.target.value)} /><button type="submit" aria-label="Add exercise" disabled={!exerciseName.trim()}><Plus /></button></form>}
-          <PremiumDisclosure className="music-routine-plan-options"><summary>Routine options</summary><button type="button" disabled={!draft.steps.length} onClick={() => setSharing(true)}><Share2 /> Share routine file</button><button type="button" onClick={() => setLegacy('edit')}>Full routine editor</button>{props.routine?.id === draft.id && <button type="button" onClick={() => { try { storeLibraryRoutine(draft); props.onDelete() } catch { setError('Could not save a copy of this routine.') } }}>Remove from today · keep in library</button>}</PremiumDisclosure>
+          <PremiumDisclosure className="music-routine-plan-options"><summary>Routine options</summary><button type="button" disabled={!draft.steps.length} onClick={() => setSharing(true)}><Share2 /> Share routine</button><button type="button" onClick={() => setLegacy('edit')}>Full routine editor</button>{props.routine?.id === draft.id && <button type="button" onClick={() => { try { storeLibraryRoutine(draft); props.onDelete() } catch { setError('Could not save a copy of this routine.') } }}>Remove from today · keep in library</button>}</PremiumDisclosure>
         </>}
       </fieldset>
       </PremiumFlowPage>

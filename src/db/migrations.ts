@@ -99,6 +99,11 @@ export async function migrateVaultSchema(db: SQLiteDBConnection): Promise<void> 
   )
 
   const projectColumns = await db.query('PRAGMA table_info(projects)')
+  const pitchColumns = await db.query('PRAGMA table_info(pitch_observations)')
+  const pitchExisting = new Set((pitchColumns.values ?? []).map(row => String((row as Record<string, unknown>).name)))
+  for (const column of ['instrument_profile_id', 'instrument_profile_name']) {
+    if (!pitchExisting.has(column)) await db.execute(`ALTER TABLE pitch_observations ADD COLUMN ${column} TEXT`)
+  }
   const projectExisting = new Set(
     (projectColumns.values ?? []).map((row) =>
       String((row as Record<string, unknown>).name),

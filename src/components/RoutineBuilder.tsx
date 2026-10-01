@@ -19,6 +19,8 @@ export interface RoutineBuilderProps {
   onStartMusicRoutine?: () => void
   /** Open a saved or imported routine in the music-first lineup. */
   onOpenMusicRoutine?: (routine: Routine) => void
+  /** Open on the suggestions page (presets, goals, build your own) rather than the routines list. */
+  startAtSuggestions?: boolean
   /**
    * Binds a step to its own practice folder on demand — the moment music is
    * chosen for a step that does not have one yet.

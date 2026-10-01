@@ -37,11 +37,17 @@ import {
 import { triggerLightHaptic } from '../../utils/haptics'
 import { iosSpringSnappy } from '../../utils/motionPresets'
 import type { TunerInstrument } from '../../utils/pitchConfig'
+import { midiToNoteName } from '../../utils/pitchUtils'
 import {
   getTunerTransposition,
-  TUNER_TRANSPOSITION_OPTIONS,
+  TUNER_KEY_OPTIONS,
+  getTunerKeyOption,
+  getTunerOctaveOptions,
+  tunerOctaveLabel,
   type TunerTranspositionId,
 } from '../../utils/tunerTransposition'
+import { usePitchInstrumentProfiles } from '../../hooks/usePitchInstrumentProfiles'
+import { createPitchInstrumentProfile, selectPitchInstrumentProfile, pitchSourceId, pitchProfileSources, filterPitchProfileObservations } from '../../utils/pitchInstrumentProfiles'
 import AnimatedBottomSheet from '../ui/AnimatedBottomSheet'
 import Pressable from '../ui/Pressable'
 
@@ -49,10 +55,10 @@ interface PitchInsightsScreenProps {
   isOpen: boolean
   onClose: () => void
   transpositionId?: TunerTranspositionId
+  onLegacyTranspositionChange?: (key: TunerTranspositionId) => void
   /** Instrument currently active in the tuner — used as the default filter
    * when the recorded history spans more than one instrument category. */
   tunerInstrument?: TunerInstrument
-  formatNoteName?: (midiNote: number, fallback: string) => string
   hapticFeedback?: boolean
   captureEnabled?: boolean
   onCaptureEnabledChange?: (enabled: boolean) => void
@@ -64,7 +70,6 @@ interface CentsGraphPoint {
   cents: number
 }
 
-const ADDED_INSTRUMENTS_KEY = 'besttake:pitch-insights-instruments'
 const DAY_PREVIEW_COUNT = 6
 const GRAPH_POINT_LIMIT = 160
 /** Half-range of the rail widget in cents — the visual scale a dot moves across. */
@@ -386,11 +391,11 @@ const REGISTER_PATTERN_THRESHOLD_CENTS = 4
  * view can hide entirely (a note that's flat low and sharp high averages out
  * looking centered). Only speaks up when the split is real; otherwise silent.
  */
-function describeRegisterPattern(insights: NotePitchInsight[]): string | null {
+function describeRegisterPattern(insights: NotePitchInsight[], writtenOffsetSemitones = 0): string | null {
   const centsByOctave = new Map<number, number[]>()
   for (const insight of insights) {
     if (insight.confidence === 'collecting') continue
-    const octave = octaveForMidi(insight.midiNote)
+    const octave = octaveForMidi(insight.midiNote + writtenOffsetSemitones)
     const list = centsByOctave.get(octave) ?? []
     list.push(insight.typicalCents)
     centsByOctave.set(octave, list)
@@ -1030,8 +1035,8 @@ function PitchInsightsContent({
   isOpen,
   onClose,
   transpositionId = 'concert',
+  onLegacyTranspositionChange,
   tunerInstrument,
-  formatNoteName = (_midiNote, fallback) => fallback,
   hapticFeedback = true,
   captureEnabled = true,
   onCaptureEnabledChange,
@@ -1046,47 +1051,15 @@ function PitchInsightsContent({
   const [overviewRoute, setOverviewRoute] = useState<'notes' | 'days' | null>(null)
   const [showAllDays, setShowAllDays] = useState(false)
   const [resettingKey, setResettingKey] = useState<string | null>(null)
-  const [selectedSource, setSelectedSource] = useState<string>('all')
-  const [addedInstruments, setAddedInstruments] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(ADDED_INSTRUMENTS_KEY)
-      const parsed = raw ? (JSON.parse(raw) as unknown) : null
-      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : []
-    } catch {
-      return []
-    }
-  })
+  const { profiles, activeProfile } = usePitchInstrumentProfiles()
+  const [selectedSource, setSelectedSource] = useState<string>(() => pitchSourceId(activeProfile?.id, transpositionId))
+  const [profileName, setProfileName] = useState('')
+  const [profileKey, setProfileKey] = useState<TunerTranspositionId>(transpositionId)
+  const [profileError, setProfileError] = useState('')
   const [instrumentPickerOpen, setInstrumentPickerOpen] = useState(false)
   const didInitDayFocusRef = useRef(false)
-
-  const removeInstrument = useCallback((id: string) => {
-    setAddedInstruments((current) => {
-      const next = current.filter((entry) => entry !== id)
-      try {
-        localStorage.setItem(ADDED_INSTRUMENTS_KEY, JSON.stringify(next))
-      } catch {
-        /* Private browsing must not break the filter. */
-      }
-      return next
-    })
-    setSelectedSource((current) => (current === id ? 'all' : current))
-  }, [])
-
-  const addInstrument = useCallback((id: string) => {
-    setAddedInstruments((current) => {
-      const next = current.includes(id) ? current : [...current, id]
-      try {
-        localStorage.setItem(ADDED_INSTRUMENTS_KEY, JSON.stringify(next))
-      } catch {
-        /* Private browsing must not break the filter. */
-      }
-      return next
-    })
-    setSelectedSource(id)
-    setInstrumentPickerOpen(false)
-  }, [])
-
   const activeRef = useRef(false)
+
   const loadSequenceRef = useRef(0)
   const fallbackReloadTimerRef = useRef<number | null>(null)
   const liveUpdateTimerRef = useRef<number | null>(null)
@@ -1149,6 +1122,8 @@ function PitchInsightsContent({
         return
       }
       if (detail?.kind === 'cleared') {
+        // A read started before this reset must not restore its old snapshot.
+        loadSequenceRef.current += 1
         pendingSavedRef.current = []
         if (liveUpdateTimerRef.current != null) {
           window.clearTimeout(liveUpdateTimerRef.current)
@@ -1158,23 +1133,21 @@ function PitchInsightsContent({
         return
       }
       if (detail?.kind === 'range-deleted') {
-        pendingSavedRef.current = pendingSavedRef.current.filter(
-          (observation) =>
-            observation.observedAt < detail.startAt ||
-            observation.observedAt >= detail.endAt,
-        )
-        setObservations((current) =>
-          current.filter(
-            (observation) =>
-              observation.observedAt < detail.startAt ||
-              observation.observedAt >= detail.endAt,
-          ),
-        )
+        loadSequenceRef.current += 1
+        const keep = (observation: PitchObservation) =>
+          (detail.transpositionId != null && observation.transpositionId !== detail.transpositionId) ||
+          (detail.instrumentProfileId !== undefined && (observation.instrumentProfileId ?? null) !== detail.instrumentProfileId) ||
+          observation.observedAt < detail.startAt || observation.observedAt >= detail.endAt
+        pendingSavedRef.current = pendingSavedRef.current.filter(keep)
+        setObservations((current) => current.filter(keep))
         return
       }
       if (detail?.kind === 'session-range-deleted') {
+        loadSequenceRef.current += 1
         const keep = (observation: PitchObservation) =>
           observation.sessionId !== detail.sessionId ||
+          (detail.transpositionId != null && observation.transpositionId !== detail.transpositionId) ||
+          (detail.instrumentProfileId !== undefined && (observation.instrumentProfileId ?? null) !== detail.instrumentProfileId) ||
           observation.observedAt < detail.startAt ||
           observation.observedAt >= detail.endAt
         pendingSavedRef.current = pendingSavedRef.current.filter(keep)
@@ -1216,32 +1189,14 @@ function PitchInsightsContent({
       setOverviewRoute(null)
       setShowAllDays(false)
       setResettingKey(null)
-      setSelectedSource(transpositionId)
+      setSelectedSource(pitchSourceId(activeProfile?.id, transpositionId))
     }
-  }, [isOpen, tunerInstrument, transpositionId])
+  }, [isOpen, tunerInstrument, transpositionId, activeProfile?.id])
 
-  // Observations are tagged with the instrument that was active when they
-  // were captured. Pooling e.g. Voice and Winds tendencies for "the same"
-  // note would blend two unrelated intonation habits into one misleading
-  // number, so only show the filter (and apply it) once more than one
-  // instrument actually shows up in the history — most players only ever
-  // see one and the screen stays exactly as before.
-  /* An instrument is its transposition — a trumpet and a horn both record as
-     'winds', so the profile cannot tell them apart. Instruments you have played
-     appear automatically; the + lets you add one before you have any history
-     for it. */
-  const instrumentIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const observation of observations) ids.add(observation.transpositionId)
-    for (const id of addedInstruments) ids.add(id)
-    return [...ids]
-  }, [observations, addedInstruments])
-
-  const showInstrumentFilter = instrumentIds.length > 1 || addedInstruments.length > 0
-  const visibleObservations = useMemo(() => {
-    if (selectedSource === 'all') return observations
-    return observations.filter((observation) => observation.transpositionId === selectedSource)
-  }, [observations, selectedSource])
+  const sources = useMemo(() => pitchProfileSources(profiles, observations, transpositionId), [profiles, observations, transpositionId])
+  const selectedProfileSource = sources.find(source => source.id === selectedSource)
+  const showInstrumentFilter = sources.length > 1
+  const visibleObservations = useMemo(() => filterPitchProfileObservations(observations, selectedSource), [observations, selectedSource])
   const allObservationsDayCount = useMemo(
     () =>
       new Set(observations.map((observation) => localPracticeDayBounds(observation.observedAt).key))
@@ -1283,7 +1238,15 @@ function PitchInsightsContent({
     () => rankNotesWorthReviewing(focusedInsights),
     [focusedInsights],
   )
-  const registerNote = useMemo(() => describeRegisterPattern(allInsights), [allInsights])
+  const displayProfile = getTunerTransposition(selectedProfileSource?.transpositionId ?? transpositionId)
+  const formatNoteName = useCallback(
+    (midiNote: number, _fallback: string) => midiToNoteName(midiNote + displayProfile.writtenOffsetSemitones),
+    [displayProfile.writtenOffsetSemitones],
+  )
+  const registerNote = useMemo(
+    () => describeRegisterPattern(allInsights, displayProfile.writtenOffsetSemitones),
+    [allInsights, displayProfile.writtenOffsetSemitones],
+  )
   const warmUpNote = useMemo(() => {
     if (!focusedDay) return null
     const firstSession = [...focusedDay.sessions].sort(
@@ -1298,7 +1261,6 @@ function PitchInsightsContent({
       ? allInsights
       : focusedInsights
   const selected = selectionInsights.find((insight) => insight.midiNote === selectedMidi) ?? null
-  const displayProfile = getTunerTransposition(transpositionId)
   const overallMedian = useMemo(
     () => median(visibleObservations.map((observation) => observation.centsOffset)),
     [visibleObservations],
@@ -1324,9 +1286,11 @@ function PitchInsightsContent({
 
   const resetDay = useCallback(
     async (day: PitchPracticeDaySummary) => {
+      const resetSource = selectedProfileSource
+      const scopeLabel = resetSource ? ` for ${resetSource.label}` : ''
       const confirmed = await showConfirm({
         title: `Reset ${formatDayHeading(day)}?`,
-        message: `${plural(day.observationCount, 'note held', 'notes held')} from ${plural(day.sessionCount, 'session')} will be removed from Pitch Insights. Other days will stay intact.`,
+        message: `${plural(day.observationCount, 'note held', 'notes held')} from ${plural(day.sessionCount, 'session')}${scopeLabel} will be removed from Pitch Insights. Other days${resetSource ? ' and pitch groups' : ''} will stay intact.`,
         confirmLabel: 'Reset Day',
         destructive: true,
       })
@@ -1334,7 +1298,7 @@ function PitchInsightsContent({
 
       setResettingKey(day.key)
       try {
-        await deletePitchObservationsInRange(day.startAt, day.endAt)
+        await deletePitchObservationsInRange(day.startAt, day.endAt, resetSource?.transpositionId, resetSource?.profileId)
         setSelectedMidi(null)
         if (selectedDayKey === day.key) setSelectedDayKey(null)
         if (focusedDayKey === day.key) setFocusedDayKey('all')
@@ -1342,14 +1306,15 @@ function PitchInsightsContent({
         console.warn('[PitchInsights] Failed to reset practice day', error)
         await showAlert({
           title: 'Couldn’t reset this day',
-          message: 'Your Pitch Insights history was not changed. Please try again.',
+          message: 'The reset could not be completed. Check your reloaded history, then try again.',
           tone: 'error',
         })
+        void load()
       } finally {
         setResettingKey(null)
       }
     },
-    [focusedDayKey, selectedDayKey, showAlert, showConfirm],
+    [focusedDayKey, selectedDayKey, selectedProfileSource, showAlert, showConfirm, load],
   )
 
   // A reset (this day, or all) can empty the practice-days or all-notes
@@ -1387,13 +1352,14 @@ function PitchInsightsContent({
       console.warn('[PitchInsights] Failed to reset all history', error)
       await showAlert({
         title: 'Couldn’t reset Pitch Insights',
-        message: 'Your Pitch Insights history was not changed. Please try again.',
+        message: 'The reset could not be completed. Check your reloaded history, then try again.',
         tone: 'error',
       })
+      void load()
     } finally {
       setResettingKey(null)
     }
-  }, [allObservationsDayCount, observations.length, showAlert, showConfirm, showInstrumentFilter])
+  }, [allObservationsDayCount, observations.length, showAlert, showConfirm, showInstrumentFilter, load])
 
   return (
     <AnimatedBottomSheet
@@ -1427,14 +1393,12 @@ function PitchInsightsContent({
         <div className="pitch-insights-screen__scroll">
 
           {!selected && !selectedDay && !overviewRoute && onCaptureEnabledChange ? (
-            <section className="pitch-insights-capture-setting" aria-label="Save Pitch Insights">
+            <section className="pitch-insights-capture-setting" aria-label="Pitch Insights">
               <div>
-                <strong>Save Pitch Insights</strong>
-                <p>{captureEnabled
-                  ? 'Steady notes are added automatically. Turn off when the microphone may hear other players.'
-                  : 'Off stops new readings. The tuner still works, and your saved history stays.'}</p>
+                <strong>Pitch Insights</strong>
+                <p>{activeProfile ? `${activeProfile.name} · ${getTunerKeyOption(activeProfile.transpositionId).keyLabel}` : `Default · ${getTunerKeyOption(transpositionId).keyLabel}`}</p>
               </div>
-              <button type="button" role="switch" aria-label="Save Pitch Insights" aria-checked={captureEnabled} onClick={() => onCaptureEnabledChange(!captureEnabled)}>
+              <button type="button" role="switch" aria-label="Pitch Insights" aria-checked={captureEnabled} onClick={() => onCaptureEnabledChange(!captureEnabled)}>
                 {captureEnabled ? 'On' : 'Off'}
               </button>
             </section>
@@ -1512,105 +1476,43 @@ function PitchInsightsContent({
                     empties the screen, and when this sat inside the content
                     branch it vanished with everything else — leaving no way to
                     switch back. */}
-                {!loading && !loadError && showInstrumentFilter ? (
-                  <>
-                    <div
-                      className="pitch-insights-instrument-filter"
-                      role="tablist"
-                      aria-label="Filter Pitch Insights by instrument"
-                    >
-                      <button
-                        type="button"
-                        role="tab"
-                        aria-selected={selectedSource === 'all'}
-                        className={`pitch-insights-instrument-filter__pill ${
-                          selectedSource === 'all' ? 'is-active' : ''
-                        }`}
-                        onClick={() => {
+                {!loadError ? <>
+                  <div className="pitch-insights-instrument-filter" role="group" aria-label="Instrument profiles">
+                    {sources.map(source => <button key={source.id} type="button" aria-pressed={selectedSource === source.id}
+                      className={`pitch-insights-instrument-filter__pill ${selectedSource === source.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        try {
+                          selectPitchInstrumentProfile(profiles.some(profile => profile.id === source.profileId) ? source.profileId : null)
+                          if (!source.profileId) onLegacyTranspositionChange?.(source.transpositionId)
+                          setSelectedSource(source.id); setSelectedMidi(null); setSelectedDayKey(null); setFocusedDayKey('all'); didInitDayFocusRef.current = false; setProfileError('')
                           triggerLightHaptic(hapticFeedback)
-                          setSelectedSource('all')
-                        }}
-                      >
-                        All instruments
-                      </button>
-                      {instrumentIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          role="tab"
-                          aria-selected={selectedSource === id}
-                          className={`pitch-insights-instrument-filter__pill ${
-                            selectedSource === id ? 'is-active' : ''
-                          }`}
-                          onClick={() => {
-                            triggerLightHaptic(hapticFeedback)
-                            setSelectedSource(id)
-                          }}
-                        >
-                          {getTunerTransposition(id as TunerTranspositionId).shortLabel}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        className="pitch-insights-instrument-filter__pill pitch-insights-instrument-filter__add"
-                        onClick={() => {
-                          triggerLightHaptic(hapticFeedback)
-                          setInstrumentPickerOpen(true)
-                        }}
-                        aria-label="Add an instrument"
-                      >
-                        <Plus aria-hidden />
-                      </button>
-                    </div>
-                    <PremiumReveal open={instrumentPickerOpen}>
-                      <div className="pitch-insights-instrument-picker" role="dialog" aria-label="Add an instrument">
-                        <header>
-                          <strong>Add an instrument</strong>
-                          <button
-                            type="button"
-                            onClick={() => setInstrumentPickerOpen(false)}
-                            aria-label="Close"
-                          >
-                            <X aria-hidden />
-                          </button>
-                        </header>
-                        <div>
-                          {TUNER_TRANSPOSITION_OPTIONS.map((option) => {
-                            const added = addedInstruments.includes(option.id)
-                            const hasHistory = observations.some(
-                              (observation) => observation.transpositionId === option.id,
-                            )
-                            return (
-                              <div
-                                key={option.id}
-                                className={`pitch-insights-instrument-picker__row ${
-                                  added || hasHistory ? 'is-added' : ''
-                                }`}
-                              >
-                                <button type="button" onClick={() => addInstrument(option.id)}>
-                                  <span>{option.keyLabel}</span>
-                                  {option.label}
-                                </button>
-                                {added ? (
-                                  <button
-                                    type="button"
-                                    className="pitch-insights-instrument-picker__remove"
-                                    onClick={() => removeInstrument(option.id)}
-                                    aria-label={`Remove ${option.label}`}
-                                  >
-                                    <X aria-hidden />
-                                  </button>
-                                ) : hasHistory ? (
-                                  <small>Recorded</small>
-                                ) : null}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </PremiumReveal>
-                  </>
-                ) : null}
+                        } catch { setProfileError('Could not select this instrument on this device. Please try again.') }
+                      }}>{source.label}</button>)}
+                    <button type="button" className="pitch-insights-instrument-filter__pill pitch-insights-instrument-filter__add" aria-label="Add an instrument"
+                      onClick={() => { setProfileKey(transpositionId); setInstrumentPickerOpen(true); setProfileError('') }}><Plus aria-hidden /></button>
+                  </div>
+                  {profileError && <p role="alert">{profileError}</p>}
+                  <PremiumReveal open={instrumentPickerOpen}>
+                    <form className="pitch-insights-instrument-picker pitch-insights-profile-form" aria-label="Add an instrument" onSubmit={event => {
+                      event.preventDefault()
+                      try {
+                        const profile = createPitchInstrumentProfile(profileName, profileKey)
+                        setSelectedSource(pitchSourceId(profile.id, profile.transpositionId)); setProfileName(''); setInstrumentPickerOpen(false); setProfileError(''); setFocusedDayKey('all'); didInitDayFocusRef.current = false
+                      } catch (cause) { setProfileError(cause instanceof Error ? cause.message : 'Could not save this instrument. Please try again.') }
+                    }}>
+                      <header><strong>Add an instrument</strong><button type="button" aria-label="Close" onClick={() => setInstrumentPickerOpen(false)}><X aria-hidden /></button></header>
+                      <label>Name<input required maxLength={60} value={profileName} placeholder="C trumpet, flute…" onChange={event => setProfileName(event.target.value)} /></label>
+                      <label>Key<select aria-label="Instrument key" value={getTunerKeyOption(profileKey).id} onChange={event => setProfileKey(event.target.value as TunerTranspositionId)}>
+                        {TUNER_KEY_OPTIONS.map(option => <option key={option.id} value={option.id}>{option.keyLabel}</option>)}
+                      </select></label>
+                      {getTunerOctaveOptions(profileKey).length > 1 && <label>Octave · optional<select aria-label="Instrument octave" value={profileKey} onChange={event => setProfileKey(event.target.value as TunerTranspositionId)}>
+                        {getTunerOctaveOptions(profileKey).map(option => <option key={option.id} value={option.id}>{tunerOctaveLabel(option.id)}</option>)}
+                      </select></label>}
+                      <button type="submit" disabled={!profileName.trim()}>Create & use instrument</button>
+                      <p>Each named instrument keeps its own history. Earlier unnamed readings remain in Legacy/default.</p>
+                    </form>
+                  </PremiumReveal>
+                </> : null}
 
                 {loading ? (
                   <div className="pitch-insights-state" role="status">

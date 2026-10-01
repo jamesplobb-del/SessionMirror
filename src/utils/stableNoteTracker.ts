@@ -1,4 +1,4 @@
-import type { SavePitchObservationInput } from '../db/pitchInsightsRepository'
+import type { PitchInsightsResetDetail, SavePitchObservationInput } from '../db/pitchInsightsRepository'
 
 /** Stable-note thresholds are intentionally centralized for real-world tuning. */
 export const STABLE_NOTE_THRESHOLDS = {
@@ -30,6 +30,8 @@ export interface StablePitchContext {
   tunerInstrument: string
   transpositionId: string
   sessionId?: string | null
+  instrumentProfileId?: string | null
+  instrumentProfileName?: string | null
 }
 
 interface CandidateSample {
@@ -70,8 +72,19 @@ function contextsMatch(left: StablePitchContext, right: StablePitchContext): boo
   return (
     left.tunerInstrument === right.tunerInstrument &&
     left.transpositionId === right.transpositionId &&
+    (left.instrumentProfileId ?? null) === (right.instrumentProfileId ?? null) &&
+    (left.instrumentProfileName ?? null) === (right.instrumentProfileName ?? null) &&
     (left.sessionId ?? null) === (right.sessionId ?? null)
   )
+}
+
+function resetMatchesContext(reset: PitchInsightsResetDetail, context: StablePitchContext): boolean {
+  if (reset.kind === 'range') return (!reset.transpositionId || reset.transpositionId === context.transpositionId) &&
+    (reset.instrumentProfileId === undefined || reset.instrumentProfileId === (context.instrumentProfileId ?? null))
+  if (reset.kind === 'session-range') return reset.sessionId === context.sessionId &&
+    (!reset.transpositionId || reset.transpositionId === context.transpositionId) &&
+    (reset.instrumentProfileId === undefined || reset.instrumentProfileId === (context.instrumentProfileId ?? null))
+  return true
 }
 
 function octaveForMidi(midiNote: number): number {
@@ -97,6 +110,8 @@ function validFrame(frame: StablePitchFrame): boolean {
  */
 export class StableNoteTracker {
   private candidate: StableNoteCandidate | null = null
+  private resetBoundaries: PitchInsightsResetDetail[] = []
+  private resetHeldNote: Pick<StableNoteCandidate, 'midiNote' | 'context'> | null = null
   private readonly onObservation: StableObservationHandler
 
   constructor(onObservation: StableObservationHandler) {
@@ -108,13 +123,46 @@ export class StableNoteTracker {
     this.candidate = null
   }
 
+  /** Reset stored history without letting the same unfinished tone return. */
+  reset(detail: PitchInsightsResetDetail): void {
+    if (detail.kind === 'all') {
+      this.resetBoundaries = [detail]
+    } else {
+      // Repeating a reset for the same scope replaces its delayed-frame fence.
+      this.resetBoundaries = this.resetBoundaries.filter((previous) =>
+        previous.kind !== detail.kind ||
+        (
+          previous.startAt !== detail.startAt || previous.endAt !== detail.endAt ||
+          (previous.kind === 'range' && detail.kind === 'range' && (previous.transpositionId !== detail.transpositionId || previous.instrumentProfileId !== detail.instrumentProfileId)) ||
+          (previous.kind === 'session-range' && detail.kind === 'session-range' && (previous.sessionId !== detail.sessionId || previous.transpositionId !== detail.transpositionId || previous.instrumentProfileId !== detail.instrumentProfileId))
+        ),
+      )
+      this.resetBoundaries.push(detail)
+    }
+    const candidate = this.candidate
+    if (!candidate || !resetMatchesContext(detail, candidate.context)) return
+    if (detail.kind !== 'all' && (candidate.lastAt < detail.startAt || candidate.startedAt >= detail.endAt)) return
+    this.resetHeldNote = { midiNote: candidate.midiNote, context: candidate.context }
+    this.discard()
+  }
+
   ingest(frame: StablePitchFrame | null, context: StablePitchContext): void {
     if (!frame || !validFrame(frame)) {
+      if (!frame || frame.frequencyHz <= 0 || frame.noteName === '—') this.resetHeldNote = null
       this.finish()
       return
     }
 
+    if (this.resetBoundaries.some((reset) =>
+      frame.timestamp <= reset.requestedAt && resetMatchesContext(reset, context) &&
+      (reset.kind === 'all' || (frame.timestamp >= reset.startAt && frame.timestamp < reset.endAt)),
+    )) return
+
     const roundedMidi = Math.round(frame.midiNote)
+    if (this.resetHeldNote) {
+      if (this.resetHeldNote.midiNote === roundedMidi && contextsMatch(this.resetHeldNote.context, context)) return
+      this.resetHeldNote = null
+    }
     const current = this.candidate
     const startsNewNote =
       !current ||
@@ -208,6 +256,8 @@ export class StableNoteTracker {
       tunerInstrument: candidate.context.tunerInstrument,
       transpositionId: candidate.context.transpositionId,
       sessionId: candidate.context.sessionId ?? null,
+      instrumentProfileId: candidate.context.instrumentProfileId ?? null,
+      instrumentProfileName: candidate.context.instrumentProfileName ?? null,
     })
   }
 }

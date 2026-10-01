@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
-import { loadPracticePassage, savePracticePassage, emptyPassage, type PracticePassage } from '../utils/practicePassages'
+import { loadPracticePassage, savePracticePassage, emptyPassage, passageExceedsDuration, type PracticePassage } from '../utils/practicePassages'
 import { YOUTUBE_PROXY_ORIGIN } from '../utils/youtubeEmbed'
 import { seekYoutubeProxy, startYoutubeProxyPlayback } from '../utils/playalong/youtubeBridge'
 
@@ -15,6 +15,7 @@ export function useYoutubePracticePassage({ projectId, videoId, iframeRef, recor
   const current = useRef(passage)
   const blocked = useRef(recording)
   blocked.current = recording
+  const rangeInvalid = passageExceedsDuration(passage, duration)
   useEffect(() => {
     const initial = projectId && videoId ? loadPracticePassage(projectId, `youtube:${videoId}`) : emptyPassage()
     current.current = initial; setPassage(initial); setPosition(initial.positionSeconds)
@@ -65,11 +66,11 @@ export function useYoutubePracticePassage({ projectId, videoId, iframeRef, recor
     } catch { setError('Could not save this passage. Please try again.') }
   }
   const play = () => {
-    if (!ready || blocked.current) return
+    if (!ready || blocked.current || passageExceedsDuration(current.current, duration)) return
     beforePlay()
     const start = current.current.startSeconds ?? current.current.positionSeconds
     seekYoutubeProxy(iframeRef.current, Math.min(start, Math.max(0, (duration ?? start + 1) - .5)))
     startYoutubeProxyPlayback(iframeRef.current)
   }
-  return { passage, position, duration, ready, error, update, play }
+  return { passage, position, duration, ready, rangeInvalid, error, update, play }
 }

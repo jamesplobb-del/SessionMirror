@@ -8,6 +8,7 @@ import type TunerTakePillRow from './audioPractice/TunerTakePillRow'
 import AudioModeHome, { AudioModeTakeCard } from './audioPractice/AudioModeHome'
 import {
   clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition,
+  settleClearOfMusicRail,
 } from '../utils/floatingWidgetLayout'
 import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 
@@ -71,8 +72,11 @@ export default function DraggableTakesWidget({
   }, [boundaryRef, dragX, dragY])
 
   const persist = useCallback(
-    () => saveWidgetPosition(POSITION_ID, dragX.get(), dragY.get()),
-    [dragX, dragY],
+    () => {
+      settleClearOfMusicRail(dragX, widgetRef.current, boundaryRef.current)
+      saveWidgetPosition(POSITION_ID, dragX.get(), dragY.get())
+    },
+    [boundaryRef, dragX, dragY],
   )
 
   const held = [pills.benchmarkTake, pills.libraryBenchmarkPlayback, pills.challengerTake]
@@ -97,6 +101,8 @@ export default function DraggableTakesWidget({
       dragElastic={0.04}
       dragConstraints={boundaryRef}
       onDragEnd={persist}
+      // The drag's own settle animation runs after onDragEnd; re-check once it lands.
+      onDragTransitionEnd={persist}
       className={`takes-widget pointer-events-auto absolute left-0 top-0 z-20 ${fold.collapsed ? 'widget-is-collapsed' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}

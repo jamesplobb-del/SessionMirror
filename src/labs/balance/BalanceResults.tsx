@@ -41,7 +41,7 @@ export default function BalanceResults({
     <div className="balance-results-screen">
       <section className="balance-results-card">
         <p className="balance-eyebrow">Balance</p>
-        <h1>Routine complete</h1>
+        <h1>{result.completed ? 'Routine complete' : 'Run finished'}</h1>
         <p className="balance-results-card__routine">{result.routineName}</p>
 
         <div className="balance-score-hero">

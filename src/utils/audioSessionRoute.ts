@@ -6,6 +6,7 @@ export interface AudioRouteSnapshot {
   success?: boolean
   inputPort?: string
   outputPort?: string
+  outputUID?: string
   usesBuiltInMic?: boolean
   usesBluetoothOutput?: boolean
   usesA2DPOutput?: boolean

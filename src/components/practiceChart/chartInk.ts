@@ -123,7 +123,7 @@ export function loadInkStrokes(projectId: string): InkStroke[] {
   }
 }
 
-export function saveInkStrokes(projectId: string, strokes: InkStroke[]): void {
+export function saveInkStrokes(projectId: string, strokes: InkStroke[]): boolean {
   try {
     if (strokes.length === 0) localStorage.removeItem(inkKey(projectId))
     // Rounded to four places: a mark is a gesture, not a measurement, and four
@@ -136,13 +136,12 @@ export function saveInkStrokes(projectId: string, strokes: InkStroke[]): void {
         points: stroke.points.map(value => Math.round(value * 1e4) / 1e4),
       })),
     ))
-  } catch {
-    /* private mode / quota — the marks stay on screen for this sitting */
-  }
+    return true
+  } catch { return false }
 }
 
-export function clearInkStrokes(projectId: string): void {
-  try { localStorage.removeItem(inkKey(projectId)) } catch { /* private mode */ }
+export function clearInkStrokes(projectId: string): boolean {
+  try { localStorage.removeItem(inkKey(projectId)); return true } catch { return false }
 }
 
 /**

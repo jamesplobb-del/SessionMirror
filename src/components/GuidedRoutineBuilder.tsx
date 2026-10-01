@@ -3,7 +3,6 @@ import { requirePlus } from '../plus/plusAccess'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import PremiumFlowPage from './ui/PremiumFlowPage'
 import SwipeRoutineItem from './SwipeRoutineItem'
-import { PRACTICE_GOALS, buildGoalRoutine, type PracticeGoal } from '../utils/routineGoals'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, useReducedMotion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, FileMusic, Music2, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
@@ -16,17 +15,17 @@ import RoutineMusicSetup from './RoutineMusicSetup'
 import RoutineShareDialog from './RoutineShareDialog'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
 import { buildPresetRoutine, getRoutinePresets, getStepTemplates, presetMinutes, stepFromTemplate } from '../utils/routinePresets'
-import { blankDesk, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
+import { blankDesk, clampMinutes, createRoutine, createStep, formatMinutes, MAX_ROUTINE_NAME, MAX_ROUTINE_STEPS, MAX_STEP_MINUTES, MAX_STEP_TITLE, summarizeStep, type Routine, type RoutineStep, type RoutineStepKind } from '../utils/practiceRoutines'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import type { MetronomePrefs } from '../utils/metronomeConfig'
-import { loadExerciseLibrary, loadRoutineLibrary, storeLibraryExercise, storeLibraryRoutine } from '../utils/routineLibrary'
+import { loadExerciseLibrary, loadRoutineLibrary, RoutineLibraryRecoveryError, storeLibraryExercise, storeLibraryRoutine, storeLibraryRoutineWithExercises } from '../utils/routineLibrary'
 import { hasPracticeChart, savePracticeChart } from '../utils/practiceChartStorage'
 import { importPracticePlanFileFromText, MAX_PRACTICE_PLAN_BYTES, PRACTICE_PLAN_EXTENSION } from '../utils/practiceRoutineShare'
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import type { LabsRoute } from './labs/LabsOverlay'
 import '../styles/routine-guide.css'
 
-type Screen = 'routines' | 'goals' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'library'
+type Screen = 'routines' | 'instrument' | 'choose' | 'lineup' | 'custom-items' | 'custom-tool' | 'custom-reference' | 'custom-settings' | 'library'
 type ToolChoice = { key: string; kind: RoutineStepKind; mode?: 'audio' | 'video'; title: string; detail: string }
 const toolChoices: ToolChoice[] = [
   { key: 'camera', kind: 'record', mode: 'video', title: 'Camera', detail: 'Record video, review, and retry' },
@@ -72,10 +71,9 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const { mode, routine, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, onCreatePracticeItem, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
   const [showReorder, setShowReorder] = useState(false)
-  const [goal, setGoal] = useState<PracticeGoal>('balanced')
   const [screen, setScreen] = useState<Screen>(() => {
     if (mode === 'edit' && routine) return 'lineup'
-    if (mode === 'build') return 'routines'
+    if (mode === 'build' && !props.startAtSuggestions) return 'routines'
     return initialInstrument ? 'library' : 'instrument'
   })
   const [instrument, setInstrument] = useState(initialInstrument)
@@ -106,6 +104,10 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [direction, setDirection] = useState(1)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const [musicImportStatus, setMusicImportStatus] = useState('')
   const [importingMusic, setImportingMusic] = useState(false)
   const [shareItem, setShareItem] = useState<Routine | null>(null)
@@ -138,11 +140,11 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const setupTitle = (editingStepId ? draft.steps.find(step => step.id === editingStepId)?.title : customItems[customIndex]) ?? 'Your item'
   const total = draft.steps.reduce((sum, step) => sum + step.minutes, 0)
   const titles: Record<Screen, string> = {
-    routines: 'Your\nroutines.', goals: 'What would you like\nto build?', instrument: 'What do you play?', choose: 'Add an exercise.', lineup: 'Ready when\nyou are.',
+    routines: 'Your\nroutines.', instrument: 'What do you play?', choose: 'Add an exercise.', lineup: 'Ready when\nyou are.',
     'custom-settings': 'Set up your tools.', 'custom-reference': musicSetup ? 'Add your music.' : 'Add a reference.', 'custom-items': 'Build your own.', 'custom-tool': setupTitle, library: 'Build your\nroutine.',
   }
   const subtitles: Record<Screen, string> = {
-    routines: 'Create a new plan or open one you’ve already built.', goals: 'Choose what you want to practice. You can change the exercises later.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions for ${instrumentName.toLowerCase()}.`, lineup: 'Review your exercises and their order.',
+    routines: 'Create a new plan or open one you’ve already built.', instrument: 'A starting point that fits your instrument.', choose: `Suggestions for ${instrumentName.toLowerCase()}.`, lineup: 'Review your exercises and their order.',
     'custom-settings': setupTitle, 'custom-reference': musicSetup ? `A PDF or photo · ${setupTitle}` : `Optional · ${setupTitle}`, 'custom-items': 'Type every item in the order you want to practice it.',
     'custom-tool': editingStepId || customItems.length <= 1 ? 'What should open with it?' : `Item ${customIndex + 1} of ${customItems.length} · What should open with it?`,
     library: 'Start with a suggestion, then make it yours.',
@@ -154,7 +156,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   }
   const back = () => {
     if (screen === 'routines') onCancel()
-    else if (screen === 'goals') move('library', true)
     else if (screen === 'custom-reference') move('custom-settings', true)
     else if (screen === 'custom-settings') move('custom-tool', true)
     else if (screen === 'custom-tool' && editingStepId) { clearItemSetup(); move('lineup', true) }
@@ -176,6 +177,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
       else if (mode === 'build') move('routines', true)
       else onCancel()
     }
+    else if (screen === 'library' && props.startAtSuggestions && props.onStartMusicRoutine) props.onStartMusicRoutine()
     else if (screen === 'library' && libraryReturn) move(libraryReturn, true)
     else onCancel()
   }
@@ -197,6 +199,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     setDraft(createRoutine('My practice', [], instrument)); setCustomItems([]); setCustomInput('')
     setCustomIndex(0); setCustomSteps([]); clearItemSetup(); setLineupReturn('library'); move('custom-items')
   }
+  // A new routine starts with music; "Don't have music?" there leads back to
+  // the suggestions page for routines without scores.
   const startNewRoutine = () => {
     if (props.onStartMusicRoutine) {
       props.onStartMusicRoutine()
@@ -320,17 +324,23 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   }
   const customMusicPinned = Boolean(customSetup?.projectId && hasPracticeChart(customSetup.projectId))
   const pendingSetup = draft.steps.filter(step => !configuredIds.includes(step.id))
-  const saveDraft = (start: boolean) => {
-    if (!canSaveRoutine(draft, () => saveDraft(start))) return
+  const saveDraft = async (start: boolean) => {
+    if (savingRef.current) return
+    if (!canSaveRoutine(draft, () => { void saveDraft(start) })) return
     if (pendingSetup.length) { openItemSetup(pendingSetup[0]); return }
+    if (!draft.steps.length) return
+    const plusFeature = draft.steps.some(step => step.sharedScoreName || step.desk?.showMusic) ? 'music'
+      : draft.steps.some(step => step.desk?.autoSoundRecording) ? 'handsfree' : null
+    if (start && plusFeature && !requirePlus(plusFeature, () => { void saveDraft(start) })) return
     const next = { ...draft, steps: draft.steps.map(step => createStep(step)), name: draft.name.trim() || `${instrumentName} practice`, instrumentId: instrument, updatedAt: Date.now() }
+    savingRef.current = true; setSaving(true); setError('')
     try {
-      if (routine && routine.id !== next.id) storeLibraryRoutine(routine)
-      storeLibraryRoutine(next)
+      storeLibraryRoutineWithExercises(next, routine)
       setDraft(next); setLibrary(loadRoutineLibrary())
-      if (start && onSaveAndStart) onSaveAndStart(next)
+      if (start && onSaveAndStart) await onSaveAndStart(next)
       else onSave(next)
-    } catch { setError('Could not save your routine on this device. Please try again.') }
+    } catch (cause) { if (alive.current) setError(cause instanceof RoutineLibraryRecoveryError ? cause.message : 'Could not save or start your routine. Your draft is still here; please try again.') }
+    finally { savingRef.current = false; if (alive.current) setSaving(false) }
   }
   const removeFromToday = () => {
     if (!routine) return
@@ -393,8 +403,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const editingToday = routine?.id === draft.id
   const startLabel = editingToday && todayStarted ? 'Save & continue' : 'Start routine'
   const secondaryAction = canStart ? { label: editingToday ? 'Save changes' : 'Save for later', run: () => saveDraft(false) } : null
-  const action = screen === 'goals' ? () => { const next = buildGoalRoutine(instrument, goal); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('goals'); move('lineup') }
-    : screen === 'instrument' ? () => move(instrumentReturn)
+  const action = screen === 'instrument' ? () => move(instrumentReturn)
     : screen === 'choose' ? () => move('lineup')
     : screen === 'lineup' ? () => saveDraft(canStart)
     : screen === 'custom-items' ? () => { setCustomIndex(0); setCustomSteps([]); setCustomToolKey(null); setCustomReferenceVideo(null); setCustomReference(''); setCustomGameRoute('menu'); move('custom-tool') }
@@ -402,8 +411,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     : screen === 'custom-settings' ? () => move('custom-reference')
     : screen === 'custom-reference' ? () => { if (!customReferenceVideo) setCustomReference(''); saveCustomTool() }
     : undefined
-  const actionLabel = screen === 'goals' ? 'Build my practice plan' : screen === 'choose' ? 'Done' : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? toolSkipsDesk(customToolKey) ? 'Save item' : customToolKey === 'metronome' ? 'Set metronome' : 'Continue to tools' : screen === 'custom-settings' ? musicSetup ? 'Continue to music' : 'Continue to reference' : screen === 'custom-reference' ? musicSetup ? customMusicPinned ? 'Save item' : 'Skip music & save item' : customReferenceVideo ? 'Save item' : 'Skip reference & save item' : 'Continue'
-  const disabled = screen === 'instrument' ? !instrument : screen === 'choose' || screen === 'lineup' ? !draft.steps.length : screen === 'custom-items' ? !customItems.length : screen === 'custom-tool' ? !customToolKey : false
+  const actionLabel = screen === 'choose' ? 'Done' : screen === 'lineup' ? pendingSetup.length ? `Set up items · ${pendingSetup.length}` : canStart ? startLabel : 'Save routine' : screen === 'custom-items' ? `Set up ${customItems.length} ${customItems.length === 1 ? 'item' : 'items'}` : screen === 'custom-tool' ? toolSkipsDesk(customToolKey) ? 'Save item' : customToolKey === 'metronome' ? 'Set metronome' : 'Continue to tools' : screen === 'custom-settings' ? musicSetup ? 'Continue to music' : 'Continue to reference' : screen === 'custom-reference' ? musicSetup ? customMusicPinned ? 'Save item' : 'Skip music & save item' : customReferenceVideo ? 'Save item' : 'Skip reference & save item' : 'Continue'
+  const disabled = saving || (screen === 'instrument' ? !instrument : screen === 'choose' || screen === 'lineup' ? !draft.steps.length : screen === 'custom-items' ? !customItems.length : screen === 'custom-tool' ? !customToolKey : false)
   const renderTemplate = (template: typeof templates[number]) => <Pressable key={template.id} type="button" haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion}
     className="routine-guide-exercise" aria-pressed={isSelected(template.id)} onClick={() => toggle(template.id, () => stepFromTemplate(template, instrument))}>
     <span className="routine-guide-check">{isSelected(template.id) ? <Check aria-hidden /> : <Plus aria-hidden />}</span>
@@ -411,17 +420,18 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   </Pressable>
 
   return <section className="routine-guide" aria-label="Build your routine" onKeyDown={event => {
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); back() }
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!savingRef.current) back() }
   }}>
     <nav className="routine-guide-nav" aria-label="Routine navigation">
-      <button type="button" onClick={back} aria-label="Back"><ArrowLeft aria-hidden /></button>
+      <button type="button" disabled={saving} onClick={back} aria-label="Back"><ArrowLeft aria-hidden /></button>
       <span>BESTTAKE <i /> YOUR PRACTICE</span>
-      <button type="button" onClick={onCancel} aria-label="Close routine builder"><X aria-hidden /></button>
+      <button type="button" disabled={saving} onClick={onCancel} aria-label="Close routine builder"><X aria-hidden /></button>
     </nav>
     {screen !== 'routines' && <div className="routine-guide-progress" aria-label={screen === 'instrument' ? 'Step 1 of 3' : screen === 'choose' ? 'Step 2 of 3' : 'Your routine'}>
       {[0, 1, 2].map(index => <i key={index} className={index <= (screen === 'instrument' ? 0 : screen === 'library' || screen === 'choose' || screen.startsWith('custom') ? 1 : 2) ? 'is-on' : ''} />)}
     </div>}
     <div className="routine-guide-scroll" ref={scrollRef}>
+      <fieldset className="contents" disabled={saving}>
         <PremiumFlowPage key={`${screen}-${screen === 'custom-tool' ? `${customIndex}-${editingStepId ?? ''}` : 0}`}
           direction={direction} data-routine-screen={screen}
           onAnimationComplete={() => {
@@ -440,7 +450,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <button type="button" className="routine-guide-new-routine" onClick={startNewRoutine}>
               <span><Plus aria-hidden /></span>
               <strong>New routine</strong>
-              <small>Choose music, then set up your exercises</small>
+              <small>Import your music, or start from a suggestion</small>
               <ChevronRight aria-hidden />
             </button>
             <section className="routine-guide-saved" aria-label="Your saved routines">
@@ -516,9 +526,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
               </button>
             </section>}
           </div>}
-          {screen === 'goals' && <>
-            <div className="routine-guide-tool-list">{PRACTICE_GOALS.map(item => <button type="button" key={item.id} className="routine-guide-choice" aria-pressed={goal === item.id} onClick={() => setGoal(item.id)}><span><strong>{item.title}</strong><small>{item.detail}</small></span>{goal === item.id && <Check aria-hidden />}</button>)}</div>
-          </>}
           {screen === 'instrument' && <div className="routine-guide-instruments">
             {INSTRUMENT_FAMILIES.map(family => <section key={family}>
               <h3>{family}</h3><div className="routine-guide-grid">
@@ -542,7 +549,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <button type="button" className="routine-guide-text" onClick={() => move('lineup')}>Back to lineup</button>
           </>}
           {screen === 'lineup' && <>
-            <button type="button" className="routine-guide-own" disabled={!draft.steps.length} onClick={() => shareRoutine(draft)}><Share2 aria-hidden /> Share routine file</button>
+            <button type="button" className="routine-guide-own" disabled={!draft.steps.length} onClick={() => shareRoutine(draft)}><Share2 aria-hidden /> Share routine</button>
             <label className="routine-guide-field routine-guide-field--name">Routine name<input id="guide-routine-name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
             <div className="routine-guide-lineup-meta">{draft.steps.length} exercises <span>·</span> {formatMinutes(total)}</div>
             <p className="routine-guide-ready-note">{pendingSetup.length ? null : <Check size={16} aria-hidden />}{pendingSetup.length ? 'Set up the remaining exercises before starting.' : 'Ready to start. Tap an exercise to adjust.'}</p>
@@ -572,7 +579,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           </div>}
           {screen === 'custom-tool' && <>
             {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}
-            <div className="routine-guide-tool-list">{toolChoices.map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => {
+            <div className="routine-guide-tool-list">{toolChoices.filter(choice => choice.key !== 'music' || customToolKey === 'music').map(choice => <Pressable type="button" key={choice.key} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" aria-pressed={customToolKey === choice.key} onClick={() => {
               setCustomToolKey(choice.key)
               if (choice.kind === 'game' && !customGameRoute) setCustomGameRoute('menu')
               if (choice.kind === 'metro') {
@@ -582,7 +589,7 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             }}><span><strong>{choice.title}</strong><small>{choice.detail}</small></span>{customToolKey === choice.key && <Check aria-hidden />}</Pressable>)}</div>
             {customToolKey === 'game' && <div className="routine-guide-tool-list" role="radiogroup" aria-label="Which game">{GAMES.map(game => <Pressable type="button" key={game.route} haptic="light" hapticFeedback={hapticFeedback} squish={!reducedMotion} className="routine-guide-choice" role="radio" aria-checked={customGameRoute === game.route} onClick={() => { setCustomToolKey('game'); setCustomGameRoute(game.route) }}><span><strong>{game.label}</strong><small>{game.hint}</small></span>{customGameRoute === game.route && <Check aria-hidden />}</Pressable>)}</div>}
             {customToolKey && !toolSkipsDesk(customToolKey) && <label className="routine-guide-current"><input type="checkbox" checked={useCurrent} onChange={event => setUseCurrent(event.target.checked)} /><SlidersHorizontal aria-hidden /><span>Also use my current workspace settings</span></label>}
-            <label className="routine-guide-field">Minutes <small>· optional</small><input type="number" inputMode="numeric" min={0} max={180} aria-label="Exercise minutes" value={customMinutes || ''} placeholder="Untimed" onChange={event => setCustomMinutes(Math.max(0, Math.min(180, Math.round(Number(event.target.value) || 0))))} /></label>
+            <label className="routine-guide-field">Minutes <small>· optional</small><input type="number" inputMode="numeric" min={0} max={MAX_STEP_MINUTES} aria-label="Exercise minutes" value={customMinutes || ''} placeholder="Untimed" onChange={event => setCustomMinutes(clampMinutes(Number(event.target.value)))} /></label>
           </>}
           {screen === 'custom-settings' && customSetup && <div className="routine-guide-editor">
             <RoutineDeskSetup
@@ -603,12 +610,13 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
           )}
           {screen === 'library' && <>
             <section className="routine-guide-library"><h3>Suggested for {instrumentName.toLowerCase()}</h3>{presets.map(preset => <button type="button" key={preset.id} className="routine-guide-choice" onClick={() => { const next = buildPresetRoutine(preset, instrument); setDraft(next); setSelection(selectionForRoutine(next)); setConfiguredIds(next.steps.map(step => step.id)); setLineupReturn('library'); clearItemSetup(); move('lineup') }}><span><strong>{preset.name}</strong><small>{preset.blurb} · About {presetMinutes(preset, instrument)} min</small></span><ChevronRight aria-hidden /></button>)}</section>
-            <button type="button" className="routine-guide-choice routine-goal-entry" onClick={() => move('goals')}><span><strong>Build a plan for my goals</strong><small>Choose what you want to work on</small></span><ArrowRight aria-hidden /></button>
             <button type="button" className="routine-guide-own" onClick={startCustomRoutine}><Plus aria-hidden /><span><strong>Build your own routine</strong><small>Type your practice items and choose what opens for each.</small></span><ArrowRight aria-hidden /></button>
           </>}
         </PremiumFlowPage>
+      </fieldset>
     </div>
     {error && <p className="routine-guide-error" role="alert">{error}</p>}
+    {saving && <p className="routine-guide-error" role="status">Saving routine…</p>}
     <RoutineMetronomeEditor
       isOpen={metronomeEditorOpen}
       itemTitle={setupTitle}

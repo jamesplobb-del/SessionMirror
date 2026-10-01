@@ -3605,8 +3605,9 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setMusicPageVisible(false)
     setLabsRoute(null)
     handleAudioPracticeTabChange('audio')
+    handleRecordingModeChange('video')
     dismissPracticeHub()
-  }, [dismissPracticeHub, handleAutoSoundRecordingChange, handleAudioPracticeTabChange, settings.hapticFeedback])
+  }, [dismissPracticeHub, handleAutoSoundRecordingChange, handleAudioPracticeTabChange, handleRecordingModeChange, settings.hapticFeedback])
 
   /**
    * Closing the sheet resumes whatever context is already live — it never
@@ -5864,14 +5865,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }, surfaceChanges ? 1700 : 600)
   }, [])
 
-  const openRoutineStep = useCallback(async (stepId: string) => {
+  const openRoutineStep = useCallback(async (stepId: string): Promise<void> => {
     let target = routineRef.current
     const step = target?.steps.find(item => item.id === stepId)
     if (!target || !step) throw new Error('This routine item is no longer available.')
+    const rememberedDay = routineDayRef.current
+    const rememberedDesk = rememberedDay?.routineId === target.id && rememberedDay.date === todayKey()
+      ? rememberedDay.desksByStep[step.id] : null
+    const plusFeature = step.sharedScoreName || step.desk?.showMusic || rememberedDesk?.showMusic ? 'music'
+      : step.desk?.autoSoundRecording || rememberedDesk?.autoSoundRecording ? 'handsfree' : null
+    if (plusFeature && !requirePlus(plusFeature, () => {
+      void runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId))
+        .catch(cause => setTakeDeleteError(cause instanceof Error ? cause.message : 'Could not open that step. Your routine is safe; try again.'))
+    })) throw new Error(`Unlock Plus to use this item’s ${plusFeature === 'music' ? 'music' : 'hands-free recording'}. Your routine is still saved.`)
     if (canUsePlus() && (step.sharedScoreName || (step.desk?.showMusic && step.projectId)) && !(step.projectId && hasPracticeChart(step.projectId))) {
       handleOpenRoutineBuilder('edit')
-      setTakeDeleteError(`Import ${step.sharedScoreName ?? step.title} in this routine before starting the exercise.`)
-      return
+      const message = `Import ${step.sharedScoreName ?? step.title} in this routine before starting the exercise.`
+      setTakeDeleteError(message)
+      throw new Error(message)
     }
     const surfaceBefore = recordingModeRef.current
     setIsSplitView(false)
@@ -5981,7 +5992,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Preparing a step must never open a browser or cover the practice surface.
   }, [commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleOpenRoutineBuilder, handleRecordingModeChange,
-    openRoutinePracticeSession, rememberCurrentPracticeDesk, rememberLastPracticeDestination, scheduleRoutineClick, settings.hapticFeedback])
+    openRoutinePracticeSession, rememberCurrentPracticeDesk, rememberLastPracticeDestination, runPracticeTransition, scheduleRoutineClick, settings.hapticFeedback])
 
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
@@ -5991,14 +6002,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSaveAndStartRoutine = useCallback(async (next: Routine) => {
     if (!commitSavedRoutine(next)) throw new Error('Practice is still switching. Try again in a moment.')
     setIncomingRoutine(null)
-    try {
-      const target = routineRef.current
-      const step = target ? routineResumeStep(target, routineDayRef.current) ?? target.steps[0] : undefined
-      if (step) await handleStartRoutineStep(step.id)
-    } finally {
-      // Cleared only now, so the sheet leaves from the builder rather than flashing Home.
-      setRoutineBuilderRequest(null)
-    }
+    const target = routineRef.current
+    const step = target ? routineResumeStep(target, routineDayRef.current) ?? target.steps[0] : undefined
+    if (!step) throw new Error('Add a practice item before starting this routine.')
+    await handleStartRoutineStep(step.id)
+    // Leave only after the item is ready; failed starts keep the draft and repair controls open.
+    setRoutineBuilderRequest(null)
   }, [commitSavedRoutine, handleStartRoutineStep])
   const handleDailyPractice = useCallback((plan: DailyChallengePlan) => {
     void runPracticeTransition('daily-practice', async () => {
@@ -6125,8 +6134,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   /** Straight to any step from the bar's list. The step being left keeps its time. */
   const handleJumpToRoutineStep = useCallback((stepId: string) => {
-    void handleStartRoutineStep(stepId).catch(() =>
-      setTakeDeleteError('Could not open that step. Your routine is safe; try again.'))
+    void handleStartRoutineStep(stepId).catch(cause =>
+      setTakeDeleteError(cause instanceof Error ? cause.message : 'Could not open that step. Your routine is safe; try again.'))
   }, [handleStartRoutineStep])
 
   const handleEditRoutineFromBar = useCallback(() => {
@@ -6673,7 +6682,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onChromeHiddenChange={setMusicChromeHidden}
                     isRecording={isRecording}
                     isStopping={isStopping}
-                    recordReady={ready || simulatorCaptureAvailable}
+                    // Same rule as the deck's record button: only a video take waits on the
+                    // camera. Gating audio on it grayed Record out whenever the mic was being
+                    // set up again (Pitch turning on, or right after saving and pinning a take).
+                    recordReady={recordingMode !== 'video' || ready || simulatorCaptureAvailable}
                     recordElapsed={elapsed}
                     onToggleRecord={handleToggleRecord}
                     handsFreeEnabled={settings.autoSoundRecording}
@@ -7360,14 +7372,25 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         pitchTrackerEnabled={hudQuickSettings.pitchTrackerEnabled}
                         pitchToggleVisible={!isAudioPracticeTunerTab}
                         showTakeCards={hudQuickSettings.showTakeCards}
-                        onPitchTrackerChange={handlePitchTrackerSettingChange}
+                        // On the music page widgets fold into the right-hand rail; turning
+                        // one on from Workspace must open it, as the stand's own menu does.
+                        onPitchTrackerChange={enabled => {
+                          if (musicRoomActive) setMusicWorkspaceExpandRequest(current => ({ ...current, pitch: enabled || undefined }))
+                          handlePitchTrackerSettingChange(enabled)
+                        }}
                         onShowTakeCardsChange={handleShowTakeCardsSettingChange}
                         showMetronome={hudQuickSettings.showMetronome}
                         metronomeToggleVisible={!isAudioPracticeMetronomeTab}
-                        onShowMetronomeChange={handleShowMetronomeSettingChange}
+                        onShowMetronomeChange={enabled => {
+                          if (musicRoomActive) setMusicWorkspaceExpandRequest(current => ({ ...current, metronome: enabled || undefined }))
+                          handleShowMetronomeSettingChange(enabled)
+                        }}
                         showDrone={hudQuickSettings.showDrone}
                         droneToggleVisible
-                        onShowDroneChange={handleShowDroneSettingChange}
+                        onShowDroneChange={enabled => {
+                          if (musicRoomActive) setMusicWorkspaceExpandRequest(current => ({ ...current, drone: enabled || undefined }))
+                          handleShowDroneSettingChange(enabled)
+                        }}
                         showMusic={hudQuickSettings.showMusic}
                         musicToggleVisible={false}
                         onShowMusicChange={handleShowMusicSettingChange}

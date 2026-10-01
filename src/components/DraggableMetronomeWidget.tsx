@@ -26,7 +26,7 @@ import {
 } from '../utils/haptics'
 import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 import { usePinchResize } from '../hooks/usePinchResize'
-import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize } from '../utils/floatingWidgetLayout'
+import { getFloatingWidgetTopCenter, clampWidgetPosition, loadWidgetPosition, loadWidgetSize, saveWidgetPosition, saveWidgetSize, settleClearOfMusicRail } from '../utils/floatingWidgetLayout'
 import MetronomeAudioSelect from './audioPractice/MetronomeAudioSelect'
 import MetronomeBeatMarkers from './audioPractice/MetronomeBeatMarkers'
 import RhythmCellGlyph from './audioPractice/RhythmCellGlyph'
@@ -256,8 +256,9 @@ export default function DraggableMetronomeWidget({
   }, [boundaryRef, defaultTopOffset, dragX, dragY, positionId])
 
   const persistPosition = useCallback(() => {
+    settleClearOfMusicRail(dragX, widgetRef.current, boundaryRef.current)
     saveWidgetPosition(positionId, dragX.get(), dragY.get())
-  }, [dragX, dragY, positionId])
+  }, [boundaryRef, dragX, dragY, positionId])
 
   const reclampPosition = useCallback(() => {
     const bounds = boundaryRef.current
@@ -496,6 +497,7 @@ export default function DraggableMetronomeWidget({
       onPointerUp={handleShellPointerUp}
       onPointerCancel={onPinchPointerCancel}
       onDragEnd={() => { lastTapAtRef.current = 0; persistPosition() }}
+      onDragTransitionEnd={persistPosition}
       className={`metronome-widget-draggable pointer-events-auto absolute left-0 top-0 z-[12] touch-none ${fold.collapsed ? 'widget-is-collapsed' : ''} ${pinching ? 'metronome-widget-draggable--pinching' : ''} ${playing ? 'metronome-widget-draggable--playing' : ''} ${controlsLocked ? 'metronome-widget-draggable--locked' : ''}`}
       initial={{ opacity: 0, scale: 0.94 }}
       animate={fold.panelAnimation}

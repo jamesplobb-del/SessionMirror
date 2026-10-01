@@ -9,6 +9,7 @@ import { type LayoutRectPercent } from '../layout/layoutRects'
 import { panelOffsetMs, playbackCountOffSec, sourceWindow, withOverlayLeadIn } from '../synchronization/projectTiming'
 import { compositionRects } from '../layout/composition'
 import { sheetCueWindows, sheetYAt } from '../sheetMusic/sheetMusicTimeline'
+import { missingMultitrackFiles } from '../state/multitrackReadiness'
 import type { MultitrackLayoutPreset, MultitrackSession, PerformancePanelState } from '../types'
 
 const MULTITRACK_EXPORT_DIR = 'multitrack-export-assets'
@@ -50,7 +51,7 @@ export async function exportMultitrackSession(
   durationSeconds: number,
   options: MultitrackExportOptions = {},
 ): Promise<MultitrackExportResult> {
-  if (session.panels.some(p => p.kind === 'performance' && !p.hidden && p.missingTakeId && !p.take)) {
+  if (missingMultitrackFiles(session).length > 0) {
     return { ok: false, reason: 'missing_file' }
   }
   if (!(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios')) {

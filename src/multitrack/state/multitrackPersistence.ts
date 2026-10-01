@@ -1,5 +1,6 @@
 import { normalizeLayoutStyle } from '../layout/quietWorkspaceLayout'
 import { persistAsset, restoreAsset } from './multitrackAssets'
+import { recordingCountInBars } from '../recording/multitrackCountIn'
 import type { Take } from '../../types'
 import { Capacitor } from '@capacitor/core'
 import { Directory, Filesystem } from '@capacitor/filesystem'
@@ -91,14 +92,14 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
           ? [panel.sectionStartSec ?? null, panel.sectionEndSec ?? null]
           : null,
       ),
-      practice: session.practice,
+      practice: { ...session.practice, countInBars: recordingCountInBars(session.practice.countInBars) },
       backing: session.backing.kind === 'audio'
-        ? { ...session.backing, src: await persistAsset(session.backing.src) } : session.backing,
+        ? { ...session.backing, src: session.backing.missing ? session.backing.src : await persistAsset(session.backing.src) } : session.backing,
       sheetMusic: {
         ...session.sheetMusic,
-        asset: session.sheetMusic.asset ? { ...session.sheetMusic.asset, src: await persistAsset(session.sheetMusic.asset.src) } : null,
+        asset: session.sheetMusic.asset ? { ...session.sheetMusic.asset, src: session.sheetMusic.asset.missing ? session.sheetMusic.asset.src : await persistAsset(session.sheetMusic.asset.src) } : null,
         cues: await Promise.all((session.sheetMusic.cues ?? []).map(async cue => ({
-          ...cue, asset: { ...cue.asset, src: await persistAsset(cue.asset.src) },
+          ...cue, asset: { ...cue.asset, src: cue.asset.missing ? cue.asset.src : await persistAsset(cue.asset.src) },
         }))),
       },
     }
@@ -183,20 +184,22 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
     if (persisted.backing?.kind === 'youtube' && typeof persisted.backing.embedUrl === 'string') {
       backing = { ...persisted.backing, volume: bounded(persisted.backing.volume, .85, 0, 1) }
     } else if (persisted.backing?.kind === 'audio') {
-      const src = await restoreAsset(persisted.backing.src)
-      if (src) backing = { ...persisted.backing, src, volume: bounded(persisted.backing.volume, .85, 0, 1) }
-      else missingAssets = true
+      const src = await restoreAsset(persisted.backing.src).catch(() => null)
+      backing = { ...persisted.backing, src: src ?? persisted.backing.src, missing: src ? undefined : true,
+        volume: bounded(persisted.backing.volume, .85, 0, 1) }
+      if (!src) missingAssets = true
     }
     const sheetMusic: MultitrackSession['sheetMusic'] = { kind: 'sheet-music', id: 'music', asset: null, cues: [] }
     if (persisted.sheetMusic?.asset) {
-      const src = await restoreAsset(persisted.sheetMusic.asset.src)
-      if (src) sheetMusic.asset = { ...persisted.sheetMusic.asset, src }
-      else missingAssets = true
+      const src = await restoreAsset(persisted.sheetMusic.asset.src).catch(() => null)
+      sheetMusic.asset = { ...persisted.sheetMusic.asset, src: src ?? persisted.sheetMusic.asset.src, missing: src ? undefined : true }
+      if (!src) missingAssets = true
     }
     for (const cue of persisted.sheetMusic?.cues ?? []) {
-      const src = await restoreAsset(cue.asset.src)
-      if (src) sheetMusic.cues!.push({ ...cue, startSec: bounded(cue.startSec, 0, 0, 86400), asset: { ...cue.asset, src } })
-      else missingAssets = true
+      const src = await restoreAsset(cue.asset.src).catch(() => null)
+      sheetMusic.cues!.push({ ...cue, startSec: bounded(cue.startSec, 0, 0, 86400),
+        asset: { ...cue.asset, src: src ?? cue.asset.src, missing: src ? undefined : true } })
+      if (!src) missingAssets = true
     }
     sheetMusic.cues!.sort((a, b) => a.startSec - b.startSec)
 
@@ -209,7 +212,7 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
       endSec: typeof persisted.endSec === 'number' ? bounded(persisted.endSec, 1, .1, 86400) : undefined,
       panels,
       sheetMusic,
-      ...((missingAssets || panels.some(p => p.missingTakeId)) ? { recoveryNotice: [panels.some(p => p.missingTakeId) ? 'Some recordings are missing. Tap a missing part to replace it.' : '', missingAssets ? 'Some imported files are missing. Reimport your backing audio or sheet music.' : ''].filter(Boolean).join(' ') } : {}),
+      ...((missingAssets || panels.some(p => p.missingTakeId)) ? { recoveryNotice: [panels.some(p => p.missingTakeId) ? 'Some recordings are missing. Tap a missing part to replace it.' : '', missingAssets ? 'Some imported files are missing. Reconnect or remove them to continue.' : ''].filter(Boolean).join(' ') } : {}),
       practice: {
         meter: typeof persisted.practice?.meter === 'string' && /^(?:[1-9]|1[0-2])\/(?:2|4|8|16)$/.test(persisted.practice.meter) ? persisted.practice.meter : '4/4',
         clickSound: typeof persisted.practice?.clickSound === 'string' ? persisted.practice.clickSound : 'classic',
@@ -217,7 +220,7 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
         showPitch: typeof persisted.practice?.showPitch === 'boolean' ? persisted.practice.showPitch : false,
         practiceOverlayEnabled: typeof persisted.practice?.practiceOverlayEnabled === 'boolean' ? persisted.practice.practiceOverlayEnabled : true,
         clickEnabled: typeof persisted.practice?.clickEnabled === 'boolean' ? persisted.practice.clickEnabled : true,
-        countInBars: Math.round(bounded(persisted.practice?.countInBars, 1, 0, 8)),
+        countInBars: recordingCountInBars(persisted.practice?.countInBars),
         bpm: Math.round(bounded(persisted.practice?.bpm, 120, 40, 300)),
       },
       backing,

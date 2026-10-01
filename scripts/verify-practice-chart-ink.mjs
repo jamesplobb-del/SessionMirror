@@ -55,6 +55,46 @@ async function load(entry, plugins = []) {
 const ink = await load('src/components/practiceChart/chartInk.ts')
 const exporter = await load('src/components/practiceChart/chartExport.ts', [stubCapacitor])
 
+/* A failed save must be observable, keep the previous marks, and permit retry. */
+{
+  const previousStorage = globalThis.localStorage
+  const store = new Map()
+  let full = false
+  let removalBlocked = false
+  globalThis.localStorage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, value) => {
+      if (full) throw new Error('Storage quota exceeded')
+      store.set(key, value)
+    },
+    removeItem: key => {
+      if (removalBlocked) throw new Error('Storage unavailable')
+      store.delete(key)
+    },
+  }
+  try {
+    const original = [{ page: 0, colour: 'red', points: [0.1, 0.2, 0.4, 0.5] }]
+    const edited = [...original, { page: 1, colour: 'black', points: [0.2, 0.3, 0.5, 0.6] }]
+    assert.equal(ink.saveInkStrokes('qa-ink', original), true)
+    assert.deepEqual(ink.loadInkStrokes('qa-ink'), original)
+    full = true
+    assert.equal(ink.saveInkStrokes('qa-ink', edited), false, 'The reader must know marks were not saved')
+    assert.deepEqual(ink.loadInkStrokes('qa-ink'), original, 'A failed write leaves prior marks intact')
+    full = false
+    assert.equal(ink.saveInkStrokes('qa-ink', edited), true, 'Retry can save all current marks')
+    assert.deepEqual(ink.loadInkStrokes('qa-ink'), edited)
+    removalBlocked = true
+    assert.equal(ink.clearInkStrokes('qa-ink'), false, 'A failed clear must be observable too')
+    assert.deepEqual(ink.loadInkStrokes('qa-ink'), edited)
+    removalBlocked = false
+    assert.equal(ink.clearInkStrokes('qa-ink'), true)
+    assert.deepEqual(ink.loadInkStrokes('qa-ink'), [])
+  } finally {
+    if (previousStorage === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = previousStorage
+  }
+}
+
 /* ---- What survives being read back ------------------------------------- */
 
 assert.deepEqual(ink.parseInkStrokes(null), [], 'Junk is not a set of marks')

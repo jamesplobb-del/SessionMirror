@@ -1,4 +1,5 @@
 import { requirePlus } from '../../plus/plusAccess'
+import { recordingCountInBars } from '../recording/multitrackCountIn'
 import { DEFAULT_LAYOUT_STYLE, withPortraitLayout } from '../layout/quietWorkspaceLayout'
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react'
 import type { Take } from '../../types'
@@ -218,7 +219,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     if (take && !completedCapture && sessionRef.current.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === panelId) >= 2 && !requirePlus('multitrack')) return
     setSession(prev => ({ ...prev, panels: prev.panels.map(panel => {
       if (panel.id !== panelId || panel.kind !== 'performance') return panel
-      if (panel.take?.id === take?.id) return { ...panel, take, missingTakeId: undefined }
+      if (panel.take?.id === take?.id || (take && panel.missingTakeId === take.id)) return { ...panel, take, missingTakeId: undefined }
       // A replacement has its own timing. Keep its visual placement and name only.
       return { kind: 'performance', id: panel.id, take, label: panel.label,
         hidden: panel.hidden, overlay: panel.overlay, frame: panel.frame, sectionAudio: panel.overlay ? true : undefined }
@@ -412,7 +413,8 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
   }, [])
 
   const updatePractice = useCallback((patch: Partial<MultitrackPracticeSettings>) => {
-    setSession((prev) => ({ ...prev, practice: { ...prev.practice, ...patch } }))
+    setSession((prev) => ({ ...prev, practice: { ...prev.practice, ...patch,
+      countInBars: recordingCountInBars(patch.countInBars ?? prev.practice.countInBars) } }))
   }, [])
 
   const updateBacking = useCallback((backing: MultitrackBackingTrack) => {

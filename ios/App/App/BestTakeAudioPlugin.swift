@@ -85,6 +85,8 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     private let nativeCameraEngine = NativeCameraRecordingEngine.shared
     private var routeObserver: NSObjectProtocol?
     private var lastReportedHeadphoneOutput: Bool?
+    private var lastReportedOutputPort: String?
+    private var lastReportedOutputUID: String?
     private var nativeTestPlayer: AVPlayer?
     private var nativeTestEndObserver: NSObjectProtocol?
     private var playbackRouteRestorePending = false
@@ -161,7 +163,10 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
                 sampleCount: sampleCount
             )
         }
-        lastReportedHeadphoneOutput = headphoneOutputEvent()["usesHeadphones"] as? Bool
+        let initialOutput = headphoneOutputEvent()
+        lastReportedHeadphoneOutput = initialOutput["usesHeadphones"] as? Bool
+        lastReportedOutputPort = initialOutput["outputPort"] as? String
+        lastReportedOutputUID = initialOutput["outputUID"] as? String
         routeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(),
@@ -170,8 +175,15 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let self = self else { return }
             let event = self.headphoneOutputEvent()
             let usesHeadphones = event["usesHeadphones"] as? Bool ?? false
-            guard usesHeadphones != self.lastReportedHeadphoneOutput else { return }
+            let outputPort = event["outputPort"] as? String
+            let outputUID = event["outputUID"] as? String
+            guard usesHeadphones != self.lastReportedHeadphoneOutput
+                || outputPort != self.lastReportedOutputPort
+                || outputUID != self.lastReportedOutputUID
+                || outputUID == nil else { return }
             self.lastReportedHeadphoneOutput = usesHeadphones
+            self.lastReportedOutputPort = outputPort
+            self.lastReportedOutputUID = outputUID
             self.notifyListeners("audioRouteChanged", data: event)
         }
         DispatchQueue.main.async { [weak self] in
@@ -419,6 +431,7 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func getPlaybackOutputProfile(_ call: CAPPluginCall) {
         let snapshot = AudioRouteConfigurator.routeSnapshot()
         var result = snapshot
+        result["outputUID"] = AVAudioSession.sharedInstance().currentRoute.outputs.first?.uid
         let headphonePorts: Set<String> = [
             AVAudioSession.Port.bluetoothA2DP.rawValue,
             AVAudioSession.Port.bluetoothHFP.rawValue,
@@ -437,17 +450,20 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     /// The live UI only needs the output state, so avoid querying availableInputs
     /// and serializing a full session snapshot on the main thread for each one.
     private func headphoneOutputEvent() -> [String: Any] {
-        let outputPorts = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        let outputPorts = outputs.map(\.portType)
         let bluetoothPorts: Set<AVAudioSession.Port> = [.bluetoothA2DP, .bluetoothHFP, .bluetoothLE]
         let headphonePorts: Set<AVAudioSession.Port> = [
             .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .headphones, .headsetMic, .airPlay,
         ]
-        return [
+        var event: [String: Any] = [
             "outputPort": outputPorts.first?.rawValue ?? "none",
             "usesBluetoothOutput": outputPorts.contains { bluetoothPorts.contains($0) },
             "usesA2DPOutput": outputPorts.contains(.bluetoothA2DP),
             "usesHeadphones": outputPorts.contains { headphonePorts.contains($0) },
         ]
+        event["outputUID"] = outputs.first?.uid
+        return event
     }
 
     // MARK: - Native playback A/B test (AVPlayer — bypasses WKWebView / Web Audio)

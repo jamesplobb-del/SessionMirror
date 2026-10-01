@@ -101,7 +101,9 @@ CREATE TABLE IF NOT EXISTS pitch_observations (
   variability_cents REAL NOT NULL DEFAULT 0,
   tuner_instrument TEXT NOT NULL DEFAULT 'voice',
   transposition_id TEXT NOT NULL DEFAULT 'concert',
-  session_id TEXT
+  session_id TEXT,
+  instrument_profile_id TEXT,
+  instrument_profile_name TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_pitch_observations_note

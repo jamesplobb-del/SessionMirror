@@ -8,18 +8,17 @@ import {
   type CSSProperties,
 } from 'react'
 import { Pause } from 'lucide-react'
-import type { PitchReadout } from '../../utils/pitchUtils'
+import { midiToNoteName, type PitchReadout } from '../../utils/pitchUtils'
 import { getPracticeGameCharacter } from '../practiceGameCharacters'
 import {
   computeAccuracy,
   DIFFICULTY_LABELS,
-  getDetectedPitchClass,
+  getDetectedWrittenMidi,
   getKeySignatureMarkers,
   getTargetNoteAtStep,
   getVisiblePlatforms,
   isRhythmMode,
-  pitchClassLabel,
-  pitchClassesMatch,
+  isReadoutCorrectPitch,
   showKeySignature,
   type StaffJumperState,
 } from './staffJumperMusicLogic'
@@ -224,11 +223,12 @@ export default function StaffJumperGame({
   const config = state.config!
   const rhythmMode = isRhythmMode(config)
   const target = getTargetNoteAtStep(config, state.sequenceStep)
-  const detectedPc = getDetectedPitchClass(readout, config)
-  const isMatch = detectedPc != null && pitchClassesMatch(detectedPc, target.pitchClass)
+  const detectedMidi = getDetectedWrittenMidi(readout, config)
+  const detectedPc = detectedMidi == null ? null : ((detectedMidi % 12) + 12) % 12
+  const isMatch = !target.isRest && detectedMidi === target.midi
   const detectedNote =
-    detectedPc != null ? (isMatch ? target.noteLabel : pitchClassLabel(detectedPc, config.key)) : '—'
-  const isPlayableMatch = isMatch && (config.difficulty !== 'hard' || Math.abs(readout.cents) <= 20)
+    detectedMidi != null ? midiToNoteName(detectedMidi) : '—'
+  const isPlayableMatch = !target.isRest && isReadoutCorrectPitch(readout, target.midi, config)
   const accuracy = computeAccuracy(state.correctCount, state.missCount)
   const cents = Math.round(readout.cents)
   const targetDisplay = target.isRest
@@ -1003,7 +1003,7 @@ export default function StaffJumperGame({
 
           {state.isCountingIn && (
             <div className="sj-count-in" role="status">
-              <strong>Listen for the count-in</strong>
+              <strong>{state.config?.metronome ? 'Listen for the count-in' : 'Get ready'}</strong>
               <small>
                 {config.tempoBpm} BPM · {meterSpec.label}
                 {rhythmMode ? ' · play on the click' : ''}

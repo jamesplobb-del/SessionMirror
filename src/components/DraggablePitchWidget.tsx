@@ -5,7 +5,7 @@ import { useCollapsibleWidget } from './useCollapsibleWidget'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject, type ReactNode } from 'react'
 import { usePinchResize } from '../hooks/usePinchResize'
 import LivePitchTuner from './LivePitchTuner'
-import { clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition } from '../utils/floatingWidgetLayout'
+import { clampWidgetPosition, getFloatingWidgetTopCenter, loadWidgetPosition, saveWidgetPosition, settleClearOfMusicRail } from '../utils/floatingWidgetLayout'
 import { iosDragRelease, motionExitHide } from '../utils/motionPresets'
 
 type TunerProps = Omit<
@@ -195,9 +195,10 @@ export default function DraggablePitchWidget({
   }, [boundaryRef, dragX, dragY, isAudioMode, layoutRegion])
 
   const persistPosition = useCallback(() => {
+    settleClearOfMusicRail(dragX, widgetRef.current, boundaryRef.current)
     if (isAudioMode) return
     saveWidgetPosition(resolvedPositionId, dragX.get(), dragY.get())
-  }, [dragX, dragY, isAudioMode, resolvedPositionId])
+  }, [boundaryRef, dragX, dragY, isAudioMode, resolvedPositionId])
 
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x: dragX, y: dragY,
     positionId: resolvedPositionId, label: 'pitch', icon: <PitchToolIcon aria-hidden />, detail: 'Pitch',
@@ -247,6 +248,7 @@ export default function DraggablePitchWidget({
       dragElastic={0.04}
       dragConstraints={boundaryRef}
       onDragEnd={persistPosition}
+      onDragTransitionEnd={persistPosition}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

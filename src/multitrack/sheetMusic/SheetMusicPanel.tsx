@@ -5,6 +5,7 @@ import type { SheetMusicAsset, SheetMusicPanelState } from '../types'
 import { loadSheetMusicFile, sheetMusicAcceptAttribute } from './sheetMusicUtils'
 import { sheetCueWindows, sheetYAt } from './sheetMusicTimeline'
 import SheetPdfPages from './SheetPdfPages'
+import { reconnectSheetSource } from '../state/multitrackAssetRecovery'
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -59,6 +60,10 @@ export default function SheetMusicPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadedAssetUrlRef = useRef<string | null>(null)
   const [importError, setImportError] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+  const [recoveryCueId, setRecoveryCueId] = useState<string | null>(null)
+  const panelRef = useRef(panel)
+  panelRef.current = panel
   /*
    * Page count as the open file reports it. It is not written back into the
    * project: the length of a PDF is a property of the file, and recording it
@@ -75,6 +80,12 @@ export default function SheetMusicPanel({
   }
   const activeCue = cueWindows[activeIndex] ?? null
   const activeAsset = activeCue?.asset ?? null
+  // Every missing cue must be reachable without playing/seeking an incomplete project.
+  const missingCues = cueWindows.filter(cue => cue.asset.missing)
+  const recoveryCue = missingCues.find(cue => cue.id === recoveryCueId)
+    ?? missingCues.find(cue => cue.id === activeCue?.id) ?? missingCues[0] ?? null
+  const importCueRef = useRef(recoveryCue ?? activeCue)
+  importCueRef.current = recoveryCue ?? activeCue
 
   const initialTransform = activeAsset
     ? { x: activeAsset.x ?? 0.5, y: activeAsset.y ?? 0.5, scale: activeAsset.scale ?? 1 }
@@ -114,8 +125,25 @@ export default function SheetMusicPanel({
 
   const importFile = useCallback((file: File) => {
     setImportError('')
+    setIsImporting(true)
+    const reconnecting = importCueRef.current?.asset.missing ? importCueRef.current : null
     void loadSheetMusicFile(file)
       .then((asset) => {
+        if (reconnecting) {
+          const active = importCueRef.current
+          if (active?.id !== reconnecting.id || active.asset.src !== reconnecting.asset.src || !active.asset.missing) {
+            URL.revokeObjectURL(asset.src)
+            throw new Error('The selected part changed. Choose the file again.')
+          }
+          let next: SheetMusicPanelState
+          try { next = reconnectSheetSource(panelRef.current, reconnecting.asset.src, asset) }
+          catch (error) { URL.revokeObjectURL(asset.src); throw error }
+          if (next.asset !== panelRef.current.asset) onAssetChange(next.asset)
+          for (const cue of next.cues ?? []) {
+            if (cue.asset !== panelRef.current.cues?.find(previous => previous.id === cue.id)?.asset) onCueAssetChange?.(cue.id, cue.asset)
+          }
+          return
+        }
         uploadedAssetUrlRef.current = asset.src
         onAssetChange(asset)
       })
@@ -124,7 +152,8 @@ export default function SheetMusicPanel({
           ? cause.message
           : 'That file could not be opened.')
       })
-  }, [onAssetChange])
+      .finally(() => setIsImporting(false))
+  }, [onAssetChange, onCueAssetChange])
 
   if (!activeCue || !activeAsset) {
     return (
@@ -149,7 +178,33 @@ export default function SheetMusicPanel({
     )
   }
 
-  const asset = activeAsset
+  const asset = recoveryCue?.asset ?? activeAsset
+  if (recoveryCue) {
+    return (
+      <div className="multitrack-panel multitrack-panel--empty" role="status">
+        <input ref={fileInputRef} type="file" accept={asset.mimeType === 'application/pdf' ? 'application/pdf,.pdf' : 'image/*'} className="hidden"
+          onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) importFile(file) }} />
+        <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center">
+          <FileImage className="h-6 w-6 text-stone-400" />
+          {missingCues.length > 1 ? <select aria-label="Missing music file to reconnect" value={recoveryCue.id} disabled={interactionDisabled || isImporting}
+            onChange={event => { setRecoveryCueId(event.target.value); setImportError('') }}>
+            {missingCues.map(cue => <option key={cue.id} value={cue.id}>{cue.asset.fileName}{cue.isBase ? ' · opening' : ` · ${cue.startSec}s`}{cue.asset.mimeType === 'application/pdf' ? ` · page ${(cue.asset.pageIndex ?? 0) + 1}` : ''}</option>)}
+          </select> : null}
+          <span className="text-sm font-medium">{asset.fileName}</span>
+          <span className="text-xs text-stone-500">File missing. Your placement{asset.mimeType === 'application/pdf' ? ` and page ${(asset.pageIndex ?? 0) + 1}` : ''} are kept.</span>
+          <Pressable type="button" intensity="soft" disabled={interactionDisabled || isImporting}
+            onClick={() => fileInputRef.current?.click()} aria-label={`Reconnect ${asset.fileName}`}>
+            <Upload className="h-4 w-4" /> {isImporting ? 'Opening file…' : 'Reconnect file'}
+          </Pressable>
+          <Pressable type="button" intensity="soft" disabled={interactionDisabled || isImporting}
+            onClick={() => { if (recoveryCue.isBase) onAssetChange(null); else onRemoveCue?.(recoveryCue.id) }} aria-label={`Remove missing ${asset.fileName}`}>
+            <Trash2 className="h-4 w-4" /> Remove
+          </Pressable>
+          {importError ? <p className="multitrack-panel__sheet-error" role="alert">{importError}</p> : null}
+        </div>
+      </div>
+    )
+  }
   const isPdf = asset.mimeType === 'application/pdf'
   // Older saved image assets predate contentMode. Treat them as fill so they
   // receive the same stripe-free behavior as newly imported photos.

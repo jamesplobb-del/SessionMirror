@@ -2,10 +2,11 @@ import { getLayoutPreset, MULTITRACK_PANEL_SLOT_IDS } from './layoutPresets'
 import type { MultitrackSession, PerformancePanelState } from '../types'
 
 export interface MultitrackLayoutStyle { gap: number; cornerRadius: number }
-export const DEFAULT_LAYOUT_STYLE: MultitrackLayoutStyle = { gap: 6, cornerRadius: 12 }
+export const DEFAULT_LAYOUT_STYLE: MultitrackLayoutStyle = { gap: 0, cornerRadius: 12 }
 export function normalizeLayoutStyle(style?: Partial<MultitrackLayoutStyle>): MultitrackLayoutStyle {
   const bounded = (value: number | undefined, fallback: number, max: number) => Number.isFinite(value) ? Math.max(0, Math.min(max, value!)) : fallback
-  return { gap: bounded(style?.gap, 0, 16), cornerRadius: bounded(style?.cornerRadius, 0, 24) }
+  // Keep the legacy field for project compatibility; boxes always meet now.
+  return { gap: 0, cornerRadius: bounded(style?.cornerRadius, 0, 24) }
 }
 /** Pure draft update: changing the visible grid never discards a take or extra box. */
 export function withPortraitLayout(session: MultitrackSession, layoutId: string): MultitrackSession {

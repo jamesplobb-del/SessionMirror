@@ -17,6 +17,11 @@ import {
 import './staff-jumper.css'
 import '../balance/balance-arcade.css'
 import { useLivePitchTracker } from '../../hooks/useLivePitchTracker'
+import { useBluetoothHeadphoneConfirmation, useConfirmedHeadphoneOutput } from '../../hooks/useHeadphoneOutput'
+import { confirmBluetoothHeadphones, isConfirmedHeadphoneOutputActive, subscribeConfirmedHeadphoneOutput } from '../../utils/headphoneOutput'
+import { applyDroneFromDesk, getDroneSnapshot, subscribeDrone } from '../../hooks/useDrone'
+import { sharedMetronomeEngine } from '../../metronome/sharedMetronomeEngine'
+import { canUseStaffJumperAudio } from './staffJumperAudioPolicy'
 import { transposePitchReadout } from '../../utils/tunerTransposition'
 import { GAME_TEST_INPUT_AVAILABLE, isGameTestInputOn, SILENT_READOUT, setGameTestInputOn, syntheticReadout, TEST_TAP_HOLD_MS, useGameTestInput } from '../gameTestInput'
 import {
@@ -232,6 +237,23 @@ export default function StaffJumperScreen({
   onRequestMicStream,
   onBack,
 }: StaffJumperScreenProps) {
+  const headphonesConnected = useConfirmedHeadphoneOutput()
+  const needsHeadphoneConfirmation = useBluetoothHeadphoneConfirmation()
+  useEffect(() => {
+    // Desk tools may already be running when Games opens. They must follow
+    // the same headphone rule as the game's own independent audio.
+    const silenceSpeakerTools = () => {
+      if (isConfirmedHeadphoneOutputActive()) return
+      if (sharedMetronomeEngine.getSnapshot().playing) sharedMetronomeEngine.stop()
+      const drone = getDroneSnapshot()
+      if (drone.enabled || drone.activeNotes.length) applyDroneFromDesk(null, drone.octave)
+    }
+    silenceSpeakerTools()
+    const removeRoute = subscribeConfirmedHeadphoneOutput(silenceSpeakerTools)
+    const removeMetronome = sharedMetronomeEngine.subscribe(silenceSpeakerTools)
+    const removeDrone = subscribeDrone(silenceSpeakerTools)
+    return () => { removeRoute(); removeMetronome(); removeDrone() }
+  }, [])
   const mediaRef = useRef<HTMLMediaElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [savedSetup] = useState(initialInstrumentSetup)
@@ -629,12 +651,29 @@ export default function StaffJumperScreen({
               type="button"
               haptic="medium"
               hapticFeedback={hapticFeedback}
-              disabled={midiPoolForConfig(draftConfig).length < 2}
+              disabled={midiPoolForConfig(draftConfig).length < 2 || !canUseStaffJumperAudio(draftConfig, headphonesConnected)}
               onClick={() => start(draftConfig)}
               className="balance-cta"
             >
               <Play aria-hidden /> Play
             </Pressable>
+            {needsHeadphoneConfirmation && (
+              <Pressable type="button" hapticFeedback={hapticFeedback} onClick={confirmBluetoothHeadphones}
+                className="balance-cta balance-cta--blue">
+                <Headphones aria-hidden /> I'm using Bluetooth headphones
+              </Pressable>
+            )}
+            {!headphonesConnected && (draftMetronome || draftDrone) && (
+              <Pressable type="button" hapticFeedback={hapticFeedback}
+                disabled={midiPoolForConfig(draftConfig).length < 2}
+                onClick={() => {
+                  setDraftMetronome(false)
+                  setDraftDrone(false)
+                  start({ ...draftConfig, metronome: false, drone: false })
+                }} className="balance-cta balance-cta--quiet">
+                Practice without sound
+              </Pressable>
+            )}
             <p className={`sj-start__mic ${hasPitchSignal ? 'sj-start__mic--live' : ''}`}>
               <Mic aria-hidden />
               {hasPitchSignal ? `Hearing ${heardNoteName}` : 'Play a note to check your mic'}
@@ -642,9 +681,9 @@ export default function StaffJumperScreen({
             {(draftMetronome || draftDrone) && (
               <p className="balance-ready__headphones">
                 <Headphones aria-hidden />
-                {draftDrone
-                  ? 'Use headphones — the mic hears the drone as a played note.'
-                  : 'Use headphones — the mic can hear the click and misread it.'}
+                {headphonesConnected
+                  ? 'Headphones connected. Play the note in the octave shown.'
+                  : 'Connect headphones for the drone or metronome, or practice without sound.'}
               </p>
             )}
           </div>
@@ -1016,6 +1055,7 @@ export default function StaffJumperScreen({
             type="button"
             intensity="soft"
             hapticFeedback={hapticFeedback}
+            disabled={!headphonesConnected && !draftMetronome}
             onClick={() => setDraftMetronome((on) => !on)}
             className="sj-field sj-field--switch"
             aria-pressed={draftMetronome}
@@ -1024,7 +1064,7 @@ export default function StaffJumperScreen({
               Metronome{' '}
               <span>
                 Counts you in, then the run follows the click: play each note on its
-                beat and hold it for its written length
+                beat and hold it for its written length. Headphones required.
               </span>
             </span>
             <span className={`sj-switch ${draftMetronome ? 'sj-switch--on' : ''}`} aria-hidden />
@@ -1034,12 +1074,13 @@ export default function StaffJumperScreen({
             type="button"
             intensity="soft"
             hapticFeedback={hapticFeedback}
+            disabled={!headphonesConnected && !draftDrone}
             onClick={() => setDraftDrone((on) => !on)}
             className="sj-field sj-field--switch"
             aria-pressed={draftDrone}
           >
             <span className="sj-field__label">
-              Tonic drone <span>Holds {droneNoteLabel} underneath</span>
+              Tonic drone <span>Holds {droneNoteLabel} underneath. Headphones required.</span>
             </span>
             <span className={`sj-switch ${draftDrone ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
@@ -1061,13 +1102,24 @@ export default function StaffJumperScreen({
       >
         <div className="balance-arcade__spacer" />
         <h1 className="balance-display balance-display--page">Paused</h1>
+        {needsHeadphoneConfirmation && (
+          <Pressable type="button" hapticFeedback={hapticFeedback} onClick={confirmBluetoothHeadphones} className="balance-cta balance-cta--blue">
+            <Headphones aria-hidden /> I'm using Bluetooth headphones
+          </Pressable>
+        )}
+        {state.config && !canUseStaffJumperAudio(state.config, headphonesConnected) && (
+          <p className="balance-ready__headphones" role="status">
+            <Headphones aria-hidden /> Headphones disconnected. Reconnect to resume, or finish this run.
+          </p>
+        )}
         <section className="balance-card balance-award">
           <dl className="balance-award__stats balance-award__stats--pair">
             <div><dt>Score</dt><dd>{state.score}</dd></div>
             <div><dt>Streak</dt><dd>{state.streak}</dd></div>
           </dl>
           <div className="balance-award__actions">
-            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={resume} className="balance-cta">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={resume}
+              disabled={Boolean(state.config && !canUseStaffJumperAudio(state.config, headphonesConnected))} className="balance-cta">
               <Play aria-hidden /> Resume
             </Pressable>
             <div className="balance-award__next">
@@ -1133,8 +1185,19 @@ export default function StaffJumperScreen({
             </p>
           )}
 
+          {needsHeadphoneConfirmation && (
+            <Pressable type="button" hapticFeedback={hapticFeedback} onClick={confirmBluetoothHeadphones} className="balance-cta balance-cta--blue">
+              <Headphones aria-hidden /> I'm using Bluetooth headphones
+            </Pressable>
+          )}
+          {!canUseStaffJumperAudio(state.config, headphonesConnected) && (
+            <p className="balance-award__note" role="status">
+              Connect headphones to play again, or turn off the drone and metronome in Settings.
+            </p>
+          )}
           <div className="balance-award__actions">
-            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart} className="balance-cta">
+            <Pressable type="button" haptic="medium" hapticFeedback={hapticFeedback} onClick={restart}
+              disabled={!canUseStaffJumperAudio(state.config, headphonesConnected)} className="balance-cta">
               <RotateCcw aria-hidden /> Play Again
             </Pressable>
             <div className="balance-award__next">

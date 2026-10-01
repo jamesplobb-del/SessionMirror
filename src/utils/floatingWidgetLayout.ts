@@ -1,3 +1,4 @@
+import { musicDockClearX } from './musicDockClearance'
 const EDGE_INSET = 12
 const POSITION_STORAGE_PREFIX = 'sessionmirror:widget-pos:'
 const PERSISTENT_POSITION_STORAGE_PREFIX = 'sessionmirror:persistent-widget-pos:'
@@ -176,4 +177,19 @@ export function findAvailableWidgetBallPosition(
   for (const x of xs) for (const y of ys) candidates.push({ x, y })
   candidates.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y))
   return candidates.find(free) ?? start
+}
+
+/**
+ * A widget let go over the Music page's right-hand tools rail slides back to
+ * rest just left of it; the rail's circles must stay tappable. No-op off the
+ * Music page or with the rail closed.
+ */
+export function settleClearOfMusicRail(
+  x: { get(): number; set(value: number): void },
+  widget: HTMLElement | null,
+  boundary: HTMLElement | null,
+): void {
+  if (!widget || typeof document === 'undefined') return
+  const clear = musicDockClearX(x.get(), widget.offsetWidth, boundary?.getBoundingClientRect().left ?? 0)
+  if (clear < x.get()) x.set(Math.max(EDGE_INSET, clear))
 }

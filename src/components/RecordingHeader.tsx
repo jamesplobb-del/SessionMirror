@@ -11,7 +11,7 @@ export default function RecordingHeader({ mode, disabled, onModeChange, onSettin
 }) {
   return <header className="open-lens-header">
     <div className="open-lens-modes" role="group" aria-label="Recording mode">
-      {(['audio', 'video'] as const).map(value => <Pressable key={value} disabled={disabled}
+      {(['video', 'audio'] as const).map(value => <Pressable key={value} disabled={disabled}
         aria-pressed={mode === value} onClick={() => onModeChange(value)} hapticFeedback={hapticFeedback}>
         {value === 'audio' ? <Mic aria-hidden /> : <Camera aria-hidden />}<span>{value === 'audio' ? 'Audio' : 'Video'}</span>
       </Pressable>)}
