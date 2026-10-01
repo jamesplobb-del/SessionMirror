@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react'
-import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Radio, SlidersHorizontal, Square, Upload } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -87,6 +87,8 @@ interface PracticeChartLayerProps {
    * already asked inside its own tap, so the player is not asked twice.
    */
   offerFileOnOpen?: boolean
+  /** Optional setlist transport, rendered with the page's own top tools. */
+  setlistNavigation?: ReactNode
 }
 
 /** What the rail says while hands-free is running the sitting. */
@@ -118,7 +120,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0, onScoreReplaced,
+  revision = 0, onScoreReplaced, setlistNavigation,
 }: PracticeChartLayerProps) {
   const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
@@ -148,6 +150,7 @@ export default function PracticeChartLayer({
    */
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [pageToolsRequested, setPageToolsRequested] = useState(false)
+  const [markUpRequested, setMarkUpRequested] = useState(false)
   const [chromeOff, setChromeOff] = useState(false)
   useLayoutEffect(() => {
     if (!active) return
@@ -220,6 +223,13 @@ export default function PracticeChartLayer({
    */
   const mounted = paperVisible && chart !== null
   const showing = active && mounted
+  useEffect(() => { if (!showing) setMarker(null) }, [showing])
+  useEffect(() => {
+    setMarker(null)
+    setMarkUpRequested(false)
+    setPageToolsRequested(false)
+    setWorkspaceOpen(false)
+  }, [collapseResetKey])
   /*
    * An empty stand is still the music page. Without it, turning Music on for an
    * item with no part left the room exactly as it was apart from a ball on the
@@ -384,6 +394,12 @@ export default function PracticeChartLayer({
 
   const handleSpreadAvailable = useCallback((available: boolean) => {
     setSpreadAvailable(available)
+  }, [])
+
+  const openMarkUp = useCallback(() => {
+    setWorkspaceOpen(false)
+    setPageToolsRequested(true)
+    setMarkUpRequested(true)
   }, [])
 
   /*
@@ -582,10 +598,12 @@ export default function PracticeChartLayer({
           * exits is how a player gets stranded on a page with no deck.
           */}
         <div className="practice-chart-topbar">
+        <div className="practice-chart-tools">
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
           <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
-          <button type="button" className="practice-chart-control" onClick={() => setPageToolsRequested(true)}><FileMusic aria-hidden /><span>Page</span></button>
+          <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" onClick={() => setPageToolsRequested(true)}><FileMusic aria-hidden /><span>Page</span></button>
+          <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" onClick={openMarkUp}><Pen aria-hidden /><span>Mark up</span></button>
           <button
             type="button"
             className="practice-chart-control practice-chart-control--start"
@@ -600,10 +618,11 @@ export default function PracticeChartLayer({
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
         </div>
+        {setlistNavigation && <div className="practice-chart-setlist-navigation">{setlistNavigation}</div>}
         {workspaceOpen && (
           <div className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => (
-              <button key={key} type="button" aria-pressed={workspace[key]}
+            <button key={key} type="button" aria-pressed={workspace[key]}
                 onClick={() => onWorkspaceChange(key, !workspace[key])}>
                 <Icon aria-hidden /><span>{label}</span>
               </button>
@@ -612,11 +631,13 @@ export default function PracticeChartLayer({
               onClick={() => onReferencesChange(!referencesVisible)}>
               <FileMusic aria-hidden /><span>References</span>
             </button>}
+            <button type="button" onClick={openMarkUp}><Pen aria-hidden /><span>Mark up</span></button>
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
           </div>
         )}
+        </div>
         </div>
         {/*
           * In full screen the deck is away, and the whole point of the page
@@ -713,6 +734,8 @@ export default function PracticeChartLayer({
       visible={active}
       expandRequest={pageToolsRequested}
       onExpandRequestConsumed={() => setPageToolsRequested(false)}
+      markUpRequest={markUpRequested}
+      onMarkUpRequestConsumed={() => setMarkUpRequested(false)}
       collapseResetKey={collapseResetKey}
       hasChart={chart !== null}
       fileName={chart?.fileName ?? null}

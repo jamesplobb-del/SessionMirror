@@ -100,6 +100,7 @@ interface PracticeHubProps {
   routineDay: RoutineDay | null
   /** Non-null opens the builder in that mode when the sheet shows. */
   routineBuilderRequest: RoutineBuilderMode | null
+  routineBuilderDraft?: Routine | null
   instrumentId: string | null
   liveDeskSnapshot: DeskSnapshot
   onSelectInstrument: (instrumentId: string) => void
@@ -165,6 +166,7 @@ export default function PracticeHub({
   routine,
   routineDay,
   routineBuilderRequest,
+  routineBuilderDraft,
   instrumentId,
   liveDeskSnapshot,
   onSelectInstrument,
@@ -418,9 +420,10 @@ export default function PracticeHub({
                     transition={{ duration: reducedMotion ? 0 : .558, ease: [.22, 1, .36, 1] }}
                   >
                     <MusicRoutineBuilder
-                      key={routineBuilderRequest}
+                      key={`${routineBuilderRequest}:${routineBuilderDraft?.id ?? ''}`}
                       mode={routineBuilderRequest}
                       routine={routine}
+                      initialRoutine={routineBuilderDraft}
                       instrumentId={instrumentId}
                       projects={projects}
                       liveDeskSnapshot={liveDeskSnapshot}

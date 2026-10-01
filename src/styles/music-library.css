@@ -60,3 +60,12 @@
 .music-library__delete-confirm>div{display:flex;justify-content:flex-end;gap:8px}
 .music-library__delete-confirm button{min-height:44px;padding:0 14px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);font-size:12px;font-weight:600}
 .music-library__delete-confirm .music-library__delete-confirm-action{border-color:#a23d49;background:#a23d49;color:#fff}
+
+.music-library__selection > .music-library__create-routine{background:#315be8;border-color:#315be8;color:#fff;font-weight:650;padding:0 16px}
+@media(max-width:480px){.music-library__selection > .music-library__create-routine{order:1;flex:1 0 100%}.music-library__selection > .music-library__delete-selected{order:2;margin-left:auto}}
+
+.music-library__selection > .music-library__create-setlist{background:var(--ml-panel,#fff);border-color:var(--ml-accent,#315be8);color:var(--ml-accent,#315be8);font-weight:650;padding:0 16px}
+.music-library__setlists{margin:22px 0;padding:16px;border:1px solid var(--ml-line,#dbe2ea);border-radius:14px;background:var(--ml-panel,#fff)}
+.music-library__setlists>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.music-library__setlists h2{margin:0;font-size:18px;font-weight:600}.music-library__setlists>div>button{min-height:44px;padding:0 10px;color:var(--ml-accent,#315be8);font-size:13px;border:0;background:transparent}
+.music-library__setlists ul{list-style:none;margin:8px 0 0;padding:0}.music-library__setlists li+li{border-top:1px solid var(--ml-line,#dbe2ea)}.music-library__setlists li button{width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;border:0;background:transparent;padding:8px 0}.music-library__setlists strong,.music-library__setlists small{display:block}.music-library__setlists strong{font-size:14px;overflow-wrap:anywhere}.music-library__setlists small,.music-library__setlists p{font-size:12px;color:var(--ml-muted,#64748b);margin:5px 0}.music-library__setlists svg{width:18px;height:18px;flex:none}
+@media(max-width:480px){.music-library__selection>.music-library__create-setlist{order:1;flex:1 0 100%}}

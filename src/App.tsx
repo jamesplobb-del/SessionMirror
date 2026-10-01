@@ -36,6 +36,8 @@ import ControlDeck from './components/ControlDeck'
 import RecordingHeader from './components/RecordingHeader'
 import ReferenceWidget from './components/ReferenceWidget'
 import MusicLibrary from './components/MusicLibrary'
+import MusicSetlistNavigation from './components/MusicSetlistNavigation'
+import type { MusicSetlist } from './utils/musicSetlists'
 import MusicWidgetDrawer from './components/MusicWidgetDrawer'
 import { loadMusicScoreSettings, loadMusicSetup, saveMusicSetup } from './utils/musicLibrary'
 import { blankDesk } from './utils/practiceRoutines'
@@ -299,6 +301,8 @@ import { prepareRoutineProgram, pauseRoutineProgram, exitRoutineProgram } from '
 import { PracticeTransitionGate } from './utils/practiceTransitions'
 import { findRoutinePracticeProject } from './db/practiceRepository'
 import {
+  createRoutine,
+  MAX_ROUTINE_STEPS,
   checkpointRoutineDay,
   pauseRoutineDay,
   holdRoutineDay,
@@ -317,6 +321,7 @@ import {
   todayKey,
   type Routine,
   type RoutineDay,
+  type RoutineStep,
 } from './utils/practiceRoutines'
 import type { RoutineBuilderMode } from './components/RoutineBuilder'
 import {
@@ -679,6 +684,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return () => window.removeEventListener('besttake:practice-plan-music-imported', refreshImportedMusic)
   }, [])
   const [musicLibraryOpen, setMusicLibraryOpen] = useState(true)
+  const [activeMusicSetlist, setActiveMusicSetlist] = useState<{ list: MusicSetlist; entryId: string } | null>(null)
   const musicSetupOwnerRef = useRef<string | null>(null)
   /** Rehearsal view: the player has put the tabs and the deck away as well. */
   const [musicChromeHidden, setMusicChromeHidden] = useState(false)
@@ -722,6 +728,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return stored ? loadRoutineDay(stored) : null
   })
   const [routineBuilderRequest, setRoutineBuilderRequest] = useState<RoutineBuilderMode | null>(null)
+  const [routineBuilderDraft, setRoutineBuilderDraft] = useState<Routine | null>(null)
   const [incomingRoutine, setIncomingRoutine] = useState<Routine | null>(null)
   const [preferredInstrumentId, setPreferredInstrumentId] = useState<string | null>(() =>
     loadPreferredInstrumentId(),
@@ -3547,6 +3554,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     const openImportedPlan = () => {
       const imported = getPendingPracticePlanOpen()
       if (!imported) return
+      setRoutineBuilderDraft(null)
       setIncomingRoutine(imported)
       setRoutineBuilderRequest('edit')
       handleOpenPracticeHome()
@@ -4808,8 +4816,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     return project.id
   }, [])
 
-  const handleOpenMusicScore = useCallback((projectId: string) => {
-    if (!requirePlus('music', () => { void handleOpenMusicScore(projectId) })) return Promise.resolve()
+  const handleOpenMusicScore = useCallback((projectId: string, setlist?: { list: MusicSetlist; entryId: string }) => {
+    if (!requirePlus('music', () => { void handleOpenMusicScore(projectId, setlist).catch(() => setTakeDeleteError('Could not open this score. Please try again.')) })) {
+      return setlist ? Promise.reject(new Error('Unlock Music to read this setlist. Your list is still here.')) : Promise.resolve()
+    }
+    if (setlist && (isRecording || isStopping)) return Promise.reject(new Error('Stop recording before changing pieces.'))
+    if (setlist && !setlist.list.entries.some(entry => entry.id === setlist.entryId && entry.projectId === projectId)) return Promise.reject(new Error('This setlist entry is no longer available.'))
     return runPracticeTransition(`music:${projectId}`, async () => {
       if (!hasPracticeChart(projectId)) throw new Error('This file is no longer available. Import it again.')
       const previousId = activeProjectIdRef.current
@@ -4818,7 +4830,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       // not overwrite that score's settings when returning through the library.
       // Browsing is harmless; choosing a different score pauses the routine before
       // recordings can be attributed to a different exercise's practice session.
-      if (previousId !== projectId || (focusedRoutineContextRef.current && !focusedPracticeSessionIdRef.current)) {
+      if (setlist || previousId !== projectId || (focusedRoutineContextRef.current && !focusedPracticeSessionIdRef.current)) {
         const day = routineDayRef.current
         if (day) commitRoutineDay(pauseRoutineDay(day, Date.now(), liveDeskSnapshotRef.current))
         pauseRoutineProgram()
@@ -4832,7 +4844,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       }
       await handleSelectProject(projectId)
       if (!focusedRoutineContextRef.current) {
-        const desk = loadMusicSetup(projectId) ?? blankDesk('audio')
+        const entry = setlist?.list.entries.find(item => item.id === setlist.entryId && item.projectId === projectId)
+        if (setlist && !entry) throw new Error('This setlist entry is no longer available.')
+        const savedDesk = entry?.desk ?? loadMusicSetup(projectId) ?? blankDesk('audio')
+        // Repertoire navigation opens quietly; tools can be enabled deliberately.
+        const desk = setlist ? { ...savedDesk, pitchTrackerEnabled: false, showMetronome: false, showDrone: false, autoSoundRecording: false, audioEnhancerEnabled: false, showTakeCards: false } : savedDesk
         applyDeskSnapshot({ ...desk, mode: 'audio', showMusic: true })
         const exercise = loadExerciseLibrary().find(item => item.step.projectId === projectId)?.step
         const scoreSettings = loadMusicScoreSettings(projectId)
@@ -4842,8 +4858,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         } else if (!getSelectedReferenceUrl(projectId) && referenceVideoId) {
           selectPracticeReference(projectId, buildYoutubeProxyUrl(referenceVideoId))
         }
-        prepareRoutineProgram(scoreSettings ? scoreSettings.programId : exercise?.programId ?? null)
-        musicSetupOwnerRef.current = projectId
+        prepareRoutineProgram(setlist ? null : scoreSettings ? scoreSettings.programId : exercise?.programId ?? null)
+        musicSetupOwnerRef.current = setlist ? null : projectId
         setMusicWorkspaceExpandRequest({ pitch: desk.pitchTrackerEnabled || undefined, metronome: desk.showMetronome || undefined, drone: desk.showDrone || undefined })
       }
       pauseYoutubeProxy(youtubeIframeRef.current)
@@ -4855,8 +4871,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setMusicLibraryOpen(false)
       handleAudioPracticeTabChange('music')
       rememberLastPracticeDestination({ kind: 'music', projectId })
+      setActiveMusicSetlist(setlist ?? null)
     })
-  }, [runPracticeTransition, handleSelectProject, applyDeskSnapshot, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
+  }, [isRecording, isStopping, runPracticeTransition, handleSelectProject, applyDeskSnapshot, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
+
+  const handleReadMusicSetlist = useCallback(async (list: MusicSetlist, entryId: string) => {
+    const entry = list.entries.find(item => item.id === entryId)
+    if (!entry || !hasPracticeChart(entry.projectId)) throw new Error('This score is missing. Return to the Music Library to choose a replacement in the setlist.')
+    await handleOpenMusicScore(entry.projectId, { list, entryId })
+  }, [handleOpenMusicScore])
 
   const handleContinueMusic = useCallback(async (projectId: string) => {
     if (!requirePlus('music', () => { void handleContinueMusic(projectId) })) return
@@ -4969,7 +4992,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     [handleAudioPracticeTabChange, handleRecordingModeChange, updateSettings],
   )
 
+  useEffect(() => {
+    if (musicLibraryOpen || recordingMode !== 'audio' || audioPracticeTab !== 'music') setActiveMusicSetlist(null)
+  }, [musicLibraryOpen, recordingMode, audioPracticeTab])
+
   const handleCloseMusic = useCallback(() => {
+    setActiveMusicSetlist(null)
     setMusicLibraryOpen(true)
     setMusicChromeHidden(false)
   }, [])
@@ -5807,6 +5835,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   const handleSaveRoutine = useCallback((next: Routine) => {
     if (commitSavedRoutine(next)) {
       setRoutineBuilderRequest(null)
+      setRoutineBuilderDraft(null)
       setIncomingRoutine(null)
       confirmFeatureAction('Routine updated')
     }
@@ -5838,11 +5867,24 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
   const handleOpenRoutineBuilder = useCallback(
     (mode: RoutineBuilderMode) => {
+      setRoutineBuilderDraft(null)
       setRoutineBuilderRequest(mode)
       if (!isPracticeHubOpen) handleOpenPracticeHome()
     },
     [handleOpenPracticeHome, isPracticeHubOpen],
   )
+
+  const handleCreateRoutineFromMusic = useCallback((steps: RoutineStep[]) => {
+    if (captureBusyRef.current || practiceTransition.current.busy || isRecording || isStopping || !canOpenOverlaySheet() || isExperimentalOpen) {
+      throw new Error('Practice is still switching. Your selection is still here; try again in a moment.')
+    }
+    if (!steps.length || steps.length > MAX_ROUTINE_STEPS) throw new Error(`Choose 1 to ${MAX_ROUTINE_STEPS} scores for a routine.`)
+    const draft = createRoutine('My practice', steps, preferredInstrumentId)
+    handleOpenPracticeHome()
+    setIncomingRoutine(null)
+    setRoutineBuilderDraft(draft)
+    setRoutineBuilderRequest('build')
+  }, [canOpenOverlaySheet, handleOpenPracticeHome, isExperimentalOpen, isRecording, isStopping, preferredInstrumentId])
 
   /**
    * A step's click starts once the step has landed, not in the same moment.
@@ -5885,6 +5927,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       throw new Error(message)
     }
     const surfaceBefore = recordingModeRef.current
+    setActiveMusicSetlist(null)
     setIsSplitView(false)
     triggerLightHaptic(settings.hapticFeedback)
     rememberCurrentPracticeDesk()
@@ -6008,6 +6051,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     await handleStartRoutineStep(step.id)
     // Leave only after the item is ready; failed starts keep the draft and repair controls open.
     setRoutineBuilderRequest(null)
+    setRoutineBuilderDraft(null)
   }, [commitSavedRoutine, handleStartRoutineStep])
   const handleDailyPractice = useCallback((plan: DailyChallengePlan) => {
     void runPracticeTransition('daily-practice', async () => {
@@ -6422,13 +6466,14 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                 routine={incomingRoutine ?? routine}
                 routineDay={routineDay}
                 routineBuilderRequest={routineBuilderRequest}
+                routineBuilderDraft={routineBuilderDraft}
                 instrumentId={preferredInstrumentId}
                 liveDeskSnapshot={liveDeskSnapshot}
                 onSelectInstrument={handleSelectInstrument}
                 onStartRoutineStep={handleStartRoutineStep}
                 onToggleRoutineStep={handleToggleRoutineStep}
                 onOpenRoutineBuilder={handleOpenRoutineBuilder}
-                onCloseRoutineBuilder={() => { setRoutineBuilderRequest(null); setIncomingRoutine(null) }}
+                onCloseRoutineBuilder={() => { setRoutineBuilderRequest(null); setRoutineBuilderDraft(null); setIncomingRoutine(null) }}
                 onSaveRoutine={handleSaveRoutine}
                 onCreatePracticeItem={handleCreatePracticeItem}
                 onSaveAndStartRoutine={handleSaveAndStartRoutine}
@@ -6437,6 +6482,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {routine &&
                 routineActiveStep &&
+                !activeMusicSetlist &&
                 !multitrackOpen &&
                 !isPracticeHubOpen &&
                 !isReviewOpen &&
@@ -6676,7 +6722,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     }}
                     active={musicRoomActive}
                     boundaryRef={appShellRef}
-                    collapseResetKey={routineActiveStep?.id}
+                    collapseResetKey={activeMusicSetlist?.entryId ?? routineActiveStep?.id}
+                    setlistNavigation={activeMusicSetlist ? <MusicSetlistNavigation
+                      list={activeMusicSetlist.list} entryId={activeMusicSetlist.entryId}
+                      disabled={isRecording || isStopping || practiceTransitionBusy}
+                      onOpen={handleReadMusicSetlist} /> : undefined}
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
                     onChromeHiddenChange={setMusicChromeHidden}
@@ -7018,6 +7068,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                         <MusicLibrary projects={projects} activeProjectId={activeProjectId} instrumentId={preferredInstrumentId} revision={musicChartRevision}
                           disabled={isRecording || isStopping || practiceTransitionBusy}
                           onCreateItem={handleCreatePracticeItem} onOpen={handleOpenMusicScore}
+                          onCreateRoutine={handleCreateRoutineFromMusic}
+                          onReadSetlist={handleReadMusicSetlist}
                           onRename={handleRenameMusicScore}
                           onImported={() => setMusicChartRevision(value => value + 1)} />
                       </AnimatedTabPanel>

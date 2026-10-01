@@ -25,6 +25,8 @@ interface MusicWidgetProps {
   visible: boolean
   expandRequest?: boolean
   onExpandRequestConsumed?: () => void
+  markUpRequest?: boolean
+  onMarkUpRequestConsumed?: () => void
   collapseResetKey?: string
   hasChart: boolean
   fileName: string | null
@@ -73,7 +75,7 @@ export default function MusicWidget({
   busy, error, fit, spreadAvailable, halfTurn, onAdd, onRemove, onTurn, onFitChange,
   onHalfTurnChange, onPaperVisibleChange, chromeHidden, onChromeHiddenChange,
   marker, inkWidth, markCount, saving, onMarkerChange, onInkWidthChange, onUndoMark, onClearMarks, onSaveMarked,
-  expandRequest, onExpandRequestConsumed,
+  expandRequest, onExpandRequestConsumed, markUpRequest, onMarkUpRequestConsumed,
 }: MusicWidgetProps) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const dragX = useMotionValue(0)
@@ -124,6 +126,27 @@ export default function MusicWidget({
     expandRequest, onExpandRequestConsumed, showBall: false,
   })
 
+  useLayoutEffect(() => {
+    if (!markUpRequest) return
+    setSection('mark')
+    setNibOpen(false)
+    if (marker === null) onMarkerChange('black')
+    onMarkUpRequestConsumed?.()
+  }, [markUpRequest, marker, onMarkUpRequestConsumed, onMarkerChange])
+
+  useLayoutEffect(() => {
+    if (paperVisible && visible) return
+    setSection('read')
+    setNibOpen(false)
+    if (marker !== null) onMarkerChange(null)
+  }, [marker, onMarkerChange, paperVisible, visible])
+
+  useLayoutEffect(() => {
+    setSection('read')
+    setNibOpen(false)
+    onMarkerChange(null)
+  }, [collapseResetKey, onMarkerChange])
+
   const turnable = hasChart && paperVisible && (pageView?.count ?? 0) > 0
 
   return <>
@@ -153,7 +176,13 @@ export default function MusicWidget({
               type="button"
               className="music-widget__close"
               aria-label="Close page controls"
-              onClick={event => { event.stopPropagation(); fold.collapse() }}
+              onClick={event => {
+                event.stopPropagation()
+                setSection('read')
+                setNibOpen(false)
+                onMarkerChange(null)
+                fold.collapse()
+              }}
               onPointerDown={event => event.stopPropagation()}
             >
               <ChevronUp size={18} aria-hidden />
@@ -208,6 +237,11 @@ export default function MusicWidget({
             * default so a page-turn tap cannot draw a line across a system.
             */}
           <div className="music-widget__marker" role="group" aria-label="Marker">
+            <button
+              type="button"
+              className="music-widget__done-marking"
+              onClick={() => { setNibOpen(false); onMarkerChange(null); setSection('read') }}
+            >Done marking</button>
             <button
               type="button"
               aria-pressed={marker === null}

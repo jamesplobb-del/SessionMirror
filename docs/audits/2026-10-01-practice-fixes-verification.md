@@ -1,5 +1,7 @@
 # Practice fixes and bot verification
 
+Subsequent implementation: [Music additions verification](/Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-music-additions-verification.md) now covers dedicated setlists, direct markup, visible routine ordering and library selection. This document remains a record of its earlier scope.
+
 The confirmed tuner, duration and browser score-reload failures have been repaired. Routine save/start failures now preserve the draft and support retry. This report supersedes the failed cases in the earlier [workflow verification](/Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-practice-workflow-verification.md); that report remains a record of the broken version.
 
 GPT-6.1 Sol served as the implementation lead. GPT-6 Luna implemented and tested score persistence; a separate GPT-6 Luna reviewer challenged the integrated changes. The coordinating agent performed the real browser interactions below. The bots executed production utility and callback checks; they did not independently operate the same browser or certify native device behavior.

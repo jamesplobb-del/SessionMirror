@@ -37,11 +37,11 @@ function exerciseSummary(step: RoutineStep): string {
 /** The approved music-first flow. Existing plans keep the same routine model. */
 export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const plus = usePlus()
-  const [draft, setDraft] = useState(() => props.mode === 'edit' && props.routine ? props.routine : createRoutine('My practice', [], props.instrumentId))
-  const [screen, setScreen] = useState<'music' | 'lineup'>(() => props.mode === 'edit' && props.routine ? 'lineup' : 'music')
+  const [draft, setDraft] = useState(() => props.initialRoutine ?? (props.mode === 'edit' && props.routine ? props.routine : createRoutine('My practice', [], props.instrumentId)))
+  const [screen, setScreen] = useState<'music' | 'lineup'>(() => props.initialRoutine || (props.mode === 'edit' && props.routine) ? 'lineup' : 'music')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [legacy, setLegacy] = useState<'edit' | null>(null)
-  const [musicEditorOpen, setMusicEditorOpen] = useState(false)
+  const [musicEditorOpen, setMusicEditorOpen] = useState(Boolean(props.initialRoutine))
   // Where the suggestions builder should reopen when this one is left.
   const [suggestions, setSuggestions] = useState(false)
   const [musicEditorOrigin, setMusicEditorOrigin] = useState<'new' | 'saved' | null>(null)
@@ -266,7 +266,13 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
             const attached = Boolean(step.projectId && hasPracticeChart(step.projectId))
             const needsMusic = Boolean((step.sharedScoreName || (desk.showMusic && step.projectId)) && !attached)
             return <li key={step.id} className={expanded === step.id ? 'is-expanded' : ''}>
-              <button type="button" className="music-routine-item" aria-expanded={expanded === step.id} onClick={() => setExpanded(expanded === step.id ? null : step.id)}><span className="music-routine-order">{index + 1}</span>{attached ? <ScoreThumbnail projectId={step.projectId} revision={revision} /> : <span className="music-routine-thumb"><Music2 /></span>}<span className="music-routine-copy"><strong>{step.title}</strong><small>{needsMusic ? 'Music needed · ' : ''}{exerciseSummary(step)}</small></span><ChevronDown /></button>
+              <div className="music-routine-line">
+                <button type="button" className="music-routine-item" aria-expanded={expanded === step.id} onClick={() => setExpanded(expanded === step.id ? null : step.id)}><span className="music-routine-order">{index + 1}</span>{attached ? <ScoreThumbnail projectId={step.projectId} revision={revision} /> : <span className="music-routine-thumb"><Music2 /></span>}<span className="music-routine-copy"><strong>{step.title}</strong><small>{needsMusic ? 'Music needed · ' : ''}{exerciseSummary(step)}</small></span><ChevronDown /></button>
+                <div className="music-routine-reorder" role="group" aria-label={`Reorder ${step.title}`}>
+                  <button type="button" disabled={busy || index === 0} aria-label={`Move ${step.title} up`} onClick={() => reorder(index, -1)}><ArrowUp aria-hidden /></button>
+                  <button type="button" disabled={busy || index === draft.steps.length - 1} aria-label={`Move ${step.title} down`} onClick={() => reorder(index, 1)}><ArrowDown aria-hidden /></button>
+                </div>
+              </div>
               {needsMusic && <div className="music-routine-missing"><button type="button" onClick={() => openPicker(step.id)}><Plus aria-hidden /> Import {step.sharedScoreName ?? step.title}</button>{music.length > 0 && <button type="button" className="music-routine-use-library" onClick={() => setChooseFromLibraryId(chooseFromLibraryId === step.id ? null : step.id)}>Use from library</button>}</div>}
               {needsMusic && chooseFromLibraryId === step.id && <div className="music-routine-choose-library" aria-label={`Choose music for ${step.title}`}>{music.map(item => <button type="button" key={item.step.projectId} onClick={() => { patchStep(step.id, { projectId: item.step.projectId }); setChooseFromLibraryId(null) }}>{item.step.title}</button>)}</div>}
               <PremiumReveal open={expanded === step.id} className="music-routine-item-settings">
@@ -282,7 +288,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
                     {draft.steps.filter(item => item.id !== step.id && item.kind !== 'game' && item.kind !== 'free').length > 0 && <button type="button" className="music-routine-copy-setup" onClick={() => { setCopyFrom(copyFrom === step.id ? null : step.id); setCopyTargets([]) }}>Copy setup to other exercises…</button>}
                     {copyFrom === step.id && <div className="music-routine-copy-targets"><p>Choose which exercises to update.</p>{draft.steps.filter(item => item.id !== step.id && item.kind !== 'game' && item.kind !== 'free').map(item => <label key={item.id}><input type="checkbox" checked={copyTargets.includes(item.id)} onChange={() => setCopyTargets(ids => ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id])} />{item.title}</label>)}<button type="button" disabled={!copyTargets.length} onClick={() => { setDraft(current => ({ ...current, steps: current.steps.map(item => copyTargets.includes(item.id) ? copyExerciseTools(step, item) : item) })); setCopyFrom(null); setCopyTargets([]) }}>Apply to selected</button></div>}
                   </>}
-                  <div className="music-routine-item-actions"><button type="button" disabled={index === 0} aria-label={`Move ${step.title} up`} onClick={() => reorder(index, -1)}><ArrowUp /></button><button type="button" disabled={index === draft.steps.length - 1} aria-label={`Move ${step.title} down`} onClick={() => reorder(index, 1)}><ArrowDown /></button><button type="button" onClick={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}><Trash2 /> Remove from routine</button></div>
+                  <div className="music-routine-item-actions"><button type="button" onClick={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}><Trash2 /> Remove from routine</button></div>
                 </PremiumDisclosure>
               </PremiumReveal>
             </li>

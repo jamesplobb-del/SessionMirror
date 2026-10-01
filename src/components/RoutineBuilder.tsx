@@ -9,6 +9,8 @@ export type RoutineBuilderMode = 'build' | 'presets' | 'edit'
 export interface RoutineBuilderProps {
   mode: RoutineBuilderMode
   routine: Routine | null
+  /** Unsaved lineup supplied by the Music Library when building a new routine. */
+  initialRoutine?: Routine | null
   instrumentId: string | null
   projects: Project[]
   liveDeskSnapshot: DeskSnapshot

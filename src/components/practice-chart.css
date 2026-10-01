@@ -677,6 +677,8 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   transition: opacity 0.25s ease;
   align-items: center;
 }
+.practice-chart-tools { pointer-events: none; }
+.practice-chart-setlist-navigation { display: flex; justify-content: center; gap: 8px; margin-top: 6px; pointer-events: auto; }
 .practice-chart-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;font-weight:550;color:#34465a;text-align:center}
 
 .practice-chart-scroll--half-turn { overflow: hidden; touch-action: pan-y; }
@@ -725,6 +727,8 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   }
   .practice-chart-workspace button { min-width: 0; flex-direction: column; gap: 3px; padding: 6px 3px; font-size: 10px; }
   .practice-chart-controls .practice-chart-control { padding: 0 8px; font-size: 10px; min-height: 44px; }
+  .practice-chart-controls .practice-chart-control--mark-up span,
+  .practice-chart-controls .practice-chart-control--page span { display: none; }
 }
 
 /* While marking, they step back so a stroke near a corner is not a mis-tap. */
@@ -879,6 +883,7 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 }
 
 .music-widget__marker button { gap: 0.22rem; padding: 0 0.15rem; }
+.music-widget__marker .music-widget__done-marking { grid-column: 1 / -1; min-height: 44px; border: 1px solid rgba(127, 160, 210, 0.28); opacity: 1; }
 .music-widget__marker button svg { width: 13px; height: 13px; flex: none; }
 
 .music-widget__marker button i {

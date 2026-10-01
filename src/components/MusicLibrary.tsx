@@ -9,13 +9,15 @@ import { exportPracticeChart, deletePracticeChart, hasPracticeChart, practiceCha
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import { clearMusicScoreSettings, loadMusicOrder, loadMusicOrganization, loadMusicScoreSettings, loadMusicSetup, orderMusic, saveMusicOrder, saveMusicOrganization, saveMusicScoreSettings, saveMusicSetup, type MusicOrganization } from '../utils/musicLibrary'
 import { loadExerciseLibrary } from '../utils/routineLibrary'
-import { blankDesk, type RoutineStep } from '../utils/practiceRoutines'
+import { blankDesk, MAX_ROUTINE_STEPS, type RoutineStep } from '../utils/practiceRoutines'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getWrittenPitchLabel } from '../utils/tunerTransposition'
 import MusicToolSetup from './MusicToolSetup'
 import RoutineProgramSetup from './RoutineProgramSetup'
 import ScoreThumbnail from './ScoreThumbnail'
 import { clearInkStrokes } from './practiceChart/chartInk'
+import MusicSetlistEditor from './MusicSetlistEditor'
+import { createMusicSetlist, deleteMusicSetlist, loadMusicSetlists, saveMusicSetlist, type MusicSetlist } from '../utils/musicSetlists'
 import '../styles/music-library.css'
 
 interface Props {
@@ -28,6 +30,8 @@ interface Props {
   onOpen: (projectId: string) => Promise<void>
   onRename: (projectId: string, name: string) => Promise<void>
   onImported: () => void
+  onCreateRoutine: (steps: RoutineStep[]) => void
+  onReadSetlist: (setlist: MusicSetlist, entryId: string) => Promise<void>
 }
 type DragKind = 'score' | 'folder'
 type DragGesture = { kind: DragKind; id: string; startX: number; startY: number; active: boolean }
@@ -48,7 +52,7 @@ function setupLabel(id: string): string {
 }
 
 /** Folders organize the library; a score's recordings stay in its practice item. */
-export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported }: Props) {
+export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported, onCreateRoutine, onReadSetlist }: Props) {
   const plus = usePlus()
   const input = useRef<HTMLInputElement>(null)
   const scroll = useRef<HTMLElement>(null)
@@ -72,6 +76,8 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [chartRevision, setChartRevision] = useState(0)
+  const [setlists, setSetlists] = useState(loadMusicSetlists)
+  const [setlistDraft, setSetlistDraft] = useState<MusicSetlist | null>(null)
   useEffect(() => {
     const refresh = () => setChartRevision(current => current + 1)
     window.addEventListener(PRACTICE_CHART_CHANGED, refresh)
@@ -104,6 +110,35 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
       refreshSetup(value => value + 1)
       setError('')
     } catch { setError('Could not save these score settings. Please try again.') }
+  }
+
+  const createSelectedRoutine = () => {
+    if (working.current || disabled) return
+    const selected = music.filter(item => selectedIds.includes(item.id))
+    if (!selected.length) return
+    if (selected.length > MAX_ROUTINE_STEPS) {
+      setError(`Select up to ${MAX_ROUTINE_STEPS} scores for one routine.`)
+      return
+    }
+    if (!requirePlus('music', createSelectedRoutine)) return
+    try {
+      onCreateRoutine(selected.map(scoreStep))
+      setError('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not open this routine. Your selection is still here; please try again.')
+    }
+  }
+
+  const createSelectedSetlist = () => {
+    if (working.current || disabled) return
+    const selected = music.filter(item => selectedIds.includes(item.id))
+    if (!selected.length || !requirePlus('music', createSelectedSetlist)) return
+    try { setSetlistDraft(createMusicSetlist(selected)); setError('') }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not create this setlist. Your selection is still here.') }
+  }
+  const saveSetlist = (next: MusicSetlist) => {
+    saveMusicSetlist(next)
+    setSetlists(loadMusicSetlists())
   }
 
   const persist = (next: MusicOrganization, nextOrder = order) => {
@@ -297,17 +332,39 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
       }
     }}><GripVertical aria-hidden /></button>
 
+  if (setlistDraft) return <MusicSetlistEditor key={setlistDraft.id}
+    setlist={setlistDraft} scores={music} disabled={disabled || Boolean(busy)}
+    onSave={saveSetlist} onCancel={() => setSetlistDraft(null)}
+    onDelete={setlists.some(list => list.id === setlistDraft.id) ? id => {
+      deleteMusicSetlist(id); setSetlists(loadMusicSetlists()); setSetlistDraft(null)
+    } : undefined}
+    onRead={async (list, entryId) => {
+      if (!requirePlus('music')) throw new Error('Unlock Music to read this setlist. Your draft is still here.')
+      await onReadSetlist(list, entryId)
+      setSelecting(false)
+      setSelectedIds([])
+      setSetlistDraft(null)
+    }} />
+
   return <section ref={scroll} className="music-library" aria-label="Music library">
     <header className="music-library__header">
       <div>{selectedFolder && <button type="button" className="music-library__back" data-music-drop="root" onClick={() => { setFolderId(null); setQuery(''); setEditingFolder(null); setRemoveFolder(false) }}><ArrowLeft aria-hidden /> All music</button>}<h1>{selectedFolder?.name ?? 'Music'}</h1><p>{selectedFolder ? 'Scores in this folder' : 'Your scores, ready for practice.'}</p></div>
       {!selecting && <div className="music-library__header-actions">{!selectedFolder && <button type="button" className="music-library__new-folder" onClick={() => { setEditingFolder('new'); setFolderName('') }}><FolderPlus aria-hidden /> New folder</button>}<button type="button" className="music-library__import" disabled={disabled || Boolean(busy)} onClick={() => input.current?.click()}><Upload aria-hidden />Import music</button></div>}
     </header>
+    {!selectedFolder && !selecting && <section className="music-library__setlists" aria-label="Your setlists">
+      <div><h2>Setlists</h2><button type="button" disabled={disabled || Boolean(busy)} onClick={() => {
+        if (!requirePlus('music')) return
+        setSetlistDraft(createMusicSetlist([]))
+      }}>New setlist</button></div>
+      {setlists.length ? <ul>{setlists.map(list => <li key={list.id}><button type="button" disabled={disabled || Boolean(busy)} onClick={() => setSetlistDraft(list)}><span><strong>{list.name}</strong><small>{list.entries.length} {list.entries.length === 1 ? 'piece' : 'pieces'}</small></span><ChevronRight aria-hidden /></button></li>)}</ul>
+        : <p>Organize scores for rehearsals and concerts.</p>}
+    </section>}
     {editingFolder && <form className="music-library__folder-form" onSubmit={saveFolder}><input autoFocus aria-label="Folder name" maxLength={60} placeholder="Folder name" value={folderName} onChange={event => setFolderName(event.target.value)} /><button type="submit" disabled={!folderName.trim()}>{editingFolder === 'new' ? 'Create' : 'Save'}</button><button type="button" aria-label="Cancel" onClick={() => setEditingFolder(null)}><X aria-hidden /></button></form>}
     {selectedFolder && !selecting && <div className="music-library__folder-actions"><button type="button" onClick={() => { setFolderName(selectedFolder.name); setEditingFolder('rename') }}><Pencil aria-hidden /> Rename</button><button type="button" onClick={() => setRemoveFolder(true)}><Trash2 aria-hidden /> Remove folder</button></div>}
     {removeFolder && selectedFolder && <div className="music-library__remove-confirm" role="alert"><span>Move this folder’s scores to All music?</span><button type="button" onClick={() => setRemoveFolder(false)}>Cancel</button><button type="button" onClick={removeCurrentFolder}>Remove folder</button></div>}
     {!selectedFolder && organization.folders.length > 0 && !searching && <div className="music-library__folders" aria-label="Music folders">{organization.folders.map(folder => <div key={folder.id} className={`music-library__folder${drag?.target === `folder:${folder.id}` ? ' music-library__drop-target' : ''}`} data-music-drop={`folder:${folder.id}`}><button type="button" className="music-library__folder-open" onClick={() => { setFolderId(folder.id); setQuery(''); setRemoveFolder(false) }}><Folder aria-hidden /><span><strong>{folder.name}</strong><small>{music.filter(item => organization.placements[item.id] === folder.id).length} scores</small></span><ChevronRight aria-hidden /></button>{!selecting && dragHandle('folder', folder.id, folder.name)}</div>)}</div>}
     {music.length > 0 && <div className="music-library__toolbar"><label className="music-library__search"><Search aria-hidden /><input type="search" aria-label="Find music" placeholder="Find music" value={query} onChange={event => setQuery(event.target.value)} /></label><button type="button" disabled={Boolean(busy) || disabled} onClick={() => { setSelecting(current => !current); setSelectedIds([]); setDeleteIds(null); setSetupId(null) }}>{selecting ? 'Done' : 'Select'}</button></div>}
-    {selecting && music.length > 0 && <div className="music-library__selection"><span>{selectedCount} of {music.length} selected</span><button type="button" disabled={Boolean(busy) || disabled} onClick={() => setSelectedIds(allSelected ? [] : music.map(item => item.id))}>{allSelected ? 'Deselect all' : 'Select all music'}</button><button type="button" className="music-library__delete-selected" disabled={!selectedCount || Boolean(busy) || disabled} onClick={() => setDeleteIds(selectedIds)}><Trash2 aria-hidden />{allSelected ? 'Delete all' : 'Delete selected'}</button></div>}
+    {selecting && music.length > 0 && <div className="music-library__selection"><span>{selectedCount} of {music.length} selected</span><button type="button" disabled={Boolean(busy) || disabled} onClick={() => setSelectedIds(allSelected ? [] : music.map(item => item.id))}>{allSelected ? 'Deselect all' : 'Select all music'}</button><button type="button" className="music-library__create-routine" disabled={!selectedCount || Boolean(busy) || disabled} onClick={createSelectedRoutine}>Create routine</button><button type="button" className="music-library__create-setlist" disabled={!selectedCount || Boolean(busy) || disabled} onClick={createSelectedSetlist}>Create setlist</button><button type="button" className="music-library__delete-selected" disabled={!selectedCount || Boolean(busy) || disabled} onClick={() => setDeleteIds(selectedIds)}><Trash2 aria-hidden />{allSelected ? 'Delete all' : 'Delete selected'}</button></div>}
     {music.length > 0 && !selecting && <div className="music-library__count">{visible.length} {visible.length === 1 ? 'score' : 'scores'}<span>Drag scores to reorder or add them to a folder</span></div>}
     {deleteIds && <div className="music-library__delete-confirm" role="alert" aria-label="Delete music"><strong>{deleteIds.length === 1 ? `Delete “${music.find(item => item.id === deleteIds[0])?.name ?? 'this score'}”?` : `Delete ${deleteIds.length} scores?`}</strong><p>The music files and markings will be removed. Recordings in these practice items will stay. Routines using this music will need a replacement score.</p><div><button type="button" disabled={Boolean(busy)} onClick={() => setDeleteIds(null)}>Cancel</button><button type="button" className="music-library__delete-confirm-action" disabled={Boolean(busy) || disabled} onClick={() => void confirmDelete()}>{deleteIds.length === music.length ? 'Delete all music' : 'Delete music'}</button></div></div>}
     {!plus.active && <PlusLocked feature="music"><p>Your saved music stays here. Open Tools to export or delete an original file.</p></PlusLocked>}

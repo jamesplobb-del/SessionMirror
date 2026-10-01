@@ -1,5 +1,7 @@
 # Music and routines audit bot swarm
 
+Subsequent implementation: [Music additions verification](/Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-music-additions-verification.md) now covers dedicated setlists, direct markup, visible routine ordering and library selection. This document remains a record of its earlier scope.
+
 This map turns the requested musician-focused audit into a bounded sequence: repair the tuner menu and routine inconsistencies, make score marking and routine assembly easier, then add dedicated setlists for rehearsals and concerts. It records a planning-first audit of the current working tree on October 1, 2026. Application changes have not been implemented. Multitrack is outside this audit.
 
 The subsequent [practice workflow verification](/Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-practice-workflow-verification.md) includes actual phone-size browser sessions, reproduced failures and paid release gates. It supersedes the initial map's untested status for the specific cases it exercised.

@@ -239,6 +239,8 @@ export default function StaffJumperScreen({
 }: StaffJumperScreenProps) {
   const headphonesConnected = useConfirmedHeadphoneOutput()
   const needsHeadphoneConfirmation = useBluetoothHeadphoneConfirmation()
+  const [headphoneHelpFor, setHeadphoneHelpFor] = useState<'Metronome' | 'Tonic drone' | null>(null)
+  const headphoneNoticeRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     // Desk tools may already be running when Games opens. They must follow
     // the same headphone rule as the game's own independent audio.
@@ -1051,12 +1053,35 @@ export default function StaffJumperScreen({
             <span className={`sj-switch ${draftLives ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
 
+          {!headphonesConnected && (
+            <div ref={headphoneNoticeRef} id="sj-headphone-notice" className="sj-headphone-notice" role="status" aria-live="polite" aria-atomic="true">
+              <strong><Headphones aria-hidden /> {headphoneHelpFor ? `${headphoneHelpFor} needs headphones` : 'Headphones required for sound'}</strong>
+              <p>Speaker sound can confuse pitch detection. Connect headphones to turn on the drone or metronome. You can practice with both off.</p>
+              {needsHeadphoneConfirmation && (
+                <Pressable type="button" hapticFeedback={hapticFeedback} onClick={() => {
+                  confirmBluetoothHeadphones()
+                  setHeadphoneHelpFor(null)
+                }} className="balance-cta balance-cta--blue balance-cta--small">
+                  I'm using Bluetooth headphones
+                </Pressable>
+              )}
+            </div>
+          )}
+
           <Pressable
             type="button"
             intensity="soft"
             hapticFeedback={hapticFeedback}
-            disabled={!headphonesConnected && !draftMetronome}
-            onClick={() => setDraftMetronome((on) => !on)}
+            aria-describedby={!headphonesConnected ? 'sj-headphone-notice' : undefined}
+            onClick={() => {
+              if (!draftMetronome && !headphonesConnected) {
+                setHeadphoneHelpFor('Metronome')
+                headphoneNoticeRef.current?.scrollIntoView({ block: 'nearest' })
+                return
+              }
+              setHeadphoneHelpFor(null)
+              setDraftMetronome((on) => !on)
+            }}
             className="sj-field sj-field--switch"
             aria-pressed={draftMetronome}
           >
@@ -1064,7 +1089,8 @@ export default function StaffJumperScreen({
               Metronome{' '}
               <span>
                 Counts you in, then the run follows the click: play each note on its
-                beat and hold it for its written length. Headphones required.
+                beat and hold it for its written length.
+                {!headphonesConnected && !draftMetronome && ' Connect headphones to turn on. Tap for details.'}
               </span>
             </span>
             <span className={`sj-switch ${draftMetronome ? 'sj-switch--on' : ''}`} aria-hidden />
@@ -1074,13 +1100,23 @@ export default function StaffJumperScreen({
             type="button"
             intensity="soft"
             hapticFeedback={hapticFeedback}
-            disabled={!headphonesConnected && !draftDrone}
-            onClick={() => setDraftDrone((on) => !on)}
+            aria-describedby={!headphonesConnected ? 'sj-headphone-notice' : undefined}
+            onClick={() => {
+              if (!draftDrone && !headphonesConnected) {
+                setHeadphoneHelpFor('Tonic drone')
+                headphoneNoticeRef.current?.scrollIntoView({ block: 'nearest' })
+                return
+              }
+              setHeadphoneHelpFor(null)
+              setDraftDrone((on) => !on)
+            }}
             className="sj-field sj-field--switch"
             aria-pressed={draftDrone}
           >
             <span className="sj-field__label">
-              Tonic drone <span>Holds {droneNoteLabel} underneath. Headphones required.</span>
+              Tonic drone <span>Holds {droneNoteLabel} underneath.
+                {!headphonesConnected && !draftDrone && ' Connect headphones to turn on. Tap for details.'}
+              </span>
             </span>
             <span className={`sj-switch ${draftDrone ? 'sj-switch--on' : ''}`} aria-hidden />
           </Pressable>
