@@ -6,7 +6,7 @@ import PremiumReveal from './ui/PremiumReveal'
 import PremiumFlowPage from './ui/PremiumFlowPage'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, FileMusic, Music2, Plus, Share2, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, FileMusic, GripVertical, Music2, Plus, Share2, Trash2, X } from 'lucide-react'
 import type { RoutineBuilderProps } from './RoutineBuilder'
 import GuidedRoutineBuilder from './GuidedRoutineBuilder'
 import MusicToolSetup from './MusicToolSetup'
@@ -21,6 +21,8 @@ import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getWrittenPitchLabel } from '../utils/tunerTransposition'
 import type { DeskSnapshot } from '../utils/workspaceDesks'
 import ScoreThumbnail from './ScoreThumbnail'
+import { useSortableList } from '../hooks/useSortableList'
+import { moveItem } from '../utils/sortableOrder'
 import '../styles/routine-guide.css'
 import '../styles/music-routine-builder.css'
 
@@ -85,6 +87,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
       return { ...item, id: projectId, step: { ...item.step, desk: loadMusicSetup(projectId) ?? item.step.desk,
         referenceQuery: scoreSettings ? scoreSettings.referenceQuery : item.step.referenceQuery,
         referenceVideoId: scoreSettings ? scoreSettings.referenceVideoId : item.step.referenceVideoId,
+        referenceAudio: scoreSettings ? scoreSettings.referenceAudio ?? null : item.step.referenceAudio,
         programId: scoreSettings ? scoreSettings.programId : item.step.programId } }
     }), loadMusicOrder())
   }, [exerciseLibrary, props.projects, props.instrumentId, revision])
@@ -207,9 +210,12 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
     } catch (cause) { if (alive.current) setError(cause instanceof RoutineLibraryRecoveryError ? cause.message : 'Could not save or start this routine. Your draft is still here; please try again.') }
     finally { busyRef.current = false; if (alive.current) setBusy(false) }
   }
-  const reorder = (index: number, delta: number) => setDraft(current => {
-    const steps = [...current.steps]; [steps[index], steps[index + delta]] = [steps[index + delta], steps[index]]
-    return { ...current, steps }
+  const sortable = useSortableList({
+    ids: draft.steps.map(step => step.id),
+    scrollRef: scroll,
+    disabled: busy,
+    onMove: (from, to) => setDraft(current => ({ ...current, steps: moveItem(current.steps, from, to) })),
+    describe: id => draft.steps.find(step => step.id === id)?.title ?? 'Exercise',
   })
 
   if ((props.mode !== 'edit' && !musicEditorOpen) || legacy) return <GuidedRoutineBuilder {...props}
@@ -244,7 +250,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
           </div>
           {music.length > 0 && <section className="music-routine-recent"><div className="music-routine-section-title"><div><h3>Music library</h3><span>{selectedMusicCount} selected</span></div></div>{music.map(({ step }) => {
             const selectedStep = draft.steps.find(item => item.projectId === step.projectId)
-            return <button type="button" key={step.projectId ?? step.id} className="music-routine-recent-row" aria-pressed={Boolean(selectedStep)} onClick={() => toggleMusic(step)}><ScoreThumbnail projectId={step.projectId} revision={revision} /><span><strong>{step.title}</strong><small>{exerciseSummary(selectedStep ?? step)}</small></span><span className="music-routine-select" aria-hidden>{selectedStep ? <Check /> : <Plus />}</span></button>
+            return <button type="button" key={step.projectId ?? step.id} className="music-routine-recent-row" aria-pressed={Boolean(selectedStep)} onClick={() => toggleMusic(step)}><ScoreThumbnail projectId={step.projectId} revision={revision} /><span><strong>{step.title}</strong><small>{exerciseSummary(selectedStep ?? step)}</small></span><span className="music-routine-select" aria-hidden>{selectedStep ? draft.steps.indexOf(selectedStep) + 1 : <Plus />}</span></button>
           })}</section>}
           {props.mode !== 'edit' && !draft.steps.length ? <>
             {/* The free way in: it has to read as a real choice, not fine print. */}
@@ -260,23 +266,27 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
           <label className="music-routine-name"><span>Routine name</span><input aria-label="Routine name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
           <div className="music-routine-section-title"><h3>Order and setup</h3><span>{draft.steps.length} {draft.steps.length === 1 ? 'exercise' : 'exercises'}</span></div>
           {missingMusic.length > 0 && <p className="music-routine-import-note">{missingMusic.length} {missingMusic.length === 1 ? 'score needs' : 'scores need'} your own music before you can start. The exercise settings are already in place.</p>}
-          <ol className="music-routine-list">{draft.steps.map((step, index) => {
+          <ol className="music-routine-list" ref={sortable.listRef} data-sorting={sortable.sorting ? '' : undefined}>{draft.steps.map((step, index) => {
             const desk = step.desk ?? blankDesk('audio')
             const toolsAllowed = step.kind !== 'game' && step.kind !== 'free'
             const attached = Boolean(step.projectId && hasPracticeChart(step.projectId))
             const needsMusic = Boolean((step.sharedScoreName || (desk.showMusic && step.projectId)) && !attached)
-            return <li key={step.id} className={expanded === step.id ? 'is-expanded' : ''}>
+            return <li key={step.id} {...sortable.itemProps(step.id)} className={expanded === step.id ? 'is-expanded' : ''}>
               <div className="music-routine-line">
                 <button type="button" className="music-routine-item" aria-expanded={expanded === step.id} onClick={() => setExpanded(expanded === step.id ? null : step.id)}><span className="music-routine-order">{index + 1}</span>{attached ? <ScoreThumbnail projectId={step.projectId} revision={revision} /> : <span className="music-routine-thumb"><Music2 /></span>}<span className="music-routine-copy"><strong>{step.title}</strong><small>{needsMusic ? 'Music needed · ' : ''}{exerciseSummary(step)}</small></span><ChevronDown /></button>
-                <div className="music-routine-reorder" role="group" aria-label={`Reorder ${step.title}`}>
-                  <button type="button" disabled={busy || index === 0} aria-label={`Move ${step.title} up`} onClick={() => reorder(index, -1)}><ArrowUp aria-hidden /></button>
-                  <button type="button" disabled={busy || index === draft.steps.length - 1} aria-label={`Move ${step.title} down`} onClick={() => reorder(index, 1)}><ArrowDown aria-hidden /></button>
-                </div>
+                <span className="music-routine-grip" {...sortable.handleProps(step.id, step.title)}><GripVertical aria-hidden /></span>
               </div>
               {needsMusic && <div className="music-routine-missing"><button type="button" onClick={() => openPicker(step.id)}><Plus aria-hidden /> Import {step.sharedScoreName ?? step.title}</button>{music.length > 0 && <button type="button" className="music-routine-use-library" onClick={() => setChooseFromLibraryId(chooseFromLibraryId === step.id ? null : step.id)}>Use from library</button>}</div>}
               {needsMusic && chooseFromLibraryId === step.id && <div className="music-routine-choose-library" aria-label={`Choose music for ${step.title}`}>{music.map(item => <button type="button" key={item.step.projectId} onClick={() => { patchStep(step.id, { projectId: item.step.projectId }); setChooseFromLibraryId(null) }}>{item.step.title}</button>)}</div>}
               <PremiumReveal open={expanded === step.id} className="music-routine-item-settings">
-                {toolsAllowed && <MusicToolSetup step={step} instrumentId={draft.instrumentId} onChange={patch => patchStep(step.id, patch)} />}
+                {toolsAllowed && <MusicToolSetup step={step} instrumentId={draft.instrumentId} onChange={patch => patchStep(step.id, patch)}
+                  ensureProject={async () => {
+                    if (step.projectId) return step.projectId
+                    // A recording needs a practice item to live in; make the exercise's now.
+                    const projectId = await props.onCreatePracticeItem(step.title)
+                    patchStep(step.id, { projectId })
+                    return projectId
+                  }} />}
                 {!needsMusic && (!attached || !toolsAllowed) && <button type="button" className="music-routine-attach" onClick={() => openPicker(step.id)}><FileMusic /> Add music to this exercise</button>}
                 <PremiumDisclosure className="music-routine-more"><summary>More options</summary>
                   <label className="music-routine-field">Exercise name<input aria-label="Exercise name" maxLength={MAX_STEP_TITLE} value={step.title} onChange={event => patchStep(step.id, { title: event.target.value })} /></label>
@@ -293,6 +303,7 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
               </PremiumReveal>
             </li>
           })}</ol>
+          {sortable.liveRegion}
           <button type="button" className="music-routine-add" onClick={() => { setMusicBackTarget('lineup'); setScreen('music') }}><Plus /> Choose music</button>
           <button type="button" className="music-routine-text" disabled={draft.steps.length >= MAX_ROUTINE_STEPS} onClick={() => setShowExercise(value => !value)}>Add an exercise without music</button>
           {showExercise && <form className="music-routine-exercise-entry" onSubmit={event => { event.preventDefault(); addExercise() }}><input autoFocus aria-label="New exercise name" maxLength={MAX_STEP_TITLE} placeholder="Long tones, warm-up…" value={exerciseName} onChange={event => setExerciseName(event.target.value)} /><button type="submit" aria-label="Add exercise" disabled={!exerciseName.trim()}><Plus /></button></form>}

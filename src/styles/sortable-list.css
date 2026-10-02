@@ -1,0 +1,8 @@
+/* Shared by every list that reorders by dragging (useSortableList). */
+.sortable-live{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
+[data-sort-id]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+[data-sorting]>[data-sort-id]:not([data-dragging]){transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+[data-sort-id][data-dragging]{position:relative;z-index:4;cursor:grabbing;will-change:transform;transition:none}
+[data-sort-handle]{touch-action:none;cursor:grab;-webkit-tap-highlight-color:transparent}
+[data-dragging] [data-sort-handle]{cursor:grabbing}
+@media (prefers-reduced-motion:reduce){[data-sorting]>[data-sort-id]:not([data-dragging]){transition:none}}

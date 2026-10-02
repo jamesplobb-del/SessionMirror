@@ -1,0 +1,10 @@
+PASS: 1428 multitrack assertions (1–12 parts, count-ins, lead-in, seek, timing, layouts, section exports, project restore).
+PASS: exporter payload, floating layer order, timed score, mix, mirror, format, ending and cancellation.
+file:///Users/jameslobb/Documents/SessionMirror/scripts/verify-multitrack-upgrade.mjs:217
+    assert.ok(extra.startsWith('extra-'))
+                    ^
+
+TypeError: Cannot read properties of null (reading 'startsWith')
+    at file:///Users/jameslobb/Documents/SessionMirror/scripts/verify-multitrack-upgrade.mjs:217:21
+
+Node.js v24.16.0

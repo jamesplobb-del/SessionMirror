@@ -1,0 +1,11 @@
+10:54:47  Acquired tunnel connection to device.
+10:54:47  Enabling developer disk image services.
+10:54:47  Acquired usage assertion.
+App installed:
+• bundleID: com.besttake.app.practiceqa
+• installationURL: file:///private/var/containers/Bundle/Application/A4562901-6B6D-45B7-8540-CD5B552AD8E2/App.app/
+• launchServicesIdentifier: unknown
+• databaseUUID: A267BE85-9F63-4D7C-8B1D-60F73507B738
+• databaseSequenceNumber: 3588
+• options: 
+Saving JSON output file to /Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-media-fixes/device-install.json

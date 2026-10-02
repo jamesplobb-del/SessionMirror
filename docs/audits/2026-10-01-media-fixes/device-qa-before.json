@@ -1,0 +1,34 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "info",
+      "apps",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--bundle-id",
+      "com.besttake.app.practiceqa",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-qa-before.json"
+    ],
+    "commandType" : "devicectl.device.info.apps",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "apps" : [
+
+    ],
+    "defaultAppsIncluded" : false,
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "hiddenAppsIncluded" : false,
+    "internalAppsIncluded" : false,
+    "matchingBundleIdentifier" : "com.besttake.app.practiceqa",
+    "removableAppsIncluded" : true
+  }
+}

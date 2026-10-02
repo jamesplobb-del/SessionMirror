@@ -1,0 +1,1 @@
+PASS: delayed YouTube duration invalidates the saved range, playback is blocked, and the controls expose correction UX.

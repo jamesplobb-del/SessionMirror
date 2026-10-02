@@ -1,0 +1,439 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -workspace scripts/practice-qa/results/native-media-2026-10-01/ios/App/App.xcworkspace -scheme App -configuration Debug -sdk iphoneos -destination id=00008130-000A49203EF2001C -derivedDataPath scripts/practice-qa/results/native-media-derived -allowProvisioningUpdates
+
+Build settings from command line:
+    SDKROOT = iphoneos26.5
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (27 targets)
+    Target 'App' in project 'App'
+        ➜ Explicit dependency on target 'QuickTunerControl' in project 'App'
+        ➜ Implicit dependency on target 'Pods-App' in project 'Pods' via file 'Pods_App.framework' in build phase 'Link Binary'
+        ➜ Implicit dependency on target 'Capacitor' in project 'Pods' via options '-framework Capacitor' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorApp' in project 'Pods' via options '-framework CapacitorApp' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorCommunityKeepAwake' in project 'Pods' via options '-framework CapacitorCommunityKeepAwake' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorCommunityMedia' in project 'Pods' via options '-framework CapacitorCommunityMedia' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorCommunitySqlite' in project 'Pods' via options '-framework CapacitorCommunitySqlite' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorFilesystem' in project 'Pods' via options '-framework CapacitorFilesystem' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorHaptics' in project 'Pods' via options '-framework CapacitorHaptics' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorScreenOrientation' in project 'Pods' via options '-framework CapacitorScreenOrientation' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorShare' in project 'Pods' via options '-framework CapacitorShare' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorSplashScreen' in project 'Pods' via options '-framework CapacitorSplashScreen' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorStatusBar' in project 'Pods' via options '-framework CapacitorStatusBar' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'CapacitorCordova' in project 'Pods' via options '-framework Cordova' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'SDWebImage' in project 'Pods' via options '-framework SDWebImage' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'SQLCipher' in project 'Pods' via options '-framework SQLCipher' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'Sentry' in project 'Pods' via options '-framework Sentry' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'SentryCapacitor' in project 'Pods' via options '-framework SentryCapacitor' in build setting 'OTHER_LDFLAGS'
+        ➜ Implicit dependency on target 'ZIPFoundation' in project 'Pods' via options '-framework ZIPFoundation' in build setting 'OTHER_LDFLAGS'
+    Target 'Pods-App' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorApp' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCommunityKeepAwake' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCommunityMedia' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCommunitySqlite' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCordova' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorFilesystem' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorHaptics' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorScreenOrientation' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorShare' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorSplashScreen' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorStatusBar' in project 'Pods'
+        ➜ Explicit dependency on target 'IONFilesystemLib' in project 'Pods'
+        ➜ Explicit dependency on target 'SDWebImage' in project 'Pods'
+        ➜ Explicit dependency on target 'SQLCipher' in project 'Pods'
+        ➜ Explicit dependency on target 'Sentry' in project 'Pods'
+        ➜ Explicit dependency on target 'SentryCapacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'ZIPFoundation' in project 'Pods'
+    Target 'SentryCapacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'Sentry' in project 'Pods'
+    Target 'Sentry' in project 'Pods'
+        ➜ Explicit dependency on target 'Sentry-Sentry' in project 'Pods'
+    Target 'Sentry-Sentry' in project 'Pods' (no dependencies)
+    Target 'CapacitorStatusBar' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorSplashScreen' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorShare' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorScreenOrientation' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorHaptics' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorFilesystem' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'IONFilesystemLib' in project 'Pods'
+    Target 'IONFilesystemLib' in project 'Pods' (no dependencies)
+    Target 'CapacitorCommunitySqlite' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'SQLCipher' in project 'Pods'
+        ➜ Explicit dependency on target 'ZIPFoundation' in project 'Pods'
+    Target 'ZIPFoundation' in project 'Pods'
+        ➜ Explicit dependency on target 'ZIPFoundation-ZIPFoundation_Privacy' in project 'Pods'
+    Target 'ZIPFoundation-ZIPFoundation_Privacy' in project 'Pods' (no dependencies)
+    Target 'SQLCipher' in project 'Pods'
+        ➜ Explicit dependency on target 'SQLCipher-SQLCipher' in project 'Pods'
+    Target 'SQLCipher-SQLCipher' in project 'Pods' (no dependencies)
+    Target 'CapacitorCommunityMedia' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'SDWebImage' in project 'Pods'
+    Target 'SDWebImage' in project 'Pods'
+        ➜ Explicit dependency on target 'SDWebImage-SDWebImage' in project 'Pods'
+    Target 'SDWebImage-SDWebImage' in project 'Pods' (no dependencies)
+    Target 'CapacitorCommunityKeepAwake' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'CapacitorApp' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor-Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCordova' in project 'Pods'
+    Target 'Capacitor-Capacitor' in project 'Pods'
+        ➜ Implicit dependency on target 'CapacitorCordova' in project 'Pods' via options '-framework Cordova' in build setting 'OTHER_LDFLAGS'
+    Target 'CapacitorCordova' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCordova-CapacitorCordova' in project 'Pods'
+    Target 'CapacitorCordova-CapacitorCordova' in project 'Pods' (no dependencies)
+    Target 'QuickTunerControl' in project 'App' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/SDKStatCaches.noindex/iphoneos26.5-23F73-32daed1954a7d5dd0789fcaf2a9bb78b.sdkstatcache
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -o /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/SDKStatCaches.noindex/iphoneos26.5-23F73-32daed1954a7d5dd0789fcaf2a9bb78b.sdkstatcache
+
+warning: Run script build phase '[CP] Copy XCFrameworks' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'IONFilesystemLib' from project 'Pods')
+PhaseScriptExecution [CP]\ Copy\ XCFrameworks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/IONFilesystemLib.build/Script-EE90BFDE136327140A5672AE82AC099A.sh (in target 'IONFilesystemLib' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    /bin/sh -c /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/Pods.build/Debug-iphoneos/IONFilesystemLib.build/Script-EE90BFDE136327140A5672AE82AC099A.sh
+Selected xcframework slice ios-arm64
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods/IONFilesystemLib/IONFilesystemLib.xcframework/ios-arm64/*" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/XCFrameworkIntermediates/IONFilesystemLib"
+Transfer starting: 22 files
+
+sent 1966 bytes  received 20 bytes  116140 bytes/sec
+total size is 1201599  speedup is 605.03
+Copied /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods/IONFilesystemLib/IONFilesystemLib.xcframework/ios-arm64 to /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/XCFrameworkIntermediates/IONFilesystemLib
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework/CapacitorCordova.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCordova/CapacitorCordova.bundle (in target 'CapacitorCordova' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCordova/CapacitorCordova.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Capacitor/Capacitor.framework/Capacitor.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Capacitor/Capacitor.bundle (in target 'Capacitor' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Capacitor/Capacitor.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Capacitor/Capacitor.framework
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SDWebImage/SDWebImage.framework/SDWebImage.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SDWebImage/SDWebImage.bundle (in target 'SDWebImage' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SDWebImage/SDWebImage.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SDWebImage/SDWebImage.framework
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SQLCipher/SQLCipher.framework/SQLCipher.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SQLCipher/SQLCipher.bundle (in target 'SQLCipher' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SQLCipher/SQLCipher.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SQLCipher/SQLCipher.framework
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/ZIPFoundation/ZIPFoundation.framework/ZIPFoundation_Privacy.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/ZIPFoundation/ZIPFoundation_Privacy.bundle (in target 'ZIPFoundation' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/ZIPFoundation/ZIPFoundation_Privacy.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/ZIPFoundation/ZIPFoundation.framework
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Sentry/Sentry.framework/Sentry.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Sentry/Sentry.bundle (in target 'Sentry' from project 'Pods')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/Pods
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Sentry/Sentry.bundle /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Sentry/Sentry.framework
+
+warning: Run script build phase '[CP] Embed Pods Frameworks' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'App' from project 'App')
+PhaseScriptExecution Patch\ Local\ Capacitor\ Plugins /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Script-PATCH1FED79650016851F.sh (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    /bin/sh -c /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Script-PATCH1FED79650016851F.sh
+Registered local audio plugin in ios/App/App/capacitor.config.json: App.BestTakeAudioPlugin, App.DronePlugin, App.MetronomePlugin, App.QuickTunerPlugin (removed duplicate bare name)
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/capacitor.config.json /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/capacitor.config.json (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/capacitor.config.json /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app
+
+CpResource /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/public /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/public (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/public /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app
+
+PhaseScriptExecution [CP]\ Embed\ Pods\ Frameworks /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Script-64C0F87B8B65D522B63873FD.sh (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    /bin/sh -c /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Script-64C0F87B8B65D522B63873FD.sh
+mkdir -p /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Capacitor/Capacitor.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 7 files
+deleting Capacitor.framework/_CodeSignature/CodeResources
+deleting Capacitor.framework/_CodeSignature/
+Capacitor.framework/
+Capacitor.framework/Capacitor
+Capacitor.framework/Capacitor.bundle/
+Capacitor.framework/Capacitor.bundle/Info.plist
+Capacitor.framework/Capacitor.bundle/PrivacyInfo.xcprivacy
+
+sent 2083190 bytes  received 98 bytes  51952319 bytes/sec
+total size is 2136451  speedup is 1.03
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Capacitor.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Capacitor.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorApp/CapacitorApp.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorApp.framework/_CodeSignature/CodeResources
+deleting CapacitorApp.framework/_CodeSignature/
+CapacitorApp.framework/
+CapacitorApp.framework/CapacitorApp
+
+sent 149809 bytes  received 48 bytes  5741647 bytes/sec
+total size is 150208  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorApp.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorApp.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCommunityKeepAwake/CapacitorCommunityKeepAwake.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorCommunityKeepAwake.framework/_CodeSignature/CodeResources
+deleting CapacitorCommunityKeepAwake.framework/_CodeSignature/
+CapacitorCommunityKeepAwake.framework/
+CapacitorCommunityKeepAwake.framework/CapacitorCommunityKeepAwake
+
+sent 117977 bytes  received 48 bytes  11685643 bytes/sec
+total size is 118352  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunityKeepAwake.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunityKeepAwake.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCommunityMedia/CapacitorCommunityMedia.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorCommunityMedia.framework/_CodeSignature/CodeResources
+deleting CapacitorCommunityMedia.framework/_CodeSignature/
+CapacitorCommunityMedia.framework/
+CapacitorCommunityMedia.framework/CapacitorCommunityMedia
+
+sent 264237 bytes  received 48 bytes  15455263 bytes/sec
+total size is 264600  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunityMedia.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunityMedia.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCommunitySqlite/CapacitorCommunitySqlite.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorCommunitySqlite.framework/_CodeSignature/CodeResources
+deleting CapacitorCommunitySqlite.framework/_CodeSignature/
+CapacitorCommunitySqlite.framework/
+CapacitorCommunitySqlite.framework/CapacitorCommunitySqlite
+
+sent 1980265 bytes  received 48 bytes  34681488 bytes/sec
+total size is 1980418  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunitySqlite.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorCommunitySqlite.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorCordova/Cordova.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 6 files
+deleting Cordova.framework/_CodeSignature/CodeResources
+deleting Cordova.framework/_CodeSignature/
+Cordova.framework/
+Cordova.framework/Cordova
+Cordova.framework/CapacitorCordova.bundle/
+Cordova.framework/CapacitorCordova.bundle/Info.plist
+Cordova.framework/CapacitorCordova.bundle/PrivacyInfo.xcprivacy
+
+sent 146204 bytes  received 98 bytes  5027560 bytes/sec
+total size is 146284  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Cordova.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Cordova.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorFilesystem/CapacitorFilesystem.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorFilesystem.framework/_CodeSignature/CodeResources
+deleting CapacitorFilesystem.framework/_CodeSignature/
+CapacitorFilesystem.framework/
+CapacitorFilesystem.framework/CapacitorFilesystem
+
+sent 388209 bytes  received 48 bytes  20327591 bytes/sec
+total size is 388568  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorFilesystem.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorFilesystem.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorHaptics/CapacitorHaptics.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorHaptics.framework/_CodeSignature/CodeResources
+deleting CapacitorHaptics.framework/_CodeSignature/
+CapacitorHaptics.framework/
+CapacitorHaptics.framework/CapacitorHaptics
+
+sent 153153 bytes  received 48 bytes  13801891 bytes/sec
+total size is 153546  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorHaptics.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorHaptics.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorScreenOrientation/CapacitorScreenOrientation.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorScreenOrientation.framework/_CodeSignature/CodeResources
+deleting CapacitorScreenOrientation.framework/_CodeSignature/
+CapacitorScreenOrientation.framework/
+CapacitorScreenOrientation.framework/CapacitorScreenOrientation
+
+sent 142689 bytes  received 48 bytes  7101343 bytes/sec
+total size is 143062  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorScreenOrientation.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorScreenOrientation.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorShare/CapacitorShare.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorShare.framework/_CodeSignature/CodeResources
+deleting CapacitorShare.framework/_CodeSignature/
+CapacitorShare.framework/
+CapacitorShare.framework/CapacitorShare
+
+sent 122013 bytes  received 48 bytes  3381191 bytes/sec
+total size is 122412  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorShare.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorShare.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorSplashScreen/CapacitorSplashScreen.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorSplashScreen.framework/_CodeSignature/CodeResources
+deleting CapacitorSplashScreen.framework/_CodeSignature/
+CapacitorSplashScreen.framework/
+CapacitorSplashScreen.framework/CapacitorSplashScreen
+
+sent 212813 bytes  received 48 bytes  12448011 bytes/sec
+total size is 213188  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorSplashScreen.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorSplashScreen.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/CapacitorStatusBar/CapacitorStatusBar.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting CapacitorStatusBar.framework/_CodeSignature/CodeResources
+deleting CapacitorStatusBar.framework/_CodeSignature/
+CapacitorStatusBar.framework/
+CapacitorStatusBar.framework/CapacitorStatusBar
+
+sent 231573 bytes  received 48 bytes  19142231 bytes/sec
+total size is 231950  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorStatusBar.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/CapacitorStatusBar.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SDWebImage/SDWebImage.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 6 files
+deleting SDWebImage.framework/_CodeSignature/CodeResources
+deleting SDWebImage.framework/_CodeSignature/
+SDWebImage.framework/
+SDWebImage.framework/SDWebImage
+SDWebImage.framework/SDWebImage.bundle/
+SDWebImage.framework/SDWebImage.bundle/Info.plist
+SDWebImage.framework/SDWebImage.bundle/PrivacyInfo.xcprivacy
+
+sent 1045432 bytes  received 98 bytes  27441732 bytes/sec
+total size is 1045408  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SDWebImage.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SDWebImage.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SQLCipher/SQLCipher.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 6 files
+deleting SQLCipher.framework/_CodeSignature/CodeResources
+deleting SQLCipher.framework/_CodeSignature/
+SQLCipher.framework/
+SQLCipher.framework/SQLCipher
+SQLCipher.framework/SQLCipher.bundle/
+SQLCipher.framework/SQLCipher.bundle/Info.plist
+SQLCipher.framework/SQLCipher.bundle/PrivacyInfo.xcprivacy
+
+sent 2091741 bytes  received 98 bytes  39394331 bytes/sec
+total size is 2091597  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SQLCipher.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SQLCipher.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Sentry/Sentry.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 6 files
+deleting Sentry.framework/_CodeSignature/CodeResources
+deleting Sentry.framework/_CodeSignature/
+Sentry.framework/
+Sentry.framework/Sentry
+Sentry.framework/Sentry.bundle/
+Sentry.framework/Sentry.bundle/Info.plist
+Sentry.framework/Sentry.bundle/PrivacyInfo.xcprivacy
+
+sent 8592577 bytes  received 98 bytes  51116448 bytes/sec
+total size is 8591661  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Sentry.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/Sentry.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/SentryCapacitor/SentryCapacitor.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting SentryCapacitor.framework/_CodeSignature/CodeResources
+deleting SentryCapacitor.framework/_CodeSignature/
+SentryCapacitor.framework/
+SentryCapacitor.framework/SentryCapacitor
+
+sent 262581 bytes  received 48 bytes  7275041 bytes/sec
+total size is 262960  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SentryCapacitor.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/SentryCapacitor.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/ZIPFoundation/ZIPFoundation.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 6 files
+deleting ZIPFoundation.framework/_CodeSignature/CodeResources
+deleting ZIPFoundation.framework/_CodeSignature/
+ZIPFoundation.framework/
+ZIPFoundation.framework/ZIPFoundation
+ZIPFoundation.framework/ZIPFoundation_Privacy.bundle/
+ZIPFoundation.framework/ZIPFoundation_Privacy.bundle/Info.plist
+ZIPFoundation.framework/ZIPFoundation_Privacy.bundle/PrivacyInfo.xcprivacy
+
+sent 673170 bytes  received 98 bytes  2199503 bytes/sec
+total size is 673142  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/ZIPFoundation.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/ZIPFoundation.framework'
+rsync --delete -av --filter P .*.?????? --links --filter "- CVS/" --filter "- .svn/" --filter "- .git/" --filter "- .hg/" --filter "- Headers" --filter "- PrivateHeaders" --filter "- Modules" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/XCFrameworkIntermediates/IONFilesystemLib/IONFilesystemLib.framework" "/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks"
+Transfer starting: 3 files
+deleting IONFilesystemLib.framework/_CodeSignature/CodeResources
+deleting IONFilesystemLib.framework/_CodeSignature/
+IONFilesystemLib.framework/
+IONFilesystemLib.framework/IONFilesystemLib
+
+sent 131729 bytes  received 48 bytes  9345886 bytes/sec
+total size is 132099  speedup is 1.00
+Code Signing /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/IONFilesystemLib.framework with Identity Apple Development: jamesplobb2@gmail.com (R2566GLA56)
+/usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9  --preserve-metadata=identifier,entitlements '/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks/IONFilesystemLib.framework'
+
+Copy /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns/QuickTunerControl.appex /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/QuickTunerControl.appex (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/QuickTunerControl.appex /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns
+
+ProcessInfoPlistFile /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Info.plist /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/Info.plist (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-infoPlistUtility /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App/App/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PkgInfo -expandbuildsettings -format binary -platform iphoneos -additionalcontentfile /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Base.lproj/LaunchScreen-SBPartialInfo.plist -additionalcontentfile /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/Base.lproj/Main-SBPartialInfo.plist -additionalcontentfile /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns/QuickTunerControl.appex -requiredArchitecture arm64 -o /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Info.plist
+
+CopySwiftLibs /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-swiftStdLibTool --copy --verbose --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9 --scan-executable /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/App.debug.dylib --scan-folder /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks --scan-folder /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns --scan-folder /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/SystemExtensions --scan-folder /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Extensions --scan-folder /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/Pods_App.framework --platform iphoneos --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+
+CodeSign /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/App.debug.dylib (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    
+    Signing Identity:     "Apple Development: jamesplobb2@gmail.com (R2566GLA56)"
+    Provisioning Profile: "iOS Team Provisioning Profile: com.besttake.app.practiceqa"
+                          (056d894b-4729-4468-a107-62a7ca6e6ede)
+    
+    /usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9 --timestamp\=none --generate-entitlement-der /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/App.debug.dylib
+/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/App.debug.dylib: replacing existing signature
+
+CodeSign /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/__preview.dylib (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    
+    Signing Identity:     "Apple Development: jamesplobb2@gmail.com (R2566GLA56)"
+    Provisioning Profile: "iOS Team Provisioning Profile: com.besttake.app.practiceqa"
+                          (056d894b-4729-4468-a107-62a7ca6e6ede)
+    
+    /usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9 --timestamp\=none --generate-entitlement-der /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/__preview.dylib
+/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/__preview.dylib: replacing existing signature
+
+CodeSign /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    
+    Signing Identity:     "Apple Development: jamesplobb2@gmail.com (R2566GLA56)"
+    Provisioning Profile: "iOS Team Provisioning Profile: com.besttake.app.practiceqa"
+                          (056d894b-4729-4468-a107-62a7ca6e6ede)
+    
+    /usr/bin/codesign --force --sign 3E08E6EE494320AF6B8586A2D05CB7124C0598F9 --entitlements /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Intermediates.noindex/App.build/Debug-iphoneos/App.build/App.app.xcent --timestamp\=none --generate-entitlement-der /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app
+/Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app: replacing existing signature
+
+ValidateEmbeddedBinary /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns/QuickTunerControl.appex (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    /Applications/Xcode.app/Contents/Developer/usr/bin/embeddedBinaryValidationUtility /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/PlugIns/QuickTunerControl.appex -signing-cert 3E08E6EE494320AF6B8586A2D05CB7124C0598F9 -info-plist-path /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app/Info.plist
+
+Validate /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app (in target 'App' from project 'App')
+    cd /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-2026-10-01/ios/App
+    builtin-validationUtility /Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app -shallow-bundle -infoplist-subpath Info.plist
+
+** BUILD SUCCEEDED **
+

@@ -231,15 +231,19 @@ let handoffFails = false
 const selection = ['b', 'gone', 'a']
 const selectionMusic = [{ id: 'a' }, { id: 'b' }]
 const selectionWorking = { current: false }
+// The component derives this from the tapped order; keep it in step with `selection`.
+const selectedMusic = []
+const syncSelected = () => selectedMusic.splice(0, selectedMusic.length, ...selection.map(id => selectionMusic.find(item => item.id === id)).filter(Boolean))
+syncSelected()
 const createSelected = await bindCallback('src/components/MusicLibrary.tsx', 'createSelectedRoutine', {
-  working: selectionWorking, disabled: false, music: selectionMusic, selectedIds: selection,
+  working: selectionWorking, disabled: false, music: selectionMusic, selectedIds: selection, selectedMusic,
   MAX_ROUTINE_STEPS: 12, setError: value => { selectionError = value },
   requirePlus: (_feature, retry) => { selectionRetry = retry; return selectionAllowed },
   scoreStep: item => ({ projectId: item.id, title: item.id, desk: { marker: item.id } }),
   onCreateRoutine: steps => { if (handoffFails) throw new Error('Switching'); selectionEvents.push(steps) },
 })
 createSelected()
-assert.deepEqual(selectionEvents[0].map(step => step.projectId), ['a', 'b'], 'Uses library order; includes retained filtered selections; ignores stale IDs')
+assert.deepEqual(selectionEvents[0].map(step => step.projectId), ['b', 'a'], 'Uses the order the scores were tapped in; includes retained filtered selections; ignores stale IDs')
 assert.deepEqual(selection, ['b', 'gone', 'a'], 'Handoff retains selection for cancellation')
 selectionAllowed = false
 createSelected()
@@ -256,6 +260,7 @@ createSelected()
 assert.equal(selectionEvents.length, 2, 'Busy library does not open a draft')
 selectionWorking.current = false
 for (let i = 0; i < 13; i++) { const id = `limit-${i}`; selectionMusic.push({ id }); selection.push(id) }
+syncSelected()
 createSelected()
 assert.match(selectionError, /up to 12/)
 assert.equal(selectionEvents.length, 2, 'Over-limit selection never silently drops scores')

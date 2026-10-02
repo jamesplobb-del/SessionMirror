@@ -1,18 +1,20 @@
 import { premiumMotion } from '../utils/premiumMotion'
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { motion, useMotionValue, animate } from 'framer-motion'
 import { Trash2 } from 'lucide-react'
 
 /** Reveal-only swipe. Vertical gestures scroll; swipes never activate the row. */
-export default function SwipeRoutineItem({ title, onRemove, children }: {
+export default function SwipeRoutineItem({ title, onRemove, children, rowProps }: {
   title: string; onRemove: () => void; children: ReactNode
+  /** Extra attributes for the row, e.g. the ones a sortable list needs. */
+  rowProps?: HTMLAttributes<HTMLLIElement> & { 'data-sort-id'?: string; 'data-dragging'?: string }
 }) {
   const x = useMotionValue(0)
   const [open, setOpen] = useState(false)
   const gesture = useRef<{ x: number; y: number; start: number; horizontal: boolean; vertical: boolean } | null>(null)
   const suppressClick = useRef(false)
   const reveal = (next: boolean) => { setOpen(next); animate(x, next ? -88 : 0, premiumMotion({ duration: .18 }, 'control')) }
-  return <li className="routine-swipe-row">
+  return <li className="routine-swipe-row" {...rowProps}>
     <button type="button" className="routine-swipe-delete" aria-label={`Remove ${title} from this routine`}
       onFocus={() => reveal(true)} onClick={onRemove}><Trash2 aria-hidden /><span>Remove</span></button>
     <motion.div className="routine-swipe-content" style={{ x, touchAction: 'pan-y' }}

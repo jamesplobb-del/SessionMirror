@@ -39,15 +39,8 @@
 }
 @media(max-width:600px){.music-library__header{align-items:flex-start;flex-wrap:wrap}.music-library__header-actions{width:100%;justify-content:flex-start}.music-library__count>span{max-width:160px;text-align:right}.music-library__new-folder,.music-library button.music-library__import{min-height:44px}.music-library__folders{grid-template-columns:repeat(2,minmax(0,1fr))}.music-library__folder-open{gap:6px;padding-left:9px}.music-library__folder-open>svg:first-child{width:19px;height:19px}.music-library__folder-open>svg:last-child{display:none}}
 
-.music-library__selection{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:-3px 0 16px;color:var(--ml-muted);font-size:12px}
-.music-library__selection>span{flex:1;min-width:105px}
-.music-library__selection>button{min-height:44px;padding:0 10px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);color:var(--ml-accent);font-weight:600;font-size:12px}
-.music-library__selection>.music-library__delete-selected{display:flex;align-items:center;gap:6px;color:#a23d49}
 .music-library__delete-selected svg,.music-library__remove-score svg{width:16px;height:16px}
 .music-library__list>li.music-library__score-selected{border-color:var(--ml-accent);background:color-mix(in srgb,var(--ml-accent) 6%,var(--ml-panel))}
-.music-library__select-mark{display:grid;place-items:center;width:23px;height:23px;flex:none;border:1.5px solid var(--ml-muted);border-radius:50%;background:var(--ml-panel)}
-.music-library__score[aria-pressed=true] .music-library__select-mark{border-color:var(--ml-accent);background:var(--ml-accent);color:white}
-.music-library__select-mark svg{width:15px;height:15px;stroke-width:2.7}
 .music-library__remove-score{display:flex;align-items:center;gap:7px;min-height:44px;margin-top:12px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#a23d49!important;font-size:12px;font-weight:600}
 .music-library__rename-score{display:flex;align-items:center;gap:7px;min-height:44px;margin-bottom:10px;padding:0 8px;border:0;background:transparent;color:var(--ml-accent)!important;font-size:12px;font-weight:600}
 .music-library__rename-score svg{width:16px;height:16px}
@@ -61,11 +54,35 @@
 .music-library__delete-confirm button{min-height:44px;padding:0 14px;border:1px solid var(--ml-line);border-radius:10px;background:var(--ml-panel);font-size:12px;font-weight:600}
 .music-library__delete-confirm .music-library__delete-confirm-action{border-color:#a23d49;background:#a23d49;color:#fff}
 
-.music-library__selection > .music-library__create-routine{background:#315be8;border-color:#315be8;color:#fff;font-weight:650;padding:0 16px}
-@media(max-width:480px){.music-library__selection > .music-library__create-routine{order:1;flex:1 0 100%}.music-library__selection > .music-library__delete-selected{order:2;margin-left:auto}}
+/* Selection: a sticky bar so Routine / Setlist stay in reach while the list scrolls. */
+.music-library__selection{position:sticky;top:-24px;z-index:6;margin:0 -22px 14px;padding:10px 22px 12px;background:color-mix(in srgb,var(--ls-bg,#f8faff) 94%,transparent);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--ml-line)}
+.music-library__selection-top{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;font-size:15px;font-weight:600}
+.music-library__selection-top>span{min-width:0}
+.music-library__selection-tools{display:flex;align-items:center;gap:2px}.music-library__selection-tools>button{min-height:44px;padding:0 10px;border:0;background:none;color:var(--ml-accent);font-size:14px;font-weight:600}.music-library__selection-tools>.music-library__selection-done{padding-right:0;font-weight:700}
+.music-library__selection-actions{display:flex;gap:10px}
+.music-library__selection-actions>button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border:1px solid var(--ml-line);border-radius:14px;background:var(--ml-panel);color:var(--ml-accent);font-size:15px;font-weight:650}
+.music-library__selection-actions>.music-library__create-routine,.music-library__selection-actions>.music-library__create-setlist{flex:1}
+.music-library__selection-actions>.music-library__create-routine{border-color:var(--ml-accent);background:var(--ml-accent);color:#fff}
+.music-library__selection-actions>.music-library__delete-selected{flex:none;width:48px;color:#a23d49}
+.music-library__selection-actions svg{width:18px;height:18px;flex:none}
+.music-library__select-mark{display:grid;place-items:center;width:26px;height:26px;flex:none;border:1.5px solid var(--ml-muted);border-radius:50%;background:var(--ml-panel);color:#fff;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.music-library__score[aria-pressed=true] .music-library__select-mark{border-color:var(--ml-accent);background:var(--ml-accent)}
+@media(min-width:744px){.music-library__selection{margin-inline:-32px;padding-inline:32px;top:-34px}}
 
-.music-library__selection > .music-library__create-setlist{background:var(--ml-panel,#fff);border-color:var(--ml-accent,#315be8);color:var(--ml-accent,#315be8);font-weight:650;padding:0 16px}
-.music-library__setlists{margin:22px 0;padding:16px;border:1px solid var(--ml-line,#dbe2ea);border-radius:14px;background:var(--ml-panel,#fff)}
-.music-library__setlists>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.music-library__setlists h2{margin:0;font-size:18px;font-weight:600}.music-library__setlists>div>button{min-height:44px;padding:0 10px;color:var(--ml-accent,#315be8);font-size:13px;border:0;background:transparent}
-.music-library__setlists ul{list-style:none;margin:8px 0 0;padding:0}.music-library__setlists li+li{border-top:1px solid var(--ml-line,#dbe2ea)}.music-library__setlists li button{width:100%;min-height:56px;display:flex;align-items:center;justify-content:space-between;text-align:left;gap:10px;border:0;background:transparent;padding:8px 0}.music-library__setlists strong,.music-library__setlists small{display:block}.music-library__setlists strong{font-size:14px;overflow-wrap:anywhere}.music-library__setlists small,.music-library__setlists p{font-size:12px;color:var(--ml-muted,#64748b);margin:5px 0}.music-library__setlists svg{width:18px;height:18px;flex:none}
-@media(max-width:480px){.music-library__selection>.music-library__create-setlist{order:1;flex:1 0 100%}}
+/* Setlists: a quiet section, one grouped list, no card around a card. */
+.music-library__setlists{margin:4px 0 26px}
+.music-library__section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.music-library__section-head h2{margin:0;font-size:20px;font-weight:650;letter-spacing:-.3px}
+.music-library__section-head>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px 0 10px;border:0;background:none;color:var(--ml-accent);font-size:15px;font-weight:600}
+.music-library__section-head>button svg{width:17px;height:17px}
+.music-library__setlists>p{margin:2px 0 0;color:var(--ml-muted);font-size:14px;line-height:1.5}
+.music-library__setlists>ul{list-style:none;margin:0;padding:0;border:1px solid var(--ml-line);border-radius:14px;background:var(--ml-panel);overflow:hidden}
+.music-library__setlists>ul>li{position:relative}.music-library__setlists>ul>li+li::before{content:'';position:absolute;top:0;left:68px;right:0;height:1px;background:var(--ml-line)}
+.music-library__setlists>ul>li>button{display:flex;align-items:center;gap:14px;width:100%;min-height:64px;padding:8px 14px;border:0;background:none;text-align:left}
+.music-library__setlist-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--ml-accent) 11%,transparent);color:var(--ml-accent)}
+.music-library__setlist-icon svg{width:20px;height:20px}
+.music-library__setlist-copy{flex:1;min-width:0}
+.music-library__setlist-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:600}
+.music-library__setlist-copy small{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ml-muted);font-size:13px}
+.music-library__setlists>ul>li>button>svg:last-child{width:16px;height:16px;flex:none;color:var(--ml-muted)}
+html.app-dark-mode .music-library__selection-actions>.music-library__create-routine,html.app-dark-mode .music-library__score[aria-pressed=true] .music-library__select-mark{color:#0e1a2c}

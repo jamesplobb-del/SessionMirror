@@ -1,12 +1,83 @@
-.music-setlist-editor{--ms-ink:var(--ls-ink,#1d3049);--ms-muted:var(--ls-muted,#617287);--ms-line:var(--ls-line,#dbe5ef);--ms-accent:var(--ls-blue,#2873cd);--ms-panel:var(--ls-panel,#fff);display:flex;flex-direction:column;min-height:0;max-height:calc(94dvh - 26px);width:100%;max-width:900px;margin:0 auto;color:var(--ms-ink);background:var(--ms-panel)}
-.music-setlist-editor :where(button,input,select,textarea){font:inherit;color:inherit}.music-setlist-editor button{min-width:44px;min-height:44px;display:inline-flex;justify-content:center;align-items:center;gap:6px;padding:8px 12px;border:1px solid var(--ms-line);border-radius:10px;background:var(--ms-panel);cursor:pointer;font-size:13px}.music-setlist-editor button:disabled{opacity:.4;cursor:default}.music-setlist-editor :where(button,input,textarea,select,summary):focus-visible{outline:2px solid var(--ms-accent);outline-offset:3px}.music-setlist-editor svg{width:17px;height:17px;flex:none}.music-setlist-editor__header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px 14px;border-bottom:1px solid var(--ms-line);flex:none}.music-setlist-editor__header span{font-size:11px;color:var(--ms-muted)}.music-setlist-editor__header h2{margin:4px 0 0;font-size:28px;font-weight:550;letter-spacing:-.6px}.music-setlist-editor__scroll{overflow:auto;overscroll-behavior:contain;min-height:0;padding:20px 22px}.music-setlist-editor fieldset{margin:0;padding:0;border:0;min-width:0}.music-setlist-editor label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--ms-muted)}.music-setlist-editor :where(input,textarea,select){width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--ms-line);border-radius:10px;background:var(--ms-panel);font-size:14px;color:var(--ms-ink);box-sizing:border-box}.music-setlist-editor textarea{resize:vertical;line-height:1.5}.music-setlist-editor__name input{font-size:17px}.music-setlist-editor__intro,.music-setlist-editor__empty{color:var(--ms-muted);font-size:13px;line-height:1.5}.music-setlist-editor__count{display:flex;justify-content:space-between;gap:12px;margin:22px 0 12px;font-size:12px}.music-setlist-editor__count span{color:var(--ms-muted)}.music-setlist-editor__entries{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:14px}.music-setlist-editor__entries>li{border:1px solid var(--ms-line);border-radius:14px;padding:14px;min-width:0}.music-setlist-editor__entry-heading{display:flex;align-items:center;gap:10px;margin-bottom:12px}.music-setlist-editor__entry-heading>span{display:grid;place-items:center;min-width:26px;height:26px;border-radius:50%;background:var(--ls-soft,#eef5ff);color:var(--ms-accent);font-size:12px}.music-setlist-editor__entry-heading strong{flex:1;min-width:0;overflow-wrap:anywhere;font-size:15px;font-weight:550}.music-setlist-editor__entry-heading button{flex:none;color:var(--ms-accent)}.music-setlist-editor__entry-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.music-setlist-editor__entry-actions .music-setlist-editor__remove{margin-left:auto;color:#a23d49}.music-setlist-editor details{margin-top:10px}.music-setlist-editor summary{min-height:44px;align-content:center;font-size:12px;color:var(--ms-accent);cursor:pointer}.music-setlist-editor details label{margin:4px 0}.music-setlist-editor__missing,.music-setlist-editor__limit{color:#9a4a24;font-size:12px;line-height:1.5}.music-setlist-editor__entries>.is-missing{border-color:#e4ba9f}.music-setlist-editor__footer{display:flex;gap:8px;align-items:center;padding:14px 22px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--ms-line);flex:none}.music-setlist-editor__footer>:first-child{margin-right:auto}.music-setlist-editor .music-setlist-editor__save{background:var(--ms-accent);border-color:var(--ms-accent);color:white;font-weight:600}.music-setlist-editor .music-setlist-editor__danger{color:#a23d49}.music-setlist-editor__error{color:#a23d49;font-size:13px;line-height:1.5}.music-setlist-editor__confirm{padding:16px;border:1px solid #e7c7cb;border-radius:12px;background:#fff6f7;margin-bottom:18px;font-size:14px}.music-setlist-editor__confirm p{font-size:12px;line-height:1.5;color:var(--ms-muted)}.music-setlist-editor__confirm>div{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-@media(max-width:390px){.music-setlist-editor__scroll{padding:16px 12px}.music-setlist-editor__header,.music-setlist-editor__footer{padding-inline:12px}.music-setlist-editor__entry-actions{gap:5px}.music-setlist-editor__entry-actions button{padding:8px}.music-setlist-editor__footer button{padding:8px;font-size:12px}}
-@media(min-width:744px){.music-setlist-editor__header,.music-setlist-editor__footer{padding-inline:32px}.music-setlist-editor__scroll{padding:24px 32px}.music-setlist-editor__entry-actions{justify-content:flex-end}.music-setlist-editor__entry-actions .music-setlist-editor__remove{margin-left:0}}
+/* Setlist editor and music picker: one sheet, flat grouped lists, hairline dividers. */
+.music-sheet{--ms-ink:var(--audio-text-primary,var(--ls-ink,#171a22));--ms-muted:var(--audio-text-secondary,var(--ls-muted,#6c7077));--ms-line:var(--audio-divider,rgba(23,26,34,.09));--ms-accent:var(--ls-blue,#2873cd);--ms-surface:var(--audio-surface,#fff);--ms-bg:var(--audio-bg-base,#f7f8fa);display:flex;flex-direction:column;min-height:min(560px,calc(94dvh - 26px));max-height:calc(94dvh - 26px);width:100%;max-width:640px;margin:0 auto;color:var(--ms-ink);background:var(--ms-bg)}
+.music-sheet :where(button,input){font:inherit;color:inherit}
+.music-sheet button{cursor:pointer}.music-sheet button:disabled{opacity:.4;cursor:default}
+.music-sheet :where(button,input,[role=slider]):focus-visible{outline:2px solid var(--ms-accent);outline-offset:2px}
+.music-sheet svg{width:18px;height:18px;flex:none}
 
-.music-setlist-editor__saved{color:var(--ms-accent);font-size:13px;margin:0 0 12px}
+.music-sheet__header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 18px 8px 22px;flex:none}
+.music-sheet__header h2{margin:0;font-size:17px;font-weight:650;letter-spacing:-.2px}
+.music-sheet__close{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:color-mix(in srgb,var(--ms-ink) 7%,transparent);color:var(--ms-muted)}
+.music-sheet__header--picker{display:grid;grid-template-columns:1fr auto 1fr;padding-left:10px}
+.music-sheet__back{display:inline-flex;align-items:center;justify-self:start;min-height:44px;padding:0 10px 0 0;border:0;background:none;color:var(--ms-accent);font-size:16px}
+.music-sheet__back svg{width:22px;height:22px;margin-right:-2px}
+.music-sheet__scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 22px 22px;-webkit-overflow-scrolling:touch}
+.music-sheet__footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 22px max(14px,env(safe-area-inset-bottom));border-top:1px solid var(--ms-line);background:var(--ms-bg)}
+.music-sheet__footer--picker{justify-content:stretch}
+.music-sheet .music-sheet__primary{min-height:50px;min-width:132px;padding:0 26px;border:0;border-radius:14px;background:var(--ms-accent);color:#fff;font-size:16px;font-weight:650}
+.music-sheet__footer--picker .music-sheet__primary{flex:1}
 
-.music-setlist-editor__entries{gap:8px}.music-setlist-editor__entries>li{padding:8px}
-.music-setlist-editor__piece{display:flex;align-items:center;gap:4px;min-width:0}
-.music-setlist-editor button.music-setlist-editor__read{flex:1;min-width:0;border:0;text-align:left;justify-content:flex-start;gap:10px;padding:8px 4px}
-.music-setlist-editor__read>span{flex:none;color:var(--ms-muted);font-size:12px;min-width:16px;text-align:center}.music-setlist-editor__read strong{font-size:14px;line-height:1.4;overflow-wrap:anywhere;font-weight:550}
-.music-setlist-editor__order{display:flex;flex:none;gap:4px}.music-setlist-editor__order button{width:44px;padding:0}
+.music-setlist-editor fieldset{margin:0;padding:0;border:0;min-width:0}
+.music-setlist-editor .music-setlist-editor__name{display:block;width:100%;box-sizing:border-box;margin:0;padding:8px 0 12px;border:0;border-bottom:1px solid var(--ms-line);border-radius:0;background:transparent;color:var(--ms-ink);font-size:28px;font-weight:650;letter-spacing:-.6px;line-height:1.15;outline:0;-webkit-appearance:none}
+.music-setlist-editor__name:focus{border-bottom-color:var(--ms-accent);box-shadow:0 1px 0 var(--ms-accent)}
+.music-setlist-editor__name::placeholder{color:var(--ms-muted);opacity:.55}
+.music-setlist-editor__meta{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;color:var(--ms-muted);font-size:14px}
+.music-sheet .music-setlist-editor__start{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 16px;border:0;border-radius:999px;background:color-mix(in srgb,var(--ms-accent) 11%,transparent);color:var(--ms-accent);font-size:14px;font-weight:650}
+
+.music-setlist-editor__entries{list-style:none;margin:0;padding:0;border:1px solid var(--ms-line);border-radius:16px;background:var(--ms-surface)}
+.music-setlist-editor__entry{position:relative;display:flex;align-items:center;min-height:68px;padding:0 2px 0 14px;border-radius:16px;touch-action:pan-y}
+.music-setlist-editor__entry+.music-setlist-editor__entry::before{content:'';position:absolute;top:0;left:14px;right:0;height:1px;background:var(--ms-line)}
+.music-setlist-editor__entry[data-dragging]{background:var(--ms-surface);box-shadow:0 14px 30px rgba(18,30,48,.24),0 0 0 1px var(--ms-line)}
+.music-setlist-editor__entry[data-dragging]::before,[data-sort-id][data-dragging]+.music-setlist-editor__entry::before{opacity:0}
+.music-sheet .music-setlist-editor__open{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:68px;padding:8px 0;border:0;background:none;text-align:left}
+.music-setlist-editor__open--missing{cursor:default}
+.music-setlist-editor__number{flex:none;width:22px;text-align:center;font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;color:var(--ms-muted)}
+.music-setlist-editor__name-block{flex:1;min-width:0}
+.music-setlist-editor__name-block strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.music-setlist-editor__name-block small{display:block;margin-top:3px;font-size:12px;color:#a85a2c}
+.music-setlist-editor__entry.is-missing .music-setlist-editor__name-block strong{color:var(--ms-muted)}
+.music-sheet .music-setlist-editor__replace{flex:none;min-height:40px;padding:0 10px;border:0;background:none;color:var(--ms-accent);font-size:14px;font-weight:650}
+.music-sheet .music-setlist-editor__remove{display:grid;place-items:center;flex:none;width:44px;height:44px;border:0;border-radius:12px;background:none;color:var(--ms-muted);opacity:.75}
+.music-setlist-editor__remove:active{color:#b3414f;opacity:1}
+.music-setlist-editor__grip{display:grid;place-items:center;flex:none;width:44px;height:56px;border-radius:12px;color:var(--ms-muted)}
+.music-setlist-editor__grip svg{width:20px;height:20px}
+.music-setlist-editor__grip:focus-visible{outline:2px solid var(--ms-accent);outline-offset:-2px}
+
+.music-sheet .music-setlist-editor__add{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;margin-top:6px;padding:0 4px;border:0;background:none;color:var(--ms-accent);font-size:16px;font-weight:650;text-align:left}
+.music-setlist-editor__add>span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:color-mix(in srgb,var(--ms-accent) 12%,transparent)}
+.music-setlist-editor__undo{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 0;padding:2px 4px 2px 16px;border-radius:12px;background:#1d2635;color:#f4f7fb;font-size:14px}
+.music-sheet .music-setlist-editor__undo button{min-height:44px;padding:0 12px;border:0;background:none;color:#8cc2ff;font-weight:650}
+.music-sheet__footer-end{display:flex;align-items:center;gap:14px;margin-left:auto}
+.music-setlist-editor__saved{display:inline-flex;align-items:center;gap:5px;color:var(--ms-accent);font-size:14px;font-weight:600}.music-setlist-editor__saved svg{width:16px;height:16px}
+.music-setlist-editor__error{margin:0 0 10px;color:#b3414f;font-size:14px;line-height:1.5}
+.music-setlist-editor__limit{margin:0 0 10px;color:#a85a2c;font-size:13px;line-height:1.5}
+.music-sheet .music-setlist-editor__delete{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 4px;border:0;background:none;color:#b3414f;font-size:15px}
+.music-setlist-editor__confirm{margin:0 0 14px;padding:16px;border:1px solid #e7c7cb;border-radius:14px;background:#fff6f7;color:#2a2230}
+.music-setlist-editor__confirm strong{font-size:15px}.music-setlist-editor__confirm p{margin:6px 0 12px;font-size:13px;line-height:1.5;color:#5d5560}
+.music-setlist-editor__confirm>div{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.music-sheet .music-setlist-editor__confirm button{min-height:44px;padding:0 14px;border:1px solid #e0d2d4;border-radius:10px;background:#fff;font-size:14px;font-weight:600}
+.music-sheet .music-setlist-editor__confirm .music-setlist-editor__danger{border-color:#b3414f;background:#b3414f;color:#fff}
+
+.music-picker__search{display:flex;align-items:center;gap:10px;min-height:44px;margin:0 0 12px;padding:0 12px;border:1px solid var(--ms-line);border-radius:12px;background:var(--ms-surface)}
+.music-picker__search svg{color:var(--ms-muted)}
+.music-picker__search input{flex:1;min-width:0;min-height:42px;border:0;background:transparent;font-size:16px;outline:0}
+.music-picker__list{list-style:none;margin:0;padding:0;border:1px solid var(--ms-line);border-radius:16px;background:var(--ms-surface);overflow:hidden}
+.music-picker__list>li{position:relative}
+.music-picker__list>li+li::before{content:'';position:absolute;top:0;left:14px;right:0;height:1px;background:var(--ms-line)}
+.music-sheet .music-picker__row{display:flex;align-items:center;gap:12px;width:100%;min-height:68px;padding:8px 14px;border:0;background:none;text-align:left}
+.music-picker__row[aria-pressed=true]{background:color-mix(in srgb,var(--ms-accent) 8%,transparent)}
+.music-picker__copy{flex:1;min-width:0}
+.music-picker__copy strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:16px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+.music-picker__copy small{display:block;margin-top:3px;font-size:12px;color:var(--ms-muted)}
+.music-picker__mark{display:grid;place-items:center;flex:none;width:28px;height:28px;border:1.5px solid color-mix(in srgb,var(--ms-muted) 70%,transparent);border-radius:50%;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff}
+.music-picker__row[aria-pressed=true] .music-picker__mark{border-color:var(--ms-accent);background:var(--ms-accent)}
+.music-picker__empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:48px 20px;text-align:center;color:var(--ms-muted)}
+.music-picker__empty svg{width:44px;height:44px;color:var(--ms-accent);stroke-width:1.3}
+.music-picker__empty strong{color:var(--ms-ink);font-size:17px}.music-picker__empty p{margin:0;max-width:280px;font-size:14px;line-height:1.5}
+.music-picker__none{margin:16px 4px;color:var(--ms-muted);font-size:14px}
+@media(max-width:380px){.music-sheet__scroll{padding-inline:14px}.music-sheet__header{padding-left:16px}.music-sheet__footer{padding-inline:14px}}
+@media(min-width:744px){.music-sheet__scroll{padding-inline:28px}.music-sheet__footer{padding-inline:28px}}
+
+/* Dark mode: the accent turns light, so text on it turns dark; and the global dark input fill must not box the name. */
+html.app-dark-mode .music-setlist-editor input.music-setlist-editor__name,html.app-dark-mode .music-picker__search input{background:transparent}
+html.app-dark-mode .music-sheet .music-sheet__primary,html.app-dark-mode .music-picker__row[aria-pressed=true] .music-picker__mark{color:#0e1a2c}

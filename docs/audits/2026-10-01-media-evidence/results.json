@@ -1,0 +1,150 @@
+{
+  "tests": [
+    {
+      "command": "node scripts/verify-multitrack-upgrade.mjs",
+      "exitCode": 1,
+      "durationSeconds": 0.92,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-upgrade.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-editor.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.18,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-editor.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-quiet.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.28,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-quiet.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-native-read.mjs",
+      "exitCode": 0,
+      "durationSeconds": 8.42,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-native-read.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-transport-handoff.mjs",
+      "exitCode": 0,
+      "durationSeconds": 2.45,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-transport-handoff.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-reference-preview.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.61,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-reference-preview.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-sharing.mjs",
+      "exitCode": 0,
+      "durationSeconds": 14.3,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-multitrack-sharing.log"
+    },
+    {
+      "command": "node scripts/verify-handsfree-cycle.mjs",
+      "exitCode": 0,
+      "durationSeconds": 4.26,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-handsfree-cycle.log"
+    },
+    {
+      "command": "node scripts/verify-handsfree-playback.mjs",
+      "exitCode": 1,
+      "durationSeconds": 3.72,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-handsfree-playback.log"
+    },
+    {
+      "command": "node scripts/verify-camera-handsfree-playback.mjs",
+      "exitCode": 0,
+      "durationSeconds": 2.54,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-camera-handsfree-playback.log"
+    },
+    {
+      "command": "node scripts/verify-handsfree-handoff.mjs",
+      "exitCode": 0,
+      "durationSeconds": 2.56,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-handsfree-handoff.log"
+    },
+    {
+      "command": "node scripts/verify-handsfree-manual.mjs",
+      "exitCode": 0,
+      "durationSeconds": 1.64,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-handsfree-manual.log"
+    },
+    {
+      "command": "node scripts/verify-handsfree-monitor.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.69,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-handsfree-monitor.log"
+    },
+    {
+      "command": "node scripts/verify-headphone-output.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.15,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-headphone-output.log"
+    },
+    {
+      "command": "node scripts/verify-audio-lifecycle.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.28,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-audio-lifecycle.log"
+    },
+    {
+      "command": "node scripts/verify-playback-route.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.2,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-playback-route.log"
+    },
+    {
+      "command": "node scripts/verify-library-audio-preview.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.29,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-library-audio-preview.log"
+    },
+    {
+      "command": "node scripts/verify-take-guidance.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.21,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-take-guidance.log"
+    },
+    {
+      "command": "node scripts/verify-trim-metadata.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.18,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-trim-metadata.log"
+    },
+    {
+      "command": "node scripts/verify-natural-preview.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.18,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-natural-preview.log"
+    },
+    {
+      "command": "node scripts/verify-live-recording-waveform.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.17,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-live-recording-waveform.log"
+    },
+    {
+      "command": "node scripts/verify-plus-access.mjs",
+      "exitCode": 0,
+      "durationSeconds": 0.19,
+      "log": "docs/audits/2026-10-01-media-evidence/verify-plus-access.log"
+    },
+    {
+      "command": "node scripts/practice-qa/regressions/recording-web-writer.mjs",
+      "exitCode": 1,
+      "durationSeconds": 1.43,
+      "log": "docs/audits/2026-10-01-media-evidence/recording-web-writer.log"
+    },
+    {
+      "command": "node scripts/practice-qa/regressions/multitrack-vault-audio.mjs",
+      "exitCode": 0,
+      "durationSeconds": 2.78,
+      "log": "docs/audits/2026-10-01-media-evidence/multitrack-vault-audio.log"
+    }
+  ],
+  "sourceChangedDuringRun": [],
+  "scope": "Utility/source/hook harnesses; no physical capture or live UI pass"
+}

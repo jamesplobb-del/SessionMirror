@@ -1,0 +1,18 @@
+{
+  "productionBuild": "passed",
+  "nativeBuild": "passed",
+  "nativeBuildLog": "docs/audits/2026-10-01-media-fixes/flush-layout-native-build-generic.log",
+  "packagedBundleHashes": "passed",
+  "checks": [
+    {
+      "command": "node scripts/verify-multitrack-quiet.mjs",
+      "exitCode": 0,
+      "log": "docs/audits/2026-10-01-media-fixes/flush-layout-quiet.log"
+    },
+    {
+      "command": "node scripts/verify-multitrack-upgrade.mjs",
+      "exitCode": 0,
+      "log": "docs/audits/2026-10-01-media-fixes/flush-layout-upgrade.log"
+    }
+  ]
+}

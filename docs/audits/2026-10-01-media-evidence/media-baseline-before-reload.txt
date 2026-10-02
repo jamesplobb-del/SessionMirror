@@ -1,0 +1,26 @@
+Browser tab: 1, Title: "BestTake QA media baseline", URL: "http://127.0.0.1:5229/scripts/practice-qa/media.html".
+1 AXWebArea BestTake QA media baseline, URL: 127.0.0.1:5229/scripts/practice-qa/media.html
+	2 heading Synthetic media baseline, Value: 1
+		3 text Synthetic media baseline
+	4 text Test-only origin. No physical microphone or camera. This validates browser media support, not the app’s recording workflow.
+	5 button Generate and save 3-second sample, ID: capture
+	6 button Reopen saved sample, ID: reopen
+	7 button Validate playback and audio, ID: validate
+	8 container player
+		10 container
+			11 button
+			12 slider
+			13 button
+			14 button
+			15 pop up button
+		9 slider video time scrubber
+	16 text {
+  "stage": "playback-and-audio-verified",
+  "audioDuration": 3,
+  "channels": 2,
+  "rms": 0.056545337796779296,
+  "playbackTime": 0.654484,
+  "decodedVideoFrames": 28
+}
+
+The focused UI element is 7 button Validate playback and audio, ID: validate

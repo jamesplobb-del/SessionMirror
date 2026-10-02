@@ -43,6 +43,24 @@ export type RoutineTopic =
   | 'cooldown'
   | 'other'
 
+/** An audio file from Files, stored in the practice item's library and pinned as its reference. */
+export interface ReferenceAudioRef {
+  /** The library item holding the file. */
+  itemId: string
+  name: string
+  /** Whole seconds; 0 when the length is unknown. */
+  duration: number
+}
+
+export function parseReferenceAudio(value: unknown): ReferenceAudioRef | null {
+  if (!value || typeof value !== 'object') return null
+  const raw = value as Record<string, unknown>
+  if (typeof raw.itemId !== 'string' || !raw.itemId) return null
+  const duration = Number(raw.duration)
+  return { itemId: raw.itemId, name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 120) : 'Audio file',
+    duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0 }
+}
+
 export interface RoutineStep {
   id: string
   title: string
@@ -64,6 +82,8 @@ export interface RoutineStep {
    * fallback for items where you would rather choose in the moment.
    */
   referenceVideoId: string | null
+  /** An audio file pinned instead of a YouTube recording; it opens with the item the same way. */
+  referenceAudio: ReferenceAudioRef | null
   /** Existing metronome timeline ID. Recording remains owned by the normal camera/audio controls. */
   programId: string | null
   /** For `game` steps. */
@@ -189,6 +209,7 @@ export function createStep(partial: Partial<RoutineStep> & { title: string }): R
     sharedScoreName: (partial.sharedScoreName ?? '').trim().slice(0, 180) || null,
     referenceQuery: (partial.referenceQuery ?? '').trim().slice(0, 80),
     referenceVideoId: /^[\w-]{11}$/.test(partial.referenceVideoId ?? '') ? partial.referenceVideoId! : null,
+    referenceAudio: parseReferenceAudio(partial.referenceAudio),
     programId: partial.programId ?? null,
     gameRoute: partial.gameRoute ?? null,
   }
@@ -262,6 +283,7 @@ export function parseStep(value: unknown): RoutineStep | null {
     sharedScoreName: typeof raw.sharedScoreName === 'string' ? raw.sharedScoreName : null,
     referenceQuery: typeof raw.referenceQuery === 'string' ? raw.referenceQuery : '',
     referenceVideoId: typeof raw.referenceVideoId === 'string' ? raw.referenceVideoId : null,
+    referenceAudio: parseReferenceAudio(raw.referenceAudio),
     programId: typeof raw.programId === 'string' && raw.programId.trim() ? raw.programId : null,
     gameRoute: GAME_ROUTES.includes(raw.gameRoute as LabsRoute) ? (raw.gameRoute as LabsRoute) : null,
   })

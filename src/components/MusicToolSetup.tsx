@@ -11,15 +11,19 @@ import type { DeskSnapshot } from '../utils/workspaceDesks'
 import { getPracticeRhythmOptions, AUDIO_PRACTICE_CLICK_SOUNDS } from './audioPractice/audioPracticeMetronome'
 import RoutineMetronomeEditor from './RoutineMetronomeEditor'
 import RoutineReferenceSetup from './RoutineReferenceSetup'
+import { useReferenceAudio } from '../context/ReferenceAudioContext'
 import '../styles/routine-guide.css'
 import '../styles/music-routine-builder.css'
 
 /** The same per-exercise controls serve a routine step and a score in Music. */
-export default function MusicToolSetup({ step, instrumentId, onChange }: {
+export default function MusicToolSetup({ step, instrumentId, onChange, ensureProject }: {
   step: RoutineStep
   instrumentId: string | null
   onChange: (patch: Partial<RoutineStep>) => void
+  /** Where a reference recording is kept; omit to offer YouTube only. */
+  ensureProject?: () => Promise<string>
 }) {
+  const referenceStore = useReferenceAudio()
   const [metronomeOpen, setMetronomeOpen] = useState(false)
   const desk = step.desk ?? blankDesk('audio')
   const metronome = normalizeDeskMetronome(desk.metronome)
@@ -52,10 +56,12 @@ export default function MusicToolSetup({ step, instrumentId, onChange }: {
         options={[{ value: '', label: 'Choose a note' }, ...Array.from({ length: 12 }, (_, pitch) => ({ value: String(pitch), label: getWrittenPitchLabel(pitch, desk.drone.octave, 'concert').label }))]}
         onChange={value => patchDesk({ drone: { ...desk.drone, pitchClass: value === '' ? null : Number(value) } })} />
     </div></PremiumReveal>
-    <PremiumDisclosure className="music-routine-reference"><summary><FileMusic aria-hidden /><span>Reference<small>{step.referenceVideoId ? 'Selected' : 'Add a recording'}</small></span><ChevronDown aria-hidden /></summary>
+    <PremiumDisclosure className="music-routine-reference"><summary><FileMusic aria-hidden /><span>Reference<small>{step.referenceAudio ? step.referenceAudio.name : step.referenceVideoId ? 'YouTube' : 'Add a recording'}</small></span><ChevronDown aria-hidden /></summary>
       <RoutineReferenceSetup instrumentId={instrumentId} title={step.title} value={step.referenceQuery}
         onChange={referenceQuery => onChange({ referenceQuery })} videoId={step.referenceVideoId}
-        onVideoIdChange={referenceVideoId => onChange({ referenceVideoId })} />
+        onVideoIdChange={referenceVideoId => onChange({ referenceVideoId })}
+        audio={ensureProject && referenceStore ? { value: step.referenceAudio, projectId: step.projectId, ensureProject,
+          onChange: referenceAudio => onChange({ referenceAudio, ...(referenceAudio ? { referenceVideoId: null, referenceQuery: '' } : {}) }) } : undefined} />
     </PremiumDisclosure>
     <RoutineMetronomeEditor isOpen={metronomeOpen} itemTitle={step.title} value={metronome}
       onSave={metronome => patchDesk({ metronome })} onClose={() => setMetronomeOpen(false)} />

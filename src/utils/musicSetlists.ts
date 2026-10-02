@@ -3,6 +3,7 @@ import { safeRandomUUID } from './uuid'
 import { blankDesk } from './practiceRoutines'
 import { loadMusicSetup } from './musicLibrary'
 import { normalizeDeskSnapshot, type DeskSnapshot } from './workspaceDesks'
+import { moveItem } from './sortableOrder'
 
 export const MUSIC_SETLISTS_KEY = 'besttake:music-setlists:v1'
 export const MUSIC_SETLISTS_CHANGED = 'besttake:music-setlists-changed'
@@ -54,6 +55,22 @@ function editEntries(setlist: MusicSetlist, entries: MusicSetlistEntry[]): Music
 export function appendSetlistScore(setlist: MusicSetlist, score: Score): MusicSetlist {
   assertCapacity(setlist.entries.length + 1)
   return editEntries(setlist, [...setlist.entries, createSetlistEntry(score)])
+}
+/** Adds several scores in the order given, e.g. the order they were tapped in the picker. */
+export function appendSetlistScores(setlist: MusicSetlist, scores: readonly Score[]): MusicSetlist {
+  assertCapacity(setlist.entries.length + scores.length)
+  return editEntries(setlist, [...setlist.entries, ...scores.map(createSetlistEntry)])
+}
+export function reorderSetlistEntry(setlist: MusicSetlist, from: number, to: number): MusicSetlist {
+  const next = moveItem(setlist.entries, from, to)
+  return next === setlist.entries ? setlist : editEntries(setlist, next)
+}
+/** Puts a removed entry back where it was, for Undo. */
+export function restoreSetlistEntry(setlist: MusicSetlist, entry: MusicSetlistEntry, index: number): MusicSetlist {
+  assertCapacity(setlist.entries.length + 1)
+  const entries = [...setlist.entries]
+  entries.splice(Math.max(0, Math.min(entries.length, index)), 0, entry)
+  return editEntries(setlist, entries)
 }
 export function duplicateSetlistEntry(setlist: MusicSetlist, entryId: string): MusicSetlist {
   assertCapacity(setlist.entries.length + 1)

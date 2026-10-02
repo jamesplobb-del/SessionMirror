@@ -1,0 +1,9 @@
+TIMING {"trim":0,"lead":{"trimStart":0,"offsetMs":-8000,"leadIn":2},"nativeDownbeat":2,"visualDownbeat":0,"errorSec":2,"declaredEnd":22,"nativeEnd":20}
+TIMING {"trim":0.3,"lead":{"trimStart":0,"offsetMs":-8000,"leadIn":2},"nativeDownbeat":2,"visualDownbeat":0.3000000000000007,"errorSec":1.6999999999999993,"declaredEnd":21.7,"nativeEnd":20}
+TIMING {"trim":1,"lead":{"trimStart":0,"offsetMs":-8000,"leadIn":2},"nativeDownbeat":2,"visualDownbeat":1,"errorSec":1,"declaredEnd":21,"nativeEnd":20}
+TIMING {"trim":2,"lead":{"trimStart":0,"offsetMs":-8000,"leadIn":2},"nativeDownbeat":2,"visualDownbeat":2,"errorSec":0,"declaredEnd":20,"nativeEnd":20}
+TIMING {"trim":2.3,"lead":{"trimStart":0.2999999999999998,"offsetMs":-8000,"leadIn":2},"nativeDownbeat":2.3000000000000007,"visualDownbeat":2.3000000000000007,"errorSec":0,"declaredEnd":19.7,"nativeEnd":19.7}
+PASS: independently reproduced overlay source mapping defect
+FIRST_LOAD {"backing":{"kind":"none","volume":0.85},"asset":null,"cues":[],"notice":"Some imported files are missing. Reimport your backing audio or sheet music."}
+SECOND_LOAD_ASSETS_AVAILABLE {"backing":{"kind":"none","volume":0.85},"asset":null,"cues":[],"notice":null}
+PASS: independently reproduced loss of unresolved imported asset references after save/reopen

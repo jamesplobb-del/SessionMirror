@@ -1,0 +1,32 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "info",
+      "processes",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--filter",
+      "processIdentifier == 54958",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-processes-final.json"
+    ],
+    "commandType" : "devicectl.device.info.processes",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "runningProcesses" : [
+      {
+        "executable" : "file:///private/var/containers/Bundle/Application/A4562901-6B6D-45B7-8540-CD5B552AD8E2/App.app/App",
+        "processIdentifier" : 54958
+      }
+    ]
+  }
+}

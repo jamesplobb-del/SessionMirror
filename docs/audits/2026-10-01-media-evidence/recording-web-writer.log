@@ -1,0 +1,46 @@
+[AudioRecordLifecycle] userPressedRecord
+[AudioRecordLifecycle] userPressedRecord
+[{"mode":"audio","started":false,"recorderStarts":0,"reportedRecording":false},{"mode":"video","started":false,"recorderStarts":0,"reportedRecording":false}]
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Web recording should start MediaRecorder using the buffered fallback when native file writing is unavailable
++ actual - expected
+
+  [
+    {
++     recorderStarts: 0,
++     reportedRecording: false,
++     started: false
+-     recorderStarts: 1,
+-     reportedRecording: true,
+-     started: true
+    },
+    {
++     recorderStarts: 0,
++     reportedRecording: false,
++     started: false
+-     recorderStarts: 1,
+-     reportedRecording: true,
+-     started: true
+    }
+  ]
+
+    at file:///Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/regressions/recording-web-writer.mjs:96:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: [
+    { started: false, recorderStarts: 0, reportedRecording: false },
+    { started: false, recorderStarts: 0, reportedRecording: false }
+  ],
+  expected: [
+    { started: true, recorderStarts: 1, reportedRecording: true },
+    { started: true, recorderStarts: 1, reportedRecording: true }
+  ],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.16.0

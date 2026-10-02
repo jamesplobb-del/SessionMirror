@@ -1,0 +1,1 @@
+PASS: native import hydration skips one redundant stat/URI pair; later reads verify the file; deletion clears the hint.

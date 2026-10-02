@@ -1,0 +1,360 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "list",
+      "devices",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/video-first-devices.json"
+    ],
+    "commandType" : "devicectl.list.devices",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "devices" : [
+      {
+        "capabilities" : [
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.acquireusageassertion",
+            "name" : "Acquire Usage Assertion"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.connectdevice",
+            "name" : "Connect to Device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.tags",
+            "name" : "Modify Tags"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.default.user.credentials",
+            "name" : "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.unpairdevice",
+            "name" : "Unpair Device"
+          }
+        ],
+        "connectionProperties" : {
+          "authenticationType" : "manualPairing",
+          "isMobileDeviceOnly" : false,
+          "lastConnectionDate" : "2026-10-01T16:12:00.000Z",
+          "pairingState" : "paired",
+          "potentialHostnames" : [
+            "James-Lobb.coredevice.local",
+            "D694E1F1-E4B5-5F70-A548-4FB658154D23.coredevice.local",
+            "00008130-000A49203EF2001C.coredevice.local"
+          ],
+          "transportType" : "wired",
+          "tunnelState" : "disconnected",
+          "tunnelTransportProtocol" : "tcp"
+        },
+        "deviceProperties" : {
+          "bootState" : "booted",
+          "bootedFromSnapshot" : true,
+          "bootedSnapshotName" : "com.apple.os.update-D33AF8DB3DDBEC59E5AED855175B2715AE34DA4A788F8052CA7F30FE7319996D",
+          "ddiServicesAvailable" : false,
+          "developerModeStatus" : "enabled",
+          "hasInternalOSBuild" : false,
+          "name" : "James Lobb",
+          "osBuildUpdate" : "23G90",
+          "osVersionNumber" : "26.6.2",
+          "providerSpecificValues" : {
+            "hasAMRestorableDeviceRef" : "true"
+          },
+          "rootFileSystemIsWritable" : false,
+          "screenViewingURL" : "devices://device/open?id=D694E1F1-E4B5-5F70-A548-4FB658154D23",
+          "supportsCheckedAllocations" : false
+        },
+        "hardwareProperties" : {
+          "cpuType" : {
+            "name" : "arm64e",
+            "subType" : 2,
+            "type" : 16777228
+          },
+          "deviceType" : "iPhone",
+          "ecid" : 2895152610934812,
+          "hardwareModel" : "D83AP",
+          "internalStorageCapacity" : 128000000000,
+          "isProductionFused" : true,
+          "marketingName" : "iPhone 15 Pro",
+          "platform" : "iOS",
+          "productType" : "iPhone16,1",
+          "reality" : "physical",
+          "serialNumber" : "KDQG4N7699",
+          "supportedCPUTypes" : [
+            {
+              "name" : "arm64e",
+              "subType" : 2,
+              "type" : 16777228
+            },
+            {
+              "name" : "arm64",
+              "subType" : 0,
+              "type" : 16777228
+            }
+          ],
+          "supportedDeviceFamilies" : [
+            1
+          ],
+          "thinningProductType" : "iPhone16,1",
+          "udid" : "00008130-000A49203EF2001C"
+        },
+        "identifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+        "tags" : [
+
+        ],
+        "visibilityClass" : "default"
+      },
+      {
+        "capabilities" : [
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.tags",
+            "name" : "Modify Tags"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.default.user.credentials",
+            "name" : "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.unpairdevice",
+            "name" : "Unpair Device"
+          }
+        ],
+        "connectionProperties" : {
+          "authenticationType" : "manualPairing",
+          "isMobileDeviceOnly" : false,
+          "lastConnectionDate" : "2026-09-29T15:20:00.000Z",
+          "pairingState" : "paired",
+          "potentialHostnames" : [
+            "Jamess-iPad-5.coredevice.local",
+            "77BA2DA6-BE92-5FAD-80BA-9B39F0890808.coredevice.local",
+            "00008103-001544963469401E.coredevice.local"
+          ],
+          "tunnelState" : "unavailable"
+        },
+        "deviceProperties" : {
+          "bootedFromSnapshot" : true,
+          "bootedSnapshotName" : "com.apple.os.update-4432EDF595602EB3EAD7ADFA39720AD38DEAB66EC79D9CC8BCB3861AF63D232F",
+          "ddiServicesAvailable" : false,
+          "developerModeStatus" : "enabled",
+          "hasInternalOSBuild" : false,
+          "name" : "James’s iPad (5)",
+          "osBuildUpdate" : "22H352",
+          "osVersionNumber" : "18.7.8",
+          "rootFileSystemIsWritable" : false,
+          "supportsCheckedAllocations" : false
+        },
+        "hardwareProperties" : {
+          "cpuType" : {
+            "name" : "arm64e",
+            "subType" : 2,
+            "type" : 16777228
+          },
+          "deviceType" : "iPad",
+          "ecid" : 5986386426019870,
+          "hardwareModel" : "J522AP",
+          "internalStorageCapacity" : 128000000000,
+          "isProductionFused" : true,
+          "marketingName" : "iPad Pro (12.9-inch) (5th generation)",
+          "platform" : "iOS",
+          "productType" : "iPad13,8",
+          "reality" : "physical",
+          "serialNumber" : "WCX937WLDY",
+          "supportedCPUTypes" : [
+            {
+              "name" : "arm64e",
+              "subType" : 2,
+              "type" : 16777228
+            },
+            {
+              "name" : "arm64",
+              "subType" : 0,
+              "type" : 16777228
+            },
+            {
+              "name" : "unknown-12-13",
+              "subType" : 13,
+              "type" : 12
+            }
+          ],
+          "supportedDeviceFamilies" : [
+            1,
+            2
+          ],
+          "thinningProductType" : "iPad13,8",
+          "udid" : "00008103-001544963469401E"
+        },
+        "identifier" : "77BA2DA6-BE92-5FAD-80BA-9B39F0890808",
+        "tags" : [
+
+        ],
+        "visibilityClass" : "default"
+      },
+      {
+        "capabilities" : [
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.acquireusageassertion",
+            "name" : "Acquire Usage Assertion"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.connectdevice",
+            "name" : "Connect to Device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.tags",
+            "name" : "Modify Tags"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.default.user.credentials",
+            "name" : "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.unpairdevice",
+            "name" : "Unpair Device"
+          }
+        ],
+        "connectionProperties" : {
+          "authenticationType" : "manualPairing",
+          "isMobileDeviceOnly" : false,
+          "lastConnectionDate" : "2026-06-05T20:58:00.000Z",
+          "pairingState" : "paired",
+          "potentialHostnames" : [
+            "Jeffs-AppleWatch.coredevice.local",
+            "2C5E99AB-77CE-5597-9803-F2203CFAA00A.coredevice.local",
+            "00008310-000B285921D2601E.coredevice.local"
+          ],
+          "transportType" : "localNetwork",
+          "tunnelState" : "disconnected",
+          "tunnelTransportProtocol" : "tcp"
+        },
+        "deviceProperties" : {
+          "ddiServicesAvailable" : false,
+          "developerModeStatus" : "disabled",
+          "hasInternalOSBuild" : false,
+          "name" : "Jeff’s Apple Watch",
+          "osBuildUpdate" : "22S560",
+          "osVersionNumber" : "11.3.1",
+          "screenViewingURL" : "devices://device/open?id=2C5E99AB-77CE-5597-9803-F2203CFAA00A"
+        },
+        "hardwareProperties" : {
+          "cpuType" : {
+            "name" : "arm64_32",
+            "subType" : 1,
+            "type" : 33554444
+          },
+          "deviceType" : "appleWatch",
+          "ecid" : 3140588028452894,
+          "hardwareModel" : "N217sAP",
+          "isProductionFused" : true,
+          "marketingName" : "Apple Watch Series 10",
+          "platform" : "watchOS",
+          "productType" : "Watch7,8",
+          "reality" : "physical",
+          "serialNumber" : "DY7CYVPFWW",
+          "thinningProductType" : "Watch7,8",
+          "udid" : "00008310-000B285921D2601E"
+        },
+        "identifier" : "2C5E99AB-77CE-5597-9803-F2203CFAA00A",
+        "tags" : [
+
+        ],
+        "visibilityClass" : "default"
+      },
+      {
+        "capabilities" : [
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.tags",
+            "name" : "Modify Tags"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.default.user.credentials",
+            "name" : "Modify credentials for default users for a device"
+          },
+          {
+            "featureIdentifier" : "com.apple.coredevice.feature.unpairdevice",
+            "name" : "Unpair Device"
+          }
+        ],
+        "connectionProperties" : {
+          "authenticationType" : "manualPairing",
+          "isMobileDeviceOnly" : false,
+          "lastConnectionDate" : "2026-07-31T01:58:00.000Z",
+          "pairingState" : "paired",
+          "potentialHostnames" : [
+            "Maddie-Smith.coredevice.local",
+            "076D6604-699A-561F-92BD-C70B3CEE708D.coredevice.local",
+            "00008140-001A30321A83801C.coredevice.local"
+          ],
+          "tunnelState" : "unavailable"
+        },
+        "deviceProperties" : {
+          "bootedFromSnapshot" : true,
+          "bootedSnapshotName" : "com.apple.os.update-DC1635C8289631B78DA554AF3647B8F62703058D85FCD2349213198F9DE6A918",
+          "ddiServicesAvailable" : false,
+          "developerModeStatus" : "disabled",
+          "hasInternalOSBuild" : false,
+          "name" : "Maddie Smith",
+          "osBuildUpdate" : "23F84",
+          "osVersionNumber" : "26.5.2",
+          "rootFileSystemIsWritable" : false,
+          "supportsCheckedAllocations" : false
+        },
+        "hardwareProperties" : {
+          "cpuType" : {
+            "name" : "arm64e",
+            "subType" : -2147483646,
+            "type" : 16777228
+          },
+          "deviceType" : "iPhone",
+          "ecid" : 7371341145800732,
+          "hardwareModel" : "D47AP",
+          "internalStorageCapacity" : 128000000000,
+          "isProductionFused" : true,
+          "marketingName" : "iPhone 16",
+          "platform" : "iOS",
+          "productType" : "iPhone17,3",
+          "reality" : "physical",
+          "serialNumber" : "KC000NW75V",
+          "supportedCPUTypes" : [
+            {
+              "name" : "arm64e",
+              "subType" : -2147483646,
+              "type" : 16777228
+            },
+            {
+              "name" : "arm64",
+              "subType" : 0,
+              "type" : 16777228
+            },
+            {
+              "name" : "arm64",
+              "subType" : 1,
+              "type" : 16777228
+            },
+            {
+              "name" : "arm64_32",
+              "subType" : 1,
+              "type" : 33554444
+            }
+          ],
+          "supportedDeviceFamilies" : [
+            1
+          ],
+          "thinningProductType" : "iPhone17,3",
+          "udid" : "00008140-001A30321A83801C"
+        },
+        "identifier" : "076D6604-699A-561F-92BD-C70B3CEE708D",
+        "tags" : [
+
+        ],
+        "visibilityClass" : "default"
+      }
+    ]
+  }
+}

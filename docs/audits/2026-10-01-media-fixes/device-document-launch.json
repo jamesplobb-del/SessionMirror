@@ -1,0 +1,59 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "process",
+      "launch",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--terminate-existing",
+      "--payload-url",
+      "file:///private/var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/media-audit-2026-10-01/qa-pulses-two-part.btmulti",
+      "com.besttake.app.practiceqa",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-document-launch.json"
+    ],
+    "commandType" : "devicectl.device.process.launch",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "launchOptions" : {
+      "activatedWhenStarted" : true,
+      "arguments" : [
+
+      ],
+      "environmentVariables" : {
+        "TERM" : "dumb"
+      },
+      "platformSpecificOptions" : {
+
+      },
+      "startStopped" : false,
+      "terminateExistingInstances" : true,
+      "user" : {
+        "active" : true
+      }
+    },
+    "process" : {
+      "auditToken" : [
+        4294967295,
+        501,
+        501,
+        501,
+        501,
+        54958,
+        0,
+        142561
+      ],
+      "executable" : "file:///private/var/containers/Bundle/Application/A4562901-6B6D-45B7-8540-CD5B552AD8E2/App.app/App",
+      "processIdentifier" : 54958
+    }
+  }
+}

@@ -88,7 +88,8 @@ interface PracticeChartLayerProps {
    */
   offerFileOnOpen?: boolean
   /** Optional setlist transport, rendered with the page's own top tools. */
-  setlistNavigation?: ReactNode
+  /** Replaces the Library button while a setlist is open. */
+  setlistMenu?: ReactNode
 }
 
 /** What the rail says while hands-free is running the sitting. */
@@ -120,7 +121,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0, onScoreReplaced, setlistNavigation,
+  revision = 0, onScoreReplaced, setlistMenu,
 }: PracticeChartLayerProps) {
   const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
@@ -600,7 +601,7 @@ export default function PracticeChartLayer({
         <div className="practice-chart-topbar">
         <div className="practice-chart-tools">
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
-          <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>
+          {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
           <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" onClick={() => setPageToolsRequested(true)}><FileMusic aria-hidden /><span>Page</span></button>
           <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" onClick={openMarkUp}><Pen aria-hidden /><span>Mark up</span></button>
@@ -618,7 +619,6 @@ export default function PracticeChartLayer({
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
         </div>
-        {setlistNavigation && <div className="practice-chart-setlist-navigation">{setlistNavigation}</div>}
         {workspaceOpen && (
           <div className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => (

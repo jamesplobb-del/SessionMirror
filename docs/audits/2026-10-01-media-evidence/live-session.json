@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-01",
+  "platform": "Codex in-app browser",
+  "origin": "http://127.0.0.1:5229",
+  "input": "VITE_FAKE_MEDIA=1; disposable QA profile; no physical camera or microphone",
+  "cases": [
+    {
+      "id": "MEDIA-01",
+      "status": "failed",
+      "steps": [
+        "Complete onboarding",
+        "Record your first take",
+        "Got it",
+        "Click centered Video Record"
+      ],
+      "expected": "Recording starts, timer advances, stop action available",
+      "observed": "userPressedRecord and prepareStream logged; idle UI retained; no recorderStart or visible error",
+      "scope": "Actual app with synthetic media",
+      "evidence": [
+        "live-recording-console.json"
+      ],
+      "remaining": "Save/review/retry blocked; native capture untested"
+    },
+    {
+      "id": "MEDIA-02",
+      "status": "failed",
+      "steps": [
+        "Switch to Audio",
+        "Click first-take Record button"
+      ],
+      "expected": "Audio capture begins with timer",
+      "observed": "userPressedRecord and prepareStream logged; first-take idle UI retained without error",
+      "scope": "Actual app with synthetic media",
+      "evidence": [
+        "audio-record-failure.jpg",
+        "live-recording-console.json"
+      ],
+      "remaining": "Saved take playback, Best selection, Vault reopen blocked"
+    },
+    {
+      "id": "MEDIA-03",
+      "status": "failed",
+      "steps": [
+        "Focus centered Audio Record",
+        "Press Enter",
+        "Press Space",
+        "Click same centered control with pointer"
+      ],
+      "expected": "Keyboard and pointer each reach capture-start handler once",
+      "observed": "Enter/Space add no lifecycle log; pointer adds userPressedRecord and prepareStream",
+      "scope": "Actual app activation/log observation; capture blocked by independent writer defect",
+      "evidence": [
+        "live-recording-console.json"
+      ],
+      "remaining": "Stop control and assistive technology not tested"
+    },
+    {
+      "id": "MEDIA-04",
+      "status": "passed",
+      "steps": [
+        "Open independent media baseline",
+        "Generate and save 3-second sample",
+        "Validate playback and audio",
+        "Reload",
+        "Reopen saved sample",
+        "Validate playback and audio"
+      ],
+      "expected": "Persisted nonempty clip decodes video and audio after reload",
+      "observed": {
+        "bytes": 456763,
+        "mime": "video/webm;codecs=vp8,opus",
+        "size": [
+          640,
+          360
+        ],
+        "audioDuration": 3,
+        "channels": 2,
+        "rms": 0.056545337796779296,
+        "playbackTime": 0.649777,
+        "decodedVideoFrames": 23
+      },
+      "scope": "Apparatus validation only; does not prove app recording/save",
+      "evidence": [
+        "media-baseline-after-reload.txt"
+      ],
+      "remaining": "Physical capture/routing untested"
+    }
+  ]
+}

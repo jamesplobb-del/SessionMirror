@@ -73,7 +73,8 @@ export function buildPracticePlanFile(routine: Routine, appVersion?: string): st
     app: 'BestTake',
     appVersion,
     exportedAt: Date.now(),
-    routine: { ...routine, steps: routine.steps.map(step => ({ ...step,
+    // A recording from Files lives on this device only; the file never travels with a plan.
+    routine: { ...routine, steps: routine.steps.map(step => ({ ...step, referenceAudio: null,
       sharedScoreName: step.sharedScoreName ?? (step.projectId && step.desk?.showMusic && hasPracticeChart(step.projectId)
         ? practiceChartName(step.projectId) ?? step.title : null),
     })) },
@@ -152,6 +153,7 @@ export function parsePracticePlanFile(text: string): PracticePlanParseResult {
         ...step,
         id: makeId('step'),
         projectId: null,
+        referenceAudio: null,
         sharedScoreName: step.sharedScoreName ?? (step.projectId && step.desk?.showMusic
           ? (typeof envelope.scores?.[step.projectId]?.fileName === 'string'
             ? envelope.scores[step.projectId].fileName.split(/[/\\]/).at(-1)?.trim().slice(0, 180) || step.title

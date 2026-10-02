@@ -3,9 +3,11 @@ import { requirePlus } from '../plus/plusAccess'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import PremiumFlowPage from './ui/PremiumFlowPage'
 import SwipeRoutineItem from './SwipeRoutineItem'
+import { useSortableList } from '../hooks/useSortableList'
+import { moveItem } from '../utils/sortableOrder'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, useReducedMotion } from 'framer-motion'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronRight, FileMusic, Music2, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, ChevronRight, FileMusic, GripVertical, Music2, Plus, Share2, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import { kindNeedsDesk, type RoutineBuilderProps } from './RoutineBuilder'
 import Pressable from './ui/Pressable'
 import RoutineDeskSetup from './RoutineDeskSetup'
@@ -70,7 +72,6 @@ function selectionForRoutine(routine: Routine): Record<string, string> {
 export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const { mode, routine, liveDeskSnapshot, tunerTransposition, hapticFeedback, onSave, onSaveAndStart, onCreatePracticeItem, todayStarted, onCancel } = props
   const initialInstrument = mode === 'edit' && routine ? routine.instrumentId : props.instrumentId
-  const [showReorder, setShowReorder] = useState(false)
   const [screen, setScreen] = useState<Screen>(() => {
     if (mode === 'edit' && routine) return 'lineup'
     if (mode === 'build' && !props.startAtSuggestions) return 'routines'
@@ -118,6 +119,17 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
   const reducedMotion = useReducedMotion()
   const titleRef = useRef<HTMLHeadingElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const lineup = useSortableList({
+    ids: draft.steps.map(step => step.id), scrollRef,
+    onMove: (from, to) => setDraft(current => ({ ...current, steps: moveItem(current.steps, from, to) })),
+    describe: id => draft.steps.find(step => step.id === id)?.title ?? 'Exercise',
+  })
+  const customList = useSortableList({
+    // Typed items have no identity of their own, so position stands in for it.
+    ids: customItems.map((_, index) => `custom-${index}`), scrollRef,
+    onMove: (from, to) => setCustomItems(items => moveItem(items, from, to)),
+    describe: id => customItems[Number(id.slice(7))] ?? 'Item',
+  })
   const musicInputRef = useRef<HTMLInputElement>(null)
   const musicImportBusyRef = useRef(false)
   const instrumentName = instrument ? getInstrumentProfile(instrument)?.label ?? 'Your instrument' : 'Any instrument'
@@ -241,11 +253,6 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
     const title = customInput.trim().slice(0, MAX_STEP_TITLE)
     if (!title || customItems.length >= MAX_ROUTINE_STEPS) return
     setCustomItems(items => [...items, title]); setCustomInput('')
-  }
-  const moveCustomItem = (index: number, delta: number) => {
-    const destination = index + delta
-    if (destination < 0 || destination >= customItems.length) return
-    setCustomItems(items => { const next = [...items]; [next[index], next[destination]] = [next[destination], next[index]]; return next })
   }
   const makeCustomStep = (key = customToolKey) => {
     const choice = toolChoices.find(item => item.key === key)
@@ -553,18 +560,16 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
             <label className="routine-guide-field routine-guide-field--name">Routine name<input id="guide-routine-name" maxLength={MAX_ROUTINE_NAME} value={draft.name} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
             <div className="routine-guide-lineup-meta">{draft.steps.length} exercises <span>·</span> {formatMinutes(total)}</div>
             <p className="routine-guide-ready-note">{pendingSetup.length ? null : <Check size={16} aria-hidden />}{pendingSetup.length ? 'Set up the remaining exercises before starting.' : 'Ready to start. Tap an exercise to adjust.'}</p>
-            <ol className="routine-guide-lineup">
-              {draft.steps.map((step, index) => <SwipeRoutineItem key={step.id} title={step.title} onRemove={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}>
+            <ol className="routine-guide-lineup" ref={lineup.listRef} data-sorting={lineup.sorting ? '' : undefined}>
+              {draft.steps.map((step, index) => <SwipeRoutineItem key={step.id} title={step.title} rowProps={lineup.itemProps(step.id, { holdToDrag: false })} onRemove={() => setDraft(current => ({ ...current, steps: current.steps.filter(item => item.id !== step.id) }))}>
                 <span className="routine-guide-number">{String(index + 1).padStart(2, '0')}</span>
                 <button type="button" className="routine-guide-item" onClick={() => openItemSetup(step)}><strong>{step.title}</strong><small>{summarizeStep(step, tunerTransposition)}</small></button>
-                {showReorder ? <div className="routine-guide-reorder">
-                  {[-1, 1].map(delta => <button key={delta} type="button" aria-label={`Move ${step.title} ${delta === -1 ? 'up' : 'down'}`} disabled={index + delta < 0 || index + delta >= draft.steps.length} onClick={() => setDraft(current => {
-                    const steps = [...current.steps]; [steps[index], steps[index + delta]] = [steps[index + delta], steps[index]]; return { ...current, steps }
-                  })}>{delta === -1 ? <ArrowUp aria-hidden /> : <ArrowDown aria-hidden />}</button>)}
-                </div> : <ChevronRight aria-hidden className="routine-guide-edit-exercise" />}
+                <ChevronRight aria-hidden className="routine-guide-edit-exercise" />
+                <span className="routine-guide-grip" {...lineup.handleProps(step.id, step.title)}><GripVertical aria-hidden /></span>
               </SwipeRoutineItem>)}
             </ol>
-            <div className="routine-guide-lineup-actions"><button type="button" className="routine-guide-text" onClick={() => move('choose', true)}>＋ Add an exercise</button><button type="button" className="routine-guide-text" aria-pressed={showReorder} onClick={() => setShowReorder(value=>!value)}>{showReorder ? 'Done reordering' : 'Reorder exercises'}</button></div>
+            {lineup.liveRegion}
+            <div className="routine-guide-lineup-actions"><button type="button" className="routine-guide-text" onClick={() => move('choose', true)}>＋ Add an exercise</button></div>
             {routine?.id === draft.id && <button type="button" className="routine-guide-text" onClick={removeFromToday}>Remove from today · keep in library</button>}
           </>}
           {screen === 'custom-items' && <div className="routine-guide-custom-items">
@@ -575,7 +580,8 @@ export default function GuidedRoutineBuilder(props: RoutineBuilderProps) {
               const selected = customItems.includes(title)
               return <button key={template.id} type="button" aria-pressed={selected} disabled={!selected && customItems.length >= MAX_ROUTINE_STEPS} onClick={() => setCustomItems(items => selected ? items.filter(item => item !== title) : [...items, title])}>{selected ? <Check aria-hidden /> : <Plus aria-hidden />}{title}</button>
             })}</div></section>
-            <ol className="routine-guide-custom-list">{customItems.map((item, index) => <SwipeRoutineItem key={`${item}-${index}`} title={item} onRemove={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item}</strong><div><button type="button" disabled={index === 0} onClick={() => moveCustomItem(index, -1)} aria-label={`Move ${item} up`}><ArrowUp aria-hidden /></button><button type="button" disabled={index === customItems.length - 1} onClick={() => moveCustomItem(index, 1)} aria-label={`Move ${item} down`}><ArrowDown aria-hidden /></button><button type="button" onClick={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item}`}><Trash2 aria-hidden /></button></div></SwipeRoutineItem>)}</ol>
+            <ol className="routine-guide-custom-list" ref={customList.listRef} data-sorting={customList.sorting ? '' : undefined}>{customItems.map((item, index) => <SwipeRoutineItem key={`${item}-${index}`} title={item} rowProps={customList.itemProps(`custom-${index}`, { holdToDrag: false })} onRemove={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))}><span>{String(index + 1).padStart(2, '0')}</span><strong>{item}</strong><div><button type="button" onClick={() => setCustomItems(items => items.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${item}`}><Trash2 aria-hidden /></button><span className="routine-guide-grip" {...customList.handleProps(`custom-${index}`, item)}><GripVertical aria-hidden /></span></div></SwipeRoutineItem>)}</ol>
+            {customList.liveRegion}
           </div>}
           {screen === 'custom-tool' && <>
             {!editingStepId && customItems.length > 1 && <div className="routine-guide-item-progress" aria-label="Routine item progress">{customItems.map((item, index) => <span key={`${item}-${index}`} className={index < customIndex ? 'is-done' : index === customIndex ? 'is-current' : ''}>{index < customIndex ? <Check aria-hidden /> : index + 1}</span>)}</div>}

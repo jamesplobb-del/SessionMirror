@@ -29,6 +29,10 @@ function extensionForAudioMime(mimeType: string): string {
   if (mimeType.includes('audio/mp4') || mimeType.includes('m4a')) return 'm4a'
   if (mimeType.includes('wav')) return 'wav'
   if (mimeType.includes('webm')) return 'webm'
+  if (mimeType.includes('aac')) return 'aac'
+  if (mimeType.includes('aiff')) return 'aiff'
+  if (mimeType.includes('flac')) return 'flac'
+  if (mimeType.includes('caf')) return 'caf'
   return 'mp3'
 }
 

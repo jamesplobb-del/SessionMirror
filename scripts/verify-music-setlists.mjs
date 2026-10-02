@@ -13,14 +13,18 @@ globalThis.window = new EventTarget()
 const bundle = async (entry, ui = false) => {
   const mocks = {
     plus: 'export const canUsePlus=()=>false,requirePlus=()=>false',
-    react: 'export const useState=(...args)=>globalThis.__setlistHooks.useState(...args),useRef=(...args)=>globalThis.__setlistHooks.useRef(...args)',
+    react: 'export const useState=(...args)=>globalThis.__setlistHooks.useState(...args),useRef=(...args)=>globalThis.__setlistHooks.useRef(...args),useMemo=fn=>fn(),useLayoutEffect=()=>{},useEffect=()=>{}',
     'react/jsx-runtime': 'export const jsx=(type,props)=>({type,props}),jsxs=jsx;export const Fragment="Fragment"',
-    icons: 'export const ArrowDown="ArrowDown",ArrowUp="ArrowUp",BookOpen="BookOpen",Copy="Copy",Trash2="Trash2",X="X"',
+    icons: 'export const BookOpen="BookOpen",Check="Check",GripVertical="GripVertical",Plus="Plus",Trash2="Trash2",X="X"',
     sheet: 'export default "Sheet"',
+    picker: 'export default "Picker"',
+    thumb: 'export default "Thumb"',
+    sortable: 'export const useSortableList=options=>{globalThis.__sortable=options;return {listRef:{current:null},sorting:false,itemProps:()=>({}),handleProps:()=>({}),liveRegion:null}}',
   }
   const result = await build({ entryPoints: [entry], bundle: true, write: false, platform: 'node', format: 'esm', jsx: 'automatic', loader: { '.css': 'empty' }, plugins: [{ name: 'isolated-boundaries', setup(b) {
     b.onResolve({ filter: /.*/ }, args => {
-      const path = args.path.endsWith('/plusAccess') ? 'plus' : ui && args.path === 'react' ? 'react' : ui && args.path === 'react/jsx-runtime' ? 'react/jsx-runtime' : ui && args.path === 'lucide-react' ? 'icons' : ui && args.path.endsWith('/AnimatedBottomSheet') ? 'sheet' : null
+      const path = args.path.endsWith('/plusAccess') ? 'plus' : ui && args.path === 'react' ? 'react' : ui && args.path === 'react/jsx-runtime' ? 'react/jsx-runtime' : ui && args.path === 'lucide-react' ? 'icons' : ui && args.path.endsWith('/AnimatedBottomSheet') ? 'sheet'
+        : ui && args.path.endsWith('/MusicScorePicker') ? 'picker' : ui && args.path.endsWith('/ScoreThumbnail') ? 'thumb' : ui && args.path.endsWith('/useSortableList') ? 'sortable' : null
       if (path) return { path, namespace: 'fixture' }
     })
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: mocks[args.path] }))
@@ -92,6 +96,22 @@ assert.throws(() => api.saveMusicSetlist(second))
 assert.equal(storage.get(api.MUSIC_SETLISTS_KEY), '{corrupted', 'Unrecoverable saved data is never silently overwritten')
 storage.delete(api.MUSIC_SETLISTS_KEY)
 
+// Drag/keyboard ordering, picker adds and Undo are pure list operations.
+const ordered = api.createMusicSetlist([scores[0], scores[1], scores[0]], 'Order')
+const letters = list => list.entries.map(entry => entry.projectId === 'score-a' ? 'a' : 'b').join('')
+assert.equal(letters(ordered), 'aba')
+assert.equal(letters(api.reorderSetlistEntry(ordered, 0, 2)), 'baa', 'Moving the first piece to the end keeps the others in order')
+assert.equal(letters(api.reorderSetlistEntry(ordered, 2, 0)), 'aab', 'Moving the last piece to the front')
+assert.equal(api.reorderSetlistEntry(ordered, 1, 1), ordered, 'No move returns the same list')
+assert.equal(api.reorderSetlistEntry(ordered, 0, 9), ordered, 'An out-of-range move changes nothing')
+const tapped = api.appendSetlistScores(ordered, [scores[1], scores[0]])
+assert.equal(letters(tapped), 'ababa', 'Picker choices append in the order they were tapped')
+assert.equal(new Set(tapped.entries.map(entry => entry.id)).size, 5, 'Every added piece gets its own identity')
+assert.throws(() => api.appendSetlistScores(api.createMusicSetlist(Array.from({ length: 99 }, () => scores[0])), [scores[0], scores[1]]), /100/, 'Adding past the limit is refused whole')
+const removedEntry = ordered.entries[1]
+const removedList = api.removeSetlistEntry(ordered, removedEntry.id)
+assert.equal(api.restoreSetlistEntry(removedList, removedEntry, 1).entries.map(entry => entry.id).join(), ordered.entries.map(entry => entry.id).join(), 'Undo puts a removed piece back where it was')
+
 // Actual editor function and callbacks in an isolated hooks/JSX fixture; no DOM.
 class Hooks {
   slots = []; cursor = 0
@@ -111,6 +131,8 @@ function nodes(tree) {
 const find = (h, predicate) => { const node = nodes(h.tree).find(predicate); assert.ok(node, 'Expected rendered control'); return node }
 const tick = async h => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); h.render() }
 const { default: Editor } = await bundle('src/components/MusicSetlistEditor.tsx', true)
+const nameInput = h => find(h, node => node.type === 'input' && node.props['aria-label'] === 'Setlist name')
+const openButtons = h => nodes(h.tree).filter(node => node.type === 'button' && node.props['aria-label']?.startsWith('Open '))
 const h = new Hooks()
 const draft = api.createMusicSetlist([scores[0]], 'Draft concert')
 draft.entries[0].cue = 'Legacy cue'
@@ -118,23 +140,23 @@ let reads = 0
 let rejectRead = true
 h.props = { setlist: draft, scores, onCancel() {}, onSave: next => { api.saveMusicSetlist(next) }, onRead: async () => { reads++; if (rejectRead) throw Error('Score could not be opened') } }
 h.render()
-find(h, node => node.type === 'input').props.onChange({ target: { value: 'Updated concert' } })
+nameInput(h).props.onChange({ target: { value: 'Updated concert' } })
 h.render()
 failWrites = true
-find(h, node => node.type === 'button' && node.props['aria-label']?.startsWith('Read entry')).props.onClick()
+openButtons(h)[0].props.onClick()
 await tick(h)
-assert.equal(reads, 0, 'Read awaits saving; a failed save cannot falsely start a score')
-assert.equal(find(h, node => node.type === 'input').props.value, 'Updated concert')
+assert.equal(reads, 0, 'Open awaits saving; a failed save cannot falsely start a score')
+assert.equal(nameInput(h).props.value, 'Updated concert')
 assert.equal(find(h, node => node.props?.role === 'alert').props.children, 'Storage full')
 failWrites = false
-find(h, node => node.type === 'button' && node.props['aria-label']?.startsWith('Read entry')).props.onClick()
+openButtons(h)[0].props.onClick()
 await tick(h)
 assert.equal(reads, 1)
 assert.equal(find(h, node => node.props?.role === 'alert').props.children, 'Score could not be opened')
 assert.equal(api.loadMusicSetlists()[0].name, 'Updated concert', 'Successful save survives a later reader failure')
 assert.equal(api.loadMusicSetlists()[0].entries[0].cue, 'Legacy cue', 'Simplified editing preserves prior stored data')
 rejectRead = false
-find(h, node => node.type === 'button' && node.props['aria-label']?.startsWith('Read entry')).props.onClick()
+openButtons(h)[0].props.onClick()
 await tick(h)
 assert.equal(reads, 2)
 assert.equal(api.loadMusicSetlists().length, 1, 'Reader retry does not duplicate the saved list')
@@ -146,20 +168,59 @@ const submit = find(h, node => node.type === 'form').props.onSubmit
 submit({ preventDefault() {} }); submit({ preventDefault() {} })
 assert.equal(saves, 1, 'Busy ref prevents two same-turn Save taps')
 resolveSave(); await tick(h)
+
+// A missing score: no Open button, and Replace goes through the library picker, never a drop-down.
 const missing = new Hooks()
 let deleted = 0
-missing.props = { ...h.props, setlist: normalized, scores, onDelete: async () => { deleted++ } }
+missing.props = { ...h.props, onSave: next => { api.saveMusicSetlist(next) }, setlist: normalized, scores, onDelete: async () => { deleted++ } }
 missing.render()
-assert.equal(find(missing, node => node.type === 'button' && node.props['aria-label']?.startsWith('Read entry')).props.disabled, true, 'A missing score cannot falsely launch')
-find(missing, node => node.type === 'select' && node.props['aria-label'] === 'Replace score for entry 1').props.onChange({ target: { value: 'score-b' } })
+assert.equal(openButtons(missing).length, 0, 'A missing score cannot falsely launch')
+assert.ok(!nodes(missing.tree).some(node => node.type === 'select'), 'No native drop-down anywhere in the editor')
+find(missing, node => node.type === 'button' && node.props.className === 'music-setlist-editor__replace').props.onClick()
 missing.render()
-assert.equal(find(missing, node => node.type === 'button' && node.props['aria-label']?.startsWith('Read entry')).props.disabled, false, 'Choosing an available replacement repairs only that entry')
-find(missing, node => node.type === 'button' && node.props.className === 'music-setlist-editor__danger' && node.props.children?.some?.(child => child?.props?.children === 'Delete list')).props.onClick()
+const replacePicker = find(missing, node => node.type === 'Picker')
+assert.equal(replacePicker.props.mode, 'single', 'Replacing a score picks exactly one from the library')
+replacePicker.props.onPick([scores[1]])
 missing.render()
-assert.equal(deleted, 0, 'Delete list first presents a confirmation')
+assert.equal(openButtons(missing).length, 1, 'Choosing an available replacement repairs only that entry')
+assert.equal(nodes(missing.tree).filter(node => node.type === 'button' && node.props.className === 'music-setlist-editor__replace').length, 1, 'The other missing entry stays repairable')
+find(missing, node => node.type === 'button' && node.props.className === 'music-setlist-editor__delete').props.onClick()
+missing.render()
+assert.equal(deleted, 0, 'Delete first presents a confirmation')
 const confirmation = find(missing, node => node.props?.['aria-label'] === 'Delete setlist confirmation')
 assert.ok(nodes(confirmation).some(node => node.props?.children === 'Only this setlist will be deleted. Your scores and annotations stay in the music library.'))
 find(missing, node => node.type === 'button' && node.props.children === 'Delete setlist').props.onClick()
 await tick(missing)
 assert.equal(deleted, 1, 'Confirmed deletion invokes only the collection callback')
-console.log('PASS: real setlist storage/order/occurrences/snapshot/replacement isolation, limits, quota/retry, corruption preservation, list-only deletion; actual editor async save/read/retry/draft/doubletap callbacks (isolated hooks; no DOM)')
+
+// Drag/keyboard reorder, the library picker, and Undo drive the real editor callbacks.
+const order = new Hooks()
+order.props = { ...h.props, onSave: next => { api.saveMusicSetlist(next) }, setlist: api.createMusicSetlist([scores[0], scores[1], scores[0]], 'Order') }
+order.render()
+assert.equal(globalThis.__sortable.ids.length, 3, 'The editor hands its rows to the sortable list')
+globalThis.__sortable.onMove(0, 2)
+order.render()
+find(order, node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await tick(order)
+const savedOrder = () => letters(api.loadMusicSetlists().find(list => list.name === 'Order'))
+assert.equal(savedOrder(), 'baa', 'A drag to the end is what gets saved')
+find(order, node => node.type === 'button' && node.props.className === 'music-setlist-editor__add').props.onClick()
+order.render()
+const addPicker = find(order, node => node.type === 'Picker')
+assert.equal(addPicker.props.mode, 'multiple')
+assert.equal(addPicker.props.capacity, 97, 'The picker knows how many more pieces fit')
+assert.deepEqual(addPicker.props.counts, { 'score-a': 2, 'score-b': 1 }, 'The picker marks music already in the list')
+addPicker.props.onPick([scores[1], scores[0]])
+order.render()
+find(order, node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await tick(order)
+assert.equal(savedOrder(), 'baaba', 'Picked music is added in the order it was tapped')
+const removeButtons = () => nodes(order.tree).filter(node => node.type === 'button' && node.props['aria-label']?.startsWith('Remove '))
+assert.equal(removeButtons().length, 5)
+removeButtons()[1].props.onClick()
+order.render()
+assert.equal(removeButtons().length, 4)
+find(order, node => node.type === 'button' && node.props.children === 'Undo').props.onClick()
+order.render()
+assert.equal(removeButtons().length, 5, 'Undo restores the removed piece')
+find(order, node => node.type === 'form').props.onSubmit({ preventDefault() {} }); await tick(order)
+assert.equal(savedOrder(), 'baaba', 'Undo restores it in its original position')
+console.log('PASS: real setlist storage/order/occurrences/snapshot/replacement isolation, limits, quota/retry, corruption preservation, list-only deletion; drag/keyboard reorder, tap-order picker adds, Undo; actual editor async save/open/retry/draft/doubletap callbacks (isolated hooks; no DOM)')

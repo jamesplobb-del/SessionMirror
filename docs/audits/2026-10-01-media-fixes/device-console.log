@@ -1,0 +1,224 @@
+10:55:24  Acquired tunnel connection to device.
+10:55:24  Enabling developer disk image services.
+10:55:24  Acquired usage assertion.
+Launched application with com.besttake.app.practiceqa bundle identifier.
+Waiting for the application to terminate…
+[AVAudioSessionTrace] setCategory caller=AppDelegate.configurePersistentAudioSession requestedCategory=AVAudioSessionCategoryPlayAndRecord requestedMode=AVAudioSessionModeDefault requestedOptions=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"] before=category=AVAudioSessionCategorySoloAmbient mode=AVAudioSessionModeDefault options=[] input=none output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"] stack=2   App.debug.dylib                     0x00000001032d3a1c $s3App0A8DelegateC31configurePersistentAudioSession33_5F3B7A4939733AF8DC215F91F8B966E7LLyyF + 632 | 3   App.debug.dylib                     0x00000001032d1168 $s3App0A8DelegateC11application_29didFinishLaunchingWithOptionsSbSo13UIApplicationC_SDySo0i6LaunchH3KeyaypGSgtF + 716 | 4   App.debug.dylib                     0x00000001032d1268 $s3App0A8DelegateC11application_29didFinishLaunchingWithOptionsSbSo13UIApplicationC_SDySo0i6LaunchH3KeyaypGSgtFTo + 220 | 5   UIKitCore                           0x00000001902a83b0 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1213360 | 6   UIKitCore                           0x00000001902a719c 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1208732 | 7   UIKitCore                           0x00000001902a2e40 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1191488 | 8   UIKitCore                           0x00000001902a2534 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1189172 | 9   UIKitCore                           0x0000000190317428 _UIScenePerformActionsWithLifecycleActionMask + 112
+[AVAudioSessionTrace] setCategory complete caller=AppDelegate.configurePersistentAudioSession after=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeDefault options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"]
+[AVAudioSessionTrace] setActive caller=AppDelegate.configurePersistentAudioSession active=true options=0 before=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeDefault options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"] stack=2   App.debug.dylib                     0x00000001033a45ec $s3App22AudioRouteConfiguratorO19ensureSessionActive_6callerySo07AVAudioF0C_SStKFZ + 592 | 3   App.debug.dylib                     0x00000001032d3a98 $s3App0A8DelegateC31configurePersistentAudioSession33_5F3B7A4939733AF8DC215F91F8B966E7LLyyF + 756 | 4   App.debug.dylib                     0x00000001032d1168 $s3App0A8DelegateC11application_29didFinishLaunchingWithOptionsSbSo13UIApplicationC_SDySo0i6LaunchH3KeyaypGSgtF + 716 | 5   App.debug.dylib                     0x00000001032d1268 $s3App0A8DelegateC11application_29didFinishLaunchingWithOptionsSbSo13UIApplicationC_SDySo0i6LaunchH3KeyaypGSgtFTo + 220 | 6   UIKitCore                           0x00000001902a83b0 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1213360 | 7   UIKitCore                           0x00000001902a719c 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1208732 | 8   UIKitCore                           0x00000001902a2e40 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1191488 | 9   UIKitCore                           0x00000001902a2534 0D94422F-FE7C-302E-B896-3BC5873C0CFC + 1189172
+[AVAudioSessionTrace] setActive complete caller=AppDelegate.configurePersistentAudioSession after=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeDefault options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"]
+BestTake Audio [launch passive session] input=MicrophoneBuiltIn output=Speaker builtInMic=true btOut=false a2dpOut=false splitRoute=false availableInputs=["MicrophoneBuiltIn"]
+2026-10-01 10:55:25.758 App[54948:11854970] DiskCookieStorage changing policy from 2 to 0, cookie file: file:///private/var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Library/Cookies/Cookies.binarycookies
+[QuickTuner] Capacitor plugin loaded
+⚡️  Loading app at capacitor://localhost...
+[NativeCameraRecovery] AVAudioSession route change reason=Optional(__C.AVAudioSessionRouteChangeReason)
+[NativeCameraRecovery] AVAudioSession route change reason=Optional(__C.AVAudioSessionRouteChangeReason)
+[AVAudioSessionTrace] setCategory skipped (already applied) caller=AppDelegate.configurePersistentAudioSession category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeDefault options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"]
+[AVAudioSessionTrace] setActive skipped (already active) caller=AppDelegate.configurePersistentAudioSession
+BestTake Audio [launch passive session] input=MicrophoneBuiltIn output=Speaker builtInMic=true btOut=false a2dpOut=false splitRoute=false availableInputs=["MicrophoneBuiltIn"]
+⚡️  WebView loaded
+⚡️  To Native ->  OfferCodes addListener 39578473
+⚡️  To Native ->  OfferCodes getStatus 39578474
+⚡️  To Native ->  App addListener 39578475
+⚡️  To Native ->  App addListener 39578476
+⚡️  To Native ->  App addListener 39578477
+⚡️  To Native ->  QuickTunerPlugin addListener 39578478
+⚡️  To Native ->  App getLaunchUrl 39578479
+⚡️  To Native ->  App getLaunchUrl 39578480
+⚡️  To Native ->  App getLaunchUrl 39578481
+⚡️  TO JS undefined
+⚡️  To Native ->  QuickTunerPlugin markWebReady 39578482
+⚡️  TO JS undefined
+⚡️  To Native ->  App addListener 39578483
+⚡️  TO JS undefined
+⚡️  To Native ->  [QuickTuner] WebView marked ready
+App addListener 39578484
+⚡️  TO JS {}
+⚡️  [info] - [QuickTuner] web launch coordinator ready
+⚡️  TO JS {"trialStartedAt":null,"alphaUnlocked":false,"price":null,"purchased":false,"trialExpiresAt":null,"canRedeemAlpha":true,"trialAvailable":false,"purchaseAvailable":false}
+⚡️  To Native ->  SplashScreen hide 39578485
+⚡️  TO JS undefined
+⚡️  TO JS {"trialStartedAt":null,"alphaUnlocked":false,"price":null,"purchased":false,"trialExpiresAt":null,"canRedeemAlpha":true,"trialAvailable":false,"purchaseAvailable":false}
+⚡️  To Native ->  BestTakeAudioPlugin addListener 39578486
+⚡️  To Native ->  Filesystem stat 39578487
+⚡️  To Native ->  CapacitorSQLite checkConnectionsConsistency 39578488
+⚡️  To Native ->  BestTakeAudioPlugin getPlaybackOutputProfile 39578489
+⚡️  To Native ->  App addListener 39578490
+⚡️  To Native ->  ScreenOrientation lock 39578491
+⚡️  To Native ->  StatusBar setOverlaysWebView 39578492
+ERROR MESSAGE:  {"message":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/takes\/'  does not exist.","code":"OS-PLUG-FILE-0008","errorMessage":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/takes\/'  does not exist."}
+⚡️  To Native ->  Filesystem mkdir 39578493
+⚡️  TO JS {"result":false}
+⚡️  To Native ->  CapacitorSQLite createConnection 39578494
+⚡️  TO JS {"sampleRate":48000,"availableInputs":["MicrophoneBuiltIn"],"usesA2DPOutput":false,"outputPort":"Speaker","options":["mixWithOthers","defaultToSpeaker","allowBluetoothA2DP"],"splitRouteAchieved":false,"currentOutputRoute":"Speaker","availableInputPorts":["
+⚡️  TO JS undefined
+⚡️  [error] - {"message":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/takes/'  does not exist.","code":"OS-PLUG-FILE-0008","errorMessage":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/takes/'  does not exist."}
+⚡️  TO JS undefined
+⚡️  To Native ->  StatusBar setStyle 39578495
+⚡️  TO JS undefined
+⚡️  To Native ->  Filesystem stat 39578496
+database path /var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/besttake_vaultSQLite.db
+⚡️  TO JS undefined
+⚡️  TO JS {}
+⚡️  To Native ->  CapacitorSQLite open 39578497
+ERROR MESSAGE:  {"message":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/thumbnails\/'  does not exist.","errorMessage":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/thumbnails\/'  does not exist.","code":"OS-PLUG-FILE-0008"}
+⚡️  To Native ->  Filesystem mkdir 39578498
+⚡️  To Native ->  SplashScreen hide 39578499
+⚡️  TO JS undefined
+⚡️  [error] - {"message":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/thumbnails/'  does not exist.","errorMessage":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/thumbnails/'  does not exist.","code":"OS-PLUG-FILE-0008"}
+⚡️  To Native ->  CapacitorSQLite execute 39578500
+⚡️  TO JS undefined
+⚡️  TO JS undefined
+⚡️  To Native ->  Filesystem stat 39578501
+⚡️  TO JS {"changes":{"changes":0}}
+ERROR MESSAGE:  {"message":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/library\/'  does not exist.","errorMessage":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/library\/'  does not exist.","code":"OS-PLUG-FILE-0008"}
+⚡️  To Native ->  CapacitorSQLite query 39578502
+⚡️  To Native ->  Filesystem mkdir 39578503
+⚡️  TO JS {"values":[{"ios_columns":["cid","name","type","notnull","dflt_value","pk"]},{"type":"TEXT","notnull":1,"cid":0,"name":"id","dflt_value":null,"pk":1},{"cid":1,"dflt_value":null,"pk":0,"name":"project_id","notnull":1,"type":"TEXT"},{"type":"TEXT","dflt_valu
+⚡️  [error] - {"message":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/library/'  does not exist.","errorMessage":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/library/'  does not exist.","code":"OS-PLUG-FILE-0008"}
+⚡️  TO JS undefined
+⚡️  To Native ->  CapacitorSQLite execute 39578504
+⚡️  To Native ->  Filesystem stat 39578505
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578506
+ERROR MESSAGE:  {"errorMessage":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/charts\/'  does not exist.","code":"OS-PLUG-FILE-0008","message":"'stat' failed because file at 'file:\/\/\/var\/mobile\/Containers\/Data\/Application\/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2\/Documents\/charts\/'  does not exist."}
+⚡️  To Native ->  Filesystem mkdir 39578507
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  [error] - {"errorMessage":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/charts/'  does not exist.","code":"OS-PLUG-FILE-0008","message":"'stat' failed because file at 'file:///var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/charts/'  does not exist."}
+⚡️  To Native ->  CapacitorSQLite execute 39578508
+⚡️  TO JS undefined
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578509
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578510
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578511
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578512
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578513
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578514
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578515
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578516
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578517
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578518
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578519
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578520
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578521
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578522
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578523
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite query 39578524
+⚡️  TO JS {"values":[{"ios_columns":["cid","name","type","notnull","dflt_value","pk"]},{"type":"TEXT","cid":0,"name":"id","notnull":1,"dflt_value":null,"pk":1},{"dflt_value":null,"name":"name","type":"TEXT","pk":0,"cid":1,"notnull":1},{"name":"created_at","notnull":
+⚡️  To Native ->  CapacitorSQLite execute 39578525
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578526
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578527
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite query 39578528
+⚡️  TO JS {"values":[{"ios_columns":["cid","name","type","notnull","dflt_value","pk"]},{"notnull":0,"cid":0,"pk":0,"dflt_value":null,"type":"TEXT","name":"routine_id"},{"notnull":0,"dflt_value":null,"pk":0,"name":"routine_step_id","type":"TEXT","cid":1},{"type":"TEX
+⚡️  To Native ->  CapacitorSQLite execute 39578529
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite execute 39578530
+⚡️  TO JS {"changes":{"changes":0}}
+⚡️  To Native ->  CapacitorSQLite query 39578531
+⚡️  TO JS {"values":[{"ios_columns":["count"]},{"count":0}]}
+⚡️  To Native ->  CapacitorSQLite run 39578532
+⚡️  TO JS {"changes":{"changes":1,"values":[],"lastId":1}}
+⚡️  To Native ->  CapacitorSQLite query 39578533
+⚡️  TO JS {"values":[{"ios_columns":["id","name","created_at","benchmark_source","benchmark_ref_id"]},{"name":"My Session","id":"8ed636f5-9230-4421-8127-e4a7e43b2ab5","benchmark_source":null,"created_at":1790866526546,"benchmark_ref_id":null}]}
+⚡️  To Native ->  CapacitorSQLite query 39578534
+⚡️  To Native ->  CapacitorSQLite query 39578535
+⚡️  TO JS {"values":[]}
+⚡️  TO JS {"values":[]}
+⚡️  To Native ->  CapacitorSQLite query 39578536
+⚡️  To Native ->  CapacitorSQLite query 39578537
+⚡️  To Native ->  CapacitorSQLite query 39578538
+⚡️  TO JS {"values":[]}
+⚡️  TO JS {"values":[]}
+⚡️  TO JS {"values":[{"ios_columns":["benchmark_source","benchmark_ref_id"]},{"benchmark_ref_id":null,"benchmark_source":null}]}
+⚡️  To Native ->  SplashScreen hide 39578539
+⚡️  TO JS undefined
+⚡️  [info] - [AudioRoute] applying queued mic preference before getUserMedia {"requestedMicPreference":"iphone","reason":"idle-no-preview","liveCapture":false}
+⚡️  [info] - [AudioEngine] selected=Native
+⚡️  To Native ->  MetronomePlugin addListener 39578540
+⚡️  To Native ->  MetronomePlugin addListener 39578541
+⚡️  To Native ->  MetronomePlugin addListener 39578542
+⚡️  To Native ->  App addListener 39578543
+⚡️  To Native ->  App addListener 39578544
+⚡️  To Native ->  App addListener 39578545
+⚡️  To Native ->  MetronomePlugin setMuted 39578546
+⚡️  To Native ->  BestTakeAudioPlugin getRuntimeEnvironment 39578547
+⚡️  To Native ->  BestTakeAudioPlugin setCameraSessionState 39578548
+⚡️  To Native ->  BestTakeAudioPlugin setCameraSessionState 39578549
+⚡️  TO JS {"muted":false}
+⚡️  To Native ->  BestTakeAudioPlugin setCameraSessionState 39578550
+⚡️  To Native ->  BestTakeAudioPlugin addListener 39578551
+⚡️  To Native ->  BestTakeAudioPlugin setNativeExperimentalAudioMode 39578552
+⚡️  TO JS ⚡️  To Native ->  {"isSimulator":false}
+BestTakeAudioPlugin setTakesBackupExcluded 39578553
+⚡️  To Native ->  BestTakeAudioPlugin stopInlineTakeBoxPlayback 39578554
+⚡️  To Native ->  App addListener 39578555
+⚡️  To Native ->  ScreenOrientation lock 39578556
+⚡️  To Native ->  App addListener 39578557
+⚡️  To Native ->  App addListener 39578558
+[AudioRoute] skipped idle deactivation — within foreground grace period (ownership handshake still settling)
+⚡️  To Native ->  App addListener 39578559
+⚡️  TO JS {"previewActive":false,"playbackRouteActive":false,"recordingActive":false,"recordingMode":"video","playbackSessionPrepared":false,"youtubePlayAlongActive":false}
+[AudioRoute] skipped idle deactivation — within foreground grace period (ownership handshake still settling)
+⚡️  TO JS {"previewActive":false,"playbackRouteActive":false,"recordingActive":false,"recordingMode":"video","playbackSessionPrepared":false,"youtubePlayAlongActive":false}
+[AudioRoute] skipped idle deactivation — within foreground grace period (ownership handshake still settling)
+⚡️  TO JS {"previewActive":false,"playbackRouteActive":false,"recordingActive":false,"recordingMode":"video","playbackSessionPrepared":false,"youtubePlayAlongActive":false}
+[AVAudioSessionTrace] setCategory caller=applyNativeExperimentalAudioMode requestedCategory=AVAudioSessionCategoryPlayAndRecord requestedMode=AVAudioSessionModeVideoRecording requestedOptions=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP", "allowAirPlay"] before=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeDefault options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"] stack=2   App.debug.dylib                     0x00000001033b0658 $s3App22AudioRouteConfiguratorO023applyNativeExperimentalB4Mode7enabled08selectedB6Engine18micInputPreference15recordingActive08playbackP0SDySSypGSb_SSAC03MicmN0OS2btKFZ + 3892 | 3   App.debug.dylib                     0x0000000103313594 $s3App19BestTakeAudioPluginC021setNativeExperimentalD4ModeyySo13CAPPluginCallCF + 2280 | 4   App.debug.dylib                     0x0000000103313b8c $s3App19BestTakeAudioPluginC021setNativeExperimentalD4ModeyySo13CAPPluginCallCFTo + 68 | 5   Capacitor                           0x00000001035c53a8 $s9Capacitor0A6BridgeC12handleJSCall4callyAA0D0V_tFyyYbcfU0_ + 944 | 6   Capacitor                           0x00000001035c5e18 $sIegh_IeyBh_TR + 48 | 7   libdispatch.dylib                   0x00000001c50669a8 49C0CD3E-A696-3B11-BA92-5755F0C3C6E3 + 6568 | 8   libdispatch.dylib                   0x00000001c50801e4 49C0CD3E-A696-3B11-BA92-5755F0C3C6E3 + 111076 | 9   libdispatch.dylib                   0x00000001c506efb0 49C0CD3E-A696-3B11-BA92-5755F0C3C6E3 + 40880
+⚡️  To Native ->  BestTakeAudioPlugin setDeviceMicForRecording 39578560
+⚡️  To Native ->  BestTakeAudioPlugin startNativeCameraBridge 39578561
+[NativeCameraRecovery] AVAudioSession route change reason=Optional(__C.AVAudioSessionRouteChangeReason)
+[AVAudioSessionTrace] setCategory complete caller=applyNativeExperimentalAudioMode after=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP", "allowAirPlay"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"]
+[AVAudioSessionTrace] setActive skipped (already active) caller=applyNativeExperimentalAudioMode
+[NativeCameraRecovery] AVAudioSession route change reason=Optional(__C.AVAudioSessionRouteChangeReason)
+[AVAudioSessionTrace] setPreferredInput caller=applyMicInputPreference.iphone requestedInput=MicrophoneBuiltIn before=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP", "allowAirPlay"] input=MicrophoneBuiltIn output=Speaker preferredInput=auto availableInputs=["MicrophoneBuiltIn"] stack=2   App.debug.dylib                     0x00000001033a6960 $s3App22AudioRouteConfiguratorO23applyMicInputPreference_7sessionSDySSypGAC0fgH0O_So14AVAudioSessionCtKFZ + 760 | 3   App.debug.dylib                     0x00000001033b08ec $s3App22AudioRouteConfiguratorO023applyNativeExperimentalB4Mode7enabled08selectedB6Engine18micInputPreference15recordingActive08playbackP0SDySSypGSb_SSAC03MicmN0OS2btKFZ + 4552 | 4   App.debug.dylib                     0x0000000103313594 $s3App19BestTakeAudioPluginC021setNativeExperimentalD4ModeyySo13CAPPluginCallCF + 2280 | 5   App.debug.dylib                     0x0000000103313b8c $s3App19BestTakeAudioPluginC021setNativeExperimentalD4ModeyySo13CAPPluginCallCFTo + 68 | 6   Capacitor                           0x00000001035c53a8 $s9Capacitor0A6BridgeC12handleJSCall4callyAA0D0V_tFyyYbcfU0_ + 944 | 7   Capacitor                           0x00000001035c5e18 $sIegh_IeyBh_TR + 48 | 8   libdispatch.dylib                   0x00000001c50669a8 49C0CD3E-A696-3B11-BA92-5755F0C3C6E3 + 6568 | 9   libdispatch.dylib                   0x00000001c50801e4 49C0CD3E-A696-3B11-BA92-5755F0C3C6E3 + 111076
+[AVAudioSessionTrace] setPreferredInput complete caller=applyMicInputPreference.iphone after=category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP", "allowAirPlay"] input=MicrophoneBuiltIn output=Speaker preferredInput=MicrophoneBuiltIn availableInputs=["MicrophoneBuiltIn"]
+[MicInputPreference] selected=iphone availableInputs=["MicrophoneBuiltIn"] currentInputs=["MicrophoneBuiltIn"] currentOutputs=["Speaker"] preferredInput=MicrophoneBuiltIn fallback=none
+[MicRouteProof] context=applyMicInputPreference preference=iphone input=MicrophoneBuiltIn output=Speaker preferredInput=MicrophoneBuiltIn category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=105 fallback=none
+[NativeExperimentalAudio] selected=Native enabled=true category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=["mixWithOthers", "defaultToSpeaker", "allowBluetoothA2DP", "allowAirPlay"] input=MicrophoneBuiltIn output=Speaker availableInputs=["MicrophoneBuiltIn"] nativeLoudnessProfile=camera-input micPreference=iphone preferredInput=MicrophoneBuiltIn recordingActive=false playbackActive=false fallback=none
+⚡️  TO JS {"outputPort":"Speaker","usesBluetoothOutput":false,"mode":"AVAudioSessionModeVideoRecording","options":["mixWithOthers","defaultToSpeaker","allowBluetoothA2DP","allowAirPlay"],"currentOutputRoute":"Speaker","playbackActive":false,"usesA2DPOutput":false,"s
+⚡️  TO JS {"excluded":true}
+⚡️  TO JS undefined
+⚡️  TO JS undefined
+[MicInputPreference] selected=iphone availableInputs=["MicrophoneBuiltIn"] currentInputs=["MicrophoneBuiltIn"] currentOutputs=["Speaker"] preferredInput=MicrophoneBuiltIn fallback=none
+⚡️  To Native ->  BestTakeAudioPlugin stopInlineTakeBoxPlayback 39578562
+[MicRouteProof] context=applyMicInputPreference preference=iphone input=MicrophoneBuiltIn output=Speaker preferredInput=MicrophoneBuiltIn category=AVAudioSessionCategoryPlayAndRecord mode=AVAudioSessionModeVideoRecording options=105 fallback=none
+⚡️  TO JS {"outputPort":"Speaker","usesBluetoothOutput":false,"mode":"AVAudioSessionModeVideoRecording","options":["mixWithOthers","defaultToSpeaker","allowBluetoothA2DP","allowAirPlay"],"currentOutputRoute":"Speaker","preferredInputSet":"MicrophoneBuiltIn","usesA2D
+⚡️  [info] - [AudioEngine] Native Experimental diagnostics {"selectedAudioEngine":"Native","enabled":true,"category":"AVAudioSessionCategoryPlayAndRecord","mode":"AVAudioSessionModeVideoRecording","options":["mixWithOthers","defaultToSpeaker","allowBluetoothA2DP","allowAirPlay"],"currentInputRoute":"MicrophoneBuiltIn","currentOutputRoute":"Speaker","availableInputs":["MicrophoneBuiltIn"],"recordingActive":false,"playbackActive":false,"nativeLoudnessProfile":"camera-input","selectedMicPreference":"iphone","preferredInput":"MicrophoneBuiltIn"}
+⚡️  [info] - [AudioRoute] mic input preference {"selectedMicPreference":"iphone","preferredInput":"MicrophoneBuiltIn","input":"MicrophoneBuiltIn","output":"Speaker","availableInputs":["MicrophoneBuiltIn"]}
+⚡️  TO JS undefined
+⚡️  To Native ->  BestTakeAudioPlugin stopInlineTakeBoxPlayback 39578563
+⚡️  TO JS undefined
+⚡️  To Native ->  BestTakeAudioPlugin stopInlineTakeBoxPlayback 39578564
+⚡️  TO JS undefined
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  TO JS {"isActive":false}
+⚡️  To Native ->  BestTakeAudioPlugin setCameraSessionState 39578565
+⚡️  To Native ->  BestTakeAudioPlugin setNativeCameraPreviewZoom 39578566
+[AudioRoute] skipped idle deactivation — within foreground grace period (ownership handshake still settling)
+⚡️  To Native ->  BestTakeAudioPlugin setNativeCameraPreviewZoom 39578567
+⚡️  TO JS {"previewActive":false,"playbackSessionPrepared":false,"recordingMode":"video","playbackRouteActive":false,"recordingActive":false,"youtubePlayAlongActive":false}
+⚡️  TO JS undefined
+⚡️  TO JS undefined
+App terminated due to signal 9.

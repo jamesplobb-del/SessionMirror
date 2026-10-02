@@ -1,0 +1,37 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "install",
+      "app",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "scripts/practice-qa/results/native-media-derived/Build/Products/Debug-iphoneos/App.app",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/video-first-device-install.json"
+    ],
+    "commandType" : "devicectl.device.install.app",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "installedApplications" : [
+      {
+        "bundleID" : "com.besttake.app.practiceqa",
+        "databaseSequenceNumber" : 3612,
+        "databaseUUID" : "A267BE85-9F63-4D7C-8B1D-60F73507B738",
+        "installationURL" : "file:///private/var/containers/Bundle/Application/264E4913-84A7-4D2F-B172-102D3A3645BB/App.app/",
+        "launchServicesIdentifier" : "unknown",
+        "options" : {
+
+        }
+      }
+    ]
+  }
+}

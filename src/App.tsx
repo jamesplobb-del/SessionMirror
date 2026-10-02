@@ -291,6 +291,7 @@ import PracticeHub from './components/PracticeHub'
 
 import YoutubeUrlDialog from './components/YoutubeUrlDialog'
 import { PracticeReferenceContext } from './context/PracticeReferenceContext'
+import { ReferenceAudioContext, type ReferenceAudioApi } from './context/ReferenceAudioContext'
 import {
   getSelectedReferenceUrl,
   selectPracticeReference,
@@ -4805,6 +4806,13 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     handleShowDroneSettingChange(false)
   }, [handleShowDroneSettingChange])
 
+  /** Loads a pinned recording for a practice item the way a pinned YouTube link loads. */
+  const applyReferenceAudio = useCallback((projectId: string, itemId: string) => {
+    try { localStorage.setItem(`besttake.reference-audio.${projectId}`, itemId) }
+    catch { setTakeDeleteError('Could not load this item’s saved reference recording.'); return }
+    if (activeProjectIdRef.current === projectId) setReferenceAudioId(itemId)
+  }, [])
+
   /**
    * A routine step that pins music needs somewhere to keep it, and a step's
    * practice folder is normally not made until the step first runs. Choosing a
@@ -4858,6 +4866,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         } else if (!getSelectedReferenceUrl(projectId) && referenceVideoId) {
           selectPracticeReference(projectId, buildYoutubeProxyUrl(referenceVideoId))
         }
+        if (canUsePlus() && scoreSettings?.referenceAudio) applyReferenceAudio(projectId, scoreSettings.referenceAudio.itemId)
         prepareRoutineProgram(setlist ? null : scoreSettings ? scoreSettings.programId : exercise?.programId ?? null)
         musicSetupOwnerRef.current = setlist ? null : projectId
         setMusicWorkspaceExpandRequest({ pitch: desk.pitchTrackerEnabled || undefined, metronome: desk.showMetronome || undefined, drone: desk.showDrone || undefined })
@@ -4873,7 +4882,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       rememberLastPracticeDestination({ kind: 'music', projectId })
       setActiveMusicSetlist(setlist ?? null)
     })
-  }, [isRecording, isStopping, runPracticeTransition, handleSelectProject, applyDeskSnapshot, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
+  }, [isRecording, isStopping, runPracticeTransition, handleSelectProject, applyDeskSnapshot, applyReferenceAudio, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
 
   const handleReadMusicSetlist = useCallback(async (list: MusicSetlist, entryId: string) => {
     const entry = list.entries.find(item => item.id === entryId)
@@ -5184,14 +5193,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     }
   }, [teardownPipMedia])
 
-  const handleImportLibraryAudio = useCallback(async (file: File) => {
-    if (!requirePlus('music')) return
-    const projectId = activeProjectIdRef.current
-    if (!projectId) return
-
+  /** Writes an audio file into a practice item's library; no screen state changes. */
+  const storeLibraryAudio = useCallback(async (projectId: string, file: File, knownDuration?: number) => {
     const itemId = crypto.randomUUID()
     const mimeType = normalizeLibraryAudioMime(file.type)
-    const duration = await probeAudioDurationSeconds(file)
+    const duration = knownDuration ?? await probeAudioDurationSeconds(file)
     const persisted = await persistLibraryAudio(file, itemId, mimeType)
     const row = await saveLibraryAudioItem({
       projectId,
@@ -5201,6 +5207,15 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       name: file.name.replace(/\.[^.]+$/, ''),
       itemId,
     })
+    return { row, persisted }
+  }, [])
+
+  const handleImportLibraryAudio = useCallback(async (file: File) => {
+    if (!requirePlus('music')) return
+    const projectId = activeProjectIdRef.current
+    if (!projectId) return
+
+    const { row, persisted } = await storeLibraryAudio(projectId, file)
 
     const hydrated = await hydrateLibraryItems([
       {
@@ -5222,7 +5237,28 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setLibraryItems((current) => [item, ...current])
     }
     return item
-  }, [])
+  }, [storeLibraryAudio])
+
+  /** Lets the routine builder and Music library attach a recording from Files to an exercise. */
+  const referenceAudioApi = useMemo<ReferenceAudioApi>(() => ({
+    async importAudio(projectId, file, duration) {
+      if (!requirePlus('music')) throw new Error('Unlock Plus to add a reference recording.')
+      const { row, persisted } = await storeLibraryAudio(projectId, file, duration)
+      // The open practice item shows its library from state; any other loads it when it opens.
+      if (projectId === activeProjectIdRef.current) {
+        const [item] = await hydrateLibraryItems([{ id: row.id, projectId: row.projectId, kind: row.kind, name: row.name,
+          createdAt: row.createdAt, filePath: row.filePath, mimeType: row.mimeType, duration: row.duration }])
+        if (item) {
+          if (persisted.playbackUrl) item.playbackUrl = persisted.playbackUrl
+          setLibraryItems(current => [item, ...current])
+        }
+      }
+      return { itemId: row.id, name: row.name || file.name, duration: row.duration }
+    },
+    async hasAudio(projectId, itemId) {
+      return (await getLibraryItemsByProject(projectId)).some(row => row.id === itemId)
+    },
+  }), [storeLibraryAudio])
 
   useEffect(() => {
     try { setReferenceAudioId(canUsePlus() && activeProjectId ? localStorage.getItem(`besttake.reference-audio.${activeProjectId}`) : null) }
@@ -5985,6 +6021,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
         try { selectPracticeReference(project.id, buildYoutubeProxyUrl(step.referenceVideoId)) }
         catch { setTakeDeleteError('Could not load this item’s saved reference. You can still choose one from Find a reference.') }
       }
+      // A recording from Files replaces any YouTube link on the item; the two never share the widget.
+      if (canUsePlus() && step.referenceAudio) {
+        try { selectPracticeReference(project.id, null) } catch { /* The recording still loads. */ }
+        applyReferenceAudio(project.id, step.referenceAudio.itemId)
+      }
       sessionId = await openRoutinePracticeSession(project.id, {
         routineId: target.id, stepId: step.id,
         resumeSessionId: day.sessionIdsByStep[step.id]?.at(-1) ?? null,
@@ -6035,7 +6076,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     // Preparing a step must never open a browser or cover the practice surface.
   }, [commitRoutineDay, deferHudMediaPause, dismissPracticeHub,
     ensureRoutineDay, handleAudioPracticeTabChange, handleOpenRoutineBuilder, handleRecordingModeChange,
-    openRoutinePracticeSession, rememberCurrentPracticeDesk, rememberLastPracticeDestination, runPracticeTransition, scheduleRoutineClick, settings.hapticFeedback])
+    applyReferenceAudio, openRoutinePracticeSession, rememberCurrentPracticeDesk, rememberLastPracticeDestination, runPracticeTransition, scheduleRoutineClick, settings.hapticFeedback])
 
   const handleStartRoutineStep = useCallback((stepId: string) =>
     runPracticeTransition(`routine:${stepId}`, () => openRoutineStep(stepId)),
@@ -6381,6 +6422,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
   )
 
   return (
+    <ReferenceAudioContext.Provider value={referenceAudioApi}>
     <PracticeReferenceContext.Provider value={{ projectId: activeProjectId ?? undefined, query: routineActiveStep?.referenceQuery || activeProject?.name || '', autoSearch: Boolean(routineActiveStep?.referenceQuery) }}>
       <ChallengeRewardNotice />
       <FeatureGuidance
@@ -6723,10 +6765,10 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     active={musicRoomActive}
                     boundaryRef={appShellRef}
                     collapseResetKey={activeMusicSetlist?.entryId ?? routineActiveStep?.id}
-                    setlistNavigation={activeMusicSetlist ? <MusicSetlistNavigation
+                    setlistMenu={activeMusicSetlist ? <MusicSetlistNavigation
                       list={activeMusicSetlist.list} entryId={activeMusicSetlist.entryId}
                       disabled={isRecording || isStopping || practiceTransitionBusy}
-                      onOpen={handleReadMusicSetlist} /> : undefined}
+                      onOpen={handleReadMusicSetlist} onLibrary={handleCloseMusic} /> : undefined}
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
                     onChromeHiddenChange={setMusicChromeHidden}
@@ -6916,8 +6958,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
 
               {!onRecordSurface && !metronomeHudSuspended && !isLabsOpen && !showOnboardingTutorial && !quickSettingsOpen && !multitrackOpen && !musicPageVisible && !referenceVisible && (
                 <PracticeToolStrip
-                  reference={Boolean(youtubeUrl || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
-                  referenceReady={Boolean(youtubeUrl)} referenceExpanded={isSplitView}
+                  reference={Boolean(youtubeUrl || referenceAudio || routineActiveStep?.referenceQuery || routineActiveStep?.referenceVideoId)}
+                  referenceReady={Boolean(youtubeUrl || referenceAudio)} referenceExpanded={isSplitView}
                   light={recordingMode === 'audio'} disabled={isStopping}
                   onReference={() => { setReferenceVisible(true); setReferenceExpanded(true) }}
                 />
@@ -7700,5 +7742,6 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       </ActionSheetProvider>
     </TutorialProvider>
     </PracticeReferenceContext.Provider>
+    </ReferenceAudioContext.Provider>
   )
 }

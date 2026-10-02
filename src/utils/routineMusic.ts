@@ -33,6 +33,7 @@ export function reuseMusicExercise(step: RoutineStep): RoutineStep {
   } : { ...blankDesk('audio'), showMusic: true },
   referenceQuery: scoreSettings ? scoreSettings.referenceQuery : step.referenceQuery,
   referenceVideoId: scoreSettings ? scoreSettings.referenceVideoId : step.referenceVideoId,
+  referenceAudio: scoreSettings ? scoreSettings.referenceAudio ?? null : step.referenceAudio,
   programId: scoreSettings ? scoreSettings.programId : step.programId })
 }
 
@@ -63,4 +64,50 @@ export async function prepareRoutineMusicFile(file: File): Promise<File> {
     } finally { URL.revokeObjectURL(url) }
   }
   return normalized
+}
+
+/** What the Files picker offers for a reference recording. */
+// Named types only: a bare audio/* makes iOS offer Photo Library and Take Video beside Files.
+export const REFERENCE_AUDIO_ACCEPT = '.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/wav,audio/x-wav,audio/aiff,audio/x-aiff,audio/x-caf,audio/flac'
+export const MAX_REFERENCE_AUDIO_BYTES = 150 * 1024 * 1024
+
+const AUDIO_BY_EXTENSION: Record<string, string> = {
+  mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav', wave: 'audio/wav',
+  aif: 'audio/aiff', aiff: 'audio/aiff', caf: 'audio/x-caf', flac: 'audio/flac',
+}
+
+/**
+ * Checks a recording picked in Files before anything is stored: iOS may hand over
+ * an empty MIME type, and a file the player cannot open should fail here, with a
+ * reason, rather than at the start of an exercise.
+ */
+export async function prepareReferenceAudioFile(file: File): Promise<{ file: File; duration: number }> {
+  if (!requirePlus('music')) throw new Error('Unlock Plus to add a reference recording.')
+  const extension = file.name.split('.').at(-1)?.toLowerCase() ?? ''
+  const declared = file.type.startsWith('audio/') && !/ogg|opus|webm/.test(file.type) ? file.type : ''
+  const mime = declared || AUDIO_BY_EXTENSION[extension]
+  if (!mime) throw new Error('Choose an audio file: MP3, M4A, AAC, WAV, AIFF or FLAC.')
+  if (!file.size) throw new Error('This file is empty.')
+  if (file.size > MAX_REFERENCE_AUDIO_BYTES) throw new Error('This recording is larger than 150 MB. Choose a shorter or compressed version.')
+  const normalized = file.type === mime ? file : new File([file], file.name, { type: mime, lastModified: file.lastModified })
+  const url = URL.createObjectURL(normalized)
+  try {
+    const duration = await new Promise<number>((resolve, reject) => {
+      const audio = document.createElement('audio')
+      const fail = () => reject(new Error('This audio file could not be opened. Try an MP3, M4A or WAV.'))
+      const timer = window.setTimeout(fail, 10_000)
+      audio.preload = 'metadata'
+      audio.onloadedmetadata = () => { window.clearTimeout(timer); resolve(Number.isFinite(audio.duration) ? Math.max(0, Math.round(audio.duration)) : 0) }
+      audio.onerror = () => { window.clearTimeout(timer); fail() }
+      audio.src = url
+    })
+    return { file: normalized, duration }
+  } finally { URL.revokeObjectURL(url) }
+}
+
+/** 3:07 for 187 seconds. */
+export function formatAudioDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return ''
+  const whole = Math.round(seconds)
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
 }

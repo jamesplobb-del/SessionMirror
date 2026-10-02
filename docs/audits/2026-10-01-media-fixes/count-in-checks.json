@@ -1,0 +1,27 @@
+[
+  {
+    "command": "node scripts/verify-multitrack-count-in.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/count-in-regression.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-upgrade.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/count-in-upgrade.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-sharing.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/count-in-sharing.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-asset-recovery.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/count-in-asset-recovery.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-quiet.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/count-in-quiet.log"
+  }
+]

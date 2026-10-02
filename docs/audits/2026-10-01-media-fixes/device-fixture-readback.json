@@ -1,0 +1,36 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "copy",
+      "from",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--source",
+      "Documents/takes",
+      "--destination",
+      "docs/audits/2026-10-01-media-fixes/device-generated-takes",
+      "--domain-type",
+      "appDataContainer",
+      "--domain-identifier",
+      "com.besttake.app.practiceqa",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-fixture-readback.json"
+    ],
+    "commandType" : "devicectl.device.copy.from",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "destination" : "file:///Users/jameslobb/Documents/SessionMirror/docs/audits/2026-10-01-media-fixes/device-generated-takes",
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "domain" : "appDataContainer",
+    "domainIdentifier" : "com.besttake.app.practiceqa",
+    "source" : "Documents/takes"
+  }
+}

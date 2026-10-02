@@ -1,0 +1,11 @@
+{
+  "bundleId": "com.besttake.app.practiceqa",
+  "nativeBuild": "passed",
+  "packagedBundleHashes": "passed",
+  "installation": "passed",
+  "launch": "passed",
+  "nativeSyntheticProjectImportAndByteReadback": "passed",
+  "interactiveDeviceTests": "blocked: iPhone Mirroring requires user Mac authentication",
+  "remainingUsagePercent": 95,
+  "scope": "iOS app"
+}

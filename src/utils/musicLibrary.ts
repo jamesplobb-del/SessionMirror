@@ -1,6 +1,7 @@
 import type { DeskSnapshot } from './workspaceDesks'
 import { normalizeDeskSnapshot } from './workspaceDesks'
 import { loadExerciseLibrary } from './routineLibrary'
+import { parseReferenceAudio, type ReferenceAudioRef } from './practiceRoutines'
 
 const ORDER_KEY = 'besttake:music-order:v1'
 const ORGANIZATION_KEY = 'besttake:music-folders:v1'
@@ -10,6 +11,8 @@ const scoreSettingsKey = (id: string) => `besttake:music-score-settings:v1:${id}
 export interface MusicScoreSettings {
   referenceQuery: string
   referenceVideoId: string | null
+  /** An audio file from Files, pinned as this score's reference. */
+  referenceAudio?: ReferenceAudioRef | null
   programId: string | null
 }
 
@@ -22,6 +25,7 @@ export function loadMusicScoreSettings(projectId: string): MusicScoreSettings | 
     return {
       referenceQuery: typeof value.referenceQuery === 'string' ? value.referenceQuery.trim().slice(0, 80) : '',
       referenceVideoId: typeof value.referenceVideoId === 'string' && /^[\w-]{11}$/.test(value.referenceVideoId) ? value.referenceVideoId : null,
+      referenceAudio: parseReferenceAudio(value.referenceAudio),
       programId: typeof value.programId === 'string' && value.programId ? value.programId : null,
     }
   } catch { return null }

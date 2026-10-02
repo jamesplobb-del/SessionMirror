@@ -1,0 +1,20 @@
+{
+  "saved": {
+    "startSeconds": 10,
+    "endSeconds": 40,
+    "positionSeconds": 10,
+    "loop": true
+  },
+  "restored": {
+    "startSeconds": 10,
+    "endSeconds": 40,
+    "positionSeconds": 10,
+    "loop": true
+  },
+  "playerDuration": 25,
+  "loopWouldRun": false
+}
+{
+  "trimmedTakeDuration": 10,
+  "loopBoundaryUpdates": false
+}

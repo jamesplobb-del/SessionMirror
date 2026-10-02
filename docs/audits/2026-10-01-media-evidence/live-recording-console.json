@@ -1,0 +1,38 @@
+[
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] userPressedRecord",
+    "timestamp": "2026-10-01T13:57:46.659Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  },
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] prepareStream",
+    "timestamp": "2026-10-01T13:57:46.661Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  },
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] userPressedRecord",
+    "timestamp": "2026-10-01T13:58:39.488Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  },
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] prepareStream",
+    "timestamp": "2026-10-01T13:58:39.491Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  },
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] userPressedRecord",
+    "timestamp": "2026-10-01T13:59:06.268Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  },
+  {
+    "level": "log",
+    "message": "[AudioRecordLifecycle] prepareStream",
+    "timestamp": "2026-10-01T13:59:06.268Z",
+    "url": "http://127.0.0.1:5229/src/hooks/useCameraSession.ts"
+  }
+]

@@ -1,0 +1,1 @@
+PASS: actual Vault selection preserves timing for original-id reconnect and recalculates a different overlay replacement

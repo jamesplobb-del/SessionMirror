@@ -1,0 +1,77 @@
+[
+  {
+    "command": "node scripts/verify-multitrack-asset-recovery.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-asset-recovery.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-readiness.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-readiness.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-upgrade.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-upgrade.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-quiet.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-quiet.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-editor.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-editor.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-sharing.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-sharing.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-native-read.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-native-read.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-transport-handoff.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-transport-handoff.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-reference-preview.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-reference-preview.log"
+  },
+  {
+    "command": "node scripts/verify-plus-access.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-plus-access.log"
+  },
+  {
+    "command": "node scripts/verify-youtube-practice-passage.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-youtube-practice-passage.log"
+  },
+  {
+    "command": "node scripts/verify-library-audio-reference-hint.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-library-audio-reference-hint.log"
+  },
+  {
+    "command": "node scripts/verify-pitch-insights-capture.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-pitch-insights-capture.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-recovery-controls.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-recovery-controls.log"
+  },
+  {
+    "command": "node scripts/verify-multitrack-picker-reconnect.mjs",
+    "exitCode": 0,
+    "log": "docs/audits/2026-10-01-media-fixes/verify-multitrack-picker-reconnect.log"
+  }
+]

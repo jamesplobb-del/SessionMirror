@@ -824,3 +824,10 @@ html.app-dark-mode[data-refinement='depth-electric'] .routine-program-setup__pil
     max-width: 50rem;
   }
 }
+
+/* Dragging replaces the up/down arrows in both lineups. */
+.routine-guide-grip{display:grid;place-items:center;flex:none;width:44px;height:48px;border-radius:12px;color:var(--guide-muted)}
+.routine-guide-grip svg{width:20px;height:20px}
+.routine-guide-grip:focus-visible{outline:2px solid var(--guide-accent);outline-offset:-2px}
+.routine-guide :is(.routine-guide-lineup,.routine-guide-custom-list)>.routine-swipe-row[data-dragging]{box-shadow:0 14px 30px rgba(18,30,48,.24),0 0 0 1px var(--guide-line)}
+.routine-swipe-content>.routine-guide-grip,.routine-swipe-content>div>.routine-guide-grip{color:var(--guide-muted);font-size:inherit}

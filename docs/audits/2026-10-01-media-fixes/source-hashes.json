@@ -1,0 +1,18 @@
+{
+  "src/multitrack/components/MultitrackOverlay.tsx": "e36a04cd2bc17a59c4c236c6886887d753738deaac0dde4cf99857e8eb357699",
+  "src/multitrack/synchronization/projectTiming.ts": "2a7c2339663828d3eedb045ce7855dae75d66df83c2501ad663dac33a39c1b4a",
+  "src/multitrack/state/multitrackReadiness.ts": "01b9f928a3ca0034353b5560c0f257a51759cb823d3768b7f4eac39458035670",
+  "src/multitrack/state/multitrackAssetRecovery.ts": "a2a22efa406633d692cdd118905aa2c2142c6ff6bc9d335e74531a1168af340a",
+  "src/multitrack/state/multitrackPersistence.ts": "40e3f89b187f7c01985f7472069407fb167509f6b5cf0431ca5aa3eec2c66e14",
+  "src/multitrack/state/multitrackFile.ts": "115723b8f2d1f14135d01e484e444b8ba98d9ecf6144187ad40143ce67861ded",
+  "src/multitrack/state/useMultitrackSession.ts": "6b680e59b00f81baafe47da06a63bdbca70b60c4b234f990eed7aba5024730ce",
+  "src/multitrack/types.ts": "ef22b3e2b680dea4a515382f9a681d9fa27027cf56821c0a9dd7695a92eadc7a",
+  "src/multitrack/backing/MultitrackBackingTrackPanel.tsx": "dcd3ff2d3a9dbac334d8f241ae353bd18ca032efff959e989d203dce334394ae",
+  "src/multitrack/sheetMusic/SheetMusicPanel.tsx": "5b8ce10acaa16ccd4d26bacc005f6fa3ed68776967d4749ccab31b57d2ca6d2b",
+  "src/multitrack/components/MultitrackAlignStage.tsx": "ea2f6d86210f61f6f5ffdf8d999256236c1a44569829c649f1182bad016b0297",
+  "src/multitrack/components/MultitrackLayoutSheet.tsx": "1ee61d470c4f9850dd54360f99805f6547324ead3fbabd398673fc2801232c03",
+  "src/multitrack/export/multitrackExport.ts": "4bc76b8152dd249c31b855170c33491b3cdd75fede3a7e2b732807722135ed52",
+  "src/hooks/useYoutubePracticePassage.ts": "b4c5404b915d9fb63ce5131dbd332db33bc4ac7e6edb487d220da8ea0189bd68",
+  "src/components/ReferencePassageControls.tsx": "a733321700ab7ce073168ea3741b9078dd3071be3530ee685cd9b4ef57d64600",
+  "src/utils/libraryStorage.ts": "b034ac6fd622fefe5b4c05a611ccec85248d6b2b69e00456c6f62cec087c1c8b"
+}

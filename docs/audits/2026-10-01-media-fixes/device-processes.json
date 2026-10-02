@@ -1,0 +1,102 @@
+{
+  "error" : {
+    "code" : -1,
+    "domain" : "com.apple.dt.CoreDeviceError",
+    "userInfo" : {
+      "Backtrace" : {
+        "array" : [
+          {
+            "string" : "0   CoreFoundation                      0x000000018c0211c0 __exceptionPreprocess + 176"
+          },
+          {
+            "string" : "1   libobjc.A.dylib                     0x000000018baaa91c objc_exception_throw + 88"
+          },
+          {
+            "string" : "2   Foundation                          0x000000018d804a30 -[NSInPredicateOperator performPrimitiveOperationUsingObject:andObject:] + 452"
+          },
+          {
+            "string" : "3   Foundation                          0x000000018d802da0 -[NSComparisonPredicate evaluateWithObject:substitutionVariables:] + 352"
+          },
+          {
+            "string" : "4   CoreDeviceCLISupport                0x00000001007fd0e8 -[NSPredicate(CoreDeviceAdditions) cd_evaluateWithObject:substitutionVariables:error:] + 68"
+          },
+          {
+            "string" : "5   CoreDeviceCLISupport                0x00000001008c64c4 objectdestroyTm + 1540"
+          },
+          {
+            "string" : "6   CoreDeviceCLISupport                0x00000001008af168 __swift_memcpy0_1 + 54236"
+          },
+          {
+            "string" : "7   CoreDeviceCLISupport                0x00000001008b1b08 __swift_memcpy0_1 + 64892"
+          },
+          {
+            "string" : "8   libswiftCore.dylib                  0x000000019f712d10 $ss14_ArrayProtocolPsE6filterySay7ElementQzGSbAEKXEKF + 768"
+          },
+          {
+            "string" : "9   CoreDeviceCLISupport                0x00000001008aec2c __swift_memcpy0_1 + 52896"
+          },
+          {
+            "string" : "10  CoreDeviceCLISupport                0x00000001008af2f0 __swift_memcpy0_1 + 54628"
+          },
+          {
+            "string" : "11  devicectl                           0x0000000100077e7c __swift_memcpy0_1 + 46048"
+          },
+          {
+            "string" : "12  devicectl                           0x000000010004b9b1 __swift_noop_void_return + 17561"
+          },
+          {
+            "string" : "13  CoreDeviceCLISupport                0x0000000100827e79 __swift_memcpy18_8 + 40417"
+          },
+          {
+            "string" : "14  CoreDeviceCLISupport                0x0000000100828ef9 __swift_memcpy18_8 + 44641"
+          },
+          {
+            "string" : "15  devicectl                           0x000000010004bc91 __swift_noop_void_return + 18297"
+          },
+          {
+            "string" : "16  devicectl                           0x00000001000f7525 __swift_store_extra_inhabitant_indexTm + 98461"
+          },
+          {
+            "string" : "17  devicectl                           0x0000000100046789 async_MainTQ4_ + 1"
+          },
+          {
+            "string" : "18  devicectl                           0x0000000100046a3d async_MainTY6_ + 321"
+          },
+          {
+            "string" : "19  libswift_Concurrency.dylib          0x0000000290883f45 _ZL22completeTaskAndReleasePN5swift12AsyncContextEPNS_10SwiftErrorE + 1"
+          }
+        ]
+      },
+      "NSLocalizedDescription" : {
+        "string" : "An error occurred evaluating a value using the specified filter."
+      },
+      "NSLocalizedFailureReason" : {
+        "string" : "Can't use in/contains operator with collection file:///System/Developer/usr/libexec/dtfilesandboxd (not a collection)"
+      },
+      "Name" : {
+        "string" : "NSInvalidArgumentException"
+      }
+    }
+  },
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "info",
+      "processes",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--filter",
+      "executable CONTAINS \"App.app\"",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-processes.json"
+    ],
+    "commandType" : "devicectl.device.info.processes",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "failed",
+    "version" : "518.31"
+  }
+}

@@ -1,0 +1,8 @@
+[PlaybackRoute] applying playback session
+[PlaybackRoute] playback ended
+[PlaybackRoute] restoring camera session
+[PlaybackRoute] applying playback session
+[PlaybackRoute] playback ended
+[PlaybackRoute] restoring camera session
+[PlaybackRoute] applying playback session
+Playback route checks passed: pending preparation, ordered restore/replay, native rejection, retry, and lifecycle cleanup.

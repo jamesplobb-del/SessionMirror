@@ -1,0 +1,60 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "device",
+      "copy",
+      "to",
+      "--device",
+      "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+      "--source",
+      "scripts/practice-qa/results/media/qa-pulses-two-part.btmulti",
+      "--destination",
+      "Documents/media-audit-2026-10-01/qa-pulses-two-part.btmulti",
+      "--domain-type",
+      "appDataContainer",
+      "--domain-identifier",
+      "com.besttake.app.practiceqa",
+      "--json-output",
+      "docs/audits/2026-10-01-media-fixes/device-fixture-copy.json"
+    ],
+    "commandType" : "devicectl.device.copy.to",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "destination" : "file:///private/var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/media-audit-2026-10-01/qa-pulses-two-part.btmulti",
+    "deviceIdentifier" : "D694E1F1-E4B5-5F70-A548-4FB658154D23",
+    "domain" : "appDataContainer",
+    "domainIdentifier" : "com.besttake.app.practiceqa",
+    "file" : {
+      "metadata" : {
+        "extendedAttributes" : {
+
+        },
+        "lastModDate" : "2026-09-27T13:12:44.000Z",
+        "ownerGid" : 501,
+        "ownerUid" : 501,
+        "permissions" : 420,
+        "size" : 706826
+      },
+      "name" : "/private/var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/media-audit-2026-10-01/qa-pulses-two-part.btmulti",
+      "relativePath" : "/private/var/mobile/Containers/Data/Application/4CDFA4B9-EA58-40E6-80C1-F5F87FD387A2/Documents/media-audit-2026-10-01/qa-pulses-two-part.btmulti",
+      "resources" : {
+        "isDirectory" : false,
+        "isHidden" : false,
+        "isReadable" : true,
+        "isSymbolicLink" : false,
+        "isWritable" : true
+      }
+    },
+    "source" : "file:///Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/media/qa-pulses-two-part.btmulti",
+    "sources" : [
+      "file:///Users/jameslobb/Documents/SessionMirror/scripts/practice-qa/results/media/qa-pulses-two-part.btmulti"
+    ]
+  }
+}
