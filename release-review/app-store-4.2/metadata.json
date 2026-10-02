@@ -1,0 +1,57 @@
+{
+  "version": "4.2",
+  "build": "19",
+  "name": "BestTake: Your Practice Room",
+  "subtitle": "Record. Listen. Repeat.",
+  "promotionalText": "Keep your sheet music, tuner, metronome, and recordings on one screen. Move the tools where you need them and record without leaving the page.",
+  "keywords": "tuner,metronome,intonation,trumpet,band,brass,multitrack,playalong,rehearsal,drone,pitch,sax",
+  "description": "Practice with your sheet music, tuner, metronome, and recordings on the same screen. Open a PDF, move the tools where you want them, and record without leaving the page.\n\nYou know the advice: record yourself and listen back. BestTake keeps your takes together so you can compare performances, mark your favorite, and hear what changed.\n\nYOUR MUSIC AND TOOLS, TOGETHER\nBring a PDF or photo into the Music Stand. Add markings, play along with backing audio, or keep a YouTube reference close by. Keep your practice tools open over your sheet music or recording screen. Music features are included with Plus.\n\nKEEP YOUR INSTRUMENT IN YOUR HANDS\nWith BestTake Plus, hands-free recording listens for you to start playing, records your take, plays it back, and gets ready for the next one.\n\nRECORD, LISTEN, TRY AGAIN\nRecord audio or video, leave notes on a take, and share a recording with your teacher or a friend. Keep as many takes as your device has room for. No account to create.\n\nBUILD YOUR PRACTICE ROUTINE\nSave the exercises you want to work on. Each exercise opens the tools it needs. One saved routine is free; Plus adds unlimited saved routines.\n\nTUNER, METRONOME, AND DRONE\nA live tuner with transposition, a metronome with subdivisions, and a tuning drone are always free.\n\nPLAY EVERY PART YOURSELF\nRecord each part in multitrack, then hear them together. Use two boxes for free, or up to twelve with Plus.\n\nA FUN WAY TO PRACTICE\nPlay the Learn and Balance games with your instrument. Try Staff Jumper on Easy for free, then move to Medium and Hard with Plus.\n\nTRACK YOUR PITCH OVER TIME\nPitch Insights in Plus keeps a history of the notes you hold, so you can see which notes tend sharp or flat and how your playing changes over time.\n\nMOST TOOLS ARE FREE. PLUS IS A ONE-TIME PURCHASE.\nRecording, playback, sharing, the tuner, metronome, drone, one saved routine, two multitrack boxes, Learn, Balance, and Easy Staff Jumper are free.\n\nBestTake Plus adds hands-free recording, sheet music, backing tracks, YouTube references, Pitch Insights, unlimited saved routines, more multitrack boxes, and the remaining Staff Jumper levels. An optional seven-day trial is available to eligible users. It does not renew or charge automatically.\n\nYour recordings stay on your device. BestTake does not upload them.\n\nMade by a solo developer, with plenty more to come. Found a bug or have an idea? There is a report link in Settings. I would love to hear it.",
+  "supportURL": "https://besttake-share.netlify.app/support.html",
+  "privacyPolicyURL": "https://besttake-share.netlify.app/privacy",
+  "copyright": "2026 James Parker Lobb",
+  "reviewNotes": "BestTake is a practice recording app for musicians. No account or sign-in is required.\n\nTo test recording, allow microphone access, choose audio mode, record a few seconds, and stop. The take appears below the record control. Record a second take to compare them. Camera access is only needed for video recording. The tuner and instrument-controlled games also need microphone input.\n\nBestTake Plus is an optional non-consumable purchase (com.besttake.app.plus.lifetime). The optional seven-day trial is a separate $0 non-consumable (com.besttake.app.plus.trial7days); it never renews or charges automatically. Plus includes hands-free recording, imported sheet music and backing audio, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium/Hard Staff Jumper.\n\nLearn, Balance, Easy Staff Jumper, manual recording, playback/export, the live tuner, metronome, drone, one saved routine, and two multitrack boxes work without Plus. YouTube references use YouTube's embedded player.\n\nThe alpha shortcut is restricted to development and verified sandbox/TestFlight environments. It does not unlock a public App Store installation. Public offer codes are redeemed through Apple's sheet.",
+  "screenshots": [
+    {
+      "id": "00-music",
+      "headline": "Your tools,\nright on your music.",
+      "detail": "Tuner, metronome and drone float over the page. Record without leaving it.",
+      "screen": "music"
+    },
+    {
+      "id": "01-record",
+      "headline": "Compare\nyour takes.",
+      "detail": "No more digging through your camera roll or voice memos.",
+      "screen": "recording"
+    },
+    {
+      "id": "02-routine",
+      "headline": "Build your\npractice routine.",
+      "detail": "Each exercise opens the tools it needs.",
+      "screen": "routine"
+    },
+    {
+      "id": "03-tools",
+      "headline": "Tuner and\nmetronome.",
+      "detail": "Both free, built right in.",
+      "screen": "metronome"
+    },
+    {
+      "id": "05-games",
+      "headline": "Instrument-\ncontrolled games.",
+      "detail": "Sight reading and pitch games. Your playing is the controller.",
+      "screen": "gameshub"
+    },
+    {
+      "id": "06-learn",
+      "headline": "Learn the\nfingerings.",
+      "detail": "See the note, find the fingering, play it.",
+      "screen": "games"
+    },
+    {
+      "id": "07-multitrack",
+      "headline": "Play every\npart yourself.",
+      "detail": "Record each line, then hear them together.",
+      "screen": "multitrack"
+    }
+  ]
+}
