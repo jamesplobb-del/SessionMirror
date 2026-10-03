@@ -33,7 +33,7 @@ export default function QuickToolsScreen({ request, onExit }: {
         </button>
         <div><p>BestTake</p><h1>Quick Tools</h1></div>
       </header>
-      <AudioPracticeTopTabs activeTab={activeTool} includeGames={false}
+      <AudioPracticeTopTabs activeTab={activeTool} includeMusic={false} includeGames={false}
         onTabChange={tab => {
           if (tab === 'tuner' || tab === 'metronome') setActiveTool(tab)
         }} />

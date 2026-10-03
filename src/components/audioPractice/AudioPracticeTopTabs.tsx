@@ -17,6 +17,7 @@ const TABS: { id: AudioPracticeTab; label: string }[] = [
 interface AudioPracticeTopTabsProps {
   /** Historical navigation for the isolated appearance comparison. */
   includeRecording?: boolean
+  includeMusic?: boolean
   includeGames?: boolean
   onBackToRecording?: () => void
   activeTab: AudioPracticeTab
@@ -25,6 +26,7 @@ interface AudioPracticeTopTabsProps {
 
 export default function AudioPracticeTopTabs({
   includeRecording = false,
+  includeMusic = true,
   includeGames = true,
   onBackToRecording,
   activeTab,
@@ -32,7 +34,9 @@ export default function AudioPracticeTopTabs({
 }: AudioPracticeTopTabsProps) {
   const [pending, startTabTransition] = useTransition()
   const [selectedTab, setSelectedTab] = useOptimistic(activeTab)
-  const toolTabs = includeGames ? TABS : TABS.filter(tab => tab.id !== 'games')
+  const toolTabs = TABS.filter(tab =>
+    (includeMusic || tab.id !== 'music') && (includeGames || tab.id !== 'games'),
+  )
   const tabs = includeRecording ? [{ id: 'audio' as const, label: 'Record' }, ...toolTabs] : toolTabs
   if (activeTab === 'practice') {
     return <nav className="program-top-nav pointer-events-auto" aria-label="Program navigation">
