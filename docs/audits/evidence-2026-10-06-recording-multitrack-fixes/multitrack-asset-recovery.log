@@ -1,0 +1,4 @@
+PASS: missing backing/base/cues survive two autosave/reopen cycles; healthy cues and timeline retained; sharing blocked before source reads.
+PASS: files becoming available clear missing state; a rejected read retains the backing and retries on reopen.
+PASS: reconnect retains source views/pages/cue identity/time/roll, rejects mismatched or short PDFs atomically, persists healthy state; explicit removal remains removed.
+PASS: reconnecting the original Vault take preserves timing/trim/mix/section/mirror; choosing a different take clears old timing.

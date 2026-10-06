@@ -1494,7 +1494,11 @@ export function useCameraSession({
 
   const bindRecordingHandlers = useCallback(
     (recorder: MediaRecorder, takeId: string) => {
+      // MediaRecorder can deliver queued callbacks after an error or stop.
+      // They must not mutate the next capture or resurrect a failed take.
+      let captureEnded = false
       recorder.ondataavailable = (event) => {
+        if (captureEnded || recorderRef.current !== recorder) return
         const now = performance.now()
         console.log(`[AudioRecordLifecycle] dataavailable size=${event.data.size} recordingId=${takeId}`)
 
@@ -1516,11 +1520,13 @@ export function useCameraSession({
 
         if (event.data.size === 0) return
 
-        if (writerRef.current) {
-          void writerRef.current.enqueue(event.data).catch(async () => {
+        const chunkWriter = writerRef.current
+        if (chunkWriter) {
+          void chunkWriter.enqueue(event.data).catch(async () => {
+            if (recorderRef.current !== recorder || writerRef.current !== chunkWriter) return
             await abortActiveWriter().catch(() => {})
-            if (recorderRef.current?.state === 'recording') {
-              recorderRef.current.stop()
+            if (recorderRef.current === recorder && recorder.state === 'recording') {
+              recorder.stop()
             }
           })
           return
@@ -1530,6 +1536,20 @@ export function useCameraSession({
       }
 
       recorder.onstop = () => {
+        if (captureEnded || recorderRef.current !== recorder) return
+        captureEnded = true
+        const stoppedStream = recordStreamRef.current
+        const completedMimeType = recorderMimeTypeRef.current
+        const completedOrientation = recordingOrientationRef.current
+        const cleanupStoppedCapture = () => {
+          releaseRecorderStream(stoppedStream, streamRef.current)
+          if (recorderRef.current || activeRecordingIdRef.current || recordStreamRef.current !== stoppedStream) return
+          recordStreamRef.current = null
+          setIsRecording(false)
+          setIsStopping(false)
+          scheduleWarmAutoAudioRef.current()
+          void restoreNativeAudioBridgeAfterWebKitCapture().catch(() => {})
+        }
         console.log('[AudioRecordLifecycle] recorderStop')
         void (async () => {
           const shouldSaveTake =
@@ -1590,12 +1610,12 @@ export function useCameraSession({
               const persisted = await activeWriter.finalize()
               onCompleteRef.current({
                 takeId: stoppedTakeId,
-                mimeType: recorderMimeTypeRef.current,
+                mimeType: completedMimeType,
                 mediaType: completedMode,
                 filePath: persisted.filePath,
                 videoUrl: persisted.videoUrl,
                 durationSeconds,
-                recordingOrientation: recordingOrientationRef.current,
+                recordingOrientation: completedOrientation,
                 captureProfile,
                 captureTrackSnapshot,
                 autoPerformanceStartSeconds,
@@ -1603,12 +1623,12 @@ export function useCameraSession({
             } else {
               const blob = composeBufferedRecordingBlob(
                 capturedChunks as Blob[],
-                recorderMimeTypeRef.current,
+                completedMimeType,
               )
               const persisted = await persistRecordingBlob(
                 blob,
                 stoppedTakeId,
-                recorderMimeTypeRef.current,
+                completedMimeType,
               )
 
               // Verify file exists and has size > 0 on native
@@ -1636,12 +1656,12 @@ export function useCameraSession({
 
                 onCompleteRef.current({
                   takeId: stoppedTakeId,
-                  mimeType: recorderMimeTypeRef.current,
+                  mimeType: completedMimeType,
                   mediaType: completedMode,
                   filePath: persisted.filePath,
                   videoUrl: persisted.videoUrl,
                   durationSeconds: finalDuration,
-                  recordingOrientation: recordingOrientationRef.current,
+                  recordingOrientation: completedOrientation,
                   blob,
                   captureProfile,
                   captureTrackSnapshot,
@@ -1684,23 +1704,16 @@ export function useCameraSession({
               tone: 'error',
             })
           } finally {
-            releaseRecorderStream(recordStreamRef.current, streamRef.current)
-            recordStreamRef.current = null
-            setIsRecording(false)
-            setIsStopping(false)
-            scheduleWarmAutoAudioRef.current()
-            void restoreNativeAudioBridgeAfterWebKitCapture()
+            cleanupStoppedCapture()
           }
         })().catch(() => {
-          releaseRecorderStream(recordStreamRef.current, streamRef.current)
-          recordStreamRef.current = null
-          setIsRecording(false)
-          setIsStopping(false)
-          void restoreNativeAudioBridgeAfterWebKitCapture()
+          cleanupStoppedCapture()
         })
       }
 
       recorder.onerror = (event) => {
+        if (captureEnded || recorderRef.current !== recorder) return
+        captureEnded = true
         // The in-progress take is discarded below — always worth a report.
         const cause = (event as unknown as { error?: unknown }).error
         reportError(cause ?? new Error('MediaRecorder failed mid-take'), {
@@ -1715,9 +1728,27 @@ export function useCameraSession({
           detachRecorder(recorderRef.current)
         }
         recorderRef.current = null
+        activeRecordingIdRef.current = null
+        recordingStartMsRef.current = 0
+        recordingStartedAtRef.current = 0
+        autoPreRollActiveRef.current = false
+        autoPerformanceActiveRef.current = false
+        autoPreRollStartedAtRef.current = 0
         autoPerformanceStartedAtRef.current = 0
+        isRecordingRef.current = false
+        elapsedRef.current = 0
+        setElapsed(0)
         setIsRecording(false)
-        void restoreNativeAudioBridgeAfterWebKitCapture()
+        setIsStopping(false)
+        showAlertOutsideTree({
+          title: "That take didn't save",
+          message: 'Recording stopped unexpectedly, so this take was discarded. Tap Record to try again.',
+          tone: 'error',
+        })
+        const rearm = () => {
+          if (!isRecordingRef.current) scheduleWarmAutoAudioRef.current()
+        }
+        void restoreNativeAudioBridgeAfterWebKitCapture().then(rearm, rearm)
       }
     },
     [abortActiveWriter, restoreNativeAudioBridgeAfterWebKitCapture],

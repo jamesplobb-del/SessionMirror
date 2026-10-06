@@ -1,10 +1,18 @@
-import { useRef, type PointerEvent } from 'react'
+import { useLayoutEffect, useRef, type PointerEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 /** The dock stays mounted while its rail slides away, so tool state is preserved. */
 export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const handleRef = useRef<HTMLButtonElement>(null)
+  const dockRef = useRef<HTMLDivElement>(null)
   const gesture = useRef<{ pointerId: number; x: number } | null>(null)
   const ignoreClick = useRef(false)
+  useLayoutEffect(() => {
+    const dock = dockRef.current
+    if (!open && dock?.contains(dock.ownerDocument.activeElement)) {
+      handleRef.current?.focus({ preventScroll: true })
+    }
+  }, [open])
   const start = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || (event.currentTarget.id === 'music-widget-dock' && event.target !== event.currentTarget)) return
     gesture.current = { pointerId: event.pointerId, x: event.clientX }
@@ -22,7 +30,7 @@ export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolea
     onOpenChange(dx < 0)
   }
   return <div className={`music-widget-drawer${open ? '' : ' music-widget-drawer--closed'}`}>
-    <button type="button" className="music-widget-drawer__handle"
+    <button ref={handleRef} type="button" className="music-widget-drawer__handle"
       aria-label={open ? 'Hide music tools' : 'Show music tools'} aria-expanded={open}
       aria-controls="music-widget-dock" title={open ? 'Hide music tools' : 'Show music tools'}
       onPointerDown={start} onPointerUp={end} onPointerCancel={() => { gesture.current = null }}
@@ -30,7 +38,8 @@ export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolea
       onClick={event => { if (ignoreClick.current && event.detail !== 0) { ignoreClick.current = false; return } onOpenChange(!open) }}>
       {open ? <ChevronRight aria-hidden /> : <ChevronLeft aria-hidden />}
     </button>
-    <div id="music-widget-dock" className="music-widget-dock" role="toolbar" aria-label="Music tools"
+    <div ref={dockRef} id="music-widget-dock" className="music-widget-dock" role="toolbar" aria-label="Music tools"
+      inert={!open} aria-hidden={!open}
       onPointerDown={start} onPointerUp={end} onPointerCancel={() => { gesture.current = null }}
       onLostPointerCapture={() => { gesture.current = null }} />
   </div>

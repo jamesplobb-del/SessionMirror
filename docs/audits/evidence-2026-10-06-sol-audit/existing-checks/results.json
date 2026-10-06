@@ -1,0 +1,52 @@
+[
+  {
+    "name": "verify-plus-access",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-navigation-response",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-ipad-parity",
+    "status": "FAILED",
+    "exit": 1
+  },
+  {
+    "name": "verify-audio-lifecycle",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-last-practice-destination",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-headphone-output",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-playback-route",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-tuner-key-controls",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-feature-guidance",
+    "status": "PASSED",
+    "exit": 0
+  },
+  {
+    "name": "verify-document-handoff",
+    "status": "PASSED",
+    "exit": 0
+  }
+]

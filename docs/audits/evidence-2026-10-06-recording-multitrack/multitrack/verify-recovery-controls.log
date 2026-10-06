@@ -1,0 +1,2 @@
+PASS: future missing cue reconnect/remove is accessible at time zero; reconnect targets all views of selected source and preserves page/placement.
+PASS: missing backing pauses and clears old media source; no retained missing URL enters the audio element.

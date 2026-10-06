@@ -18,6 +18,7 @@ export type PitchInsightsResetDetail =
 export type PitchInsightsUpdatedDetail =
   | { kind: 'saved'; observation: PitchObservation }
   | { kind: 'cleared' }
+  | { kind: 'reconciled' }
   | { kind: 'range-deleted'; startAt: number; endAt: number; transpositionId?: string; instrumentProfileId?: string | null }
   | ({ kind: 'session-range-deleted'; sessionId: string; startAt: number; endAt: number } & PitchObservationScope)
 
@@ -43,6 +44,7 @@ export type SavePitchObservationInput = Omit<PitchObservation, 'id'> & { id?: st
 type SqlRow = Record<string, unknown>
 
 let writeQueue = Promise.resolve()
+let persistenceNeedsReconciliation = false
 
 function enqueueWrite<T>(perform: () => Promise<T>): Promise<T> {
   const operation = writeQueue.then(perform, perform)
@@ -75,6 +77,22 @@ function mapPitchObservation(row: SqlRow): PitchObservation {
 function dispatchInsightsUpdated(detail: PitchInsightsUpdatedDetail): void {
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent(PITCH_INSIGHTS_UPDATED_EVENT, { detail }))
+}
+
+/** A recovered web-store write persists earlier mutations as well as this one. */
+async function persistAndNotify(detail: PitchInsightsUpdatedDetail): Promise<void> {
+  try {
+    await persistVaultWebStore()
+  } catch (error) {
+    persistenceNeedsReconciliation = true
+    throw error
+  }
+  const recovered = persistenceNeedsReconciliation
+  persistenceNeedsReconciliation = false
+  dispatchInsightsUpdated(detail)
+  // Notify after the specific mutation so all consumers finish by reloading
+  // the complete recovered snapshot, including earlier writes and deletions.
+  if (recovered) dispatchInsightsUpdated({ kind: 'reconciled' })
 }
 
 function dispatchResetRequested(detail: PitchInsightsResetDetail): void {
@@ -152,8 +170,7 @@ async function performSavePitchObservation(
     ],
   )
 
-  await persistVaultWebStore()
-  dispatchInsightsUpdated({ kind: 'saved', observation })
+  await persistAndNotify({ kind: 'saved', observation })
   return observation
 }
 
@@ -170,8 +187,7 @@ export function clearPitchObservations(): Promise<void> {
   return enqueueWrite(async () => {
     const db = await initVaultDatabase()
     await db.run('DELETE FROM pitch_observations')
-    await persistVaultWebStore()
-    dispatchInsightsUpdated({ kind: 'cleared' })
+    await persistAndNotify({ kind: 'cleared' })
   })
 }
 
@@ -196,8 +212,7 @@ export function deletePitchObservationsInRange(
       if (instrumentProfileId !== null) params.push(instrumentProfileId)
     }
     await db.run(`DELETE FROM pitch_observations WHERE ${clauses.join(' AND ')}`, params)
-    await persistVaultWebStore()
-    dispatchInsightsUpdated({ kind: 'range-deleted', startAt, endAt, transpositionId, ...(instrumentProfileId !== undefined ? { instrumentProfileId } : {}) })
+    await persistAndNotify({ kind: 'range-deleted', startAt, endAt, transpositionId, ...(instrumentProfileId !== undefined ? { instrumentProfileId } : {}) })
   })
 }
 
@@ -228,7 +243,6 @@ export function deletePitchObservationsForSessionRange(
       if (scopedFields.instrumentProfileId !== null) params.push(scopedFields.instrumentProfileId)
     }
     await db.run(`DELETE FROM pitch_observations WHERE ${clauses.join(' AND ')}`, params)
-    await persistVaultWebStore()
-    dispatchInsightsUpdated({ kind: 'session-range-deleted', sessionId, startAt, endAt, ...scopedFields })
+    await persistAndNotify({ kind: 'session-range-deleted', sessionId, startAt, endAt, ...scopedFields })
   })
 }

@@ -219,7 +219,7 @@ export function useMultitrackSession(options?: { takes?: Take[]; isOpen?: boolea
     if (take && !completedCapture && sessionRef.current.panels.filter(p => p.kind === 'performance' && !p.hidden).findIndex(p => p.id === panelId) >= 2 && !requirePlus('multitrack')) return
     setSession(prev => ({ ...prev, panels: prev.panels.map(panel => {
       if (panel.id !== panelId || panel.kind !== 'performance') return panel
-      if (panel.take?.id === take?.id || (take && panel.missingTakeId === take.id)) return { ...panel, take, missingTakeId: undefined }
+      if (panel.take?.id === take?.id || (take && panel.missingTakeId === take.id)) return { ...panel, take, missingTakeId: undefined, missingSharedTake: undefined }
       // A replacement has its own timing. Keep its visual placement and name only.
       return { kind: 'performance', id: panel.id, take, label: panel.label,
         hidden: panel.hidden, overlay: panel.overlay, frame: panel.frame, sectionAudio: panel.overlay ? true : undefined }

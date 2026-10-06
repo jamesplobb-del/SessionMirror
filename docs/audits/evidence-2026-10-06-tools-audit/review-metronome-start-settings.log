@@ -1,0 +1,25 @@
+{
+  "evidence": "production shared engine with native bridge stub; no actual iOS playback",
+  "trigger": "change controls while start promise awaits native bridge acknowledgement",
+  "displayed": {
+    "bpm": 160,
+    "meter": "3/4",
+    "soundId": "wood"
+  },
+  "nativeAcceptedPayload": {
+    "tierPattern": [
+      "downbeat",
+      "beat",
+      "macro",
+      "beat"
+    ],
+    "ticksPerBar": 4,
+    "pulseTicks": 1,
+    "secondsPerTick": 0.75,
+    "soundId": "classic",
+    "muted": false,
+    "leadSec": 0.05
+  },
+  "nativeTimingUpdates": 0
+}
+OBSERVED P2: accepted native start retains 80 BPM / 4/4 / classic while shared UI reports 160 BPM / 3/4 / wood; no timing update follows.

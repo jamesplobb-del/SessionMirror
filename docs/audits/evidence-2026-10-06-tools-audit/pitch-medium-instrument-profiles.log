@@ -1,0 +1,1 @@
+PASS: real SQLite migration, profile/key isolation, noisy origin scope and unscoped compatibility, candidate reset fences, capture boundary, profile reload and storage failure

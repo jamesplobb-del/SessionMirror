@@ -47,6 +47,7 @@ const practicePlanSubscribers = new Set<() => void>()
 /* iOS can deliver the same launch URL through both getLaunchUrl and the
  * listener; importing twice would leave two copies in the library. */
 const handledUrls = new Set<string>()
+const inFlightUrls = new Set<string>()
 
 function emit(event: RoutineOpenEvent): void {
   pending = event
@@ -144,7 +145,7 @@ async function discardInboxCopy(url: string): Promise<void> {
 }
 
 /** One place a received routine lands, whether it came as a file or a link. */
-async function acceptPracticePlanText(text: string): Promise<void> {
+async function acceptPracticePlanText(text: string): Promise<boolean> {
   const plan = await importPracticePlanFileFromText(text)
   if (plan.ok) {
     pendingPracticePlan = plan.routine
@@ -161,63 +162,67 @@ async function acceptPracticePlanText(text: string): Promise<void> {
         }
       : { title: "Couldn't Open Routine", message: plan.error, tone: 'error' },
   )
+  return plan.ok
 }
 
 async function handleIncomingUrl(url: string): Promise<void> {
-  // A routine sent as a link (Messages makes these tappable; files it can't open).
-  if (url.startsWith(ROUTINE_APP_LINK_PREFIX)) {
-    if (handledUrls.has(url)) return
-    handledUrls.add(url)
-    const text = await decodeRoutineLink(url)
-    if (text === null) {
-      announce({ title: "Couldn't Open Routine", message: 'That routine link is incomplete. Ask for it to be sent again.', tone: 'error' })
-      return
-    }
-    await acceptPracticePlanText(text)
-    return
-  }
-  if (!url || !looksLikeFileUrl(url) || handledUrls.has(url)) return
+  if (!url || handledUrls.has(url) || inFlightUrls.has(url)) return
 
-  const name = fileNameFromUrl(url)
-  const isPracticePlan = isPracticePlanFileName(name)
-  /* Other file types can reach us through "Open With"; ignore them silently
-   * rather than showing an error for a file the user never meant for us. */
+  const isLink = url.startsWith(ROUTINE_APP_LINK_PREFIX)
+  if (!isLink && !looksLikeFileUrl(url)) return
+  const name = isLink ? '' : fileNameFromUrl(url)
+  const isPracticePlan = isLink || isPracticePlanFileName(name)
+  // Ignore unrelated files handed to the app through Open With.
   if (!isPracticePlan && !isRoutineFileName(name)) return
 
-  handledUrls.add(url)
-
-  let text: string
+  // Deduplicate concurrent cold/warm deliveries, but allow failed imports to retry.
+  inFlightUrls.add(url)
   try {
-    text = await readTextFile(url)
+    let text: string
+    if (isLink) {
+      const decoded = await decodeRoutineLink(url)
+      if (decoded === null) {
+        announce({ title: "Couldn't Open Routine", message: 'That routine link is incomplete. Ask for it to be sent again.', tone: 'error' })
+        return
+      }
+      text = decoded
+    } else {
+      text = await readTextFile(url)
+    }
+
+    if (isPracticePlan) {
+      if (await acceptPracticePlanText(text)) {
+        handledUrls.add(url)
+        if (!isLink) void discardInboxCopy(url)
+      }
+      return
+    }
+
+    const result = importRoutineFromText(text)
+    if (result.ok) {
+      handledUrls.add(url)
+      void discardInboxCopy(url)
+    }
+    emit(
+      result.ok
+        ? {
+            id: `routine-open-${Date.now()}`,
+            status: 'imported',
+            routine: result.routine,
+            warnings: result.warnings,
+          }
+        : { id: `routine-open-${Date.now()}`, status: 'failed', error: result.error },
+    )
   } catch (error) {
-    console.warn('[PracticeRoutine] could not read opened file', error)
-    emit({
-      id: `routine-open-${Date.now()}`,
-      status: 'failed',
-      error: 'Could not open that routine file.',
-    })
-    return
+    console.warn('[PracticeRoutine] could not import opened routine', error)
+    if (isPracticePlan) {
+      announce({ title: "Couldn't Open Routine", message: 'Could not open that routine. Please try again.', tone: 'error' })
+    } else {
+      emit({ id: `routine-open-${Date.now()}`, status: 'failed', error: 'Could not open that routine file. Please try again.' })
+    }
+  } finally {
+    inFlightUrls.delete(url)
   }
-
-  if (isPracticePlan) {
-    void discardInboxCopy(url)
-    await acceptPracticePlanText(text)
-    return
-  }
-
-  const result = importRoutineFromText(text)
-  void discardInboxCopy(url)
-
-  emit(
-    result.ok
-      ? {
-          id: `routine-open-${Date.now()}`,
-          status: 'imported',
-          routine: result.routine,
-          warnings: result.warnings,
-        }
-      : { id: `routine-open-${Date.now()}`, status: 'failed', error: result.error },
-  )
 }
 
 export async function initializeRoutineFileOpen(): Promise<void> {

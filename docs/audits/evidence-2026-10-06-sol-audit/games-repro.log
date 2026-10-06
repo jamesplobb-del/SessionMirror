@@ -1,0 +1,4 @@
+CONFIRMED: actual Balance hook resets scored hold 1000ms -> 100ms after pause/resume/relock (mock hooks, mic frames and silent audio).
+CONFIRMED: actual hook goalReached -> pause/resume -> repeated hold yields 2 results for 1 target; actual createRoutineResult returns completed=false.
+SOURCE REDUCER: resting pause/resume retains absolute deadline (does not freeze remaining rest).
+PASS: actual Learn hook, transposed trumpet wrong octave rejected, >140ms gap resets hold, 8 notes complete with persistent course credit; restart clears current run only.

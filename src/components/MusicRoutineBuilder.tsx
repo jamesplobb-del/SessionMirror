@@ -1,3 +1,5 @@
+import { useActionSheet } from '../context/ActionSheetContext'
+import { clearInkStrokes } from './practiceChart/chartInk'
 import { requirePlus } from '../plus/plusAccess'
 import { usePlus } from '../plus/usePlus'
 import { canSaveRoutine } from '../utils/routineLibrary'
@@ -39,6 +41,7 @@ function exerciseSummary(step: RoutineStep): string {
 /** The approved music-first flow. Existing plans keep the same routine model. */
 export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
   const plus = usePlus()
+  const { showConfirm } = useActionSheet()
   const [draft, setDraft] = useState(() => props.initialRoutine ?? (props.mode === 'edit' && props.routine ? props.routine : createRoutine('My practice', [], props.instrumentId)))
   const [screen, setScreen] = useState<'music' | 'lineup'>(() => props.initialRoutine || (props.mode === 'edit' && props.routine) ? 'lineup' : 'music')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -122,7 +125,11 @@ export default function MusicRoutineBuilder(props: RoutineBuilderProps) {
           const file = await prepareRoutineMusicFile(original)
           if (!alive.current) break
           const projectId = replacement?.projectId ?? await props.onCreatePracticeItem(musicExerciseTitle(file.name))
+          if (hasPracticeChart(projectId) && !await showConfirm({ title: 'Replace this score?', message: 'Replacing the music will remove its markings. Your recordings and tool settings will stay.', confirmLabel: 'Replace music', destructive: true })) continue
+          if (!alive.current) break
           await savePracticeChart(projectId, file)
+          if (!clearInkStrokes(projectId)) failures.push(`${file.name}: music was saved, but its previous markings could not be removed. Please retry replacing this score.`)
+          if (!alive.current) break
           const step = replacement ? createStep({ ...replacement, projectId, kind: 'record', desk: { ...(replacement.desk ?? blankDesk('audio')), mode: 'audio', showMusic: true } }) : createMusicExercise(file.name, projectId)
           // An imported exercise stays in recent music if the draft is closed.
           // Library failure must not disguise a successfully stored file.

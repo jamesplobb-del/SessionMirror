@@ -1,0 +1,5 @@
+$ node docs/audits/evidence-2026-10-06-tools-audit/widgets-probe.mjs
+CONFIRMED actual Drawer SSR: closing changes class and handle aria-expanded, but toolbar has no inert/aria-hidden guard.
+HANDLER ONLY: two ArrowDown calls move ball y220→244 without consulting occupied placements; a y288 peer would geometrically intersect. Not promoted: deliberate keyboard placement and no rendered occlusion evidence.
+
+exit=0

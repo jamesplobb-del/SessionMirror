@@ -1,0 +1,51 @@
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: slow start, one replay per take, speaker suppression, repeated cycles, noisy-room calibration
+PASS: stale pending entrance cancelled and monitor disabled cleanly
+PASS: missing microphone warms native capture instead of sitting idle
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: surface return, visibility return, and one minute idle
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: failed microphone setup automatically retries
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: saved-on cold launch, hung setup, and interrupted audio recovery
+[AutoSound] monitor setup { path: 'native-tap' }
+[AutoSound] monitor setup { path: 'native-tap' }
+[AutoSound] monitor setup { path: 'native-tap' }
+[AutoSound] monitor setup { path: 'native-tap' }
+PASS: native first-frame failure, native stall recovery, and active-take protection
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: production instrument profiles, noisy-room arming, bumps, gradual noise, soft entrances, warm-up entrances, and manual take isolation
+[AutoSound] monitor setup { path: 'native-tap' }
+[AutoSound] monitor setup { path: 'webkit' }
+[AutoSound] monitor setup { path: 'webkit' }
+PASS: native noisy-room recording and calibration with metronome already playing

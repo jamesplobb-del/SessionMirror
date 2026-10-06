@@ -1,0 +1,2 @@
+PASS: continuous color boundaries and color stops anchored to stored point positions.
+PASS: unchanged rewind geometry, immutable history, 30/60/120Hz time scale, dropout hold, real rests, suspension gaps, bounded history.

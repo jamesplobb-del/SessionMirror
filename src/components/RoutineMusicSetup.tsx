@@ -1,6 +1,9 @@
+import { useActionSheet } from '../context/ActionSheetContext'
+import { clearInkStrokes } from './practiceChart/chartInk'
+import { prepareRoutineMusicFile } from '../utils/routineMusic'
 import { requirePlus } from '../plus/plusAccess'
 import { FileMusic, Trash2, Upload } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { sheetMusicAcceptAttribute } from '../multitrack/sheetMusic/sheetMusicUtils'
 import {
   deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart,
@@ -23,6 +26,10 @@ interface RoutineMusicSetupProps {
  */
 export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem }: RoutineMusicSetupProps) {
   const input = useRef<HTMLInputElement>(null)
+  const working = useRef(false)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const { showConfirm } = useActionSheet()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
@@ -40,35 +47,51 @@ export default function RoutineMusicSetup({ step, onChange, onCreatePracticeItem
   const desk = step.desk ?? blankDesk('audio')
 
   const choose = async (file: File) => {
-    if (!requirePlus('music')) return
+    if (working.current || !requirePlus('music')) return
+    working.current = true
     setBusy(true)
     setError('')
     try {
-      // A step with music and no practice item is not a thing: the file has to
-      // land in a folder, so the folder is made the moment the file is picked.
+      const prepared = await prepareRoutineMusicFile(file)
+      if (!alive.current) return
+      if (step.projectId && hasPracticeChart(step.projectId) && !await showConfirm({ title: 'Replace this score?', message: 'Replacing the music will remove its markings. Your recordings and tool settings will stay.', confirmLabel: 'Replace music', destructive: true })) return
+      if (!alive.current) return
+      // Validate the selected file before creating a practice folder.
       const projectId = step.projectId ?? await onCreatePracticeItem(step.title)
-      await savePracticeChart(projectId, file)
+      if (!alive.current) return
+      await savePracticeChart(projectId, prepared)
+      const inkCleared = clearInkStrokes(projectId)
+      if (!alive.current) return
+      if (!inkCleared) setError('Music was saved, but its previous markings could not be removed. Please retry replacing this score.')
       onChange({ projectId, desk: { ...desk, mode: 'audio', showMusic: true } })
       setRevision(value => value + 1)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save this music.')
+      if (alive.current) setError(cause instanceof Error ? cause.message : 'Could not save this music.')
     } finally {
-      setBusy(false)
+      working.current = false
+      if (alive.current) setBusy(false)
     }
   }
 
   const remove = async () => {
-    if (!step.projectId) return
+    if (!step.projectId || working.current) return
+    working.current = true
     setBusy(true)
     setError('')
     try {
+      if (!await showConfirm({ title: 'Remove this score?', message: 'The music file and all markings on it will be deleted. Recordings stay in this practice item.', confirmLabel: 'Remove music', destructive: true })) return
+      if (!alive.current) return
       await deletePracticeChart(step.projectId)
+      const inkCleared = clearInkStrokes(step.projectId)
+      if (!alive.current) return
+      if (!inkCleared) setError('Music was removed, but its previous markings could not be cleared.')
       onChange({ projectId: step.projectId })
       setRevision(value => value + 1)
     } catch {
-      setError('Could not remove this music. Please try again.')
+      if (alive.current) setError('Could not remove this music. Please try again.')
     } finally {
-      setBusy(false)
+      working.current = false
+      if (alive.current) setBusy(false)
     }
   }
 

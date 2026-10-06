@@ -1,0 +1,4 @@
+$ node scripts/verify-tuner-microphone-ownership.mjs
+PASS: existing mic release, blocked competing requests, pending/denied/stale permission races, fallback, and 100 handoff cycles
+
+exit=0

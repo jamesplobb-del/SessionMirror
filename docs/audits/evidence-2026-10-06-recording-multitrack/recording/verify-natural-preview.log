@@ -1,0 +1,1 @@
+PASS: preview deduplication, original/baked/remote bypass, failed-render retry, pending-owner cancellation, settings cancellation, immediate playback during a stalled render, ready-cache reuse, no late source replacement

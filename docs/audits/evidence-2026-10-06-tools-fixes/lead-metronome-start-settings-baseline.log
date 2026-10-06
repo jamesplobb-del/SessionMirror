@@ -1,0 +1,22 @@
+Expected pre-fix production module regression failure (HEAD version; current dependencies).
+$ node docs/audits/evidence-2026-10-06-tools-fixes/lead-metronome-start-settings-baseline.mjs
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Successful Start reconciles the latest settings once
+
+0 !== 1
+
+    at file:///Users/jameslobb/Documents/BestTake/docs/audits/evidence-2026-10-06-tools-fixes/lead-metronome-start-settings-baseline.mjs:72:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.16.0
+
+exit=1

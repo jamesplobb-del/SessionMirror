@@ -413,8 +413,8 @@ export default function PracticeChartLayer({
   const persistStrokes = useCallback((next: InkStroke[]) => {
     strokesRef.current = next
     setStrokes(next)
-    setInkSaveFailed(!saveInkStrokes(projectId, next))
-  }, [projectId])
+    setInkSaveFailed(!saveInkStrokes(projectId, next, chart?.attachmentId ?? null))
+  }, [projectId, chart?.attachmentId])
   const handleStroke = useCallback((stroke: InkStroke) => {
     persistStrokes([...strokesRef.current, stroke])
   }, [persistStrokes])
@@ -726,7 +726,7 @@ export default function PracticeChartLayer({
     {active && inkSaveFailed && <div className="practice-chart-ink-warning" role="alert">
       <p>Your marking changes could not be saved. Keep this score open and save a PDF copy before leaving.</p>
       <button type="button" disabled={saving} onClick={() => void saveMarked()}>{saving ? 'Saving…' : 'Save PDF copy'}</button>
-      <button type="button" onClick={() => setInkSaveFailed(!saveInkStrokes(projectId, strokesRef.current))}>Retry saving markings</button>
+      <button type="button" onClick={() => setInkSaveFailed(!saveInkStrokes(projectId, strokesRef.current, chart?.attachmentId ?? null))}>Retry saving markings</button>
     </div>}
 
     <MusicWidget

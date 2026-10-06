@@ -34,7 +34,45 @@ export function shouldUseAudioModeNativePlayback(item: {
   return mime.startsWith('audio') || item.filePath.endsWith('.m4a')
 }
 
+interface PlaybackAttempt {
+  generation: number
+  routePreparation: Promise<void> | null
+  routeHeld: boolean
+  routeRelease: Promise<void> | null
+}
+
 let playbackGeneration = 0
+let currentAttempt: PlaybackAttempt | null = null
+let activeAttempt: PlaybackAttempt | null = null
+let nativePlaybackWork: Promise<unknown> = Promise.resolve()
+function enqueuePlayback<T>(operation: () => Promise<T>): Promise<T> {
+  const work = nativePlaybackWork.then(operation, operation)
+  nativePlaybackWork = work.catch(() => {})
+  return work
+}
+
+function releaseAttemptRoute(attempt: PlaybackAttempt): Promise<void> {
+  if (!attempt.routeRelease) {
+    attempt.routeRelease = (async () => {
+      await attempt.routePreparation?.catch(() => {})
+      if (!attempt.routeHeld) return
+      attempt.routeHeld = false
+      await releaseInlineTakeBoxPlaybackRoute()
+    })()
+  }
+  return attempt.routeRelease
+}
+
+async function stopActiveAttempt(): Promise<void> {
+  const attempt = activeAttempt
+  if (!attempt) return
+  activeAttempt = null
+  try {
+    await stopNativeInlineTakeBoxPlayback({ notify: false, ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER })
+  } finally {
+    await releaseAttemptRoute(attempt)
+  }
+}
 let endedHandler: (() => void) | null = null
 let endedListenerInstalled = false
 export function setAudioModeNativePlaybackEndedHandler(handler: (() => void) | null): void {
@@ -62,42 +100,61 @@ export async function startAudioModeNativePlayback(options: {
 }): Promise<{ duration: number } | null> {
   if (!shouldUseAudioModeNativePlayback({ filePath: options.filePath })) return null
 
-  const generation = ++playbackGeneration
-  const fileURL = await resolveNativeFileUri(options.filePath)
-  if (!fileURL) {
-    console.warn('[AudioModeNativePlayback] could not resolve file URI', options.filePath)
-    return null
+  const attempt: PlaybackAttempt = {
+    generation: ++playbackGeneration,
+    routePreparation: null,
+    routeHeld: false,
+    routeRelease: null,
   }
-
-  // Camera-mode BestTakeBox uses this lightweight loud-speaker route.
-  await prepareInlineTakeBoxPlaybackRoute()
-  ensureEndedListener()
-
-  const startTime =
-    typeof options.startTime === 'number' && Number.isFinite(options.startTime)
-      ? Math.max(0, options.startTime)
-      : 0
-  const gainDb =
-    typeof options.gainDb === 'number' && Number.isFinite(options.gainDb)
-      ? Math.max(0, Math.min(options.gainDb, 30))
-      : 0
+  currentAttempt = attempt
+  const isCurrent = () => currentAttempt === attempt && attempt.generation === playbackGeneration
+  let started = false
 
   try {
+    const fileURL = await resolveNativeFileUri(options.filePath)
+    if (!isCurrent()) return null
+    if (!fileURL) {
+      console.warn('[AudioModeNativePlayback] could not resolve file URI', options.filePath)
+      return null
+    }
+
+    // Each start owns one lease, including while the native route is preparing.
+    attempt.routeHeld = true
+    attempt.routePreparation = prepareInlineTakeBoxPlaybackRoute()
+    await attempt.routePreparation
+    if (!isCurrent()) return null
+    ensureEndedListener()
+
+    const startTime = typeof options.startTime === 'number' && Number.isFinite(options.startTime)
+      ? Math.max(0, options.startTime) : 0
+    const gainDb = typeof options.gainDb === 'number' && Number.isFinite(options.gainDb)
+      ? Math.max(0, Math.min(options.gainDb, 30)) : 0
     const url = await readyNaturalTakePreview(fileURL, 'audio')
-    if (generation !== playbackGeneration) return null
-    const result = await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
-      url,
-      x: HEADLESS_INLINE_LAYOUT.x,
-      y: HEADLESS_INLINE_LAYOUT.y,
-      width: HEADLESS_INLINE_LAYOUT.width,
-      height: HEADLESS_INLINE_LAYOUT.height,
-      cornerRadius: HEADLESS_INLINE_LAYOUT.cornerRadius,
-      volume: 1,
-      audioOnly: true,
-      loudnessGainDb: url === fileURL ? gainDb : 0,
-      ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
-      startTime,
+    if (!isCurrent()) return null
+
+    const result = await enqueuePlayback(async () => {
+      if (!isCurrent()) return null
+      await stopActiveAttempt()
+      if (!isCurrent()) return null
+      const playback = await BestTakeAudioPlugin.startInlineTakeBoxPlayback({
+        url,
+        ...HEADLESS_INLINE_LAYOUT,
+        volume: 1,
+        audioOnly: true,
+        loudnessGainDb: url === fileURL ? gainDb : 0,
+        ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
+        startTime,
+      })
+      activeAttempt = attempt
+      // A Stop or replacement issued during native startup must settle first.
+      if (!isCurrent()) {
+        await stopActiveAttempt()
+        return null
+      }
+      return playback
     })
+    if (!result || !isCurrent()) return null
+    started = true
     const duration = typeof result.duration === 'number' ? result.duration : 0
     console.info('[AudioModeNativePlayback] started inline AVPlayer (camera parity)', {
       duration,
@@ -109,27 +166,34 @@ export async function startAudioModeNativePlayback(options: {
     return { duration }
   } catch (error) {
     console.warn('[AudioModeNativePlayback] failed to start', error)
-    await releaseInlineTakeBoxPlaybackRoute()
     return null
+  } finally {
+    if (!started) {
+      await enqueuePlayback(async () => {
+        if (activeAttempt === attempt) await stopActiveAttempt()
+      })
+      await releaseAttemptRoute(attempt)
+    }
   }
 }
 
 /** Route cleanup after natural end — player already stopped natively. */
 export async function releaseAudioModeNativePlaybackRoute(): Promise<void> {
-  if (!isNativeInlineTakeBoxPlaybackAvailable()) return
-  await releaseInlineTakeBoxPlaybackRoute()
+  const attempt = activeAttempt
+  if (!attempt) return
+  activeAttempt = null
+  if (currentAttempt === attempt) currentAttempt = null
+  await releaseAttemptRoute(attempt)
 }
 
 export async function stopAudioModeNativePlayback(): Promise<void> {
-  playbackGeneration += 1
+  const generation = ++playbackGeneration
+  const attempt = currentAttempt
+  currentAttempt = null
   if (!isNativeInlineTakeBoxPlaybackAvailable()) return
-  try {
-    await stopNativeInlineTakeBoxPlayback({
-      notify: false,
-      ownerId: AUDIO_MODE_NATIVE_PLAYBACK_OWNER,
-    })
-  } catch {
-    /* ignore */
-  }
-  await releaseInlineTakeBoxPlaybackRoute()
+  await enqueuePlayback(async () => {
+    // A newer request can acquire a lease while this stop waits in the queue.
+    if (activeAttempt && activeAttempt.generation < generation) await stopActiveAttempt()
+  })
+  if (attempt) await releaseAttemptRoute(attempt)
 }

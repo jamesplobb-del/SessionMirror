@@ -1,0 +1,593 @@
+{
+  "runtime": "Chrome headless / SwiftShader",
+  "viewports": [
+    {
+      "device": "phone",
+      "mode": "staff",
+      "passed": true,
+      "current": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": {
+          "staffGap": 32.7,
+          "activeHeadWidth": 46.5,
+          "activeWithin": true,
+          "clefWithin": true
+        },
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "phone",
+      "mode": "balance",
+      "passed": true,
+      "current": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "phone",
+      "mode": "learn",
+      "passed": true,
+      "current": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "phone",
+      "mode": "hub",
+      "passed": true,
+      "current": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": {
+        "currentTrumpet": true,
+        "conceptTrumpet": true
+      }
+    },
+    {
+      "device": "tablet",
+      "mode": "staff",
+      "passed": true,
+      "current": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": {
+          "staffGap": 56.8,
+          "activeHeadWidth": 80.9,
+          "activeWithin": true,
+          "clefWithin": true
+        },
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "tablet",
+      "mode": "balance",
+      "passed": true,
+      "current": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "tablet",
+      "mode": "learn",
+      "passed": true,
+      "current": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "tablet",
+      "mode": "hub",
+      "passed": true,
+      "current": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          820,
+          1180
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": {
+        "currentTrumpet": true,
+        "conceptTrumpet": true
+      }
+    },
+    {
+      "device": "landscape",
+      "mode": "staff",
+      "passed": true,
+      "current": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": {
+          "staffGap": 37.8,
+          "activeHeadWidth": 53.8,
+          "activeWithin": true,
+          "clefWithin": true
+        },
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "landscape",
+      "mode": "balance",
+      "passed": true,
+      "current": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "landscape",
+      "mode": "learn",
+      "passed": true,
+      "current": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": null
+    },
+    {
+      "device": "landscape",
+      "mode": "hub",
+      "passed": true,
+      "current": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 0
+      },
+      "concept": {
+        "viewport": [
+          1024,
+          768
+        ],
+        "horizontalOverflow": false,
+        "offscreen": [],
+        "internalOverflow": [],
+        "notation": null,
+        "canvasCount": 1
+      },
+      "hubInstrument": {
+        "currentTrumpet": true,
+        "conceptTrumpet": true
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "label": "Staff initial note synchronized",
+      "passed": true,
+      "actual": "F",
+      "expected": "F"
+    },
+    {
+      "label": "Staff Play 1 synchronized",
+      "passed": true,
+      "actual": "E",
+      "expected": "E"
+    },
+    {
+      "label": "CloudScore active note count",
+      "passed": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "label": "Staff Play 2 synchronized",
+      "passed": true,
+      "actual": "D",
+      "expected": "D"
+    },
+    {
+      "label": "CloudScore active note count",
+      "passed": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "label": "Staff Play 3 synchronized",
+      "passed": true,
+      "actual": "E",
+      "expected": "E"
+    },
+    {
+      "label": "CloudScore active note count",
+      "passed": true,
+      "actual": 1,
+      "expected": 1
+    },
+    {
+      "label": "Staff Pause both",
+      "passed": true,
+      "actual": [
+        1,
+        1
+      ],
+      "expected": [
+        1,
+        1
+      ]
+    },
+    {
+      "label": "Staff Reset note",
+      "passed": true,
+      "actual": [
+        "F",
+        "F"
+      ],
+      "expected": [
+        "F",
+        "F"
+      ]
+    },
+    {
+      "label": "Staff Reset score",
+      "passed": true,
+      "actual": "Score 0",
+      "expected": "Score 0"
+    },
+    {
+      "label": "Staff Reset resumes both",
+      "passed": true,
+      "actual": [
+        0,
+        0
+      ],
+      "expected": [
+        0,
+        0
+      ]
+    },
+    {
+      "label": "Balance shared timer exact after hold",
+      "passed": true,
+      "actual": "3.7s",
+      "expected": "3.7s"
+    },
+    {
+      "label": "Balance progresses in tune",
+      "passed": true,
+      "actual": {
+        "start": [
+          "2.2s",
+          "2.2s"
+        ],
+        "held": [
+          "3.7s",
+          "3.7s"
+        ]
+      }
+    },
+    {
+      "label": "Balance Pause freezes both",
+      "passed": true,
+      "actual": [
+        "3.7s",
+        "3.7s"
+      ],
+      "expected": [
+        "3.7s",
+        "3.7s"
+      ]
+    },
+    {
+      "label": "Balance sharp drift stops both",
+      "passed": true,
+      "actual": [
+        "3.7s",
+        "3.7s"
+      ],
+      "expected": [
+        "3.7s",
+        "3.7s"
+      ]
+    },
+    {
+      "label": "Balance shared drift time",
+      "passed": true,
+      "actual": "3.7s",
+      "expected": "3.7s"
+    },
+    {
+      "label": "Balance drift feedback",
+      "passed": true,
+      "actual": "+20\u00a2 \u00b7 A little sharp",
+      "expected": "+20\u00a2 \u00b7 A little sharp"
+    },
+    {
+      "label": "Balance Release freezes both",
+      "passed": true,
+      "actual": [
+        "4.8s",
+        "4.8s"
+      ],
+      "expected": [
+        "4.8s",
+        "4.8s"
+      ]
+    },
+    {
+      "label": "Balance Reset both",
+      "passed": true,
+      "actual": [
+        "2.2s",
+        "2.2s"
+      ],
+      "expected": [
+        "2.2s",
+        "2.2s"
+      ]
+    },
+    {
+      "label": "Learn Next synchronized",
+      "passed": true,
+      "actual": [
+        "2/8",
+        "2/8"
+      ],
+      "expected": [
+        "2/8",
+        "2/8"
+      ]
+    },
+    {
+      "label": "Learn Previous synchronized",
+      "passed": true,
+      "actual": [
+        "1/8",
+        "1/8"
+      ],
+      "expected": [
+        "1/8",
+        "1/8"
+      ]
+    },
+    {
+      "label": "Hub accessible destinations",
+      "passed": true,
+      "actual": 3,
+      "expected": 3
+    },
+    {
+      "label": "Hub destination enters synchronized Staff view",
+      "passed": true,
+      "actual": true,
+      "expected": true
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "passed": true,
+  "additionalChecks": {
+    "typecheck": "passed",
+    "productionFixtureBuild": "passed",
+    "builtLandscapeStaff": {
+      "pageErrors": [],
+      "badResponses": [],
+      "scoreWidth": 460.8,
+      "worldWidth": 563.2,
+      "sameTop": true,
+      "horizontalOverflow": false
+    },
+    "shortLandscapeLearn": {
+      "viewport": [
+        844,
+        390
+      ],
+      "pageErrors": [],
+      "staffHeight": 143.2,
+      "noteheadHeight": 23.8,
+      "clefAndC4LedgerVisible": true,
+      "fingeringDiagramVisible": true
+    }
+  }
+}

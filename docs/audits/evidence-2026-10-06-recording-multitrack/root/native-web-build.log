@@ -1,0 +1,151 @@
+
+> besttake@2.3.0 build
+> npm run copy:sql:wasm && npm run copy:pdf:fonts && tsc -b && vite build
+
+
+> besttake@2.3.0 copy:sql:wasm
+> copyfiles -u 3 node_modules/sql.js/dist/sql-wasm.wasm public/assets
+
+
+> besttake@2.3.0 copy:pdf:fonts
+> copyfiles -u 2 "node_modules/pdfjs-dist/standard_fonts/*" public/assets
+
+vite v6.4.3 building for production...
+[sentry-vite-plugin] Info: Sending telemetry data on issues and performance to Sentry. To disable telemetry, set `options.telemetry` to `false`.
+transforming...
+✓ 3161 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       1.50 kB │ gzip:   0.61 kB
+dist/assets/learn-instrument-TZdqTN-g.jpg            84.00 kB
+dist/assets/staff-jumper-BOKyMJ_6.jpg                86.75 kB
+dist/assets/balance-B_01WfPR.jpg                     89.63 kB
+dist/assets/pdf.worker.min-rsCePomN.mjs           1,417.59 kB
+dist/assets/LearnInstrumentScreen-DGl_-sGm.css       12.19 kB │ gzip:   2.86 kB
+dist/assets/OnboardingTutorial-BkcZUaCc.css          17.05 kB │ gzip:   3.71 kB
+dist/assets/PracticeChartLayer-Dj2Fcp5g.css          20.75 kB │ gzip:   4.33 kB
+dist/assets/BalanceScreen-BQ8gtPnN.css               43.05 kB │ gzip:   9.60 kB
+dist/assets/LabsOverlay-Cl93OqGk.css                 96.61 kB │ gzip:  18.57 kB
+dist/assets/App-Dr3ovT7T.css                        170.03 kB │ gzip:  28.78 kB
+dist/assets/index-CmSptOwM.css                    1,189.82 kB │ gzip: 178.16 kB
+dist/assets/useVideoPlayback-99DL9WkG.js              0.63 kB │ gzip:   0.43 kB │ map:     1.89 kB
+dist/assets/useHeadphoneOutput-YOa2nHmH.js            0.75 kB │ gzip:   0.44 kB │ map:     1.79 kB
+dist/assets/AnimatedExpand-CF7O7CIm.js                0.83 kB │ gzip:   0.51 kB │ map:     1.63 kB
+dist/assets/videoDuration-AHkYpQ1z.js                 0.90 kB │ gzip:   0.50 kB │ map:     2.35 kB
+dist/assets/readMultitrackAsset-DF79c9vu.js           1.49 kB │ gzip:   0.87 kB │ map:     3.25 kB
+dist/assets/usePinchResize-Dt3-0Twl.js                2.25 kB │ gzip:   0.98 kB │ map:     8.18 kB
+dist/assets/CoachMark-CV0TZieE.js                     3.71 kB │ gzip:   1.68 kB │ map:    10.65 kB
+dist/assets/DraggableTakesWidget-DHKrsflS.js          3.91 kB │ gzip:   1.77 kB │ map:    10.38 kB
+dist/assets/DraggablePitchWidget-BXT_O6sH.js          5.16 kB │ gzip:   2.35 kB │ map:    15.39 kB
+dist/assets/DraggableDroneWidget-M4AJc-vS.js          6.20 kB │ gzip:   2.47 kB │ map:    19.77 kB
+dist/assets/OnboardingTutorial-qiJVu2eO.js            8.50 kB │ gzip:   3.17 kB │ map:    21.19 kB
+dist/assets/DraggableMetronomeWidget-Ddwb-SHj.js     10.55 kB │ gzip:   4.10 kB │ map:    36.52 kB
+dist/assets/capacitor-Dx5g2ysa.js                    27.58 kB │ gzip:   8.85 kB │ map:   100.19 kB
+dist/assets/SettingsDrawer-Xd8DNpjM.js               33.29 kB │ gzip:  10.90 kB │ map:    87.66 kB
+dist/assets/ReviewModeOverlay-DgmH3zxs.js            33.33 kB │ gzip:  11.08 kB │ map:   127.07 kB
+dist/assets/LearnInstrumentScreen-BDu1N_zp.js        34.49 kB │ gzip:  10.57 kB │ map:   129.42 kB
+dist/assets/TakeVaultDrawer-CNJKjb8G.js              35.67 kB │ gzip:  10.36 kB │ map:   118.11 kB
+dist/assets/PracticeChartLayer-BpXyq0pI.js           38.21 kB │ gzip:  12.89 kB │ map:   144.15 kB
+dist/assets/motion-BN--DkwH.js                       39.46 kB │ gzip:  14.07 kB │ map:   230.43 kB
+dist/assets/BalanceScreen-DzVn2RkP.js                65.41 kB │ gzip:  17.69 kB │ map:   217.69 kB
+dist/assets/LabsOverlay-DIO_wrhU.js                 143.13 kB │ gzip:  45.53 kB │ map:   658.53 kB
+dist/assets/MultitrackOverlay-CXxOvCQC.js           201.09 kB │ gzip:  60.26 kB │ map:   702.22 kB
+dist/assets/sqlite-Dqv-EVOh.js                      338.86 kB │ gzip:  94.27 kB │ map: 1,093.47 kB
+dist/assets/index-C7ajGzdS.js                       395.78 kB │ gzip: 117.39 kB │ map: 1,501.74 kB
+dist/assets/pdfjs-BrRpCr_7.js                       410.08 kB │ gzip: 123.44 kB │ map: 1,428.18 kB
+dist/assets/App-pClmMgXa.js                         802.00 kB │ gzip: 232.65 kB │ map: 2,953.36 kB
+dist/assets/vendor-B-uD0B3W.js                      897.03 kB │ gzip: 323.96 kB │ map: 3,767.38 kB
+> Found 54 files
+> Analyzing 54 sources
+> Adding source map references
+> Bundled 54 files for upload
+> Bundle ID: af69a5c2-d128-5d78-a63f-62dcc65f05e7
+> Uploaded files to Sentry
+> File upload complete (processing pending on server)
+> Organization: besttake
+> Projects: capacitor
+> Release: besttake@2.3.0
+> Dist: None
+> Upload type: artifact bundle
+
+Source Map Upload Report
+  Scripts
+    ~/04448c05-4276-47b4-8da9-01526ed66571-14.js (sourcemap at SettingsDrawer-Xd8DNpjM.js.map, debug id 04448c05-4276-47b4-8da9-01526ed66571)
+    ~/0f19b1e5-d341-4165-987a-b220e2bcb558-26.js (sourcemap at vendor-B-uD0B3W.js.map, debug id 0f19b1e5-d341-4165-987a-b220e2bcb558)
+    ~/11d17288-34b8-44a4-ac1f-fe3cd045da9e-25.js (sourcemap at useVideoPlayback-99DL9WkG.js.map, debug id 11d17288-34b8-44a4-ac1f-fe3cd045da9e)
+    ~/1ee22d77-b77c-45a8-8924-47db6b9c59ac-15.js (sourcemap at TakeVaultDrawer-CNJKjb8G.js.map, debug id 1ee22d77-b77c-45a8-8924-47db6b9c59ac)
+    ~/23fa2370-b40e-48e5-a8ce-96e245c90d7c-27.js (sourcemap at videoDuration-AHkYpQ1z.js.map, debug id 23fa2370-b40e-48e5-a8ce-96e245c90d7c)
+    ~/2504b07e-2964-46a1-902b-62da720f83dd-8.js (sourcemap at LabsOverlay-DIO_wrhU.js.map, debug id 2504b07e-2964-46a1-902b-62da720f83dd)
+    ~/26bc2678-0931-4864-a906-35c66d2c8802-7.js (sourcemap at DraggableTakesWidget-DHKrsflS.js.map, debug id 26bc2678-0931-4864-a906-35c66d2c8802)
+    ~/308647db-2916-4bb2-b482-7c3e33c22fa4-13.js (sourcemap at ReviewModeOverlay-DgmH3zxs.js.map, debug id 308647db-2916-4bb2-b482-7c3e33c22fa4)
+    ~/38c62407-aa45-49d6-a9c9-c994ba6c3f1b-1.js (sourcemap at App-pClmMgXa.js.map, debug id 38c62407-aa45-49d6-a9c9-c994ba6c3f1b)
+    ~/3a6171d9-1528-45a1-a6f7-dea497b51c36-9.js (sourcemap at LearnInstrumentScreen-BDu1N_zp.js.map, debug id 3a6171d9-1528-45a1-a6f7-dea497b51c36)
+    ~/4ff7c3e6-7d89-4a5b-b9d9-37064fca2987-6.js (sourcemap at DraggablePitchWidget-BXT_O6sH.js.map, debug id 4ff7c3e6-7d89-4a5b-b9d9-37064fca2987)
+    ~/5c3ba316-b172-4d73-a96c-266cdf443b8f-18.js (sourcemap at motion-BN--DkwH.js.map, debug id 5c3ba316-b172-4d73-a96c-266cdf443b8f)
+    ~/761d5b6f-effc-4c6e-89e8-2e944b09d622-4.js (sourcemap at DraggableDroneWidget-M4AJc-vS.js.map, debug id 761d5b6f-effc-4c6e-89e8-2e944b09d622)
+    ~/771455ee-d51c-4644-a460-1b4ec01bc14f-2.js (sourcemap at BalanceScreen-DzVn2RkP.js.map, debug id 771455ee-d51c-4644-a460-1b4ec01bc14f)
+    ~/8756dd4b-d3ff-4695-9cee-ca28262b81e4-20.js (sourcemap at pdfjs-BrRpCr_7.js.map, debug id 8756dd4b-d3ff-4695-9cee-ca28262b81e4)
+    ~/9b6ef3e0-1a96-494a-b80b-d1a7fca96b57-5.js (sourcemap at DraggableMetronomeWidget-Ddwb-SHj.js.map, debug id 9b6ef3e0-1a96-494a-b80b-d1a7fca96b57)
+    ~/a247f3e5-14d8-4329-9047-d0a945325fd1-17.js (sourcemap at index-C7ajGzdS.js.map, debug id a247f3e5-14d8-4329-9047-d0a945325fd1)
+    ~/a7a65951-9eaa-4059-9802-10142c3ad4d0-22.js (sourcemap at sqlite-Dqv-EVOh.js.map, debug id a7a65951-9eaa-4059-9802-10142c3ad4d0)
+    ~/b82135bb-9014-4d0b-89ee-2df8bcbc2bf0-10.js (sourcemap at MultitrackOverlay-CXxOvCQC.js.map, debug id b82135bb-9014-4d0b-89ee-2df8bcbc2bf0)
+    ~/bd4201c0-ae8a-4fcc-a42d-ca0a50be2f30-3.js (sourcemap at CoachMark-CV0TZieE.js.map, debug id bd4201c0-ae8a-4fcc-a42d-ca0a50be2f30)
+    ~/c109d19c-7232-4c05-8f5a-6f0cae2a8326-24.js (sourcemap at usePinchResize-Dt3-0Twl.js.map, debug id c109d19c-7232-4c05-8f5a-6f0cae2a8326)
+    ~/d4bba748-4924-40f0-a6a5-ce5e931821fb-21.js (sourcemap at readMultitrackAsset-DF79c9vu.js.map, debug id d4bba748-4924-40f0-a6a5-ce5e931821fb)
+    ~/dc4e3e40-7114-431a-91b1-be832fb95d99-12.js (sourcemap at PracticeChartLayer-BpXyq0pI.js.map, debug id dc4e3e40-7114-431a-91b1-be832fb95d99)
+    ~/e2191554-3dd7-4916-ac82-d9f8f0e4604a-11.js (sourcemap at OnboardingTutorial-qiJVu2eO.js.map, debug id e2191554-3dd7-4916-ac82-d9f8f0e4604a)
+    ~/e28e03fc-5476-47f0-8c41-b36fd43ce81c-0.js (sourcemap at AnimatedExpand-CF7O7CIm.js.map, debug id e28e03fc-5476-47f0-8c41-b36fd43ce81c)
+    ~/f472ed43-fd01-49c0-8b18-62039baf31ac-16.js (sourcemap at capacitor-Dx5g2ysa.js.map, debug id f472ed43-fd01-49c0-8b18-62039baf31ac)
+    ~/fd39cba5-09cb-40d8-9a51-620474603119-23.js (sourcemap at useHeadphoneOutput-YOa2nHmH.js.map, debug id fd39cba5-09cb-40d8-9a51-620474603119)
+  Source Maps
+    ~/04448c05-4276-47b4-8da9-01526ed66571-14.js.map (debug id 04448c05-4276-47b4-8da9-01526ed66571)
+    ~/0f19b1e5-d341-4165-987a-b220e2bcb558-26.js.map (debug id 0f19b1e5-d341-4165-987a-b220e2bcb558)
+    ~/11d17288-34b8-44a4-ac1f-fe3cd045da9e-25.js.map (debug id 11d17288-34b8-44a4-ac1f-fe3cd045da9e)
+    ~/1ee22d77-b77c-45a8-8924-47db6b9c59ac-15.js.map (debug id 1ee22d77-b77c-45a8-8924-47db6b9c59ac)
+    ~/23fa2370-b40e-48e5-a8ce-96e245c90d7c-27.js.map (debug id 23fa2370-b40e-48e5-a8ce-96e245c90d7c)
+    ~/2504b07e-2964-46a1-902b-62da720f83dd-8.js.map (debug id 2504b07e-2964-46a1-902b-62da720f83dd)
+    ~/26bc2678-0931-4864-a906-35c66d2c8802-7.js.map (debug id 26bc2678-0931-4864-a906-35c66d2c8802)
+    ~/308647db-2916-4bb2-b482-7c3e33c22fa4-13.js.map (debug id 308647db-2916-4bb2-b482-7c3e33c22fa4)
+    ~/38c62407-aa45-49d6-a9c9-c994ba6c3f1b-1.js.map (debug id 38c62407-aa45-49d6-a9c9-c994ba6c3f1b)
+    ~/3a6171d9-1528-45a1-a6f7-dea497b51c36-9.js.map (debug id 3a6171d9-1528-45a1-a6f7-dea497b51c36)
+    ~/4ff7c3e6-7d89-4a5b-b9d9-37064fca2987-6.js.map (debug id 4ff7c3e6-7d89-4a5b-b9d9-37064fca2987)
+    ~/5c3ba316-b172-4d73-a96c-266cdf443b8f-18.js.map (debug id 5c3ba316-b172-4d73-a96c-266cdf443b8f)
+    ~/761d5b6f-effc-4c6e-89e8-2e944b09d622-4.js.map (debug id 761d5b6f-effc-4c6e-89e8-2e944b09d622)
+    ~/771455ee-d51c-4644-a460-1b4ec01bc14f-2.js.map (debug id 771455ee-d51c-4644-a460-1b4ec01bc14f)
+    ~/8756dd4b-d3ff-4695-9cee-ca28262b81e4-20.js.map (debug id 8756dd4b-d3ff-4695-9cee-ca28262b81e4)
+    ~/9b6ef3e0-1a96-494a-b80b-d1a7fca96b57-5.js.map (debug id 9b6ef3e0-1a96-494a-b80b-d1a7fca96b57)
+    ~/a247f3e5-14d8-4329-9047-d0a945325fd1-17.js.map (debug id a247f3e5-14d8-4329-9047-d0a945325fd1)
+    ~/a7a65951-9eaa-4059-9802-10142c3ad4d0-22.js.map (debug id a7a65951-9eaa-4059-9802-10142c3ad4d0)
+    ~/b82135bb-9014-4d0b-89ee-2df8bcbc2bf0-10.js.map (debug id b82135bb-9014-4d0b-89ee-2df8bcbc2bf0)
+    ~/bd4201c0-ae8a-4fcc-a42d-ca0a50be2f30-3.js.map (debug id bd4201c0-ae8a-4fcc-a42d-ca0a50be2f30)
+    ~/c109d19c-7232-4c05-8f5a-6f0cae2a8326-24.js.map (debug id c109d19c-7232-4c05-8f5a-6f0cae2a8326)
+    ~/d4bba748-4924-40f0-a6a5-ce5e931821fb-21.js.map (debug id d4bba748-4924-40f0-a6a5-ce5e931821fb)
+    ~/dc4e3e40-7114-431a-91b1-be832fb95d99-12.js.map (debug id dc4e3e40-7114-431a-91b1-be832fb95d99)
+    ~/e2191554-3dd7-4916-ac82-d9f8f0e4604a-11.js.map (debug id e2191554-3dd7-4916-ac82-d9f8f0e4604a)
+    ~/e28e03fc-5476-47f0-8c41-b36fd43ce81c-0.js.map (debug id e28e03fc-5476-47f0-8c41-b36fd43ce81c)
+    ~/f472ed43-fd01-49c0-8b18-62039baf31ac-16.js.map (debug id f472ed43-fd01-49c0-8b18-62039baf31ac)
+    ~/fd39cba5-09cb-40d8-9a51-620474603119-23.js.map (debug id fd39cba5-09cb-40d8-9a51-620474603119)
+[sentry-vite-plugin] Info: Successfully uploaded source maps to Sentry
+✓ built in 1m 25s
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/playbackRouteCoordinator.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/BestTakeBox.tsx, /Users/jameslobb/Documents/BestTake/src/components/LiveCameraBackground.tsx, /Users/jameslobb/Documents/BestTake/src/components/PipWindow.tsx, /Users/jameslobb/Documents/BestTake/src/context/AudioModePlaybackContext.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/components/MultitrackOverlay.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/synchronization/useMultitrackSync.ts, /Users/jameslobb/Documents/BestTake/src/utils/audioModeNativePlayback.ts, /Users/jameslobb/Documents/BestTake/src/utils/cameraSessionState.ts, /Users/jameslobb/Documents/BestTake/src/utils/nativeCameraTest.ts, /Users/jameslobb/Documents/BestTake/src/utils/takePlaybackAudio.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/nativeInlineTakeBoxPlayback.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/utils/takePlaybackAudio.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/BestTakeBox.tsx, /Users/jameslobb/Documents/BestTake/src/components/GuidedTakeReview.tsx, /Users/jameslobb/Documents/BestTake/src/components/PipWindow.tsx, /Users/jameslobb/Documents/BestTake/src/context/TakeGuidanceContext.tsx, /Users/jameslobb/Documents/BestTake/src/utils/audioModeNativePlayback.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/generateThumbnail.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/utils/takeThumbnailCache.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/ReviewModeOverlay.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/components/practiceChart/chartDocument.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/components/ScoreThumbnail.tsx, /Users/jameslobb/Documents/BestTake/src/utils/routineMusic.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/components/PracticeChartLayer.tsx, /Users/jameslobb/Documents/BestTake/src/components/practiceChart/PracticeChartPaper.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/sheetMusic/SheetPdfPages.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/sheetMusic/sheetPdfSource.ts, dynamic import will not move module into another chunk.
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+> Analyzing completed in 0.034s
+> Bundling completed in 0.95s
+> Optimizing completed in 0.025s
+> Uploading completed in 7.866s
+> Processing completed in 0.224s

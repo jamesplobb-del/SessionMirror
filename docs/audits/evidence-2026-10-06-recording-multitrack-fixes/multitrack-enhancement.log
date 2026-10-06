@@ -1,0 +1,15 @@
+PASS: migration, strength boundaries and zero-amount bypass
+PASS: Camera playback subscriptions follow enhancer toggles
+PASS: native enhancement follows enable, bypass, baked-take and slider settings
+Checking clean-musical-decay
+Checking quiet-sustain
+Checking steady-noise-plus-instrument
+Checking brushes-and-decays
+Checking stereo
+Checking zero-amount
+Checking quiet-global-gain
+Checking aac-export
+Checking one-sample
+Checking silence
+PASS: tone, low notes, quiet sustain, transients, stereo phase, exact duration, bypass, silence, gain limits, invalid parameters
+Measured background change: -1.42 dB; musical passage change: -0.001 dB

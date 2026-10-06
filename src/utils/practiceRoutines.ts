@@ -415,7 +415,10 @@ export function loadRoutineDay(routine: Routine): RoutineDay {
   try {
     const raw = localStorage.getItem(DAY_KEY)
     const legacy = raw ? parseDay(JSON.parse(raw)) : null
-    if (legacy && !loadRoutineHistory(legacy.routineId).some(row => row.date === legacy.date)) saveRoutineDay(pauseRoutineDay(legacy, legacy.updatedAt))
+    if (legacy && !loadRoutineHistory(legacy.routineId).some(row => row.date === legacy.date)) {
+      // Archiving is best effort: a failed write must not discard a readable day.
+      try { saveRoutineDay(pauseRoutineDay(legacy, legacy.updatedAt)) } catch { /* Retain the legacy candidate below. */ }
+    }
     const saved = loadRoutineHistory(routine.id).find(row => row.date === todayKey())
     const candidate = legacy?.routineId === routine.id && legacy.date === todayKey() ? legacy : null
     const parsed = saved && (!candidate || saved.updatedAt > candidate.updatedAt) ? saved : candidate

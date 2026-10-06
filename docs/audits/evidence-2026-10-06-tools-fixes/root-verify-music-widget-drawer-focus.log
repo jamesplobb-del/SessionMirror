@@ -1,0 +1,1 @@
+PASS: actual Drawer SSR closed dock inert/aria-hidden, handle unaffected, reopened dock restored; isolated production effect/callback external close, inside/outside focus, click/swipe/cancel; actual helper normal/closed/null launcher focus. No live DOM/browser/VoiceOver or full widget hook integration.

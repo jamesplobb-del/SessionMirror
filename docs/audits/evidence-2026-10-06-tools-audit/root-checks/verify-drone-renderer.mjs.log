@@ -1,0 +1,1 @@
+PASS: native Swift renderer, 1200 pitch/timbre/volume/chord changes, finite bounded stereo audio, contended lock, stop fade; stress seconds=1.1123580932617188

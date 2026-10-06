@@ -1,0 +1,123 @@
+PASS test reset rejects pending transitions and clears settled fixtures
+PASS final cancel awaits pending native apply and duplicate cleanup shares restore
+PASS surviving concurrent playback lease is not restored early
+PASS new owner during camera snapshot preserves the engaged route
+PASS new player waits for an already-started capture restore then reapplies
+PASS capture owner preserved {"previewActive":true,"recordingActive":false,"recordingMode":"audio"}
+PASS capture owner preserved {"previewActive":false,"recordingActive":true,"recordingMode":"audio"}
+PASS capture owner preserved {"previewActive":false,"recordingActive":false,"recordingMode":"video"}
+PASS headphone owner arriving during snapshot preserves its session
+PASS native apply reject releases without fake restore and permits retry
+[AudioRoute] Web playback route unchanged { routeApplied: false }
+PASS native apply not-applied releases without fake restore and permits retry
+PASS Stop during uri awaits cleanup and prevents late playback
+PASS Stop during prepare awaits cleanup and prevents late playback
+PASS Stop during preview awaits cleanup and prevents late playback
+PASS Stop during native awaits cleanup and prevents late playback
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS slow A/fast B/Stop releases both owned leases and preserves an independent consumer
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS replacement waits for stale native start cleanup before starting B
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS late canceled preparation cannot stop a newer active preview
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS uri failure releases only acquired ownership and allows retry
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS prepare failure releases only acquired ownership and allows retry
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS preview failure releases only acquired ownership and allows retry
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS native failure releases only acquired ownership and allows retry
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+PASS natural end and repeated cleanup release exactly one owned lease
+Native playback ownership: 23 cases passed with explicit ports; native acoustics unverified.
+[AudioRoute] Native stereo route apply failed; Web Audio playback unchanged. Error: injected apply failure
+    at f.apply (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:73:79)
+    at Object.enableStereoPlayback (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:27:80)
+    at file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-10.mjs:54:56
+    at ensureNativeStereoRouteEngaged (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-10.mjs:59:7)
+    at Module.engageStereoPlaybackAsync (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-10.mjs:77:9)
+    at file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:74:15
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async check (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:33:33)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:72:48
+[AudioModeNativePlayback] failed to start Error: injected uri failure
+    at Object.fail [as uri] (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:114:59)
+    at Object.resolve (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:81:18)
+    at resolveNativeFileUri (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-19.mjs:12:63)
+    at Module.startAudioModeNativePlayback (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-19.mjs:129:27)
+    at file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:116:28
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async check (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:33:33)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:113:61
+[AudioModeNativePlayback] failed to start Error: injected prepare failure
+    at Object.fail [as prepare] (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:114:59)
+    at Object.prepare (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:81:97)
+    at prepareInlineTakeBoxPlaybackRoute (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-20.mjs:8:75)
+    at Module.startAudioModeNativePlayback (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-20.mjs:136:32)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:116:16
+    at async check (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:33:33)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:113:61
+[AudioModeNativePlayback] failed to start Error: injected preview failure
+    at Object.fail [as preview] (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:114:59)
+    at Object.preview (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:81:38)
+    at readyNaturalTakePreview (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-21.mjs:2:66)
+    at Module.startAudioModeNativePlayback (file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-21.mjs:142:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:116:16
+    at async check (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:33:33)
+    at async file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:113:61
+[AudioModeNativePlayback] failed to start Error: injected native failure
+    at Object.fail [as start] (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:114:59)
+    at Object.startInlineTakeBoxPlayback (file:///Users/jameslobb/Documents/BestTake/scripts/verify-native-playback-ownership.mjs:82:137)
+    at file:///private/var/folders/29/2j3hmphd4593qq0zs23ywlwr0000gn/T/native-playback-ownership-k8dOeU/module-22.mjs:148:56
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

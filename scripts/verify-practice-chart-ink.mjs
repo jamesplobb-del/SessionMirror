@@ -133,6 +133,46 @@ assert.ok(ink.inkStrokeWidthPx('fine') < ink.inkStrokeWidthPx('bold'), 'Fine is 
   assert.deepEqual(ink.simplifyStroke([0, 0, 1, 1]), [0, 0, 1, 1], 'Two points cannot be thinned')
 }
 
+/* Long gestures keep their entire curve, including legacy persisted marks. */
+{
+  const previousStorage = globalThis.localStorage
+  const store = new Map()
+  globalThis.localStorage = {
+    getItem: key => store.get(key) ?? null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key),
+  }
+  try {
+    const circle = []
+    for (let index = 0; index < 650; index++) {
+      const angle = index * 2 * Math.PI / 649
+      circle.push(0.5 + 0.3 * Math.cos(angle), 0.5 + 0.3 * Math.sin(angle))
+    }
+    const curved = ink.simplifyStroke(circle)
+    assert.ok(curved.length > 800, 'The real gesture simplifier can produce more than 400 points')
+    const written = []
+    for (let index = 0; index < 2200; index++) written.push(index / 2199, 0.5 + 0.25 * Math.sin(index * 0.2))
+    for (const points of [curved, written]) {
+      const stroke = { page: 0, colour: 'red', width: 'fine', points }
+      assert.equal(ink.saveInkStrokes('qa-long-ink', [stroke]), true)
+      const loaded = ink.loadInkStrokes('qa-long-ink')[0]
+      const rounded = points.map(value => Math.round(value * 1e4) / 1e4)
+      assert.deepEqual(loaded.points, rounded, 'Every saved point returns, preserving the full gesture shape')
+      assert.deepEqual(loaded.points.slice(0, 2), rounded.slice(0, 2))
+      assert.deepEqual(loaded.points.slice(-2), rounded.slice(-2), 'The original endpoint survives reopening')
+      assert.equal(loaded.width, 'fine')
+    }
+    const oldMark = { page: 0, colour: 'black', points: curved }
+    store.set('besttake:practice-chart-ink:v1:qa-legacy-long', JSON.stringify([oldMark]))
+    assert.deepEqual(ink.loadInkStrokes('qa-legacy-long'), [oldMark], 'Already saved long marks recover their old tail without migration')
+    const lastArc = curved.slice(1140, 1142)
+    assert.deepEqual(ink.eraseStrokesAt([oldMark], 0, lastArc[0], lastArc[1], 0.001, 0.001), [], 'Erasing the previously truncated tail removes the whole gesture')
+  } finally {
+    if (previousStorage === undefined) delete globalThis.localStorage
+    else globalThis.localStorage = previousStorage
+  }
+}
+
 /* ---- What comes out of Save PDF ---------------------------------------- */
 
 async function fixturePdf(pages) {

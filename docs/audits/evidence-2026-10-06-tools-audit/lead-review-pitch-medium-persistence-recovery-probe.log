@@ -1,0 +1,4 @@
+$ node docs/audits/evidence-2026-10-06-tools-audit/pitch-medium-persistence-recovery-probe.mjs
+CONFIRMED web persistence recovery inconsistency: rejected A remains live; later B persists A+B but only B emits saved. Existing open Insights merges B and cannot discover A until reload. SQL.js in-memory database/export + injected persistence boundary; no IndexedDB/native SQLite.
+
+exit=0

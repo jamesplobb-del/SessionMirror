@@ -10,10 +10,10 @@ export type BalanceAction =
   | { type: 'UPDATE_SETTINGS'; settings: BalanceSettings; bestBalancedMs?: number }
   | { type: 'SET_BEST'; bestBalancedMs: number }
   | { type: 'START'; targets: BalanceTarget[]; settings: BalanceSettings; bestBalancedMs: number }
-  | { type: 'SET_PHASE'; phase: Exclude<BalancePhase, 'paused'> }
-  | { type: 'SET_REST'; endsAt: number | null }
+  | { type: 'SET_PHASE'; phase: Exclude<BalancePhase, 'paused'>; expectedPhase?: BalancePhase }
+  | { type: 'SET_REST'; endsAt: number | null; expectedPhase?: BalancePhase }
   | { type: 'COMPLETE_NOTE'; result: BalanceNoteResult }
-  | { type: 'NEXT_NOTE' }
+  | { type: 'NEXT_NOTE'; expectedPhase?: BalancePhase }
   | { type: 'RETRY_NOTE' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
@@ -79,10 +79,19 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
         bestBalancedMs: action.bestBalancedMs,
       }
     case 'SET_PHASE':
+      if (action.expectedPhase && state.phase !== action.expectedPhase) return state
       return { ...state, phase: action.phase, resumePhase: null }
     case 'SET_REST':
+      if (action.expectedPhase && state.phase !== action.expectedPhase) return state
       return { ...state, phase: 'resting', restEndsAt: action.endsAt }
     case 'COMPLETE_NOTE':
+      // A committed target survives pause/resume. Ignore late or repeated
+      // completions rather than appending it twice to the run's results.
+      if (
+        state.currentResult ||
+        state.targets[state.targetIndex]?.id !== action.result.target.id ||
+        state.noteResults.some((result) => result.target.id === action.result.target.id)
+      ) return state
       return {
         ...state,
         phase: action.result.goalReached ? 'goalReached' : 'noteResults',
@@ -90,6 +99,7 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
         noteResults: [...state.noteResults, action.result],
       }
     case 'NEXT_NOTE': {
+      if (action.expectedPhase && state.phase !== action.expectedPhase) return state
       const nextIndex = state.targetIndex + 1
       if (nextIndex >= state.targets.length) {
         return { ...state, phase: 'routineResults', currentResult: null, restEndsAt: null }
@@ -124,7 +134,14 @@ export function balanceReducer(state: BalanceState, action: BalanceAction): Bala
       if (state.phase !== 'paused') return state
       return {
         ...state,
-        phase: state.resumePhase === 'resting' ? 'resting' : 'countIn',
+        // Completed notes have already committed a result. Resume their
+        // presentation/continuation instead of acquiring and scoring them again.
+        phase:
+          state.resumePhase === 'resting' ||
+          state.resumePhase === 'goalReached' ||
+          state.resumePhase === 'noteResults'
+            ? state.resumePhase
+            : 'countIn',
         resumePhase: null,
       }
     case 'STOP':

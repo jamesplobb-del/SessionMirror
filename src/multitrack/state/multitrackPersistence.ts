@@ -70,10 +70,15 @@ export async function saveMultitrackSession(session: MultitrackSession): Promise
       panelTakeIds: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.take?.id ?? panel.missingTakeId ?? null : null,
       ),
-      sharedTakes: await Promise.all([...new Map(performancePanels.flatMap(p => p.take?.id.startsWith('collab-') ? [[p.take.id, p.take] as const] : [])).values()].map(async take => ({
+      sharedTakes: await Promise.all([...new Map(performancePanels.flatMap(p => {
+        const take = p.take ?? (p.missingSharedTake?.id === p.missingTakeId ? p.missingSharedTake : undefined)
+        return take?.id.startsWith('collab-') ? [[take.id, { take, missing: !p.take }] as const] : []
+      })).values()].map(async ({ take, missing }) => ({
         ...take,
-        videoUrl: take.filePath ? '' : await persistAsset(take.videoUrl),
-        thumbnailUrl: take.thumbnailUrl ? await persistAsset(take.thumbnailUrl) : '',
+        // An unavailable source already contains its durable reference. Do not
+        // refetch it or erase it when unrelated project edits autosave.
+        videoUrl: missing ? take.videoUrl : take.filePath ? '' : await persistAsset(take.videoUrl),
+        thumbnailUrl: missing ? take.thumbnailUrl : take.thumbnailUrl ? await persistAsset(take.thumbnailUrl).catch(() => '') : '',
       }))),
       panelVolumes: performancePanels.map((panel) =>
         panel.kind === 'performance' ? panel.volume ?? null : null,
@@ -127,12 +132,22 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
       kind: 'performance', id: persisted.panelIds?.[i] ?? MULTITRACK_PANEL_SLOT_IDS[i], take: null,
     }))
     const takeById = new Map(takes.map((take) => [take.id, take]))
-    for (const take of persisted.sharedTakes ?? []) {
-      const videoUrl = take.filePath
-        ? Capacitor.convertFileSrc((await Filesystem.getUri({ path: take.filePath, directory: Directory.Data })).uri)
-        : await restoreAsset(take.videoUrl)
-      if (!videoUrl) throw new Error('A shared recording is missing. Reimport the project file.')
-      takeById.set(take.id, { ...take, videoUrl, thumbnailUrl: take.thumbnailUrl ? await restoreAsset(take.thumbnailUrl) ?? '' : '' })
+    const sharedById = new Map((persisted.sharedTakes ?? []).map(take => [take.id, take]))
+    for (const take of sharedById.values()) {
+      try {
+        let videoUrl: string | null
+        if (take.filePath) {
+          const location = { path: take.filePath, directory: Directory.Data }
+          await Filesystem.stat(location)
+          videoUrl = Capacitor.convertFileSrc((await Filesystem.getUri(location)).uri)
+        } else videoUrl = await restoreAsset(take.videoUrl)
+        if (!videoUrl) continue
+        const thumbnailUrl = take.thumbnailUrl ? await restoreAsset(take.thumbnailUrl).catch(() => null) ?? '' : ''
+        takeById.set(take.id, { ...take, videoUrl, thumbnailUrl })
+      } catch {
+        // Each received source recovers independently. Healthy parts stay
+        // editable, and the missing descriptor survives the next autosave.
+      }
     }
 
     let performanceIndex = 0
@@ -150,6 +165,7 @@ export async function loadMultitrackSession(takes: Take[], projectId?: string): 
         // Preserve the source identity so an autosave cannot erase a missing part.
         take: takeId ? takeById.get(takeId) ?? null : null,
         missingTakeId: takeId && !takeById.has(takeId) ? takeId : undefined,
+        missingSharedTake: takeId && !takeById.has(takeId) ? sharedById.get(takeId) : undefined,
         ...(typeof volume === 'number' ? { volume: bounded(volume, 1, 0, 1) } : null),
         ...(muted === true ? { muted: true } : null),
         ...(Array.isArray(trim)

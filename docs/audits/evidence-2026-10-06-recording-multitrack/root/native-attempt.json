@@ -1,0 +1,19 @@
+{
+  "simulator": "iPhone 17",
+  "simulatorId": "927631C0-78EC-4DC6-BBE2-27BF3D8AD99F",
+  "bundleId": "com.besttake.app.practiceqa",
+  "workspace": "scripts/practice-qa/results/recording-multitrack-2026-10-06/ios/App/App.xcworkspace",
+  "webBuild": "passed",
+  "qaPreparation": "passed",
+  "buildRunTool": "timed out awaiting tools/call after 300s",
+  "observedXcodebuildPid": 35650,
+  "buildStillActiveAfterTimeout": true,
+  "uiExecuted": false,
+  "buildConfirmed": "passed",
+  "installed": true,
+  "launched": true,
+  "qaMicrophonePermissionTap": true,
+  "appWorkflowUiExecuted": false,
+  "uiBlocker": "Welcome screen visible in screenshot, but settled snapshot has zero targets; prior capture failed accessibility translation. No recording/multitrack screen workflow completed.",
+  "remainingPercent": 87
+}

@@ -1,0 +1,1 @@
+PASS: quota failure rolls back prior exercise setups; retry deduplicates; unrelated/newer routines survive; only mutated keys restore; absent keys and failed rollback handled

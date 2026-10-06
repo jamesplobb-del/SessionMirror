@@ -1,0 +1,6 @@
+REPRO annotation: 650 visible points saved successfully; reload keeps only 400; ending gesture lost
+REPRO routine cold-load migration quota: legacy has done Warmup, returned fresh day loses visible completion
+REPRO native chart replacement quota: rejected save, memory and name show OLD_SCORE/old.pdf; persisted file is NEW_SCORE
+ADVERSARIAL: size-based quota fails larger replacement metadata; fresh module reads NEW_SCORE named old.pdf
+REPRO custom routine attach: Files PDF with empty MIME creates orphan item then rejects as unsupported
+REPRO routine replacement primitive: B.pdf retains annotation authored on A.pdf; routine caller contains no clearInkStrokes

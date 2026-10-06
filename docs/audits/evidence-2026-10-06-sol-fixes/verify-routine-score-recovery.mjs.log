@@ -1,0 +1,1 @@
+PASS: actual routine attachment/replacement/removal callbacks validate before creating folders; confirmation/failure preserve marks; success clears marks; migration quota/retry preserves progress

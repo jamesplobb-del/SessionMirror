@@ -152,6 +152,7 @@ class SharedMetronomeEngine {
   private modeSwitchRecoveryGeneration = 0
   private startInFlight = false
   private controlGeneration = 0
+  private nativeTimingRevision = 0
   private nativeControlQueue: Promise<void> = Promise.resolve()
   private nativeRouteQueue: Promise<void> = Promise.resolve()
   private nativeSpeakerRouteHeld = false
@@ -333,6 +334,8 @@ class SharedMetronomeEngine {
   }
 
   private pushNativeTimingUpdate(): void {
+    // Settings can change while native Start is awaiting its acknowledgement.
+    this.nativeTimingRevision += 1
     if (!this.useNativeAudio || !this.snapshot.playing) return
     void nativeMetronomeUpdate(this.buildNativeTimingPayload())
   }
@@ -1392,13 +1395,15 @@ class SharedMetronomeEngine {
         const leadSec = Math.max(START_LEAD_SEC, options?.firstBeatDelaySec ?? START_LEAD_SEC)
         const anchorCtx =
           this.audioCtx && this.audioCtx.state === 'running' ? this.audioCtx : null
-        const result = await this.enqueueNativeControl(() =>
-          nativeMetronomeStart({
+        let startTimingRevision = this.nativeTimingRevision
+        const result = await this.enqueueNativeControl(() => {
+          startTimingRevision = this.nativeTimingRevision
+          return nativeMetronomeStart({
             ...this.buildNativeTimingPayload(),
             muted: this.shouldMuteOutput(),
             leadSec,
-          }),
-        )
+          })
+        })
         if (startGeneration !== this.controlGeneration) {
           await this.enqueueNativeControl(nativeMetronomeStop)
           return false
@@ -1409,6 +1414,9 @@ class SharedMetronomeEngine {
             firstClickPerfMs: result.firstClickPerfMs,
           }
           this.patchState({ playing: true, beatIndex: 0, subTickIndex: 0, beatPulseId: 0 })
+          if (startGeneration === this.controlGeneration && startTimingRevision !== this.nativeTimingRevision) {
+            this.pushNativeTimingUpdate()
+          }
           this.debugLog(options?.recovered ? 'start native (recovered)' : 'start native')
           started = true
           return true

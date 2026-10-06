@@ -1,0 +1,48 @@
+# Pitch analytics, tuner/metronome and widgets — October 6, 2026
+
+Follow-up: the four findings below were subsequently fixed in the project. See [the fix report](2026-10-06-sol-tools-workflow-fixes.md) for implementation, new acceptance regressions and current validation limits. This document preserves the original audit results.
+
+## Result
+
+The same Sol 6.1 Ultra / Sol Medium audit process found **three reproducible logic bugs and one source/SSR accessibility gap**. The two P2 races require specific asynchronous ordering; the P3 recovery inconsistency is web-only. The accessibility omission is verified in current markup/callers, while keyboard/VoiceOver consequences remain unmeasured.
+
+**31 distinct existing checks ran: 30 passed, one failed because it expects the old stepped tuner color instead of intentional blending.** Four new actual-code diagnostic probes reproduce the findings; their successful exit does not mean the features passed. Root independently reran all four. The Medium widget auditor provided a fresh challenge of the other bots' three logic findings; root challenged the widget finding, and the Ultra lead reviewed the combined evidence and native callback ordering.
+
+Audit-only scope: current HEAD `cc66c3e` plus the existing uncommitted Music/Routines/Balance fixes. Those fixes and all other existing user/concurrent work were preserved. This audit changed only reports/evidence. No fixes, commit, archive, deployment, native session, production database or purchase action occurred. Last account reading: **13% used / 87% remaining**, above the 80% floor.
+
+## Findings and repair order
+
+| Finding | Reachable trigger and outcome | Evidence and proposed repair |
+| --- | --- | --- |
+| **I1 — P2: Insights stays on Analyzing after Reset All / reopen** | Confirm Reset All, close/reopen before deletion finishes, and let the completion event arrive while the reopening read is still pending. The clear event invalidates that read; its guarded finally cannot release loading, and no new read starts. Another close/reopen recovers. [Screen](../../src/components/audioPractice/PitchInsightsScreen.tsx#L1124). | Actual component/effects/Days reset callback with controlled repository and hook scheduler. Close is not locked and the eligible tuner keeps the screen mounted. On invalidation, load a complete replacement snapshot and settle loading. Test all/day/scoped deletion during initial load without discarding surviving history. |
+| **T1 — P2: pending native Start loses changed settings** | Change BPM/meter/sound after the native Start payload is sent but before JS receives its acknowledgement. Setters skip native updates while shared playing is false. After acknowledgement, UI reports **160 BPM / 3/4 / wood**, but the accepted payload remains **80 BPM / 4/4 / classic**, with no update. [Shared engine](../../src/metronome/sharedMetronomeEngine.ts#L1396). | Actual engine with native acknowledgement held. Ordinary widget/full-view controls remain enabled. Swift starts synchronously, but neither native state/pulse callbacks nor acknowledgement reconciles newer settings. Actual bridge-window frequency and sound output were not measured. Send the newest settings after accepted Start or queue changes under the start generation; preserve Stop/new-start cancellation rules. |
+| **W1 — P2 semantic/accessibility gap: closed Music dock remains exposed** | On a Music score at width >=700px with an enabled collapsed tool, Hide/swipe/closed preference translates the dock offscreen but leaves its toolbar and enabled portaled buttons without closed-state inert/accessibility hiding. The Show handle reports expanded=false. [Drawer](../../src/components/MusicWidgetDrawer.tsx#L33). | Actual React SSR plus source tracing of CSS, portal and caller guards. Mobile display-none is a real guard; desktop transform is not a semantic hide. Actual Tab/VoiceOver impact was not exercised. Make only dock contents inert/hidden while closed, keep Show reachable, and restore focus when closing from inside. Verify in a real browser/device before claiming accessibility behavior passed. |
+| **I2 — P3, web-only: recovered history differs from the open Insights feed** | Note A inserts into SQL but saveToStore fails, so no saved event is sent. Later B persists A+B, but emits only B; open Insights sees B and misses now-durable A until full reload. [Repository](../../src/db/pitchInsightsRepository.ts#L155). | Actual repository/schema with SQL.js and exported/reloaded snapshot; injected persistence rejection. No permanent loss or duplicate-retry claim. Choose rollback or dirty-write reconciliation/full reload after recovery; do not announce durability before persistence succeeds. Native SQLite and real IndexedDB failure were not exercised. |
+
+The first two deserve priority because they can leave the visible feature unusable or disagreeing with playback. Address the accessibility state gap alongside its focus test. The web feed issue has a close/reopen workaround and lower urgency.
+
+Detailed reports: [Ultra lead](2026-10-06-sol-ultra-tools-audit.md), [pitch](2026-10-06-sol-medium-pitch-audit.md), [widgets](2026-10-06-sol-medium-widgets-audit.md), and [independent challenge](2026-10-06-sol-medium-tools-review.md).
+
+## Coverage and limits
+
+| Surface | Executed checks and source review | Still unverified |
+| --- | --- | --- |
+| Pitch analytics | Capture preference migration/on-off boundaries, noisy/session reset scope, same-key named profiles, capture identity across profile switches, key/transposition filtering, repository schema/migration in SQL.js, initial load/close/unmount/retry, profile draft failure, reset/reopen and persistence recovery. | Live rendered charts, actual microphone/capture, Capacitor SQLite and durable IndexedDB, device quota/recovery timing. |
+| Tuner | Stability, trace/history/retention/silence/sample rates, input advice, written/concert keys, Air tuner geometry, diagnostics, microphone ownership/denial/stale registration, native receiver validation and cleanup, compiled Swift detector and delivery credits. | Acoustic accuracy/noise/latency, permission dialogs, real headphones/Bluetooth and microphone recovery. |
+| Metronome | BPM/tap tempo, meter/subdivision/tier math, sound/volume contracts, program section/tempo utilities and controlled TimelinePlaybackEngine, shared native background/foreground/Stop/interruption/late response handling, pending Start settings race. | Actual native clock/audio, bridge acknowledgement latency, lock/Control Center/route transitions, real program playback timing. |
+| Widgets | Source callers for pitch/metronome/drone/takes/music/reference, collapse/expand and persistence, score/workspace restoration, visibility/recording/suspension guards, viewport placement fixtures, actual drawer SSR and isolated keyboard handler. | DOM/touch drag, rendered overlap/clipping, software keyboard/safe area, Tab focus and VoiceOver. |
+| Cross-tool | Audio recovery/frame freshness/native tap consumers, control-center lifecycle, playback routes/headphones, drone transitions and compiled renderer stress, Plus guards, settings reset and native navigation coalescing. | Real device interruption, paid purchase/restore/expiry, physical sound and recording ownership. |
+
+Compiled native checks include **52 synthetic frequency/harmonic cases**, silence and 20,000 detector frames; **one million delivery reservations** bounded at two with stale-ack/reset checks; and production drone synthesis through **1,200 pitch/timbre/volume/chord changes**, contention and stop fade. These are host synthetic/helper tests, not phone performance or acoustic certification.
+
+The [evidence index and manifest](evidence-2026-10-06-tools-audit/README.md) record 20 root checks (19 pass/1 fail), seven lead checks, three pitch checks and one unique widget placement check. Widget navigation duplicates root navigation and is counted once. Existing passing tests do not cover the newly exposed races.
+
+The failed `verify-reactive-silk.mjs` expects pure green at 5 cents; current source returns blended `#8ad952`. Commit `bd5ca35` deliberately replaced stepped colors with smoothing to reduce flicker. This is test-contract drift, not demonstrated tuning failure. Its later geometry/canvas assertions were not reached. No application/test code was changed to conceal it.
+
+## Rejected candidates and useful follow-up
+
+Same-key profile leakage, stopped capture candidates, hidden widgets retaining audio owners, and repeated native receiver/microphone subscriptions were challenged without a new supported defect. A sound picker that fails to update shared state belongs to an unused presenter chain, so it was not promoted as a reachable user bug. Geometry-only keyboard ball overlap, ReferenceWidget obstacle differences and short-viewport clipping were not promoted without rendered impact; manual placement may be intentional.
+
+Potential optimization: measure Insights with realistically large local history before introducing DB aggregation/pagination. It currently reads all observations; saved-event batching and bounded graph reduction already mitigate rendering work. A visible Starting state would also clarify the pending metronome phase, alongside fixing its settings reconciliation. Neither is a measured performance improvement in this audit.
+
+Browser automation remains unavailable: its trusted Node kernel failed to start in recent attempts. No live browser/device/VoiceOver/audio claims. **Audit deliverable complete; feature-quality bar not reached** while these findings remain unfixed and device/rendered validation is missing. The previous seven source fixes remain intact; this request was for testing the new areas.

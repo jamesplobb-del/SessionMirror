@@ -1,0 +1,2 @@
+Hands-free checks passed: delayed silence, missing audio, resumed playing, repeated takes, and visible cycle states.
+PASS: masked clicks and bounded symptom-based threshold advice

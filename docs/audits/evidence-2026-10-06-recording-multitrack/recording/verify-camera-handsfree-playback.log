@@ -1,0 +1,4 @@
+PASS: camera replay near the performance, startup ordering, pending-play timeout, frozen-clock recovery, cancellation, and decode errors
+[HandsFree] camera replay could not advance { takeId: 'first' }
+[HandsFree] camera replay could not advance { takeId: 'first' }
+[HandsFree] camera replay could not advance { takeId: 'first' }

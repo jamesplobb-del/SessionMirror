@@ -1,0 +1,3 @@
+practice routines: ok
+Session flow checks passed: paused time, restart recovery, daily archive, plan isolation, skipped outcomes, storage errors, duplicate taps, competing navigation, and retry after failure.
+PASS: expanded routine metronome roundtrip, migration, and concert instrument defaults

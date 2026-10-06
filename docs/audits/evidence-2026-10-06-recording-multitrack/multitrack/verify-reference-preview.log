@@ -1,0 +1,2 @@
+PASS: reference readiness, trim/offset positioning, visible muted references, target exclusion, and cancellation.
+PASS: individual preview owns element and speaker gain across readiness events; ending and group pause restore the mix.

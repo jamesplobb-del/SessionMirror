@@ -1,0 +1,1 @@
+Drone checks passed: initial restoration, shared recovery, background silence, and stale stop responses preserve newer commands.

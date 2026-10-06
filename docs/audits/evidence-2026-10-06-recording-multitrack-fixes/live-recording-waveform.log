@@ -1,0 +1,1 @@
+PASS: standalone live waveform, measured amplitude updates, bounded history, cancellation during subscription setup, and balanced shared-tap ownership.

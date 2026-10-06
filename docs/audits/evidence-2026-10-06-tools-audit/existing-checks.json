@@ -1,0 +1,223 @@
+{
+  "checkedAt": "2026-10-06T15:13:11.993Z",
+  "checks": [
+    {
+      "script": "verify-audio-lifecycle.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-audio-lifecycle.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-control-center-audio.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-control-center-audio.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-playback-route.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-playback-route.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-headphone-output.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-headphone-output.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-drone-renderer.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-drone-renderer.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-drone-transitions.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-drone-transitions.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-navigation-response.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-navigation-response.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-plus-access.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-plus-access.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-settings-reset.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-settings-reset.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-tap-tempo.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-tap-tempo.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-native-tuner-detector.py",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-native-tuner-detector.py.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-pitch-delivery-window.py",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-pitch-delivery-window.py.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-tuner-stability.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-tuner-stability.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-tuner-trace.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-tuner-trace.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-tuner-input-advice.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-tuner-input-advice.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-air-tuner.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-air-tuner.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-meter-logic.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-meter-logic.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-native-plugin-registration.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-native-plugin-registration.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-reactive-silk.mjs",
+      "exitCode": 1,
+      "status": "failed",
+      "log": "root-checks/verify-reactive-silk.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-practice-sounds.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "root-checks/verify-practice-sounds.mjs.log",
+      "owner": "root"
+    },
+    {
+      "script": "verify-metronome-background.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-metronome-background.log"
+    },
+    {
+      "script": "verify-metronome-program-review.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-metronome-program-review.log"
+    },
+    {
+      "script": "verify-tuner-microphone-ownership.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-tuner-microphone-ownership.log"
+    },
+    {
+      "script": "verify-tuner-key-controls.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-tuner-key-controls.log"
+    },
+    {
+      "script": "verify-tuner-history.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-tuner-history.log"
+    },
+    {
+      "script": "verify-tuner-diagnostic-mode.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-tuner-diagnostic-mode.log"
+    },
+    {
+      "script": "verify-native-tuner-receiver.mjs",
+      "owner": "Sol Ultra lead",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "lead-verify-native-tuner-receiver.log"
+    },
+    {
+      "script": "verify-pitch-insights-capture.mjs",
+      "owner": "Sol Medium pitch",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "pitch-medium-capture.log"
+    },
+    {
+      "script": "verify-pitch-insights-screen-lifecycle.mjs",
+      "owner": "Sol Medium pitch",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "pitch-medium-screen-lifecycle.log"
+    },
+    {
+      "script": "verify-pitch-instrument-profiles.mjs",
+      "owner": "Sol Medium pitch",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "pitch-medium-instrument-profiles.log"
+    },
+    {
+      "script": "verify-widget-ball-placement.mjs",
+      "owner": "Sol Medium widgets",
+      "status": "passed",
+      "exitCode": 0,
+      "log": "widgets-placement.log"
+    }
+  ],
+  "note": "Widget navigation check duplicates root navigation; counted once. New diagnostic probes assert observed defects and are excluded."
+}

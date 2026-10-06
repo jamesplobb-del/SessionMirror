@@ -1,0 +1,4 @@
+PASS: stalled first-sample cancellation, shared cleanup, released capture flags, and real-take protection
+PASS: Next holds mic warmup until route cleanup; Camera → Tools cancels replay before handoff
+PASS: Camera → Music waits for replay cleanup before mounting Tools
+PASS: native player pause resolves only after its speaker route is released

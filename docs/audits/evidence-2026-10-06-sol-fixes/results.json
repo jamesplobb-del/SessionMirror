@@ -1,0 +1,161 @@
+{
+  "checkedAt": "2026-10-06T14:55:56.078Z",
+  "checks": [
+    {
+      "script": "verify-practice-chart-native-transaction.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-practice-chart-native-transaction.mjs.log"
+    },
+    {
+      "script": "verify-practice-chart-ink.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-practice-chart-ink.mjs.log"
+    },
+    {
+      "script": "verify-routine-score-recovery.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-score-recovery.mjs.log"
+    },
+    {
+      "script": "verify-balance-completed-resume.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-balance-completed-resume.mjs.log"
+    },
+    {
+      "script": "verify-routine-open-recovery.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-open-recovery.mjs.log"
+    },
+    {
+      "script": "verify-practice-chart.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-practice-chart.mjs.log"
+    },
+    {
+      "script": "practice-qa/regressions/music-web-reload.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "practice-qa_regressions_music-web-reload.mjs.log"
+    },
+    {
+      "script": "verify-music-library.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-music-library.mjs.log"
+    },
+    {
+      "script": "verify-music-setlists.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-music-setlists.mjs.log"
+    },
+    {
+      "script": "verify-setlist-reader.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-setlist-reader.mjs.log"
+    },
+    {
+      "script": "verify-routine-music.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-music.mjs.log"
+    },
+    {
+      "script": "verify-routine-start-recovery.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-start-recovery.mjs.log"
+    },
+    {
+      "script": "verify-routine-library-transaction.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-library-transaction.mjs.log"
+    },
+    {
+      "script": "verify-practice-routines.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-practice-routines.mjs.log"
+    },
+    {
+      "script": "verify-routine-music-share.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-music-share.mjs.log"
+    },
+    {
+      "script": "verify-routine-links.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-links.mjs.log"
+    },
+    {
+      "script": "verify-routine-program-share.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-program-share.mjs.log"
+    },
+    {
+      "script": "verify-routine-preset-tools.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-routine-preset-tools.mjs.log"
+    },
+    {
+      "script": "practice-qa/regressions/routine-duration-roundtrip.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "practice-qa_regressions_routine-duration-roundtrip.mjs.log"
+    },
+    {
+      "script": "practice-qa/regressions/suggested-routine-entry.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "practice-qa_regressions_suggested-routine-entry.mjs.log"
+    },
+    {
+      "script": "verify-daily-challenges.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-daily-challenges.mjs.log"
+    },
+    {
+      "script": "verify-daily-challenge-plan.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-daily-challenge-plan.mjs.log"
+    },
+    {
+      "script": "verify-instrument-playability.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-instrument-playability.mjs.log"
+    },
+    {
+      "script": "verify-audio-lifecycle.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-audio-lifecycle.mjs.log"
+    },
+    {
+      "script": "verify-plus-access.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-plus-access.mjs.log"
+    },
+    {
+      "script": "verify-document-handoff.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-document-handoff.mjs.log"
+    }
+  ]
+}

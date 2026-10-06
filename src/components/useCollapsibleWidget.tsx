@@ -9,6 +9,7 @@ import { iosDragRelease } from '../utils/motionPresets'
 import { findAvailableWidgetBallPosition, findAvailableWidgetPanelPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, WIDGET_CONTROL_LAYOUT_EVENT, type WidgetPosition, type WidgetRect } from '../utils/floatingWidgetLayout'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
+import { focusWidgetLauncher } from '../utils/widgetFocus'
 import './widget-ball.css'
 
 const BALL_SIZE = 56
@@ -74,7 +75,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   useLayoutEffect(() => {
     if (!transferFocus.current) return
     transferFocus.current = false
-    if (collapsed) ballRef.current?.focus({ preventScroll: true })
+    if (collapsed) focusWidgetLauncher(ballRef.current)
     else widgetRef.current?.querySelector<HTMLButtonElement>('.widget-collapse')?.focus({ preventScroll: true })
   }, [collapsed, widgetRef])
 

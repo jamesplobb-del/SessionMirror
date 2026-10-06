@@ -1061,12 +1061,14 @@ function PitchInsightsContent({
   const activeRef = useRef(false)
 
   const loadSequenceRef = useRef(0)
+  const loadPendingRef = useRef(false)
   const fallbackReloadTimerRef = useRef<number | null>(null)
   const liveUpdateTimerRef = useRef<number | null>(null)
   const pendingSavedRef = useRef<PitchObservation[]>([])
 
   const load = useCallback(async () => {
     const sequence = ++loadSequenceRef.current
+    loadPendingRef.current = true
     try {
       const rows = await listPitchObservations()
       if (!activeRef.current || sequence !== loadSequenceRef.current) return
@@ -1077,7 +1079,10 @@ function PitchInsightsContent({
       console.warn('[PitchInsights] Failed to load observations', error)
       setLoadError(true)
     } finally {
-      if (activeRef.current && sequence === loadSequenceRef.current) setLoading(false)
+      if (activeRef.current && sequence === loadSequenceRef.current) {
+        loadPendingRef.current = false
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -1101,8 +1106,23 @@ function PitchInsightsContent({
     setLoading(true)
     void load()
 
+    const invalidateDeletedSnapshot = () => {
+      loadSequenceRef.current += 1
+      // Filtering an unfinished initial snapshot cannot recover surviving rows.
+      // Replace that read instead of leaving its loading state stranded.
+      if (loadPendingRef.current) void load()
+    }
     const handleUpdate = (event: Event) => {
       const detail = (event as CustomEvent<PitchInsightsUpdatedDetail>).detail
+      if (detail?.kind === 'reconciled') {
+        pendingSavedRef.current = []
+        if (liveUpdateTimerRef.current != null) {
+          window.clearTimeout(liveUpdateTimerRef.current)
+          liveUpdateTimerRef.current = null
+        }
+        void load()
+        return
+      }
       if (detail?.kind === 'saved') {
         pendingSavedRef.current.push(detail.observation)
         if (liveUpdateTimerRef.current == null) {
@@ -1123,7 +1143,7 @@ function PitchInsightsContent({
       }
       if (detail?.kind === 'cleared') {
         // A read started before this reset must not restore its old snapshot.
-        loadSequenceRef.current += 1
+        invalidateDeletedSnapshot()
         pendingSavedRef.current = []
         if (liveUpdateTimerRef.current != null) {
           window.clearTimeout(liveUpdateTimerRef.current)
@@ -1133,7 +1153,7 @@ function PitchInsightsContent({
         return
       }
       if (detail?.kind === 'range-deleted') {
-        loadSequenceRef.current += 1
+        invalidateDeletedSnapshot()
         const keep = (observation: PitchObservation) =>
           (detail.transpositionId != null && observation.transpositionId !== detail.transpositionId) ||
           (detail.instrumentProfileId !== undefined && (observation.instrumentProfileId ?? null) !== detail.instrumentProfileId) ||
@@ -1143,7 +1163,7 @@ function PitchInsightsContent({
         return
       }
       if (detail?.kind === 'session-range-deleted') {
-        loadSequenceRef.current += 1
+        invalidateDeletedSnapshot()
         const keep = (observation: PitchObservation) =>
           observation.sessionId !== detail.sessionId ||
           (detail.transpositionId != null && observation.transpositionId !== detail.transpositionId) ||

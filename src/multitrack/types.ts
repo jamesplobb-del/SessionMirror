@@ -33,6 +33,8 @@ export interface PerformancePanelState {
   take: Take | null
   /** Retained when a Vault recording is unavailable, until explicitly replaced. */
   missingTakeId?: string
+  /** Durable received-media descriptor retained while its source is unavailable. */
+  missingSharedTake?: Take
   label?: string
   hidden?: boolean
   /** Project-local timing; the source recording in the Vault is never modified. */

@@ -7,6 +7,7 @@ import type { LibraryPlaybackReference } from '../types/library'
 import { clampWidgetPosition, loadWidgetSize, saveWidgetSize } from '../utils/floatingWidgetLayout'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
+import { focusWidgetLauncher } from '../utils/widgetFocus'
 
 export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, playing = false, youtubeUrl, libraryPlayback,
   suspended, onSubmitYoutube, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
@@ -105,7 +106,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     if (expanded || !collapseRequested.current) return
     collapseRequested.current = false
     const chip = dockHost ? dockChip.current : node.current?.querySelector<HTMLButtonElement>('.reference-widget-chip')
-    chip?.focus({ preventScroll: true })
+    focusWidgetLauncher(chip)
   }, [expanded, dockHost])
   useEffect(() => {
     if (suspended) onPlaybackChange(false)

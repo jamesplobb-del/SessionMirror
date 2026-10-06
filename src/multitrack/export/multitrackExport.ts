@@ -280,7 +280,9 @@ export async function exportMultitrackSession(
     return { ok: false, reason: options.signal?.aborted ? 'cancelled' : 'render_failed' }
   } finally {
     options.signal?.removeEventListener('abort', cancel)
-    await listener?.remove()
+    try { await listener?.remove() } catch (error) {
+      console.warn('[Multitrack] export listener cleanup failed', error)
+    }
   }
 
   if (options.share) {

@@ -1,0 +1,4 @@
+$ node scripts/verify-metronome-program-review.mjs
+PASS: one-bar and multi-bar ramps, five curves, repeat totals, persistent tempo pins, count-in, loop count-in, pause and exit.
+
+exit=0

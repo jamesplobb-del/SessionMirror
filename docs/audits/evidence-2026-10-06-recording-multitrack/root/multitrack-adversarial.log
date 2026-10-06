@@ -1,0 +1,5 @@
+CONFIRMED mirror exchange: source panel.mirrored=true, imported panel.mirrored=undefined, take.mirrorPlayback=false
+CONFIRMED real save/reopen/share/import: front-camera panel flag survives reopening against original Vault metadata, then disappears from exchanged project
+CONFIRMED missing received shared take rejects entire project restore; existing missing Vault panel recovery cannot be reached
+Expected injected boundary error: [Multitrack] export render failed render rejected
+CONFIRMED listener cleanup rejection escapes typed export result after successful render (low likelihood bridge failure); normal success/render failure/pre-abort branches verified

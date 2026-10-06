@@ -1,0 +1,129 @@
+[
+  {
+    "script": "scripts/practice-qa/regressions/recording-web-writer.mjs",
+    "exit": 1,
+    "lastLines": [
+      "}",
+      "",
+      "Node.js v24.16.0"
+    ]
+  },
+  {
+    "script": "scripts/verify-handsfree-cycle.mjs",
+    "exit": 0,
+    "lastLines": [
+      "Hands-free checks passed: delayed silence, missing audio, resumed playing, repeated takes, and visible cycle states.",
+      "PASS: masked clicks and bounded symptom-based threshold advice"
+    ]
+  },
+  {
+    "script": "scripts/verify-handsfree-manual.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: manual pre-roll promotion, pending native start, duplicate taps, navigation cancellation, and audio/camera readiness bypass"
+    ]
+  },
+  {
+    "script": "scripts/verify-handsfree-handoff.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: Next holds mic warmup until route cleanup; Camera \u2192 Tools cancels replay before handoff",
+      "PASS: Camera \u2192 Music waits for replay cleanup before mounting Tools",
+      "PASS: native player pause resolves only after its speaker route is released"
+    ]
+  },
+  {
+    "script": "scripts/verify-handsfree-monitor.mjs",
+    "exit": 0,
+    "lastLines": [
+      "[AutoSound] monitor setup { path: 'webkit' }",
+      "[AutoSound] monitor setup { path: 'webkit' }",
+      "PASS: native noisy-room recording and calibration with metronome already playing"
+    ]
+  },
+  {
+    "script": "scripts/verify-handsfree-playback.mjs",
+    "exit": 1,
+    "lastLines": [
+      "}",
+      "",
+      "Node.js v24.16.0"
+    ]
+  },
+  {
+    "script": "scripts/verify-camera-handsfree-playback.mjs",
+    "exit": 0,
+    "lastLines": [
+      "[HandsFree] camera replay could not advance { takeId: 'first' }",
+      "[HandsFree] camera replay could not advance { takeId: 'first' }",
+      "[HandsFree] camera replay could not advance { takeId: 'first' }"
+    ]
+  },
+  {
+    "script": "scripts/verify-audio-lifecycle.mjs",
+    "exit": 0,
+    "lastLines": [
+      "[PitchTap] JS received first PCM frame (2 samples @ 48000Hz)",
+      "[PitchTap] JS enabled native audio tap",
+      "Audio lifecycle passed: cancelled startup, shared recovery, fresh-frame triggering, rapid tool switches, and shared tap ownership."
+    ]
+  },
+  {
+    "script": "scripts/verify-live-recording-waveform.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: standalone live waveform, measured amplitude updates, bounded history, cancellation during subscription setup, and balanced shared-tap ownership."
+    ]
+  },
+  {
+    "script": "scripts/verify-library-audio-preview.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: browser reference identity, playback hydration, replacement, deletion, and isolation"
+    ]
+  },
+  {
+    "script": "scripts/verify-natural-preview.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: preview deduplication, original/baked/remote bypass, failed-render retry, pending-owner cancellation, settings cancellation, immediate playback during a stalled render, ready-cache reuse, no late source replacement"
+    ]
+  },
+  {
+    "script": "scripts/verify-playback-route.mjs",
+    "exit": 0,
+    "lastLines": [
+      "[PlaybackRoute] restoring camera session",
+      "[PlaybackRoute] applying playback session",
+      "Playback route checks passed: pending preparation, ordered restore/replay, native rejection, retry, and lifecycle cleanup."
+    ]
+  },
+  {
+    "script": "scripts/verify-headphone-output.mjs",
+    "exit": 0,
+    "lastLines": [
+      "Headphone output checks passed: listener-first probe, stale snapshot rejection, and duplicate route suppression."
+    ]
+  },
+  {
+    "script": "scripts/verify-trim-metadata.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: trim duration, pitch cropping, time origin, alignment, thumbnail reset, and source immutability"
+    ]
+  },
+  {
+    "script": "scripts/verify-take-guidance.mjs",
+    "exit": 0,
+    "lastLines": [
+      "Take guidance transitions and native completion filtering passed."
+    ]
+  },
+  {
+    "script": "scripts/verify-camera-gestures.mjs",
+    "exit": 0,
+    "lastLines": [
+      "PASS: double taps, touch release, triple taps, timing, distance, drag, pinch, long press, cancellation, and persistent lens constraints."
+    ]
+  }
+]

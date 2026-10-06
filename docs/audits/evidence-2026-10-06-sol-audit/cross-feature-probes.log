@@ -1,0 +1,3 @@
+{"probe":"Home → Quick Record including actual JSX pause wrapper","result":"PASS; CANDIDATE REJECTED","focusContext":null,"activeStepId":null,"elapsedBeforeQuickMs":30000,"elapsedAfterQuickMinuteMs":30000}
+{"probe":"Native pause before hidden visibility","result":"VERIFIED CONDITIONAL DEFECT","activeStepId":"step-muws6g9w-4wlf1","programsPaused":0,"backgroundIntervalCountedMs":600000,"nativeDeviceTiming":"UNTESTED"}
+{"probe":"Web imported reference audio reload","result":"VERIFIED DEFECT","filePath":"library/reference-id.wav","initialPlaybackURLExists":true,"restoredPlaybackURL":"","nativeFilesystem":"NOT EXERCISED"}

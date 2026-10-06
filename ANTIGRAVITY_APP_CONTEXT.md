@@ -2,7 +2,8 @@
 
 ## 1. App Naming & Identity
 - **Product Name**: BestTake (Confirmed by `capacitor.config.ts`, `CAPACITOR_SETUP.md`).
-- **Legacy Repository Directory**: SessionMirror. Historical storage keys and plugin identifiers intentionally retain this name for compatibility.
+- **Repository Directory**: `/Users/jameslobb/Documents/BestTake`.
+- **Compatibility**: The former checkout path remains an alias. Historical storage keys and plugin identifiers are retained so existing data and integrations continue to work.
 - *Note: BestTake is the current app/product name and should be treated as such, not merely as an internal plugin name.*
 
 ## 2. Core Application Architecture

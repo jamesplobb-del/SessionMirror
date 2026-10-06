@@ -1,0 +1,127 @@
+{
+  "uniqueChecks": 18,
+  "checks": [
+    {
+      "script": "scripts/verify-navigation-response.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-navigation-response.log"
+    },
+    {
+      "script": "scripts/verify-settings-reset.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-settings-reset.log"
+    },
+    {
+      "script": "scripts/verify-tuner-key-controls.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-tuner-key-controls.log"
+    },
+    {
+      "script": "scripts/verify-tuner-history.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-tuner-history.log"
+    },
+    {
+      "script": "scripts/verify-meter-logic.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-meter-logic.log"
+    },
+    {
+      "script": "scripts/verify-tap-tempo.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-tap-tempo.log"
+    },
+    {
+      "script": "scripts/verify-audio-lifecycle.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-audio-lifecycle.log"
+    },
+    {
+      "script": "scripts/verify-control-center-audio.mjs",
+      "exitCode": 0,
+      "signal": null,
+      "reportedBy": "root",
+      "log": "root-verify-control-center-audio.log"
+    },
+    {
+      "script": "scripts/verify-metronome-start-settings.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_ultra_tools_lead",
+      "log": "lead-verify-metronome-start-settings.log"
+    },
+    {
+      "script": "scripts/verify-metronome-background.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_ultra_tools_lead",
+      "log": "lead-verify-metronome-background.log"
+    },
+    {
+      "script": "scripts/verify-metronome-program-review.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_ultra_tools_lead",
+      "log": "lead-verify-metronome-program-review.log"
+    },
+    {
+      "script": "scripts/verify-pitch-insights-recovery-screen.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_pitch",
+      "log": "pitch-medium-recovery-screen-fix.log"
+    },
+    {
+      "script": "scripts/verify-pitch-insights-persistence-recovery.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_pitch",
+      "log": "pitch-medium-persistence-recovery-fix.log"
+    },
+    {
+      "script": "scripts/verify-pitch-insights-screen-lifecycle.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_pitch",
+      "log": "pitch-medium-screen-lifecycle-fix.log"
+    },
+    {
+      "script": "scripts/verify-pitch-insights-capture.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_pitch",
+      "log": "pitch-medium-capture-fix.log"
+    },
+    {
+      "script": "scripts/verify-pitch-instrument-profiles.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_pitch",
+      "log": "pitch-medium-instrument-profiles-fix.log"
+    },
+    {
+      "script": "scripts/verify-widget-ball-placement.mjs",
+      "exitCode": 0,
+      "reportedBy": "sol_medium_widgets",
+      "log": "critic-verify-widget-ball-placement.log"
+    },
+    {
+      "script": "scripts/verify-music-widget-drawer-focus.mjs",
+      "exitCode": 0,
+      "reportedBy": "root",
+      "log": "root-verify-music-widget-drawer-focus.log",
+      "independentLog": "critic-verify-music-widget-drawer-focus.log"
+    }
+  ],
+  "productionBuild": {
+    "command": "SENTRY_AUTH_TOKEN='' npm run build",
+    "exitCode": 0,
+    "log": "production-build.log"
+  }
+}

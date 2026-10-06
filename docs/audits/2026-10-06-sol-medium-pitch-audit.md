@@ -1,0 +1,38 @@
+# Sol Medium pitch workflow audit — 2026-10-06
+
+Audit-only bounded pass of current pitch capture, profiles, Insights analytics/history and repository boundaries. No application source changed, commits, deployment, production data, browser, microphone, or native sessions. Existing unrelated working-tree files were preserved. All evidence paths below are relative to the repository root and scripts run from that root.
+
+## Ranked findings
+
+### P2 — Reset All completion after close/reopen strands Insights on its loading spinner
+
+Trigger: open Insights with history → Days → Reset All → confirm → while queued deletion/persistence is still pending, close then reopen Insights → deletion succeeds. The new opening sets `loading=true` and starts its read (PitchInsightsScreen.tsx:1100–1102). The `cleared` event increments `loadSequenceRef` and replaces the observations, but neither releases loading nor launches another read (1124–1133). The opening read then returns at 1072 and its finally block cannot release loading at 1080. The screen remains “Analyzing pitch history…” indefinitely until another close/reopen. The actual Reset All callback awaits the repository at 1346; sheet close is available independently. Repository list waits its write queue (pitchInsightsRepository.ts:93), so reopening while deletion is queued naturally leaves this read outstanding when the clear event arrives at 174. Similar range event handlers have the same invalidation shape, but only Reset All was explicitly reproduced.
+
+High-confidence actual-component/effect/callback probe: `evidence-2026-10-06-tools-audit/pitch-medium-reset-reopen-probe.mjs`; matching `.log` passes its confirmation assertions. It invokes the actual screen’s Days/Reset All callback, confirms, closes/reopens, resolves mocked deletion dispatch, then resolves the reopened read and verifies the spinner and zero replacement reads. React scheduling, repository I/O, and visual wrappers are isolated mocks; the screen function, state/effects, callback routing, analytics and profile code are actual. No browser DOM or native concurrency tested. Applies to the shared Insights component on supported platforms; physical device timing frequency remains unmeasured.
+
+Fix direction: when deletion invalidates an in-flight opening read, finish loading with a complete replacement snapshot or start a new guarded load. For a range deletion, merely releasing loading can incorrectly expose an incomplete initial snapshot; reload remaining history.
+
+### P3 — Web persistence recovery durably restores a previously rejected note without notifying the open Insights screen
+
+Trigger: an already-open Insights screen captures stable note A; SQL insertion succeeds but web `saveToStore` rejects; capture’s catch only logs at LivePitchTuner.tsx:758–760. `performSavePitchObservation` inserts before awaiting persistence and only dispatches the saved event afterward (pitchInsightsRepository.ts:124–156). The rejected A remains in the live DB. Capture note B after persistence recovers: B’s successful persistence saves both A and B, but the repository emits only B. An open screen merges saved events only (PitchInsightsScreen.tsx:1106–1122), so the now-durable A stays absent until a later full load/close-reopen. This is a recovery consistency issue, not a claim that successful recovery loses A.
+
+Actual repository probe: `evidence-2026-10-06-tools-audit/pitch-medium-persistence-recovery-probe.mjs`; matching `.log` verifies rejected A is present in the live DB, no A saved event, recovery emits only B, and a SQL.js exported/reloaded snapshot contains A+B. Actual SQL and repository module; initialization and persistence boundary are injected. Open-screen consequence follows the inspected actual event handler; it was not integrated with live IndexedDB. Web-only persistence rejection boundary (`connection.ts:65–67`); native SQLite durability was not tested. Suggested classification P3 because close/reopen repairs the visible inconsistency and later persistence recovers the row. A notification/reconciliation strategy or atomic rollback boundary should be chosen deliberately.
+
+## Passing checks / challenged candidates
+
+- `node scripts/verify-pitch-insights-capture.mjs` PASS. Fresh `pitch-medium-capture.log`: legacy preference migration, noisy activity detector, reset intent/update shapes, session scope cleanup. Repository SQL handling uses isolated mocks, not native SQLite.
+- `node scripts/verify-pitch-insights-screen-lifecycle.mjs` PASS. Fresh `pitch-medium-screen-lifecycle.log`: actual screen closed mount, load, stale response guards, reopen, error/retry, profile draft preserved after storage failure, scoped delete event. Isolated hooks/JSX, not DOM.
+- `node scripts/verify-pitch-instrument-profiles.mjs` PASS. Fresh `pitch-medium-instrument-profiles.log`: actual repository/schema/migrations against isolated SQL.js SQLite WASM; legacy migration, same-key named profile separation, persisted selection, storage-failure atomicity, original capture identity at profile switch, range and noisy-cleanup scope, candidate reset fences. This is SQL.js execution, not Capacitor native SQLite or durable IndexedDB verification.
+- Rejected candidate: same-key profile leakage. Existing actual tracker/profile/SQL.js assertions demonstrate preserved identity and matching key/profile filtering. Original noisy prompt snapshots scope before subsequent profile switch; ranged cleanup does not erase another profile/key.
+- Rejected candidate: stopped accepted-frame runs leaving an unfinished candidate. Inspected useLivePitchTracker.ts:1858–1862,1917–1923,2008–2009 sends the accepted-frame termination to the capture callback; LivePitchTuner.tsx:793–797 feeds null to actual tracker and finishes it. No physical audio claim.
+- Caller boundary: capture callback is wired only for live-mic-only (`LivePitchTuner.tsx:903`); media playback tracker has no capture callback. Insights is gated in pane by audio tools, live mic mode, and Plus at 596–608. Recording/playback leakage was not manufactured by invoking an unreachable callback.
+- Database initialization failure clears `initPromise` (connection.ts:92–95), so a failed initialization is not permanently memoized. Probe did not claim real database recovery beyond the injected repository persistence boundary.
+- Pure analytics and history were inspected: local-day boundaries use calendar midnight, profiles filter recorded key+identity, written labels transpose concert MIDI at screen:1241–1244, day reset snapshots selected profile before confirmation. No new high-confidence issue established there. Old 2026-10-01 broad script was not rerun because its fixed results destination and SQL mocks add little to fresh scoped checks.
+
+## Optimization separately
+
+Insights initially requests all observations; aggregation sorts copies and profile source construction walks the full history. Existing saved-event batching (750 ms), bounded graph reduction (160 points), and stable tracker sample cap mitigate rendering/capture work. Consider DB aggregation/pagination only after measurement with realistically large local history. This is an optimization candidate, not a demonstrated regression.
+
+## Coverage limits
+
+Browser unavailable in parent audit environment. No web UI screenshots, native session, acoustic pitch accuracy, device audio ownership, production data, or Capacitor/IndexedDB durability exercised. The tests are deterministic module/component fixtures with the boundaries listed per check. Source fixes were intentionally not made. New report and uniquely named evidence are the only writes from this subtask.

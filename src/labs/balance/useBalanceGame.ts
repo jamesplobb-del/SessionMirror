@@ -316,7 +316,7 @@ export function useBalanceGame({
         current.settings.soundRest.autoAdvance
       ) {
         clearAttempt()
-        dispatch({ type: 'NEXT_NOTE' })
+        dispatch({ type: 'NEXT_NOTE', expectedPhase: 'resting' })
       }
     }, 80)
     return () => window.clearInterval(timer)
@@ -378,24 +378,24 @@ export function useBalanceGame({
 
   useEffect(() => {
     if (state.phase !== 'goalReached') return
-    const timer = window.setTimeout(() => dispatch({ type: 'SET_PHASE', phase: 'noteResults' }), 700)
+    const timer = window.setTimeout(() => dispatch({ type: 'SET_PHASE', phase: 'noteResults', expectedPhase: 'goalReached' }), 700)
     return () => window.clearTimeout(timer)
   }, [state.phase])
 
   const continueAfterNote = useCallback(() => {
     const current = stateRef.current
-    if (!current.currentResult) return
+    if (current.phase !== 'noteResults' || !current.currentResult) return
     if (current.targetIndex >= current.targets.length - 1) {
-      dispatch({ type: 'NEXT_NOTE' })
+      dispatch({ type: 'NEXT_NOTE', expectedPhase: 'noteResults' })
       return
     }
     const rest = current.settings.soundRest.restDuration
     if (rest === 'manual') {
-      dispatch({ type: 'SET_REST', endsAt: null })
+      dispatch({ type: 'SET_REST', endsAt: null, expectedPhase: 'noteResults' })
       return
     }
     const seconds = rest === 'matchGoal' ? current.settings.goalSeconds : rest
-    dispatch({ type: 'SET_REST', endsAt: Date.now() + seconds * 1000 })
+    dispatch({ type: 'SET_REST', endsAt: Date.now() + seconds * 1000, expectedPhase: 'noteResults' })
   }, [])
 
   useEffect(() => {
@@ -529,7 +529,7 @@ export function useBalanceGame({
   }, [clearAttempt])
   const skipRest = useCallback(() => {
     clearAttempt()
-    dispatch({ type: 'NEXT_NOTE' })
+    dispatch({ type: 'NEXT_NOTE', expectedPhase: 'resting' })
   }, [clearAttempt])
 
   const saveCustomRoutine = useCallback((routine: BalanceCustomRoutine) => {

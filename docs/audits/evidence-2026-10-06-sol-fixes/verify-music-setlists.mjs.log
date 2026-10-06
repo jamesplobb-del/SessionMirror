@@ -1,0 +1,1 @@
+PASS: real setlist storage/order/occurrences/snapshot/replacement isolation, limits, quota/retry, corruption preservation, list-only deletion; drag/keyboard reorder, tap-order picker adds, Undo; actual editor async save/open/retry/draft/doubletap callbacks (isolated hooks; no DOM)

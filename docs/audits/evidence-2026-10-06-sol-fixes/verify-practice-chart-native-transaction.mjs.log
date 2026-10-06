@@ -1,0 +1,1 @@
+PASS: native score metadata commit preserves legacy/cached/cold scores on quota and partial writes; failed cleanup preserves commit semantics; retry/MIME changes/export/delete/versioned path validation; legacy/v2 ink ownership survives failed replacement and rejects old marks after failed clear

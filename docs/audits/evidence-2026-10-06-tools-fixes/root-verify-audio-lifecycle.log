@@ -1,0 +1,3 @@
+[PitchTap] JS received first PCM frame (2 samples @ 48000Hz)
+[PitchTap] JS enabled native audio tap
+Audio lifecycle passed: cancelled startup, shared recovery, fresh-frame triggering, rapid tool switches, and shared tap ownership.

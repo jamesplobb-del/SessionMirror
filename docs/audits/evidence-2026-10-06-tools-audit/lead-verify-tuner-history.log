@@ -1,0 +1,4 @@
+$ node scripts/verify-tuner-history.mjs
+PASS: note preservation, silence, sample rate, bounded retention and anchored history
+
+exit=0

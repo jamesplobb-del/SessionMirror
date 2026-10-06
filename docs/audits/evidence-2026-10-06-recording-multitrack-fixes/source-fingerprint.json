@@ -1,0 +1,27 @@
+{
+  "head": "cc66c3ee0cf7729f376276518a363dc6a054491a",
+  "sourceSha256": {
+    "src/hooks/useCameraSession.ts": "a5b9b9b6bce4ebf29f644e4e089cf14eb298954db72e1b2b0c81363dd32eff82",
+    "src/hooks/useLongPress.ts": "56ffc03f07cfb95dc2cfa0cfe1ca96da04d5771e8341695072de7cc24b2d0e5a",
+    "src/context/AudioModePlaybackContext.tsx": "395ecb962a3c76c2bffec847d8b24ded202401ae0280b3d86a102c34f689f718",
+    "src/utils/stereoPlaybackRoute.ts": "f5206b3e234babf749089a8595ded0c1d900179819f32717589b6b346fdb02db",
+    "src/utils/audioModeNativePlayback.ts": "5b868659d66fc4b342bea74d049442aaf75acd5488610e4b7fcd58b8bfe8b55c",
+    "src/multitrack/types.ts": "17951eb87c71f8be752c24df48ee3e2f86526f471b1bd1a54b9a55e99be22438",
+    "src/multitrack/state/multitrackFile.ts": "c88ea9a3b53f3ac9ca6a43ea6280ac7eaa31af17ea1a28689a061e6ef2eb8237",
+    "src/multitrack/state/multitrackPersistence.ts": "0d2a4cd0772dd3eefa975953ad3302fcdea1512ac0615f84c6fe46bb819e1261",
+    "src/multitrack/state/useMultitrackSession.ts": "aadadafeef3feb48ed3429f35c457507f20f26386e488ef95f4c0e8d7aaf2dcb",
+    "src/multitrack/export/multitrackExport.ts": "4232298517782c7d66427d88c52b7dc060e7d5c68d3cb38ec38255db5ec1c138",
+    "scripts/verify-handsfree-playback.mjs": "eece9626ed15618c72f772448131a77dbb67922b8c4fd2768b4d9a1dc7c23b41",
+    "scripts/verify-recording-terminal-controls.mjs": "f3958c1647d3c4abeb4c4c14a0619245e1a1b6853596d8f7fae586c7a1287b07",
+    "scripts/verify-multitrack-shared-recovery.mjs": "f21699aeb06a32718e0c76666da1e100c1e7016ab7752d48e56f7d0a332a53a2",
+    "scripts/verify-multitrack-export-cleanup.mjs": "4f7427c8e9b377e327efeabeaa84843cf42490ce44e539e11b409d67302be63c",
+    "scripts/verify-native-playback-ownership.mjs": "0138e0f98cc73803dba7293d9a5f4ebb0ee55f41bd43eb83ab27fbd3b406c995",
+    "scripts/verify-native-playback-ended-ownership.mjs": "7290604f18875ab1a2d0b533ef3ae0177f73c394df13299a7424b5ca3f131737"
+  },
+  "gitStatus": " M ANTIGRAVITY_APP_CONTEXT.md\n M scripts/practice-qa/regressions/suggested-routine-entry.mjs\n M scripts/verify-handsfree-playback.mjs\n M scripts/verify-practice-chart-ink.mjs\n M src/components/MusicRoutineBuilder.tsx\n M src/components/PracticeChartLayer.tsx\n M src/components/RoutineMusicSetup.tsx\n M src/components/practiceChart/chartInk.ts\n M src/context/AudioModePlaybackContext.tsx\n M src/hooks/useCameraSession.ts\n M src/hooks/useLongPress.ts\n M src/labs/balance/balanceEngine.ts\n M src/labs/balance/useBalanceGame.ts\n M src/multitrack/export/multitrackExport.ts\n M src/multitrack/state/multitrackFile.ts\n M src/multitrack/state/multitrackPersistence.ts\n M src/multitrack/state/useMultitrackSession.ts\n M src/multitrack/types.ts\n M src/practiceTimeline/storage/routineFileOpen.ts\n M src/utils/audioModeNativePlayback.ts\n M src/utils/practiceChartStorage.ts\n M src/utils/practiceRoutines.ts\n M src/utils/stereoPlaybackRoute.ts\n?? docs/audits/2026-10-06-recording-multitrack-swarm.md\n?? docs/audits/2026-10-06-sol-medium-adversarial-audit.md\n?? docs/audits/2026-10-06-sol-medium-games-audit.md\n?? docs/audits/2026-10-06-sol-medium-music-routines-audit.md\n?? docs/audits/2026-10-06-sol-medium-pitch-audit.md\n?? docs/audits/2026-10-06-sol-medium-tools-review.md\n?? docs/audits/2026-10-06-sol-medium-widgets-audit.md\n?? docs/audits/2026-10-06-sol-tools-workflow-audit.md\n?? docs/audits/2026-10-06-sol-ultra-chart-fixes.md\n?? docs/audits/2026-10-06-sol-ultra-cross-feature-audit.md\n?? docs/audits/2026-10-06-sol-ultra-tools-audit.md\n?? docs/audits/2026-10-06-sol-workflow-audit.md\n?? docs/audits/2026-10-06-sol-workflow-fixes.md\n?? docs/audits/evidence-2026-10-06-recording-multitrack-fixes/\n?? docs/audits/evidence-2026-10-06-recording-multitrack/\n?? docs/audits/evidence-2026-10-06-sol-audit/\n?? docs/audits/evidence-2026-10-06-sol-fixes/\n?? docs/audits/evidence-2026-10-06-tools-audit/\n?? launch-site/\n?? scripts/fixtures/cloud-games/\n?? scripts/verify-balance-completed-resume.mjs\n?? scripts/verify-multitrack-export-cleanup.mjs\n?? scripts/verify-multitrack-shared-recovery.mjs\n?? scripts/verify-native-playback-ended-ownership.mjs\n?? scripts/verify-native-playback-ownership.mjs\n?? scripts/verify-practice-chart-native-transaction.mjs\n?? scripts/verify-recording-terminal-controls.mjs\n?? scripts/verify-routine-open-recovery.mjs\n?? scripts/verify-routine-score-recovery.mjs\n",
+  "remainingPercent": 86,
+  "minimumReservePercent": 80,
+  "browserWriterGateChanged": false,
+  "nativeHardwareTested": false,
+  "nativeWorkflowUiTested": false
+}

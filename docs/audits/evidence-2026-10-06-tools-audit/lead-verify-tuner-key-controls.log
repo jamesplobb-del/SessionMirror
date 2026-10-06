@@ -1,0 +1,4 @@
+$ node scripts/verify-tuner-key-controls.mjs
+PASS: unique key choices preserve all historical octave IDs and concert/written pitch round trips
+
+exit=0

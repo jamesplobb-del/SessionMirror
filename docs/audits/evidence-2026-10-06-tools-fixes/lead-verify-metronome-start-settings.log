@@ -1,0 +1,4 @@
+$ node scripts/verify-metronome-start-settings.mjs
+PASS: native Start uses latest pending BPM/meter/subdivision/accents/sound; pre-dispatch changes, delayed reply after Stop/new Start, failure/retry and subscriber Stop respect control generations.
+
+exit=0

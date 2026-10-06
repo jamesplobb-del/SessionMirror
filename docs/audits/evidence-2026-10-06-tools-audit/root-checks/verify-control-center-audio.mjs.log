@@ -1,0 +1,1 @@
+PASS: Control Center keeps the route; actual background suspends and recovers once.

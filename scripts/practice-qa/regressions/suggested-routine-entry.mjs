@@ -22,6 +22,8 @@ try {
     loader: { '.css': 'empty', '.svg': 'dataurl', '.png': 'dataurl', '.jpg': 'dataurl', '.webp': 'dataurl' },
     define: { 'import.meta.env': '{}' },
     plugins: [{ name: 'capture-guided-entry', setup(b) {
+      b.onResolve({ filter: /ActionSheetContext$/ }, () => ({ path: 'action', namespace: 'qa' }))
+      b.onLoad({ filter: /^action$/, namespace: 'qa' }, () => ({ contents: 'export function useActionSheet(){return {showConfirm:async()=>true}}', loader: 'js' }))
       b.onResolve({ filter: /^\.\/GuidedRoutineBuilder$/ }, () => ({ path: 'guided', namespace: 'qa' }))
       b.onLoad({ filter: /^guided$/, namespace: 'qa' }, () => ({
         contents: "import React from 'react'; export default function GuidedRoutineBuilder(props) { return React.createElement('output', { 'data-guided-mode': props.mode }); }",

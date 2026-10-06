@@ -1,0 +1,7 @@
+PASS: keyboard/assistive activation, pointer deduplication, long press, cancellation, disabled controls, one-time manual/handsfree encoder feedback, terminal cleanup, and late callback isolation
+[AudioRecordLifecycle] dataavailable size=3 recordingId=old
+[AudioRecordLifecycle] dataavailable size=3 recordingId=old
+[AudioRecordLifecycle] recorderStop
+PASS: stale stop/data identity, delayed append failure, replacement during abort, and valid old-take finalization without replacement cleanup
+[AudioRecordLifecycle] recorderStop
+PASS: ordinary stop still delivers the take and releases capture state once

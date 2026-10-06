@@ -1,0 +1,1 @@
+PASS: native recording and incoming project read byte-for-byte without working playback URLs; bounded chunk reads and absolute paths.

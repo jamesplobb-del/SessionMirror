@@ -1,0 +1,125 @@
+{
+  "checkedAt": "2026-10-06T15:13:11.993Z",
+  "checks": [
+    {
+      "script": "verify-audio-lifecycle.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-audio-lifecycle.mjs.log"
+    },
+    {
+      "script": "verify-control-center-audio.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-control-center-audio.mjs.log"
+    },
+    {
+      "script": "verify-playback-route.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-playback-route.mjs.log"
+    },
+    {
+      "script": "verify-headphone-output.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-headphone-output.mjs.log"
+    },
+    {
+      "script": "verify-drone-renderer.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-drone-renderer.mjs.log"
+    },
+    {
+      "script": "verify-drone-transitions.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-drone-transitions.mjs.log"
+    },
+    {
+      "script": "verify-navigation-response.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-navigation-response.mjs.log"
+    },
+    {
+      "script": "verify-plus-access.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-plus-access.mjs.log"
+    },
+    {
+      "script": "verify-settings-reset.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-settings-reset.mjs.log"
+    },
+    {
+      "script": "verify-tap-tempo.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-tap-tempo.mjs.log"
+    },
+    {
+      "script": "verify-native-tuner-detector.py",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-native-tuner-detector.py.log"
+    },
+    {
+      "script": "verify-pitch-delivery-window.py",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-pitch-delivery-window.py.log"
+    },
+    {
+      "script": "verify-tuner-stability.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-tuner-stability.mjs.log"
+    },
+    {
+      "script": "verify-tuner-trace.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-tuner-trace.mjs.log"
+    },
+    {
+      "script": "verify-tuner-input-advice.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-tuner-input-advice.mjs.log"
+    },
+    {
+      "script": "verify-air-tuner.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-air-tuner.mjs.log"
+    },
+    {
+      "script": "verify-meter-logic.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-meter-logic.mjs.log"
+    },
+    {
+      "script": "verify-native-plugin-registration.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-native-plugin-registration.mjs.log"
+    },
+    {
+      "script": "verify-reactive-silk.mjs",
+      "exitCode": 1,
+      "status": "failed",
+      "log": "verify-reactive-silk.mjs.log"
+    },
+    {
+      "script": "verify-practice-sounds.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "log": "verify-practice-sounds.mjs.log"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+$ node scripts/verify-tuner-diagnostic-mode.mjs
+PASS: normal builds ignore diagnostics; investigation modes persist and switch independently
+
+exit=0

@@ -1,0 +1,1 @@
+PASS: tuner advice ignores silence, noise and healthy input; detects quiet tones and very loud input.

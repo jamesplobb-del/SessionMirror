@@ -1,0 +1,1 @@
+PASS: actual repository SQL.js writes; repeated persistence rejection, recovered note snapshot, scoped/session/full deletion recovery, single ordered reconciliation, normal success events. Persistence injected; no native SQLite or IndexedDB.

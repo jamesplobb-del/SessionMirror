@@ -60,9 +60,8 @@ export interface InkStroke {
   width?: InkWidth
 }
 
-/** Enough for a heavily marked part, small enough that one cannot fill storage. */
+/** Keep the number of saved gestures bounded without cutting a gesture short. */
 const MAX_STROKES = 600
-const MAX_POINTS_PER_STROKE = 400
 
 const inkKey = (projectId: string) => `besttake:practice-chart-ink:v1:${projectId}`
 const widthKey = 'besttake:practice-chart-ink-width:v1'
@@ -97,13 +96,14 @@ export function parseInkStrokes(value: unknown): InkStroke[] {
       ? entry.width
       : undefined
     if (!Array.isArray(entry.points) || entry.points.length < 4 || entry.points.length % 2 !== 0) continue
+    // The writer and live reader keep the complete gesture. Read every valid
+    // pair too, including long marks saved by earlier versions.
     const points: number[] = []
     for (let index = 0; index + 1 < entry.points.length; index += 2) {
       const x = entry.points[index]
       const y = entry.points[index + 1]
       if (!isFinitePair(x, y)) continue
       points.push(Math.min(1, Math.max(0, x as number)), Math.min(1, Math.max(0, y as number)))
-      if (points.length >= MAX_POINTS_PER_STROKE * 2) break
     }
     if (points.length < 4) continue
     strokes.push(width
@@ -114,28 +114,57 @@ export function parseInkStrokes(value: unknown): InkStroke[] {
   return strokes
 }
 
+/** Score metadata is the committed owner; an unreadable identity fails closed. */
+function currentAttachmentId(projectId: string): string | null {
+  const raw = localStorage.getItem(`besttake:practice-chart:v1:${projectId}`)
+  if (!raw) return null
+  const value = JSON.parse(raw) as { attachmentId?: unknown } | null
+  if (!value || typeof value !== 'object') throw new Error('Score identity is unavailable.')
+  if (value.attachmentId === undefined) return null
+  if (typeof value.attachmentId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(value.attachmentId)) {
+    throw new Error('Score identity is unavailable.')
+  }
+  return value.attachmentId
+}
+
 export function loadInkStrokes(projectId: string): InkStroke[] {
   try {
     const raw = localStorage.getItem(inkKey(projectId))
-    return raw ? parseInkStrokes(JSON.parse(raw)) : []
+    if (!raw) return []
+    const value: unknown = JSON.parse(raw)
+    const attachmentId = currentAttachmentId(projectId)
+    // Existing marks belong to the legacy attachment until it is replaced.
+    if (Array.isArray(value)) return attachmentId === null ? parseInkStrokes(value) : []
+    if (!value || typeof value !== 'object') return []
+    const saved = value as { version?: unknown; attachmentId?: unknown; strokes?: unknown }
+    return saved.version === 2 && saved.attachmentId === attachmentId
+      ? parseInkStrokes(saved.strokes)
+      : []
   } catch {
     return []
   }
 }
 
-export function saveInkStrokes(projectId: string, strokes: InkStroke[]): boolean {
+export function saveInkStrokes(projectId: string, strokes: InkStroke[], expectedAttachmentId?: string | null): boolean {
   try {
+    const attachmentId = currentAttachmentId(projectId)
+    // A reader callback created for the old part cannot rebind its strokes
+    // (or an empty Undo) to a replacement committed while it was still open.
+    if (expectedAttachmentId !== undefined && expectedAttachmentId !== attachmentId) return false
     if (strokes.length === 0) localStorage.removeItem(inkKey(projectId))
-    // Rounded to four places: a mark is a gesture, not a measurement, and four
-    // places is finer than any screen can show.
-    else localStorage.setItem(inkKey(projectId), JSON.stringify(
-      strokes.slice(-MAX_STROKES).map(stroke => ({
+    // Bind marks to committed score bytes, so a failed old-mark cleanup cannot
+    // put the previous part's fingerings or accidentals on its replacement.
+    // Four decimal places retain finer precision than any screen can show.
+    else localStorage.setItem(inkKey(projectId), JSON.stringify({
+      version: 2,
+      attachmentId,
+      strokes: strokes.slice(-MAX_STROKES).map(stroke => ({
         page: stroke.page,
         colour: stroke.colour,
         ...(stroke.width ? { width: stroke.width } : {}),
         points: stroke.points.map(value => Math.round(value * 1e4) / 1e4),
       })),
-    ))
+    }))
     return true
   } catch { return false }
 }

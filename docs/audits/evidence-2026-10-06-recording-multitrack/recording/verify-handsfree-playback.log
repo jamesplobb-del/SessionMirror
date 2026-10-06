@@ -1,0 +1,19 @@
+PASS: native replay start/end, cancelled preparation, rejected bridge call, start timeout, and stale callbacks
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Mounted iPad audio element avoids the silent native replay path
+
+1 !== 0
+
+    at file:///Users/jameslobb/Documents/BestTake/scripts/verify-handsfree-playback.mjs:130:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.16.0

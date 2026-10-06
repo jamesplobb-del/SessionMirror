@@ -1,0 +1,6 @@
+$ node scripts/verify-metronome-background.mjs
+PASS: background continuity, no duplicate start on unlock, explicit stop, native interruption, delayed Start and stale foreground response.
+PASS: selecting 3/8 at 120 sends iOS one dotted-quarter pulse with three eighths, not three quarter-note clicks.
+PASS: hands-free listen-back returns a running click, and Stop does not.
+
+exit=0

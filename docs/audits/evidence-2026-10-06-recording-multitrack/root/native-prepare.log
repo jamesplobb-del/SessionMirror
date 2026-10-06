@@ -1,0 +1,2 @@
+Registered local audio plugin in ios/App/App/capacitor.config.json: App.BestTakeAudioPlugin, App.DronePlugin, App.MetronomePlugin, App.QuickTunerPlugin (removed duplicate bare name)
+/Users/jameslobb/Documents/BestTake/scripts/practice-qa/results/recording-multitrack-2026-10-06

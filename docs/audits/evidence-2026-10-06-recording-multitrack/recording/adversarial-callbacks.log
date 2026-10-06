@@ -1,0 +1,2 @@
+{"scenario":"keyboard native click detail0 vs pointer release","keyboardActivations":0,"pointerActivations":1,"preventedNativeClick":true}
+{"scenario":"mid-take MediaRecorder encoder failure","visibleRecording":false,"reportedErrors":1,"userAlerts":0,"discardedChunks":1,"recorderDetached":true,"aborts":1}

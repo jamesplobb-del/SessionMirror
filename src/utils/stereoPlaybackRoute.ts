@@ -54,9 +54,12 @@ function snapshotIndicatesNativeRouteEngaged(snapshot: {
 
 /** In-flight native route apply — concurrent callers (YouTube + take play) share one. */
 let engageInFlight: Promise<void> | null = null
+let restoreInFlight: Promise<void> | null = null
 
 async function ensureNativeStereoRouteEngaged(): Promise<void> {
-  if (!shouldAttemptNativeStereoRoute()) return
+  // A new player must not start while the previous final release restores capture.
+  if (restoreInFlight) await restoreInFlight
+  if (holdCount <= 0 || !shouldAttemptNativeStereoRoute()) return
   if (nativeRouteEngaged && !engageInFlight) return
 
   if (!engageInFlight) {
@@ -112,35 +115,45 @@ export function refreshStereoPlaybackRoute(): void {
 /** Restore recording route only when native stereo was actually engaged. */
 export async function releaseStereoPlayback(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return
-  if (holdCount <= 0) return
+  if (holdCount <= 0) {
+    await restoreInFlight
+    return
+  }
 
   holdCount -= 1
   if (holdCount > 0) return
 
-  const wasNativeEngaged = nativeRouteEngaged
-  nativeRouteEngaged = false
+  if (!restoreInFlight) {
+    const pendingApply = engageInFlight
+    const restore = (async () => {
+      // Cancellation can arrive before native apply reports its result.
+      await pendingApply
+      if (holdCount > 0 || !nativeRouteEngaged) return
 
-  if (!wasNativeEngaged) return
+      const cameraActive = await isCameraSessionActive()
+      // A new playback hold can arrive while the camera snapshot is pending.
+      if (holdCount > 0) return
+      nativeRouteEngaged = false
 
-  if (isHeadphoneOutputActive()) {
-    recordingRouteRestoredHandler?.()
-    return
+      if (isHeadphoneOutputActive() || cameraActive) {
+        // External output and live camera capture keep their own session profile.
+        recordingRouteRestoredHandler?.()
+        return
+      }
+
+      try {
+        await BestTakeAudioPlugin.enableRecordingRoute()
+        recordingRouteRestoredHandler?.()
+      } catch (error) {
+        console.warn('Failed to release stereo playback route:', error)
+      }
+    })()
+    const settled = restore.finally(() => {
+      if (restoreInFlight === settled) restoreInFlight = null
+    })
+    restoreInFlight = settled
   }
-
-  const cameraActive = await isCameraSessionActive()
-  if (cameraActive) {
-    // Camera preview owns the session — restoring a generic recording route
-    // would stomp the live capture profile and can pause YouTube mid-playback.
-    recordingRouteRestoredHandler?.()
-    return
-  }
-
-  try {
-    await BestTakeAudioPlugin.enableRecordingRoute()
-    recordingRouteRestoredHandler?.()
-  } catch (error) {
-    console.warn('Failed to release stereo playback route:', error)
-  }
+  await restoreInFlight
 }
 
 export function isStereoPlaybackEngaged(): boolean {
@@ -151,7 +164,11 @@ export function isNativeStereoRouteEngaged(): boolean {
   return nativeRouteEngaged
 }
 
+/** Reset settled test fixtures only; pending native work must finish first. */
 export function resetStereoPlaybackRouteForTests(): void {
+  if (engageInFlight || restoreInFlight) {
+    throw new Error('Await native stereo route transitions before resetting the test fixture.')
+  }
   holdCount = 0
   nativeRouteEngaged = false
   nativeStereoPermanentlySkipped = false

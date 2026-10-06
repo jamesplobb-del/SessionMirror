@@ -1,0 +1,68 @@
+[AudioModeNativePlayback] started inline AVPlayer (camera parity) {
+  duration: 10,
+  route: 'inline-take-box',
+  systemVolume: undefined,
+  playerVolume: undefined,
+  loudnessGainDb: 0
+}
+[
+  {
+    "name": "cancel-during-stereo-route-apply",
+    "status": "FAILED_PRODUCT_INVARIANT",
+    "actual": {
+      "hold": false,
+      "nativeRoute": true,
+      "restores": 0
+    },
+    "expected": {
+      "hold": false,
+      "nativeRoute": false,
+      "restores": 1
+    },
+    "boundary": "Native AVAudioSession apply completion is deferred; no device hardware used."
+  },
+  {
+    "name": "settled-stereo-route-release-control",
+    "status": "PASSED",
+    "actual": {
+      "nativeRoute": false,
+      "restores": 1
+    }
+  },
+  {
+    "name": "surviving-competing-consumer-control",
+    "status": "PASSED",
+    "actual": {
+      "restores": 2,
+      "holds": false
+    },
+    "note": "One abandoned hold must preserve another legitimate playback consumer; final settled release restores."
+  },
+  {
+    "name": "superseded-audio-preview-route-hold",
+    "status": "FAILED_PRODUCT_INVARIANT",
+    "actual": {
+      "starts": [
+        "B.m4a"
+      ],
+      "active": null,
+      "heldAfterStop": 1
+    },
+    "expected": {
+      "starts": [
+        "B.m4a"
+      ],
+      "active": null,
+      "heldAfterStop": 0
+    },
+    "boundary": "Real audio/native-inline modules; URI, preparation, native plugin and route hold ports are explicit mocks."
+  },
+  {
+    "name": "single-preview-cancel-control",
+    "status": "PASSED",
+    "actual": {
+      "heldAfterStop": 0
+    },
+    "note": "Leak requires replacement while older preview is preparing; an ordinary Stop at this stage balances the hold."
+  }
+]

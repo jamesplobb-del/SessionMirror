@@ -1,0 +1,142 @@
+[
+  {
+    "name": "handsfree-cycle",
+    "script": "scripts/verify-handsfree-cycle.mjs",
+    "exit": 0
+  },
+  {
+    "name": "handsfree-manual",
+    "script": "scripts/verify-handsfree-manual.mjs",
+    "exit": 0
+  },
+  {
+    "name": "handsfree-handoff",
+    "script": "scripts/verify-handsfree-handoff.mjs",
+    "exit": 0
+  },
+  {
+    "name": "handsfree-monitor",
+    "script": "scripts/verify-handsfree-monitor.mjs",
+    "exit": 0
+  },
+  {
+    "name": "handsfree-playback",
+    "script": "scripts/verify-handsfree-playback.mjs",
+    "exit": 0
+  },
+  {
+    "name": "camera-handsfree-playback",
+    "script": "scripts/verify-camera-handsfree-playback.mjs",
+    "exit": 0
+  },
+  {
+    "name": "audio-lifecycle",
+    "script": "scripts/verify-audio-lifecycle.mjs",
+    "exit": 0
+  },
+  {
+    "name": "live-recording-waveform",
+    "script": "scripts/verify-live-recording-waveform.mjs",
+    "exit": 0
+  },
+  {
+    "name": "library-audio-preview",
+    "script": "scripts/verify-library-audio-preview.mjs",
+    "exit": 0
+  },
+  {
+    "name": "natural-preview",
+    "script": "scripts/verify-natural-preview.mjs",
+    "exit": 0
+  },
+  {
+    "name": "playback-route",
+    "script": "scripts/verify-playback-route.mjs",
+    "exit": 0
+  },
+  {
+    "name": "headphone-output",
+    "script": "scripts/verify-headphone-output.mjs",
+    "exit": 0
+  },
+  {
+    "name": "trim-metadata",
+    "script": "scripts/verify-trim-metadata.mjs",
+    "exit": 0
+  },
+  {
+    "name": "take-guidance",
+    "script": "scripts/verify-take-guidance.mjs",
+    "exit": 0
+  },
+  {
+    "name": "camera-gestures",
+    "script": "scripts/verify-camera-gestures.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-upgrade",
+    "script": "scripts/verify-multitrack-upgrade.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-editor",
+    "script": "scripts/verify-multitrack-editor.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-sharing",
+    "script": "scripts/verify-multitrack-sharing.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-readiness",
+    "script": "scripts/verify-multitrack-readiness.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-asset-recovery",
+    "script": "scripts/verify-multitrack-asset-recovery.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-recovery-controls",
+    "script": "scripts/verify-multitrack-recovery-controls.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-native-read",
+    "script": "scripts/verify-multitrack-native-read.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-picker-reconnect",
+    "script": "scripts/verify-multitrack-picker-reconnect.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-transport-handoff",
+    "script": "scripts/verify-multitrack-transport-handoff.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-reference-preview",
+    "script": "scripts/verify-multitrack-reference-preview.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-quiet",
+    "script": "scripts/verify-multitrack-quiet.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-count-in",
+    "script": "scripts/verify-multitrack-count-in.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-enhancement",
+    "script": "scripts/verify-multitrack-enhancement.mjs",
+    "exit": 0
+  }
+]

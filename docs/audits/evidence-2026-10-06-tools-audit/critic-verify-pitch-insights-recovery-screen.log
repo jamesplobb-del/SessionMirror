@@ -1,0 +1,3 @@
+PASS: actual Insights component function/effects: closed mount, open load, stale close/unmount response, reopen, failed load/retry, named-profile save failure/draft/retry (isolated hooks; no DOM)
+PASS: actual Reset All callback + close/reopen + deferred clear completion settles through a replacement load.
+PASS: actual Insights scoped-delete replacement, surviving rows, durability reconciliation, buffered merge cancellation, close/unmount guards (isolated hooks, no DOM).

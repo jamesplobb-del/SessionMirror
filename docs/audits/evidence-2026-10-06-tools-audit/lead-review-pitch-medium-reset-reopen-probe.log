@@ -1,0 +1,5 @@
+$ node docs/audits/evidence-2026-10-06-tools-audit/pitch-medium-reset-reopen-probe.mjs
+PASS: actual Insights component function/effects: closed mount, open load, stale close/unmount response, reopen, failed load/retry, named-profile save failure/draft/retry (isolated hooks; no DOM)
+CONFIRMED P2: actual Reset All callback + close/reopen + deferred clear completion leaves Pitch Insights analyzing indefinitely; isolated actual component/effects, repository I/O mocked.
+
+exit=0

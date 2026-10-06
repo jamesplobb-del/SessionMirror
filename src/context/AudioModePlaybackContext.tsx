@@ -950,20 +950,32 @@ export function AudioModePlaybackProvider({
   )
 
   useEffect(() => {
+    let listening = true
     setAudioModeNativePlaybackEndedHandler(() => {
       if (!nativePlaybackActiveRef.current) return
+      const requestId = playbackRequestIdRef.current
+      const sourceKey = currentSourceKeyRef.current
       nativePlaybackActiveRef.current = false
       nativePlaybackStartingRef.current = false
       const onEnded = externalNativePlaybackEndedRef.current
       externalNativePlaybackEndedRef.current = null
       externalNativePlaybackFailedRef.current = null
       void (async () => {
-        await releaseAudioModeNativePlaybackRoute()
+        try {
+          await releaseAudioModeNativePlaybackRoute()
+        } catch (error) {
+          logPlayback('Native playback route cleanup failed', {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        // Route restoration can outlive the take or this subscription.
+        if (!listening || playbackRequestIdRef.current !== requestId || currentSourceKeyRef.current !== sourceKey) return
         finishNativePlayback()
         onEnded?.()
       })()
     })
     return () => {
+      listening = false
       setAudioModeNativePlaybackEndedHandler(null)
       if (nativePlaybackActiveRef.current) {
         void stopAudioModeNativePlayback()

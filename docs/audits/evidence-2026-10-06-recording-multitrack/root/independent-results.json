@@ -1,0 +1,49 @@
+[
+  {
+    "name": "recording-web-writer",
+    "command": [
+      "node",
+      "scripts/practice-qa/regressions/recording-web-writer.mjs"
+    ],
+    "exit": 1,
+    "log": "recording-web-writer.log"
+  },
+  {
+    "name": "recording-callbacks",
+    "command": [
+      "node",
+      "/private/tmp/besttake-recording-multitrack-2026-10-06/recording/adversarial-callbacks.cjs"
+    ],
+    "exit": 0,
+    "log": "recording-callbacks.log"
+  },
+  {
+    "name": "multitrack-adversarial",
+    "command": [
+      "node",
+      "/private/tmp/besttake-recording-multitrack-2026-10-06/multitrack/adversarial.mjs"
+    ],
+    "exit": 0,
+    "log": "multitrack-adversarial.log"
+  },
+  {
+    "name": "route-ownership",
+    "command": [
+      "node",
+      "/private/tmp/besttake-recording-multitrack-2026-10-06/ultra/cross-owner-probes.mjs"
+    ],
+    "exit": 0,
+    "log": "route-ownership.log"
+  },
+  {
+    "name": "typecheck",
+    "command": [
+      "node_modules/.bin/tsc",
+      "-b",
+      "--pretty",
+      "false"
+    ],
+    "exit": 0,
+    "log": "typecheck.log"
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "src/hooks/useCameraSession.ts": "2fb66f14e2b7622baff93caeadaad55dbbc47f1c44009c34a14cfbc77bda1f63",
+  "src/hooks/useLongPress.ts": "280f98ed48ac35aeafea9d7b563a3013d805e7f6fbeda058e5a72545eb22764f",
+  "src/components/RecordingModeCarousel.tsx": "7b1164c4a302f72f1a47c1088313759be1f0733441ad80c4b9250214c1c4d1ac",
+  "src/hooks/useAutoSoundRecording.ts": "a9dafca78d5d630fe4d97ba2eefff110182a675d22a0041b0b91587ae282ddaf",
+  "src/App.tsx": "9360ef0f1d8dfaf5fa4eb8dc09e7dfc94f238c390003911ba68e47ecec463470",
+  "src/utils/takeStorage.ts": "bf74cdb71644d968b811d0d557a950359d0b47cfb0de61ddc1edffc0a0925c69",
+  "scripts/verify-handsfree-playback.mjs": "3c592a4bb1994ff51a48928b7f6ea6ad00ac64a640a2bc80abcd27310c4f0ba5"
+}

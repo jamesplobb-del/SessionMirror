@@ -1,0 +1,1 @@
+PASS: rejected native listener cleanup preserves completed path/share, original render failure and in-flight cancellation result.

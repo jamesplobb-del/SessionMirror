@@ -1,0 +1,31 @@
+[
+  {
+    "name": "recording-terminal-controls",
+    "script": "scripts/verify-recording-terminal-controls.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-shared-recovery",
+    "script": "scripts/verify-multitrack-shared-recovery.mjs",
+    "exit": 0
+  },
+  {
+    "name": "multitrack-export-cleanup",
+    "script": "scripts/verify-multitrack-export-cleanup.mjs",
+    "exit": 0
+  },
+  {
+    "name": "native-playback-ownership",
+    "script": "scripts/verify-native-playback-ownership.mjs",
+    "exit": 0
+  },
+  {
+    "name": "native-playback-ended-ownership",
+    "script": "scripts/verify-native-playback-ended-ownership.mjs",
+    "exit": 0
+  },
+  {
+    "name": "typecheck",
+    "exit": 0
+  }
+]

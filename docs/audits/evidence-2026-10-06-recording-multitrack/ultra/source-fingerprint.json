@@ -1,0 +1,24 @@
+{
+  "atUtc": "2026-10-06T14:54:08.136604+00:00",
+  "head": "cc66c3ee0cf7729f376276518a363dc6a054491a",
+  "sourceHashes": {
+    "src/App.tsx": "9360ef0f1d8dfaf5fa4eb8dc09e7dfc94f238c390003911ba68e47ecec463470",
+    "src/hooks/useCameraSession.ts": "2fb66f14e2b7622baff93caeadaad55dbbc47f1c44009c34a14cfbc77bda1f63",
+    "src/utils/stereoPlaybackRoute.ts": "f8bf3559915623b196f24f4ee62d103709b57e91673b0cab1fdc16fe4eeb3a27",
+    "src/utils/audioModeNativePlayback.ts": "ac82d94b4eb2e4f13d0af9295df12d8cb54e79d8f5a6047becc76546c63d026e",
+    "src/utils/nativeInlineTakeBoxPlayback.ts": "d353d9f69ed19e9162afc363c081da16fc8d81135c148ffd8c3f69bfa0b5893b",
+    "src/utils/playbackRouteCoordinator.ts": "a231cbc890aea99add2b48b8114616f1b85c25fea7b719f39d9a596c05021b38",
+    "src/context/AudioModePlaybackContext.tsx": "30f2cf544b3108400e54bfd1b2adb3c1ccba9a423395b423f00fed7d35c9344c",
+    "src/multitrack/recording/useMultitrackRecording.ts": "0956bba1735806df477a5560feb32e21f291462ded818dfcc2a263ee8d3773a2",
+    "src/multitrack/components/MultitrackOverlay.tsx": "e36a04cd2bc17a59c4c236c6886887d753738deaac0dde4cf99857e8eb357699",
+    "src/multitrack/components/MultitrackRecordingStage.tsx": "0a97bacc3e1896a350d87f7f7b1c8c5e88339dfd432557bcf862c6c17bb19446",
+    "src/multitrack/state/multitrackFile.ts": "fe72f4d4257c92380cb44892e620ffb44b031e598eac3bc79d80b25fc0182e9f",
+    "src/multitrack/state/multitrackPersistence.ts": "54953d32203136bf2a0f66f836c01c7ef6b8a84bddf281ab9715c4431915801a",
+    "src/multitrack/export/multitrackExport.ts": "4bc76b8152dd249c31b855170c33491b3cdd75fede3a7e2b732807722135ed52",
+    "src/components/RecordingModeCarousel.tsx": "7b1164c4a302f72f1a47c1088313759be1f0733441ad80c4b9250214c1c4d1ac",
+    "src/hooks/useLongPress.ts": "280f98ed48ac35aeafea9d7b563a3013d805e7f6fbeda058e5a72545eb22764f",
+    "ios/App/App/BestTakeAudioPlugin.swift": "f22de28d3ef54e76a4084ed4c2f171a6f479d6164e7c13975a887c7784e2a1ed"
+  },
+  "dirtyTree": " M ANTIGRAVITY_APP_CONTEXT.md\n M scripts/practice-qa/regressions/suggested-routine-entry.mjs\n M scripts/verify-practice-chart-ink.mjs\n M src/components/MusicRoutineBuilder.tsx\n M src/components/RoutineMusicSetup.tsx\n M src/components/practiceChart/chartInk.ts\n M src/labs/balance/balanceEngine.ts\n M src/labs/balance/useBalanceGame.ts\n M src/practiceTimeline/storage/routineFileOpen.ts\n M src/utils/practiceChartStorage.ts\n M src/utils/practiceRoutines.ts\n?? docs/audits/2026-10-06-sol-medium-adversarial-audit.md\n?? docs/audits/2026-10-06-sol-medium-games-audit.md\n?? docs/audits/2026-10-06-sol-medium-music-routines-audit.md\n?? docs/audits/2026-10-06-sol-ultra-cross-feature-audit.md\n?? docs/audits/2026-10-06-sol-workflow-audit.md\n?? docs/audits/evidence-2026-10-06-sol-audit/\n?? launch-site/\n?? scripts/verify-balance-completed-resume.mjs\n?? scripts/verify-practice-chart-native-transaction.mjs\n?? scripts/verify-routine-open-recovery.mjs\n?? scripts/verify-routine-score-recovery.mjs\n",
+  "limits": "Fingerprint is a final observation, not immutable proof while another chat edits unrelated files."
+}

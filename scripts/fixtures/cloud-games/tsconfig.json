@@ -1,0 +1,1 @@
+{"extends":"../../../tsconfig.app.json","compilerOptions":{"noUnusedLocals":false,"noUnusedParameters":false,"tsBuildInfoFile":"/private/tmp/besttake-cloud-review.tsbuildinfo"},"include":["./*.tsx","./*.ts","../../../src/vite-env.d.ts"]}

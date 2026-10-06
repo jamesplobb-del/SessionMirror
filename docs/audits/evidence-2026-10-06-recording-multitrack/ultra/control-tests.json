@@ -1,0 +1,12 @@
+[
+  {
+    "command": "node scripts/verify-multitrack-transport-handoff.mjs",
+    "status": "PASSED",
+    "scope": "Actual native transport TS module; controlled plugin port. Stop/prepare/start ordering, live mix, failure recovery."
+  },
+  {
+    "command": "node scripts/verify-multitrack-count-in.mjs",
+    "status": "PASSED",
+    "scope": "Actual recording hook and extracted Overlay transport callback; controlled React/native clock ports. Full count-in with delayed capture, canceled lead-in, retry."
+  }
+]

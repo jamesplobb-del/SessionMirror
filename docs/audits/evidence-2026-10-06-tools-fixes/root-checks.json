@@ -1,0 +1,42 @@
+[
+  {
+    "script": "scripts/verify-navigation-response.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-settings-reset.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-tuner-key-controls.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-tuner-history.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-meter-logic.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-tap-tempo.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-audio-lifecycle.mjs",
+    "exitCode": 0,
+    "signal": null
+  },
+  {
+    "script": "scripts/verify-control-center-audio.mjs",
+    "exitCode": 0,
+    "signal": null
+  }
+]
