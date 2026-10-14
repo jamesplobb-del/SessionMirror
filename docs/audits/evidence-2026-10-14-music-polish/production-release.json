@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-14",
+  "sourceCommit": "7492514e8f02f7a0d3adecd6aa3ae15abde5a4d1",
+  "version": "4.2",
+  "build": "21",
+  "bundleId": "com.besttake.app",
+  "sourceCommitted": true,
+  "productionWebBuild": "passed",
+  "productionCapacitorSync": "passed",
+  "sentrySourceMaps": "uploaded successfully",
+  "sentryNativeDebugInformation": "56 missing files uploaded successfully",
+  "archive": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-10-14/BestTake-4.2-21.xcarchive",
+  "archiveStatus": "ARCHIVE SUCCEEDED",
+  "archiveSignatureVerification": "passed",
+  "extensionVersion": "4.2 (21)",
+  "productionGuards": "Real bundle ID, no server URL, no web debugging, test flags disabled, no shipped source maps or temporary animation logs",
+  "uploadStatus": "blocked before upload; EXPORT FAILED",
+  "uploadError": "Failed to Use Accounts: App Store Connect access for team X24D9LKQ58 is required; Xcode requests correct Apple Account credentials in Accounts settings.",
+  "localAppStorePackage": "Export also blocked by missing iOS Distribution signing certificate.",
+  "nextAction": "User signs into BestTake Apple account in Xcode Settings > Accounts; retry automatic signing and App Store Connect upload.",
+  "privateLogs": "build/release-4.2-21/",
+  "unrelatedFiles": "Untracked scripts/fixtures/compass-home preserved and excluded from commit."
+}
