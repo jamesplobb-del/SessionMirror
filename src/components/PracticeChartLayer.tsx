@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload } from 'lucide-react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -10,7 +10,7 @@ import {
   savePracticeChart, saveChartView, setChartVisible,
   type ChartView, type PracticeChart,
 } from '../utils/practiceChartStorage'
-import MusicWidget from './practiceChart/MusicWidget'
+import MusicWidget, { type MusicMenuMode } from './practiceChart/MusicWidget'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { WIDGET_CONTROL_LAYOUT_EVENT } from '../utils/floatingWidgetLayout'
 
@@ -149,9 +149,12 @@ export default function PracticeChartLayer({
    * it would mean opening a part next week to an app with no tabs and no deck
    * and no memory of asking for that — which reads as broken, not as a feature.
    */
+  const workspaceTrigger = useRef<HTMLButtonElement>(null)
+  const workspacePanel = useRef<HTMLDivElement>(null)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
-  const [pageToolsRequested, setPageToolsRequested] = useState(false)
-  const [markUpRequested, setMarkUpRequested] = useState(false)
+  const [musicMenu, setMusicMenu] = useState<MusicMenuMode | null>(null)
+  const [musicMenuAnchor, setMusicMenuAnchor] = useState<HTMLElement | null>(null)
+  const musicMenuId = useId()
   const [chromeOff, setChromeOff] = useState(false)
   useLayoutEffect(() => {
     if (!active) return
@@ -161,6 +164,38 @@ export default function PracticeChartLayer({
   // Full screen is for the page. The tool row waits behind Workspace, closed,
   // every time the player steps in.
   useEffect(() => { if (chromeOff) setWorkspaceOpen(false) }, [chromeOff])
+  const closeWorkspace = useCallback((restoreFocus = false) => {
+    const focusWasInside = workspacePanel.current?.contains(document.activeElement)
+    setWorkspaceOpen(false)
+    if (restoreFocus || focusWasInside) workspaceTrigger.current?.focus({ preventScroll: true })
+  }, [])
+  useEffect(() => {
+    if (!workspaceOpen) return
+    const outside = (event: globalThis.PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node) || workspacePanel.current?.contains(target) || workspaceTrigger.current?.contains(target)) return
+      setWorkspaceOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      event.stopPropagation()
+      closeWorkspace(true)
+    }
+    const focusOutside = (event: FocusEvent) => {
+      const target = event.target
+      if (!(target instanceof Node) || workspacePanel.current?.contains(target) || workspaceTrigger.current?.contains(target)) return
+      setWorkspaceOpen(false)
+    }
+    document.addEventListener('pointerdown', outside, true)
+    document.addEventListener('keydown', escape)
+    document.addEventListener('focusin', focusOutside)
+    return () => {
+      document.removeEventListener('pointerdown', outside, true)
+      document.removeEventListener('keydown', escape)
+      document.removeEventListener('focusin', focusOutside)
+    }
+  }, [closeWorkspace, workspaceOpen])
   const [saving, setSaving] = useState(false)
   const [hint, setHint] = useState(false)
 
@@ -212,6 +247,8 @@ export default function PracticeChartLayer({
   useEffect(() => {
     setPageView(null)
     setLoadFailed(false)
+    setMusicMenu(null)
+    setMarker(null)
   }, [paperKey])
 
   /*
@@ -224,11 +261,13 @@ export default function PracticeChartLayer({
    */
   const mounted = paperVisible && chart !== null
   const showing = active && mounted
-  useEffect(() => { if (!showing) setMarker(null) }, [showing])
+  useEffect(() => {
+    if (!showing) { setMarker(null); setMusicMenu(null) }
+  }, [showing])
   useEffect(() => {
     setMarker(null)
-    setMarkUpRequested(false)
-    setPageToolsRequested(false)
+    setMusicMenu(null)
+    setMusicMenuAnchor(null)
     setWorkspaceOpen(false)
   }, [collapseResetKey])
   /*
@@ -397,11 +436,24 @@ export default function PracticeChartLayer({
     setSpreadAvailable(available)
   }, [])
 
-  const openMarkUp = useCallback(() => {
+  const dismissMusicMenu = useCallback((restoreFocus = false) => {
+    setMusicMenu(null)
+    setMarker(null)
+    if (restoreFocus && musicMenuAnchor?.isConnected) musicMenuAnchor.focus({ preventScroll: true })
+  }, [musicMenuAnchor])
+
+  const openMusicMenu = useCallback((mode: MusicMenuMode, anchor: HTMLElement) => {
     setWorkspaceOpen(false)
-    setPageToolsRequested(true)
-    setMarkUpRequested(true)
-  }, [])
+    setMusicMenuAnchor(anchor)
+    if (musicMenu === mode) {
+      setMusicMenu(null)
+      setMarker(null)
+      return
+    }
+    setMusicMenu(mode)
+    // Page always returns to reading, regardless of the last opened menu.
+    setMarker(mode === 'markup' ? 'black' : null)
+  }, [musicMenu])
 
   /*
    * The eraser moves faster than React re-renders, so it works from a mirror
@@ -603,8 +655,8 @@ export default function PracticeChartLayer({
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
           {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
-          <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" onClick={() => setPageToolsRequested(true)}><FileMusic aria-hidden /><span>Page</span></button>
-          <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" onClick={openMarkUp}><Pen aria-hidden /><span>Mark up</span></button>
+          <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" data-music-menu-trigger="page" aria-haspopup="dialog" aria-expanded={musicMenu === 'page'} aria-controls={`${musicMenuId}-page`} onClick={event => openMusicMenu('page', event.currentTarget)}><FileMusic aria-hidden /><span>Page</span></button>
+          <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" data-music-menu-trigger="markup" aria-haspopup="dialog" aria-expanded={musicMenu === 'markup'} aria-controls={`${musicMenuId}-markup`} onClick={event => openMusicMenu('markup', event.currentTarget)}><Pen aria-hidden /><span>Mark up</span></button>
           <button
             type="button"
             className="practice-chart-control practice-chart-control--start"
@@ -614,24 +666,39 @@ export default function PracticeChartLayer({
             {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-          <button type="button" className="practice-chart-control" aria-expanded={workspaceOpen}
-            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => setWorkspaceOpen(value => !value)}>
+          <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-expanded={workspaceOpen}
+            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => { dismissMusicMenu(); setWorkspaceOpen(value => !value) }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
         </div>
         {workspaceOpen && (
-          <div className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
-            {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => (
-            <button key={key} type="button" aria-pressed={workspace[key]}
+          <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
+            {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => key === 'audioEnhancerEnabled' ? (
+              <button key={key} type="button" aria-pressed={workspace[key]}
                 onClick={() => onWorkspaceChange(key, !workspace[key])}>
                 <Icon aria-hidden /><span>{label}</span>
               </button>
+            ) : (
+              <div key={key} className="practice-chart-workspace__tool" data-enabled={workspace[key] ? 'true' : undefined}>
+                <button type="button" onClick={() => { onWorkspaceChange(key, true); closeWorkspace() }}>
+                  <Icon aria-hidden /><span>{label}</span>
+                </button>
+                {workspace[key] && <button type="button" className="practice-chart-workspace__remove" aria-label={`Remove ${label} from workspace`}
+                  onClick={event => {
+                    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+                    onWorkspaceChange(key, false)
+                  }}><X aria-hidden /></button>}
+              </div>
             ))}
-            {onReferencesChange && <button type="button" aria-pressed={referencesVisible}
-              onClick={() => onReferencesChange(!referencesVisible)}>
-              <FileMusic aria-hidden /><span>References</span>
-            </button>}
-            <button type="button" onClick={openMarkUp}><Pen aria-hidden /><span>Mark up</span></button>
+            {onReferencesChange && <div className="practice-chart-workspace__tool" data-enabled={referencesVisible ? 'true' : undefined}>
+              <button type="button" onClick={() => { onReferencesChange(true); closeWorkspace() }}>
+                <FileMusic aria-hidden /><span>References</span>
+              </button>
+              {referencesVisible && <button type="button" className="practice-chart-workspace__remove" aria-label="Remove References from workspace" onClick={event => {
+                event.currentTarget.parentElement?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
+                onReferencesChange(false)
+              }}><X aria-hidden /></button>}
+            </div>}
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
@@ -732,11 +799,10 @@ export default function PracticeChartLayer({
     <MusicWidget
       boundaryRef={boundaryRef}
       visible={active}
-      expandRequest={pageToolsRequested}
-      onExpandRequestConsumed={() => setPageToolsRequested(false)}
-      markUpRequest={markUpRequested}
-      onMarkUpRequestConsumed={() => setMarkUpRequested(false)}
-      collapseResetKey={collapseResetKey}
+      menuMode={musicMenu}
+      menuAnchor={musicMenuAnchor}
+      menuId={musicMenuId}
+      onDismiss={dismissMusicMenu}
       hasChart={chart !== null}
       fileName={chart?.fileName ?? null}
       pageView={pageView}
@@ -746,8 +812,6 @@ export default function PracticeChartLayer({
       fit={view.fit}
       spreadAvailable={spreadAvailable}
       halfTurn={view.halfTurn}
-      chromeHidden={chromeOff}
-      onChromeHiddenChange={setChromeOff}
       marker={marker}
       inkWidth={inkWidth}
       markCount={strokes.length}

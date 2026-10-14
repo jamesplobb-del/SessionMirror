@@ -1,0 +1,9 @@
+/* References retains its live media owner during the shared fold animation. */
+.reference-widget-live:has(.reference-widget-panel[data-widget-folding]) {
+  visibility: visible !important;
+  pointer-events: none !important;
+}
+.reference-widget-live.is-collapsed .reference-widget-panel[data-widget-folding] {
+  clip-path: none;
+  opacity: 1;
+}

@@ -1,0 +1,176 @@
+/* Page and Markup share one quiet surface, each with its own purpose. */
+.music-control-menu {
+  --music-menu-surface: var(--widget-surface, var(--ls-panel, #fff));
+  --music-menu-ink: var(--widget-ink, var(--ls-ink, #19334c));
+  --music-menu-muted: var(--widget-muted, var(--ls-muted, #5d7183));
+  --music-menu-line: var(--widget-border, var(--ls-line, #dce6ef));
+  --music-menu-accent: var(--widget-accent, var(--ls-blue, #2873cd));
+  --music-menu-control: var(--widget-control, var(--ls-soft, #f0f5fa));
+  position: absolute;
+  z-index: 45;
+  width: min(292px, calc(100vw - 24px));
+  padding: 8px;
+  border: 1px solid var(--music-menu-line);
+  border-radius: 18px;
+  background: var(--music-menu-surface);
+  color: var(--music-menu-ink);
+  box-shadow: 0 10px 32px #13355221, 0 2px 8px #13355209;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.music-control-menu--markup { width: min(280px, calc(100vw - 24px)); }
+.music-control-menu button {
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .16s ease, color .16s ease;
+}
+.music-control-menu button:disabled { opacity: .4; cursor: default; }
+.music-control-menu svg { width: 17px; height: 17px; flex: none; stroke-width: 1.7; }
+.music-control-menu button:focus-visible {
+  outline: 2px solid var(--music-menu-accent);
+  outline-offset: -2px;
+}
+.music-control-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 3px 10px 10px;
+}
+.music-control-menu__head h2 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.5; }
+.music-control-menu__head > div > span {
+  display: block;
+  color: var(--music-menu-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.music-control-menu__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--music-menu-muted) !important;
+}
+.music-control-menu--markup .music-control-menu__close {
+  background: var(--music-menu-control);
+  color: var(--music-menu-accent) !important;
+}
+.music-control-menu__section {
+  display: grid;
+  padding-block: 4px;
+  border-top: 1px solid var(--music-menu-line);
+}
+.music-control-menu__choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 54px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+}
+.music-control-menu__choice strong { display: block; font-weight: 500; }
+.music-control-menu__choice small { display: block; margin-top: 2px; font-size: 10px; color: var(--music-menu-muted); }
+.music-control-menu__choice[aria-pressed='true'] { background: var(--music-menu-control); }
+.music-control-menu__choice[aria-pressed='true'] > svg { color: var(--music-menu-accent); }
+.music-control-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  background: transparent;
+  text-align: left;
+}
+.music-control-menu__row > svg { color: var(--music-menu-muted); }
+.music-control-menu__row > span { flex: 1; }
+.music-control-menu__switch { position: relative; width: 30px; height: 18px; border-radius: 20px; background: var(--music-menu-line); transition: background .16s ease; }
+.music-control-menu__switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--music-menu-surface); transition: transform .16s ease; }
+.music-control-menu__row[aria-pressed='true'] .music-control-menu__switch { background: var(--music-menu-accent); }
+.music-control-menu__row[aria-pressed='true'] .music-control-menu__switch::after { transform: translateX(12px); background: #fff; }
+.music-control-menu__turn { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px 0 8px; }
+.music-control-menu__turn button, .music-control-menu__edits button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 11px;
+  background: var(--music-menu-control);
+}
+.music-control-menu__files { padding-bottom: 0; }
+.music-control-menu__row--remove { color: var(--ls-danger, #b64d45) !important; }
+.music-control-menu__row--remove > svg { color: inherit; }
+.music-control-menu__pens { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.music-control-menu__pens button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 68px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  background: var(--music-menu-control);
+}
+.music-control-menu__pens button > i { width: 17px; height: 17px; border-radius: 50%; box-shadow: inset 0 0 0 1px #ffffff55, 0 0 0 1px #18283d26; }
+.music-control-menu__pens button[aria-pressed='true'] { color: var(--music-menu-accent); box-shadow: inset 0 0 0 1.5px var(--music-menu-accent); }
+.music-control-menu__width { padding: 12px 0; }
+.music-control-menu__label { display: block; margin: 0 4px 7px; color: var(--music-menu-muted); font-size: 10px; }
+.music-control-menu__width > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 3px; border-radius: 12px; background: var(--music-menu-control); }
+.music-control-menu__width button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 6px 4px; border-radius: 9px; background: transparent; font-size: 11px; color: var(--music-menu-muted); }
+.music-control-menu__width button i { border-radius: 50%; background: currentColor; }
+.music-control-menu__width button[aria-pressed='true'] { background: var(--music-menu-surface); color: var(--music-menu-accent); box-shadow: 0 1px 4px #1231; }
+.music-control-menu__edits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding-top: 10px; border-top: 1px solid var(--music-menu-line); }
+.music-control-menu__save { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 44px; margin-top: 8px; padding: 8px 12px; border-radius: 11px; background: var(--music-menu-control); color: var(--music-menu-accent) !important; }
+.music-control-menu__hint { display: flex; align-items: center; gap: 8px; margin: 10px; font-size: 11px; line-height: 1.5; color: var(--music-menu-muted); }
+.music-control-menu__error { margin: 10px 8px 4px; color: var(--ls-danger, #b64d45); font-size: 11px; line-height: 1.5; }
+@media (hover: hover) {
+  .music-control-menu :is(.music-control-menu__choice, .music-control-menu__row, .music-control-menu__close):hover:not(:disabled) { background: var(--music-menu-control); }
+  .music-control-menu :is(.music-control-menu__pens button, .music-control-menu__edits button, .music-control-menu__save):hover:not(:disabled) { filter: brightness(.97); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .music-control-menu *, .music-control-menu *::after { transition: none; }
+}
+
+/* Launching an enabled tool reopens it; removal is a separate, explicit tap. */
+.practice-chart-workspace__tool { display: flex; align-items: stretch; min-width: 0; border-radius: 16px; }
+.practice-chart-workspace__tool > button:first-child { flex: 1; }
+.practice-chart-workspace__tool[data-enabled='true'] { background: var(--ls-panel, #fff); box-shadow: 0 1px 4px #1231; }
+html#lens-design-system .practice-chart-workspace__tool[data-enabled='true'] > button:first-child { color: var(--ls-blue, #2873cd); }
+html#lens-design-system .practice-chart-workspace button.practice-chart-workspace__remove,
+.practice-chart-workspace button.practice-chart-workspace__remove {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+.practice-chart-workspace__remove svg { width: 13px; height: 13px; }
+@media (max-width: 540px) {
+  .practice-chart-topbar .practice-chart-workspace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html#lens-design-system .practice-chart-workspace__tool > button:first-child,
+  .practice-chart-workspace__tool > button:first-child { flex-direction: row; justify-content: flex-start; padding: 8px; gap: 7px; }
+}

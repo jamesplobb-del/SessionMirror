@@ -1,0 +1,74 @@
+
+> besttake@2.3.0 build
+> npm run copy:sql:wasm && npm run copy:pdf:fonts && tsc -b && vite build
+
+
+> besttake@2.3.0 copy:sql:wasm
+> copyfiles -u 3 node_modules/sql.js/dist/sql-wasm.wasm public/assets
+
+
+> besttake@2.3.0 copy:pdf:fonts
+> copyfiles -u 2 "node_modules/pdfjs-dist/standard_fonts/*" public/assets
+
+vite v6.4.3 building for production...
+transforming...
+✓ 3165 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/playbackRouteCoordinator.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts, /Users/jameslobb/Documents/BestTake/src/metronome/sharedMetronomeEngine.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/BestTakeBox.tsx, /Users/jameslobb/Documents/BestTake/src/components/LiveCameraBackground.tsx, /Users/jameslobb/Documents/BestTake/src/components/PipWindow.tsx, /Users/jameslobb/Documents/BestTake/src/context/AudioModePlaybackContext.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/components/MultitrackOverlay.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/synchronization/useMultitrackSync.ts, /Users/jameslobb/Documents/BestTake/src/utils/audioModeNativePlayback.ts, /Users/jameslobb/Documents/BestTake/src/utils/cameraSessionState.ts, /Users/jameslobb/Documents/BestTake/src/utils/nativeCameraTest.ts, /Users/jameslobb/Documents/BestTake/src/utils/takePlaybackAudio.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/nativeInlineTakeBoxPlayback.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/utils/takePlaybackAudio.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/BestTakeBox.tsx, /Users/jameslobb/Documents/BestTake/src/components/GuidedTakeReview.tsx, /Users/jameslobb/Documents/BestTake/src/components/PipWindow.tsx, /Users/jameslobb/Documents/BestTake/src/context/TakeGuidanceContext.tsx, /Users/jameslobb/Documents/BestTake/src/utils/audioModeNativePlayback.ts, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/utils/generateThumbnail.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/utils/takeThumbnailCache.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/App.tsx, /Users/jameslobb/Documents/BestTake/src/components/ReviewModeOverlay.tsx, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) /Users/jameslobb/Documents/BestTake/src/components/practiceChart/chartDocument.ts is dynamically imported by /Users/jameslobb/Documents/BestTake/src/components/ScoreThumbnail.tsx, /Users/jameslobb/Documents/BestTake/src/utils/routineMusic.ts but also statically imported by /Users/jameslobb/Documents/BestTake/src/components/PracticeChartLayer.tsx, /Users/jameslobb/Documents/BestTake/src/components/practiceChart/PracticeChartPaper.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/sheetMusic/SheetPdfPages.tsx, /Users/jameslobb/Documents/BestTake/src/multitrack/sheetMusic/sheetPdfSource.ts, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                       1.50 kB │ gzip:   0.61 kB
+dist/assets/learn-instrument-TZdqTN-g.jpg            84.00 kB
+dist/assets/staff-jumper-BOKyMJ_6.jpg                86.75 kB
+dist/assets/balance-B_01WfPR.jpg                     89.63 kB
+dist/assets/pdf.worker.min-rsCePomN.mjs           1,417.59 kB
+dist/assets/LearnInstrumentScreen-DGl_-sGm.css       12.19 kB │ gzip:   2.86 kB
+dist/assets/OnboardingTutorial-BkcZUaCc.css          17.05 kB │ gzip:   3.71 kB
+dist/assets/PracticeChartLayer-DAaiqsxc.css          28.66 kB │ gzip:   5.61 kB
+dist/assets/BalanceScreen-BQ8gtPnN.css               43.05 kB │ gzip:   9.60 kB
+dist/assets/LabsOverlay-Cl93OqGk.css                 96.61 kB │ gzip:  18.57 kB
+dist/assets/App-CA-NtdVn.css                        170.49 kB │ gzip:  28.89 kB
+dist/assets/index-CmSptOwM.css                    1,189.82 kB │ gzip: 178.16 kB
+dist/assets/useVideoPlayback-WcsflK1B.js              0.19 kB │ gzip:   0.18 kB
+dist/assets/useHeadphoneOutput-CUu8xNZO.js            0.31 kB │ gzip:   0.19 kB
+dist/assets/AnimatedExpand-caLoSH6a.js                0.39 kB │ gzip:   0.27 kB
+dist/assets/videoDuration-Dwx7ESIe.js                 0.46 kB │ gzip:   0.26 kB
+dist/assets/readMultitrackAsset-BbecVhyA.js           1.04 kB │ gzip:   0.64 kB
+dist/assets/usePinchResize-SeqKHszm.js                1.81 kB │ gzip:   0.74 kB
+dist/assets/CoachMark-PmdHaEVD.js                     3.27 kB │ gzip:   1.46 kB
+dist/assets/DraggableTakesWidget-CApIdcQY.js          3.47 kB │ gzip:   1.53 kB
+dist/assets/DraggablePitchWidget-B5IUKdK4.js          4.71 kB │ gzip:   2.12 kB
+dist/assets/DraggableDroneWidget-Cg3DRwvA.js          5.75 kB │ gzip:   2.23 kB
+dist/assets/OnboardingTutorial-odS3Hzck.js            8.06 kB │ gzip:   2.93 kB
+dist/assets/DraggableMetronomeWidget-BJHy9mlD.js     10.10 kB │ gzip:   3.87 kB
+dist/assets/capacitor-BQXhFRVT.js                    27.14 kB │ gzip:   8.65 kB
+dist/assets/SettingsDrawer-1btPgzNF.js               32.85 kB │ gzip:  10.66 kB
+dist/assets/ReviewModeOverlay-DIDfLio8.js            32.88 kB │ gzip:  10.84 kB
+dist/assets/LearnInstrumentScreen-C8c3G9At.js        34.04 kB │ gzip:  10.34 kB
+dist/assets/TakeVaultDrawer-B32oMmKR.js              35.23 kB │ gzip:  10.12 kB
+dist/assets/motion-C6yaJUf_.js                       39.02 kB │ gzip:  13.84 kB
+dist/assets/PracticeChartLayer-DV5JNGaR.js           40.52 kB │ gzip:  13.35 kB
+dist/assets/BalanceScreen-OrrfOdPF.js                64.97 kB │ gzip:  17.45 kB
+dist/assets/LabsOverlay-CUNNgAiH.js                 142.70 kB │ gzip:  45.31 kB
+dist/assets/MultitrackOverlay-DVYXKNdf.js           201.03 kB │ gzip:  60.13 kB
+dist/assets/sqlite-D4tLY50P.js                      338.43 kB │ gzip:  94.05 kB
+dist/assets/index-C7S3Tddz.js                       396.02 kB │ gzip: 117.40 kB
+dist/assets/pdfjs-BXdF63uW.js                       409.65 kB │ gzip: 123.23 kB
+dist/assets/App-Cw-ejsIM.js                         807.73 kB │ gzip: 234.41 kB
+dist/assets/vendor-Bc30c2Up.js                      896.21 kB │ gzip: 323.76 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.24s

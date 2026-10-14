@@ -1,0 +1,78 @@
+{
+  "date": "2026-10-14",
+  "scope": "Music menus, direct tool opening, collapse and rail polish",
+  "initialWorkflowChecksPassed": 16,
+  "finalAffectedChecks": [
+    {
+      "check": "music-control-menus",
+      "passed": true
+    },
+    {
+      "check": "widget-collapse-lifecycle",
+      "passed": true
+    },
+    {
+      "check": "music-widget-drawer-focus",
+      "passed": true
+    },
+    {
+      "check": "special-tool-dock-arrival",
+      "passed": true
+    },
+    {
+      "check": "widget-ball-placement",
+      "passed": true
+    },
+    {
+      "check": "routine-music",
+      "passed": true
+    },
+    {
+      "check": "feature-guidance",
+      "passed": true
+    },
+    {
+      "check": "music-dock-clearance",
+      "passed": true
+    }
+  ],
+  "independentCritique": "Scoped source, regression, and iPad layout review passed. Animation capture limitation documented; native diagnostics confirm actual movement.",
+  "visualVerification": {
+    "environment": "iPad Pro 11-inch (M5), iOS 26.5 simulator; isolated com.besttake.app.practiceqa Debug app with production web assets",
+    "nativeBuild": "passed; final clean source installed and launched successfully, Page menu left open for review",
+    "passedWorkflows": [
+      "Import two-page synthetic PDF through native Files and open from Music library",
+      "Page menu fits portrait iPad and Next changes page 1/2 to 2/2",
+      "Switch Page to Mark up and back with one coordinated menu",
+      "Draw on score with Mark up open; Undo removes the stroke",
+      "Workspace dismisses Page menu",
+      "Pitch opens directly on the score when enabled and when reselected while collapsed",
+      "Metronome opens directly alongside Pitch",
+      "Pitch collapses with side rail closed; rail remains closed and reopening restores launcher",
+      "Side rail launcher restores full Pitch panel",
+      "Final build restores Pitch with collapse and close controls clear of side rail handle",
+      "Final build collapses Pitch and Metronome to separate launchers",
+      "Final build preserves imported score, page and enabled tools across relaunch"
+    ],
+    "foundAndFixed": [
+      "Stale help text described removed Read/Mark up tabs and More options",
+      "Framer opacity animation competed with custom fold travel; stable Framer targets now leave departure to one animation",
+      "Restored Pitch could overlap the rail handle; actual handle touch geometry now protected through placement and collision selection"
+    ],
+    "motionReview": {
+      "nativeDiagnostics": "Verified visible mounted panel changes position, scale and opacity over time; animation finishes and rail translate changes before settling. See native-motion-diagnostics-before-timing.log.",
+      "polish": "Fold changed to 360ms with gentler easing and longer opacity retention; rail nudge uses 300ms ease-in-out at existing 3\u20134px amplitude. Final clean production and simulator builds pass.",
+      "recording": "ipad-collapse-polished.mp4 confirms collapse, correct launcher arrival and settled layout. Frame capture does not reliably resolve brief travel/nudge; physical-device smoothness is not certified.",
+      "cleanup": "Temporary diagnostic logging was limited to isolated simulator bundle; final assets replaced from clean production dist and checked to contain none of the temporary logging."
+    },
+    "limits": [
+      "Simulator verification, not physical-device performance certification",
+      "Browser automation remained unavailable due writable-root configuration; native touch automation used instead",
+      "VoiceOver and every screen size were not manually exercised in this pass"
+    ]
+  },
+  "release": "Local source, browser preview build, and isolated simulator QA copy; no phone installation or App Store distribution performed in this follow-up.",
+  "productionBuild": "passed; production-build-final.log records final animation timing and layout fixes",
+  "diffWhitespaceCheck": "passed",
+  "accountRemainingPercentAtLastCheck": 89
+}

@@ -4,13 +4,15 @@ import { reportFeatureAction } from '../utils/featureGuidance'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { animate, useIsPresent, useMotionValue, useReducedMotion, type MotionValue } from 'framer-motion'
+import { animate, useIsPresent, useMotionValue, type MotionValue } from 'framer-motion'
 import { iosDragRelease } from '../utils/motionPresets'
 import { findAvailableWidgetBallPosition, findAvailableWidgetPanelPosition, loadPersistentWidgetPosition, savePersistentWidgetPosition, saveWidgetPosition, WIDGET_CONTROL_LAYOUT_EVENT, type WidgetPosition, type WidgetRect } from '../utils/floatingWidgetLayout'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
 import { focusWidgetLauncher } from '../utils/widgetFocus'
+import { animateWidgetDockArrival, type WidgetFoldSource } from '../utils/widgetDockMotion'
 import './widget-ball.css'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 
 const BALL_SIZE = 56
 // Synchronous reservations prevent widgets mounting in the same frame from
@@ -64,7 +66,8 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   const dragged = useRef(false)
   const ballGesture = useRef<{ pointerId: number; clientX: number; clientY: number; x: number; y: number } | null>(null)
   const transferFocus = useRef(false)
-  const reducedMotion = useReducedMotion()
+  const pendingFold = useRef<WidgetFoldSource | null>(null)
+  const reducedMotion = usePrefersReducedMotion()
   const previousPlacement = useRef({ resetKey, positionId, ballSlot, boundaryRef })
   const previousExpandRequest = useRef(expandRequest)
   const expandRequestConsumed = useRef(false)
@@ -132,6 +135,19 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
         protectedControls.push(localRect(protectedControl.getBoundingClientRect()))
       }
     }
+    // Collision candidates can move away from the initially cleared spawn.
+    // Keep the real rail body and its protruding touch handle in the same
+    // protected geometry as the score controls, including a closed rail handle.
+    if (dockRight) {
+      const drawer = document.querySelector<HTMLElement>('.app-shell--music-page .music-widget-drawer')
+      const handle = drawer?.querySelector<HTMLElement>('.music-widget-drawer__handle')
+      for (const control of [drawer, handle]) {
+        if (!control?.getClientRects().length) continue
+        const rect = control.getBoundingClientRect()
+        if (rect.right <= origin.left || rect.left >= origin.right || rect.bottom <= origin.top || rect.top >= origin.bottom) continue
+        protectedControls.push(localRect(rect))
+      }
+    }
     return findAvailableWidgetPanelPosition(bounds.clientWidth, bounds.clientHeight,
       widget.offsetWidth, widget.offsetHeight, desired, occupied, protectedControls)
   }
@@ -145,8 +161,11 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     const saved = useRightDock() ? null : loadPersistentWidgetPosition(ballStorageId())
     clampBall(saved?.x ?? (bounds?.clientWidth ?? window.innerWidth) - BALL_SIZE - 12,
       saved?.y ?? ((useRightDock() ? 160 : Math.min(220, (bounds?.clientHeight ?? window.innerHeight) * 0.3)) + ballSlot * 68))
-    if (shouldReset) setCollapsed(true)
-    // Routine changes reset existing tools to independently accessible balls.
+    if (shouldReset) {
+      pendingFold.current = null
+      setCollapsed(!expandRequest)
+    }
+    // A request to open wins when a routine/placement reset arrives in the same render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey, positionId, ballSlot, boundaryRef, dockRight])
 
@@ -157,6 +176,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     }
     if (previousExpandRequest.current) return
     previousExpandRequest.current = true
+    pendingFold.current = null
     setCollapsed(false)
   }, [expandRequest])
 
@@ -198,6 +218,21 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     // Place once when expanded or moved into a new boundary, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsed, visible, present, portalHost, boundaryRef, positionId])
+
+  useLayoutEffect(() => {
+    const widget = widgetRef.current
+    if (!widget) return
+    // Visibility alone does not protect focus while the departing panel is visible.
+    widget.inert = collapsed || !visible || !present
+    const source = pendingFold.current
+    pendingFold.current = null
+    if (!collapsed || !source || !visible || !present) return
+    const launcher = ballRef.current
+    const closedDock = launcher?.closest('#music-widget-dock[inert]')
+    const target = closedDock?.closest('.music-widget-drawer')
+      ?.querySelector<HTMLElement>('.music-widget-drawer__handle') ?? launcher
+    return animateWidgetDockArrival(widget, target, source, positionId, Boolean(reducedMotion), docked)
+  }, [collapsed, visible, present, widgetRef, positionId, resetKey, boundaryRef, portalHost, reducedMotion, docked])
 
   const rememberBall = () => savePersistentWidgetPosition(ballStorageId(), ballX.get(), ballY.get())
 
@@ -287,6 +322,11 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
       clampBall(useRightDock() ? width - BALL_SIZE - 12 : cornerX + BALL_SIZE / 2 < width / 2 ? 12 : width - BALL_SIZE - 12, y.get())
       rememberBall()
     }
+    pendingFold.current = {
+      rect: widget.getBoundingClientRect(),
+      transform: getComputedStyle(widget).transform,
+      opacity: getComputedStyle(widget).opacity,
+    }
     transferFocus.current = widget.contains(document.activeElement)
     dragged.current = false
     setCollapsed(true)
@@ -309,6 +349,7 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
     saveWidgetPosition(positionId, next.x, next.y)
     onRestore?.(next)
     transferFocus.current = document.activeElement === ballRef.current
+    pendingFold.current = null
     ballPlacements.delete(placementId.current)
     reportFeatureAction('widget-expanded')
     setCollapsed(false)
@@ -347,5 +388,8 @@ export function useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId,
   </> : null
 
   return { collapsed, collapse, ball: ball && portalHost ? createPortal(ball, portalHost) : ball,
-    panelAnimation: { opacity: collapsed ? 0 : 1, scale: collapsed && !reducedMotion ? 0.94 : 1 } }
+    // Keep Framer's target stable while folding. Its passive effect starts after
+    // our layout effect; a new native opacity-to-zero animation would otherwise
+    // outrank the travel animation on the same owner. CSS hides settled folds.
+    panelAnimation: { opacity: 1, scale: 1 } }
 }

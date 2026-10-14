@@ -54,3 +54,9 @@ html.app-dark-mode .app-shell--audio-mode .widget-collapse::before { background:
 }
 
 .widget-ball .widget-ball__expand { width:12px; height:10px; opacity:.85; }
+
+/* A folded owner remains inert while its single mounted surface travels to the rail. */
+.widget-is-collapsed[data-widget-folding],
+.widget-is-collapsed[data-widget-folding] *,
+.app-shell .widget-is-collapsed[data-widget-folding],
+.app-shell .widget-is-collapsed[data-widget-folding] * { visibility: visible !important; }

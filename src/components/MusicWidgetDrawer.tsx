@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef, type PointerEvent } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { MUSIC_DOCK_ARRIVAL_EVENT, type MusicDockArrivalDetail } from '../utils/widgetDockMotion'
 
 /** The dock stays mounted while its rail slides away, so tool state is preserved. */
 export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const railRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLButtonElement>(null)
   const dockRef = useRef<HTMLDivElement>(null)
   const gesture = useRef<{ pointerId: number; x: number } | null>(null)
@@ -11,6 +13,34 @@ export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolea
     const dock = dockRef.current
     if (!open && dock?.contains(dock.ownerDocument.activeElement)) {
       handleRef.current?.focus({ preventScroll: true })
+    }
+  }, [open])
+  useLayoutEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let arrival: Animation | undefined
+    const acknowledgeArrival = (event: Event) => {
+      const detail = (event as CustomEvent<MusicDockArrivalDetail>).detail
+      if (preference.matches || !rail.animate || !rail.getClientRects().length || !detail?.id) return
+      const belongsToDock = [...(dockRef.current?.querySelectorAll<HTMLElement>('[data-music-dock-id]') ?? [])]
+        .some(tool => tool.dataset.musicDockId === detail.id)
+      if (!belongsToDock) return
+      arrival?.cancel()
+      arrival = rail.animate([
+        { translate: '0 0' },
+        { translate: `${open ? -4 : -3}px 0`, offset: .35 },
+        { translate: '1px 0', offset: .7 },
+        { translate: '0 0' },
+      ], { duration: 300, easing: 'ease-in-out' })
+    }
+    const cancelForReducedMotion = () => { if (preference.matches) arrival?.cancel() }
+    window.addEventListener(MUSIC_DOCK_ARRIVAL_EVENT, acknowledgeArrival)
+    preference.addEventListener('change', cancelForReducedMotion)
+    return () => {
+      window.removeEventListener(MUSIC_DOCK_ARRIVAL_EVENT, acknowledgeArrival)
+      preference.removeEventListener('change', cancelForReducedMotion)
+      arrival?.cancel()
     }
   }, [open])
   const start = (event: PointerEvent<HTMLElement>) => {
@@ -29,7 +59,7 @@ export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolea
     ignoreClick.current = true
     onOpenChange(dx < 0)
   }
-  return <div className={`music-widget-drawer${open ? '' : ' music-widget-drawer--closed'}`}>
+  return <div ref={railRef} className={`music-widget-drawer${open ? '' : ' music-widget-drawer--closed'}`}>
     <button ref={handleRef} type="button" className="music-widget-drawer__handle"
       aria-label={open ? 'Hide music tools' : 'Show music tools'} aria-expanded={open}
       aria-controls="music-widget-dock" title={open ? 'Hide music tools' : 'Show music tools'}

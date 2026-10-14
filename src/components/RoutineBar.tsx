@@ -1,4 +1,5 @@
 import { premiumMotion } from '../utils/premiumMotion'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
 import {
   useCallback,
@@ -17,7 +18,6 @@ import {
   motion,
   useDragControls,
   useMotionValue,
-  useReducedMotion,
 } from 'framer-motion'
 import {
   Check,
@@ -36,6 +36,8 @@ import {
 import Pressable from './ui/Pressable'
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
+import { focusWidgetLauncher } from '../utils/widgetFocus'
+import { MUSIC_DOCK_ARRIVAL_EVENT, type MusicDockArrivalDetail } from '../utils/widgetDockMotion'
 import RoutineProgramControls from './RoutineProgramControls'
 import { triggerLightHaptic } from '../utils/haptics'
 import { iosDragRelease, iosSpringSnappy } from '../utils/motionPresets'
@@ -238,7 +240,7 @@ export default function RoutineBar({
   onOpenToday,
   preferBall = false,
 }: RoutineBarProps) {
-  const reducedMotion = useReducedMotion()
+  const reducedMotion = usePrefersReducedMotion()
   const panelId = useId()
   /** The bar or the ball — whichever is showing. They never exist together. */
   const nodeRef = useRef<HTMLElement | null>(null)
@@ -260,6 +262,7 @@ export default function RoutineBar({
   const draggedRef = useRef(false)
   const [width, setWidth] = useState(() => clampWidth(loadWidgetSize(POSITION_ID)?.width ?? DEFAULT_WIDTH))
   const [folded, setFolded] = useState(loadFolded)
+  const userFoldArrival = useRef(false)
   const foldedRef = useRef(folded)
   foldedRef.current = folded
   const [open, setOpen] = useState(false)
@@ -451,6 +454,7 @@ export default function RoutineBar({
   const fold = (silent = false) => {
     const el = nodeRef.current
     if (!el) return
+    userFoldArrival.current = !silent
     if (!silent) triggerLightHaptic(hapticFeedback)
     barHeightRef.current = el.offsetHeight
     // Like every widget ball, it goes to the nearer side edge, never mid-page.
@@ -490,10 +494,32 @@ export default function RoutineBar({
     )
     restRef.current = next
     saveWidgetPosition(POSITION_ID, next.x, next.y)
+    userFoldArrival.current = false
     setFolded(false)
     saveFolded(false)
   }
   const dockItem = useMusicDockItem(BALL_POSITION_ID, unfold)
+
+  useLayoutEffect(() => {
+    const requested = userFoldArrival.current
+    userFoldArrival.current = false
+    const ball = nodeRef.current
+    if (!folded || !requested || !ball) return
+    focusWidgetLauncher(ball as HTMLButtonElement)
+    const arrive = () => {
+      if (dockHost) window.dispatchEvent(new CustomEvent<MusicDockArrivalDetail>(MUSIC_DOCK_ARRIVAL_EVENT, { detail: { id: BALL_POSITION_ID } }))
+    }
+    if (reducedMotion || !ball.animate) { arrive(); return }
+    // The existing branch replaces the bar; animate only the actual new launcher.
+    const arrival = ball.animate([
+      { scale: '.72', opacity: .35 },
+      { scale: '1.04', opacity: 1, offset: .7 },
+      { scale: '1', opacity: 1 },
+    ], { duration: 240, easing: 'cubic-bezier(.22,.68,.18,1)' })
+    arrival.onfinish = () => { arrival.cancel(); arrive() }
+    return () => { arrival.onfinish = null; arrival.cancel() }
+  }, [folded, dockHost, reducedMotion, step.id])
+
 
   // On the music page a step opens as a ball, and the page coming up folds a
   // bar that is already open. The player can still tap the ball open; this
@@ -568,7 +594,7 @@ export default function RoutineBar({
         onDragEnd={endDrag}
         onClick={dockHost ? dockItem.click : () => unfold()}
         onKeyDown={dockHost ? dockItem.keyDown : moveWithKeys}
-        initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.6 }}
+        initial={userFoldArrival.current ? false : { opacity: 0, scale: reducedMotion ? 1 : 0.6 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={premiumMotion(iosSpringSnappy, 'widget')}
       >

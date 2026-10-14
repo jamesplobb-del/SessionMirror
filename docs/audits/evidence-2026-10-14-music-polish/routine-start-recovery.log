@@ -1,0 +1,3 @@
+PASS: builder recovery/double taps/storage failure; music and hands-free access gates/resume; free routines remain free; App success-only close; score repair; Today access explanation
+PASS: library-selected routine order, retained selection, stale IDs, Plus cancellation/retry, busy/failure recovery and explicit size limit
+PASS: App creates an independent draft and blocks unavailable handoffs before mutation

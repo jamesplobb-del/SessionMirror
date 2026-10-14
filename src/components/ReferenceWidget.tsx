@@ -8,6 +8,9 @@ import { clampWidgetPosition, loadWidgetSize, saveWidgetSize } from '../utils/fl
 import { useMusicDockItem, type DockDropPoint } from './useMusicDockItem'
 import { musicDockClearX } from '../utils/musicDockClearance'
 import { focusWidgetLauncher } from '../utils/widgetFocus'
+import { animateWidgetDockArrival, type WidgetFoldSource } from '../utils/widgetDockMotion'
+import './music-dock-special-tools.css'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 
 export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, playing = false, youtubeUrl, libraryPlayback,
   suspended, onSubmitYoutube, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
@@ -34,6 +37,9 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   onBeforePlay: () => void
 }) {
   const node = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const pendingFold = useRef<WidgetFoldSource | null>(null)
+  const reducedMotion = usePrefersReducedMotion()
   const drag = useDragControls()
   const chipDragged = useRef(false)
   const collapseRequested = useRef(false)
@@ -85,6 +91,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     return () => { observer.disconnect(); window.removeEventListener('resize', findDock) }
   }, [boundaryRef, dockRight])
   const openFromDock = (point?: DockDropPoint) => {
+    pendingFold.current = null
     const bounds = boundaryRef.current
     const widget = node.current
     if (bounds && widget) {
@@ -108,6 +115,25 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
     const chip = dockHost ? dockChip.current : node.current?.querySelector<HTMLButtonElement>('.reference-widget-chip')
     focusWidgetLauncher(chip)
   }, [expanded, dockHost])
+  useLayoutEffect(() => {
+    const source = pendingFold.current
+    pendingFold.current = null
+    const panel = panelRef.current
+    if (expanded || !visible || !source || !panel) return
+    const chip = dockHost ? dockChip.current : node.current?.querySelector<HTMLButtonElement>('.reference-widget-chip')
+    const closedDock = chip?.closest('#music-widget-dock[inert]')
+    const target = closedDock?.closest('.music-widget-drawer')?.querySelector<HTMLElement>('.music-widget-drawer__handle') ?? chip ?? null
+    return animateWidgetDockArrival(panel, target, source, 'references', Boolean(reducedMotion), Boolean(dockHost))
+  }, [expanded, visible, dockHost, boundaryRef, reducedMotion])
+  const collapse = () => {
+    const panel = panelRef.current
+    if (panel) {
+      const style = getComputedStyle(panel)
+      pendingFold.current = { rect: panel.getBoundingClientRect(), transform: style.transform, opacity: style.opacity }
+    }
+    collapseRequested.current = true
+    onExpandedChange(false)
+  }
   useEffect(() => {
     if (suspended) onPlaybackChange(false)
   }, [suspended, onPlaybackChange])
@@ -120,7 +146,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   }, [boundaryRef, x, y])
   return <>
   <motion.div ref={node} className={`reference-widget-live ${expanded ? 'is-expanded' : 'is-collapsed'}`}
-    style={{ display: visible ? undefined : 'none', opacity: !expanded && dockHost ? 0 : undefined, pointerEvents: !expanded && dockHost ? 'none' : undefined, width: expanded || dockHost ? displayed.width : undefined, height: expanded || dockHost ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
+    style={{ display: visible ? undefined : 'none', visibility: !expanded && dockHost ? 'hidden' : undefined, pointerEvents: !expanded && dockHost ? 'none' : undefined, width: expanded || dockHost ? displayed.width : undefined, height: expanded || dockHost ? displayed.height : undefined, x, y }} drag dragControls={drag} dragListener={false} dragMomentum={false} dragElastic={0} dragConstraints={boundaryRef}
     onDragStart={() => { if (!expanded) chipDragged.current = true }}>
     {!expanded && !dockHost && <button type="button" className="reference-widget-chip" data-playing={playing}
       onPointerDown={event => {
@@ -136,11 +162,11 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
         onExpandedChange(true)
       }}
       aria-label={playing ? 'Open References, playing' : 'Open References'} title="Tap to open; drag to move"><FileMusic aria-hidden /><span>Ref</span><ChevronDown className="widget-ball__expand" aria-hidden /></button>}
-    <div className={`reference-widget-panel ${showTrackName && libraryPlayback ? 'reference-widget-panel--named-audio' : ''}`} aria-hidden={!expanded} inert={!expanded}
+    <div ref={panelRef} className={`reference-widget-panel ${showTrackName && libraryPlayback ? 'reference-widget-panel--named-audio' : ''}`} aria-hidden={!expanded} inert={!expanded}
       style={!expanded ? { width: displayed.width, height: displayed.height } : undefined}>
       <header onPointerDown={e => { if (!(e.target as HTMLElement).closest('button')) drag.start(e) }}>
         <span><GripHorizontal aria-hidden />References</span>
-        <button onClick={() => { collapseRequested.current = true; onExpandedChange(false) }} aria-label="Collapse References" title="Collapse References"><ChevronUp aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
+        <button onClick={collapse} aria-label="Collapse References" title="Collapse References"><ChevronUp aria-hidden /></button>{onClose && <button onClick={onClose} aria-label="Close References"><X aria-hidden /></button>}
       </header>
       {showTrackName && libraryPlayback && <p className="reference-widget-track-name">{libraryPlayback.name}</p>}
       <div className="reference-widget-media">

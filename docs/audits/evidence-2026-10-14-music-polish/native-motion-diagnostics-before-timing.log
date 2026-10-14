@@ -1,0 +1,13 @@
+⚡️  [log] - MUSIC_FOLD_DIAG {"id":"desk-metronome","reduced":false,"docked":true,"target":true,"targetRect":{"x":770,"y":600.5,"width":56,"height":56,"top":600.5,"right":826,"bottom":656.5,"left":770},"source":{"x":273,"y":168,"width":288,"height":176,"top":168,"right":561,"bottom":344,"left":273},"sourceOpacity":"1","sourceTransform":"matrix(1, 0, 0, 1, 273, 168)"}
+⚡️  [log] - MUSIC_FOLD_START visible 1
+⚡️  [log] - MUSIC_FOLD_SAMPLE 40 {"rect":{"x":653.133544921875,"y":503.8336486816406,"width":92.575927734375,"height":56.574188232421875,"top":503.8336486816406,"right":745.70947265625,"bottom":560.4078369140625,"left":653.133544921875},"opacity":"0.53671","visibility":"visible","transform":"matrix(0.321444, 0, 0, 0.321444, 555.42148, 444.120729)","time":67,"state":"running"}
+⚡️  [log] - MUSIC_FOLD_SAMPLE 100 {"rect":{"x":743.51904296875,"y":585.4987182617188,"width":56,"height":34.22222900390625,"top":585.4987182617188,"right":799.51904296875,"bottom":619.720947265625,"left":743.51904296875},"opacity":"0.260639","visibility":"visible","transform":"matrix(0.194444, 0, 0, 0.194444, 627.519054, 514.60983)","time":132,"state":"running"}
+⚡️  [log] - MUSIC_FOLD_SAMPLE 180 {"rect":{"x":763.987060546875,"y":605.5100708007812,"width":56,"height":34.22222900390625,"top":605.5100708007812,"right":819.987060546875,"bottom":639.7322998046875,"left":763.987060546875},"opacity":"0.059182","visibility":"visible","transform":"matrix(0.194444, 0, 0, 0.194444, 647.987061, 534.621206)","time":198,"state":"running"}
+⚡️  [log] - MUSIC_FOLD_SAMPLE 260 {"rect":{"x":769.7213134765625,"y":611.116455078125,"width":56,"height":34.22222900390625,"top":611.116455078125,"right":825.7213134765625,"bottom":645.3386840820312,"left":769.7213134765625},"opacity":"0.002743","visibility":"visible","transform":"matrix(0.194444, 0, 0, 0.194444, 653.721332, 540.227549)","time":282,"state":"running"}
+⚡️  [log] - MUSIC_FOLD_FINISH
+⚡️  [log] - MUSIC_RAIL_SAMPLE 0 0px
+⚡️  [log] - MUSIC_RAIL_SAMPLE 60 0.098012px
+⚡️  [log] - MUSIC_RAIL_SAMPLE 120 0.398498px
+⚡️  [log] - MUSIC_RAIL_SAMPLE 200 0.081187px
+⚡️  [log] - MUSIC_RAIL_SAMPLE 280 0.001786px
+⚡️  [log] - MUSIC_RAIL_SAMPLE 350 none
