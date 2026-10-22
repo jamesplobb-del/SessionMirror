@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-22",
+  "version": "4.2",
+  "build": "22",
+  "reviewedBuild": "4.2 (20)",
+  "submissionId": "3b09fd57-2dd4-496b-86a8-b913a5cbb386",
+  "appId": "6786522172",
+  "purchaseModel": "One-time Plus purchase with a separate free seven-day trial; no auto-renewing subscriptions in current code.",
+  "products": [
+    {
+      "productId": "com.besttake.app.plus.lifetime",
+      "type": "Non-Consumable",
+      "displayName": "BestTake Plus",
+      "description": "Full access to all BestTake Plus features.",
+      "price": "Keep the existing intended price; not changed by this fix."
+    },
+    {
+      "productId": "com.besttake.app.plus.trial7days",
+      "type": "Non-Consumable",
+      "displayName": "7-day Trial",
+      "description": "Try all BestTake Plus features for 7 days.",
+      "price": "Free / price tier 0"
+    }
+  ],
+  "appStoreConnectActions": [
+    "Inspect existing products and confirm their product IDs/types match the binary. Their live configuration and statuses are not yet visible to this agent.",
+    "Complete localization, pricing/availability, App Review notes and required App Review screenshot for both products.",
+    "Capture the actual production paywall with its loaded StoreKit products for review. QA screenshots here demonstrate custom-code removal but show product unavailable in the isolated QA bundle; do not treat them as live purchase-availability proof.",
+    "Add both products and app version 4.2 with corrected build 22 to the same review submission, then update/resubmit the rejected items."
+  ],
+  "references": [
+    "https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-in-app-purchase/",
+    "https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-information",
+    "https://developer.apple.com/app-store/review/guidelines/#in-app-purchase"
+  ],
+  "browserStatus": "Unavailable: computer-use startup rejects the symlinked SessionMirror writable root. No App Store Connect account metadata changed by this task.",
+  "upload": "Build 4.2 (22) uploaded successfully at 19:40 Eastern on 2026-10-22. Apple reported package processing; no browser confirmation of processing completion.",
+  "productionScreenshotCandidate": "production-paywall.png shows the real bundle identity in the simulator. StoreKit products were unavailable in this local check; refresh the screenshot after product setup, and verify live sandbox purchases before resubmission."
+}

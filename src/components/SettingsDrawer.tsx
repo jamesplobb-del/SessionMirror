@@ -36,7 +36,7 @@ import PrivacyPolicySheet from './PrivacyPolicySheet'
 import { HELP_TOPICS, type HelpTopic, type HelpTopicId } from '../utils/tutorialContent'
 import { resetTutorials } from '../utils/onboardingTutorial'
 import { useTutorialAction } from '../context/TutorialContext'
-import { PromoCodePanel } from '../plus/PlusPaywall'
+import { AppStoreOfferCodePanel } from '../plus/PlusPaywall'
 import { showPlus } from '../plus/plusAccess'
 import { usePlus } from '../plus/usePlus'
 import BugReportLink from './BugReportLink'
@@ -980,9 +980,9 @@ function SettingsDrawer({
               />
             </SettingsGroup>
             <SettingsGroup title="BestTake Plus" footer="One payment unlocks Plus forever. Learn and Balance stay free.">
-              <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased || plus.alphaUnlocked ? 'Plus unlocked · Manage purchase' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
+              <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased ? 'Plus unlocked · Manage purchase' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
             </SettingsGroup>
-            <SettingsGroup title="Promo codes"><PromoCodePanel /></SettingsGroup>
+            <SettingsGroup title="App Store offer codes"><AppStoreOfferCodePanel /></SettingsGroup>
             {onOpenLabs ? (
               <SettingsGroup footer="Pitch-controlled games for warm-ups. They never touch recording or playback.">
                 <LinkRow

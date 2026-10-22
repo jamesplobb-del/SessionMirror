@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { build } from 'esbuild'
+import { readFileSync } from 'node:fs'
 
 const memory = new Map()
 globalThis.localStorage = { getItem: k => memory.get(k) ?? null, setItem: (k,v) => memory.set(k,String(v)), removeItem: k => memory.delete(k) }
@@ -25,11 +26,17 @@ async function load(entry, { dev = false, native = false, stubs = {} } = {}) {
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text+`\n// fixture ${++buildId}`).toString('base64')}`)
 }
 try {
+  const nativeSource=readFileSync('ios/App/App/OfferCodesPlugin.swift','utf8')
+  assert.doesNotMatch(nativeSource,/redeemAlpha|alphaUnlocked|canRedeemAlpha|sandbox-alpha/,'Native plugin exposes no custom code grant in any environment')
+  assert.match(nativeSource,/AppStore\.presentOfferCodeRedeemSheet/,'Official redemption stays in Apple StoreKit')
+  assert.match(nativeSource,/case \.verified\(let transaction\)/,'Native access still verifies Apple transactions')
+  const paywall=readFileSync('src/plus/PlusPaywall.tsx','utf8')
+  assert.doesNotMatch(paywall,/redeemAlpha|alphaUnlocked|Test build code|<input|<form/,'Paywall has no custom code-entry form')
   const policy = await load('src/plus/plusPolicy.ts')
   const empty = { purchased:false, alphaUnlocked:false, canRedeemAlpha:false, trialStartedAt:null, trialExpiresAt:null }
   assert.equal(policy.hasPlusAccess(empty, 100), false)
   assert.equal(policy.hasPlusAccess({...empty,alphaUnlocked:true},100),false,'Production ignores an alpha flag')
-  assert.equal(policy.hasPlusAccess({...empty,alphaUnlocked:true,canRedeemAlpha:true},100),true)
+  assert.equal(policy.hasPlusAccess({...empty,alphaUnlocked:true,canRedeemAlpha:true},100),false,'Legacy sandbox code flags cannot grant access')
   assert.equal(policy.hasPlusAccess({...empty,purchased:true},1e15),true,'Lifetime access does not expire')
   const trial = {...empty,trialStartedAt:100,trialExpiresAt:200}
   assert.equal(policy.hasPlusAccess(trial,99),false)
@@ -43,43 +50,37 @@ try {
   ]) assert.equal(policy.isFreeStaffJumperSetup(setup),true,'Every Easy setup remains free')
   for (const difficulty of ['medium','hard']) assert.equal(policy.isFreeStaffJumperSetup({difficulty}),false,`${difficulty} requires Plus`)
 
-  const dev = await load('src/plus/plusAccess.ts',{dev:true})
-  await dev.refreshPlusAccess()
-  assert.equal(dev.canUsePlus(),false)
-  assert.equal(dev.requirePlus('music'),false)
-  assert.equal(dev.getPlusRequest().feature,'music')
-  await assert.rejects(()=>dev.redeemAlpha('wrong'))
-  await dev.redeemAlpha('  ALPHA  ')
-  assert.equal(dev.canUsePlus(),true)
-  const reloaded = await load('src/plus/plusAccess.ts',{dev:true})
-  await reloaded.refreshPlusAccess()
-  assert.equal(reloaded.canUsePlus(),true,'Test alpha survives reload')
-  const production = await load('src/plus/plusAccess.ts')
-  await production.refreshPlusAccess()
-  assert.equal(production.canUsePlus(),false,'Production must ignore dev storage')
-  await assert.rejects(()=>production.redeemAlpha('alpha'))
-  await assert.rejects(()=>production.startPlusTrial())
-
-  memory.clear()
-  const preview = await load('src/plus/plusAccess.ts',{dev:true})
-  await preview.refreshPlusAccess()
-  assert.equal(await preview.startPlusTrial(),true)
-  const {trialStartedAt,trialExpiresAt} = preview.getPlusSnapshot()
-  assert.equal(trialExpiresAt-trialStartedAt,policy.PLUS_TRIAL_MS)
-  await assert.rejects(()=>preview.startPlusTrial(),/already been used/)
-  const actualNow=Date.now
-  try {
-    Date.now=()=>trialExpiresAt
-    for(const {fn} of [...scheduled.values()]) fn()
-    assert.equal(preview.canUsePlus(),false)
-    assert.equal(preview.getPlusSnapshot().active,false,'Expiry publishes to UI without restart')
-  } finally { Date.now=actualNow }
+  memory.set('besttake:plus-development:v1', JSON.stringify({ alphaUnlocked:true, trialStartedAt:Date.now() }))
+  for (const dev of [false,true]) {
+    const web = await load('src/plus/plusAccess.ts',{dev})
+    await web.refreshPlusAccess()
+    assert.equal(web.canUsePlus(),false,'Saved code/trial flags cannot unlock any browser build')
+    assert.equal(web.redeemAlpha,undefined,'No custom redemption API exists')
+    assert.equal(web.requirePlus('music'),false)
+    assert.equal(web.getPlusRequest().feature,'music')
+    await assert.rejects(()=>web.startPlusTrial())
+    await assert.rejects(()=>web.purchasePlus())
+  }
 
   let status={...empty,price:'$9.99',purchaseAvailable:true,trialAvailable:true}
   let outcome='cancelled', listener
-  globalThis.__plusBridge={getStatus:async()=>status,purchase:async()=>({...status,outcome}),startTrial:async()=>({...status,outcome}),restore:async()=>status,addListener:async(_,fn)=>{listener=fn;return {remove:async()=>{}}},redeemAlpha:async()=>{throw Error('Production requires Apple offer code')}}
+  globalThis.__plusBridge={getStatus:async()=>status,purchase:async()=>({...status,outcome}),startTrial:async()=>({...status,outcome}),restore:async()=>status,addListener:async(_,fn)=>{listener=fn;return {remove:async()=>{}}}}
   const native = await load('src/plus/plusAccess.ts',{native:true})
   native.initializePlusAccess(); await native.refreshPlusAccess()
+  assert.equal(native.redeemAlpha,undefined)
+  status={...status,alphaUnlocked:true,canRedeemAlpha:true};listener(status)
+  assert.equal(native.canUsePlus(),false,'Native sandbox/debug status cannot revive old code grants')
+  const started=Date.now(), expires=started+policy.PLUS_TRIAL_MS
+  status={...status,trialStartedAt:started,trialExpiresAt:expires};listener(status)
+  assert.equal(native.canUsePlus(),true,'A verified StoreKit trial remains supported')
+  const actualNow=Date.now
+  try {
+    Date.now=()=>expires
+    for(const {fn} of [...scheduled.values()]) fn()
+    assert.equal(native.canUsePlus(),false)
+    assert.equal(native.getPlusSnapshot().active,false,'Verified trial expiry updates UI without restart')
+  } finally { Date.now=actualNow }
+  status={...status,trialStartedAt:null,trialExpiresAt:null};listener(status)
   assert.equal(await native.purchasePlus(),false,'Cancelled purchase grants nothing')
   outcome='pending'
   await assert.rejects(()=>native.purchasePlus(),/awaiting approval/)
@@ -116,5 +117,5 @@ try {
   memory.clear();activeRoutine=first
   assert.equal(routines.canSaveRoutine(second),false,'Today’s unshelved routine counts toward limit')
   assert.ok(prompts>0)
-  console.log('PASS: Plus entitlements, Staff Jumper Easy/paid levels, trial boundaries, alpha isolation, purchases, restore/revocation, and routine limits.')
+  console.log('PASS: Plus entitlements, Staff Jumper Easy/paid levels, verified trial expiry, rejected legacy code flags in every build, purchases, restore/revocation, and routine limits.')
 } finally { globalThis.setTimeout=nativeSetTimeout; globalThis.clearTimeout=nativeClearTimeout }

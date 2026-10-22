@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-22",
+  "version": "4.2",
+  "build": "22",
+  "guideline311": {
+    "customCodeForm": "removed",
+    "nativeRedemptionMethod": "removed",
+    "legacyEntitlementFlags": "ignored in every build and environment",
+    "remainingCodes": "Apple StoreKit redemption sheet only; no access granted merely by sheet completion"
+  },
+  "verification": {
+    "plusAccessRegression": "passed: rejected legacy grants in web development, web production and native status; purchase cancellation/pending, restore/revocation, verified trial expiry and free limits",
+    "typescript": "passed",
+    "productionWebBuildAndSync": "passed",
+    "nativeArchive": "ARCHIVE SUCCEEDED",
+    "archiveSignature": "passed",
+    "archiveGuards": "real app identifier; app and extension build22; no shipped custom-code bridge strings, diagnostic switches or source maps",
+    "simulator": "QA legacy promo preference was still true, but Music showed the paywall. Revised code panel contains only Apple redemption action. Production-identity app also built and opened.",
+    "limitations": [
+      "No real purchase, restore or code redemption was completed in this task.",
+      "Product price/availability and App Store Connect metadata remain unverified; purchase unavailable appeared in local simulator.",
+      "QA code action reached the native OfferCodes redeem method, but Apple sheet presentation was not visually confirmed in the simulator."
+    ]
+  },
+  "release": {
+    "archive": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-10-22/BestTake-4.2-22.xcarchive",
+    "bundleId": "com.besttake.app",
+    "appAndExtensionVersion": "4.2 (22)",
+    "upload": "EXPORT SUCCEEDED; Upload succeeded; uploaded package processing",
+    "sentry": "source maps and 21 missing native debug files uploaded successfully",
+    "privateLogs": "build/release-4.2-22/"
+  },
+  "guideline21": "Not resolved in account: both matching IAPs need complete metadata, App Review screenshots, and inclusion with build22 in the same review submission. Browser startup remains blocked; product status question is pending.",
+  "resubmitted": false
+}

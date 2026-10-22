@@ -15,14 +15,12 @@ export const PLUS_FEATURES: Record<PlusFeature, { title: string; detail: string 
 
 export interface PlusEntitlement {
   purchased: boolean
-  alphaUnlocked: boolean
-  canRedeemAlpha: boolean
   trialStartedAt: number | null
   trialExpiresAt: number | null
 }
 
 export function hasPlusAccess(entitlement: PlusEntitlement, now: number): boolean {
-  return entitlement.purchased || (entitlement.canRedeemAlpha && entitlement.alphaUnlocked) ||
+  return entitlement.purchased === true ||
     (entitlement.trialStartedAt !== null && entitlement.trialExpiresAt !== null &&
       now >= entitlement.trialStartedAt && now < entitlement.trialExpiresAt)
 }

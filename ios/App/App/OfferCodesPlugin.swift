@@ -2,8 +2,7 @@ import Capacitor
 import StoreKit
 import UIKit
 
-/// StoreKit is the authority for production access. The alpha shortcut is ignored
-/// in production even when a tester installs the public app over TestFlight.
+/// Only verified StoreKit transactions grant access in every build and environment.
 @objc(OfferCodesPlugin)
 public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "OfferCodesPlugin"
@@ -14,12 +13,10 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startTrial", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restore", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "redeemAlpha", returnType: CAPPluginReturnPromise),
     ]
     // Create both exact product IDs in App Store Connect before release.
     private let lifetimeID = "com.besttake.app.plus.lifetime"
     private let trialID = "com.besttake.app.plus.trial7days"
-    private let alphaKey = "besttake.plus.sandbox-alpha.v1"
     private let trialSeenKey = "besttake.plus.trial-first-seen.v1"
     private let clockKey = "besttake.plus.last-clock.v1"
     private var products: [String: Product] = [:]
@@ -44,7 +41,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
 
     deinit { updatesTask?.cancel() }
 
-    @MainActor private func testEnvironment() async -> Bool {
+    @MainActor private func usesSandboxStorage() async -> Bool {
         #if DEBUG
         return true
         #else
@@ -58,7 +55,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @MainActor private func rememberTrial(_ transaction: StoreKit.Transaction) async {
-        let trialSeenKey = self.trialSeenKey + (await testEnvironment() ? ".test" : ".production")
+        let trialSeenKey = self.trialSeenKey + (await usesSandboxStorage() ? ".test" : ".production")
         guard transaction.productID == trialID else { return }
         let timestamp = transaction.originalPurchaseDate.timeIntervalSince1970
         let previous = UserDefaults.standard.double(forKey: trialSeenKey)
@@ -76,7 +73,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
             if transaction.productID == lifetimeID { purchased = true }
             if transaction.productID == trialID { trialStart = transaction.originalPurchaseDate }
         }
-        let test = await testEnvironment()
+        let test = await usesSandboxStorage()
         let trialSeenKey = self.trialSeenKey + (test ? ".test" : ".production")
         let clockKey = self.clockKey + (test ? ".test" : ".production")
         let now = Date().timeIntervalSince1970
@@ -89,8 +86,6 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
         let expiry: Double? = end.map { lastClock > $0 ? min(now, $0) : $0 }
         return [
             "purchased": purchased,
-            "alphaUnlocked": test && UserDefaults.standard.bool(forKey: alphaKey),
-            "canRedeemAlpha": test,
             "trialStartedAt": start.map { $0 * 1000 } as Any? ?? NSNull(),
             "trialExpiresAt": expiry.map { $0 * 1000 } as Any? ?? NSNull(),
             "price": products[lifetimeID]?.displayPrice as Any? ?? NSNull(),
@@ -173,21 +168,6 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                 notifyListeners("plusChanged", data: status)
                 call.resolve(status)
             } catch { call.reject("Could not restore purchases. Check your App Store account and try again.") }
-        }
-    }
-
-    @objc func redeemAlpha(_ call: CAPPluginCall) {
-        Task { @MainActor in
-            guard await testEnvironment() else {
-                call.reject("Redeem your code with the App Store using Redeem App Store code below. Apple verifies it."); return
-            }
-            guard call.getString("code")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "alpha" else {
-                call.reject("That test code is not valid."); return
-            }
-            UserDefaults.standard.set(true, forKey: alphaKey)
-            let status = await snapshot()
-            notifyListeners("plusChanged", data: status)
-            call.resolve(status)
         }
     }
 
