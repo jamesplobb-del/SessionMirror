@@ -16,6 +16,8 @@ import type { AudioPracticeTab } from '../../../src/types/audioPractice'
 import { blankDesk, createRoutine, createStep } from '../../../src/utils/practiceRoutines'
 import { loadMusicSetup, saveMusicSetup } from '../../../src/utils/musicLibrary'
 import { savePracticeChart } from '../../../src/utils/practiceChartStorage'
+import { saveWebPracticeChart } from '../../../src/utils/webPracticeChartStorage'
+import { ActionSheetProvider } from '../../../src/context/ActionSheetContext'
 import { pickHudQuickSettings } from '../../../src/utils/hudQuickSettings'
 import type { AppSettings } from '../../../src/utils/appSettings'
 import '../../../src/index.css'
@@ -33,7 +35,7 @@ function FixtureDockTool({ boundaryRef, id, label, slot }: { boundaryRef: RefObj
     label, icon: <span>{label[0]}</span>, detail: label, ballSlot: slot, dockRight: true })
   return <>{fold.ball}<motion.div ref={widgetRef} style={{ x, y, width: 210, position: 'absolute', zIndex: 36,
     padding: 16, border: '1px solid #dbe5ef', borderRadius: 16, background: 'white' }}
-    className={fold.collapsed ? 'widget-is-collapsed' : ''}>
+    data-music-reading-tool className={fold.collapsed ? 'widget-is-collapsed' : ''}>
     {label} panel <button onClick={fold.collapse}>Collapse</button>
   </motion.div></>
 }
@@ -59,9 +61,19 @@ function Fixture() {
     void (async () => {
       const bytes = await fetch('../app-design/music-layout-check.pdf').then(response => response.arrayBuffer())
       const rows = ['Layout check A', 'Layout check B', 'Layout check C'].map((name, index) => ({ id: `music-feature-check-${index}`, name, createdAt: index }))
-      for (const row of rows) await savePracticeChart(row.id, new File([bytes], `${row.name}.pdf`, { type: 'application/pdf' }))
+      const readerOnly = new URLSearchParams(location.search).has('reader')
+      for (const row of rows) {
+        if (readerOnly) {
+          // Component-only reader fixture: seed a document, never an entitlement.
+          await saveWebPracticeChart(row.id, { blob: new Blob([bytes], { type: 'application/pdf' }), mimeType: 'application/pdf', fileName: `${row.name}.pdf` })
+          localStorage.setItem(`besttake:practice-chart:v1:${row.id}`, JSON.stringify({ filePath: `charts/${row.id}.pdf`, mimeType: 'application/pdf', fileName: `${row.name}.pdf` }))
+        } else await savePracticeChart(row.id, new File([bytes], `${row.name}.pdf`, { type: 'application/pdf' }))
+      }
       saveMusicSetup(rows[0].id, { ...blankDesk('audio'), showMetronome: true, metronome: { ...blankDesk('audio').metronome, bpm: 100 } })
-      if (!cancelled) setProjects(rows)
+      if (!cancelled) {
+        setProjects(rows)
+        if (readerOnly) { setActive(rows[0].id); setLibrary(false) }
+      }
     })()
     return () => { cancelled = true }
   }, [])
@@ -76,7 +88,7 @@ function Fixture() {
     observer.observe(document.body, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [])
-  return <div ref={boundary} className={active && !library ? `app-shell--music-page${drawerOpen ? '' : ' app-shell--music-dock-closed'}` : undefined} style={{ position: 'relative', height: '100dvh', background: 'white', display: 'flex', flexDirection: 'column' }} data-removed-canvases={removedCanvases}>
+  return <div ref={boundary} className={active && !library ? `app-shell--music-page${full ? ' app-shell--music-chrome-hidden' : ''}${drawerOpen ? '' : ' app-shell--music-dock-closed'}` : undefined} style={{ position: 'relative', height: '100dvh', background: 'white', display: 'flex', flexDirection: 'column' }} data-removed-canvases={removedCanvases}>
     {!full && <div style={{ zIndex: 12, paddingTop: 12 }}><AudioPracticeTopTabs activeTab={tab} onTabChange={setTab} /></div>}
     <div style={{ flex: 1, minHeight: 0, display: tab === 'music' && library ? 'flex' : 'none', zIndex: 10 }}>
       <MusicLibrary projects={projects} activeProjectId={active} instrumentId={null} revision={revision} disabled={false}
@@ -102,4 +114,4 @@ function Fixture() {
       onYoutubeHostChange={() => {}} youtubeIframeRef={youtubeIframe} onPlaybackChange={() => {}} onBeforePlay={() => {}} />}
   </div>
 }
-createRoot(document.getElementById('root')!).render(<Fixture />)
+createRoot(document.getElementById('root')!).render(<ActionSheetProvider><Fixture /></ActionSheetProvider>)

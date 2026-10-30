@@ -1,4 +1,4 @@
-# BestTake 4.2 · Build 23
+# BestTake 4.2 · Build 24
 
 ## name
 
@@ -77,6 +77,8 @@ BestTake Plus is an optional non-consumable purchase (com.besttake.app.plus.life
 
 Learn, Balance, Easy Staff Jumper, manual recording, playback/export, the live tuner, metronome, drone, one saved routine, and two multitrack boxes work without Plus. YouTube references use YouTube's embedded player.
 
-Build 23 removes all custom access-code entry and redemption, including sandbox/TestFlight and development unlocks. Stored code flags no longer grant Plus. Only verified StoreKit purchases or the verified free trial grant access. The App Store offer-code button opens Apple's redemption sheet and does not grant access on its own.
+Build 24 removes all custom access-code entry and redemption, including sandbox/TestFlight and development unlocks. Stored code flags no longer grant Plus. Only verified StoreKit purchases or the verified free trial grant access. The App Store offer-code button opens Apple's redemption sheet and does not grant access on its own.
 
 Purchase testing: Settings > BestTake Plus > Explore BestTake Plus. Use Unlock forever for the lifetime purchase, Try Plus free for 7 days for the free trial, or Restore purchases to restore verified Apple transactions. There are no auto-renewing subscriptions in this binary. Both product IDs above must be included for review with this build.
+
+Music scores open with controls hidden. Tap the center to show or hide controls, and tap the outer left or right third to turn pages. Markup mode keeps score gestures dedicated to drawing.

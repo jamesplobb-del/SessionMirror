@@ -36,8 +36,8 @@ const MUSIC_WORKSPACE_TOOLS = [
 /** A tap this short and this still is a page turn; anything else is a scroll. */
 const TAP_SLOP_PX = 8
 const TAP_MS = 500
-/** How much of each edge turns the page. The middle is for reading. */
-const TURN_ZONE = 0.22
+/** The outer thirds turn pages; the middle third toggles the reading controls. */
+const TURN_ZONE = 1 / 3
 const HINT_MS = 2600
 
 interface PracticeChartLayerProps {
@@ -144,11 +144,10 @@ export default function PracticeChartLayer({
    */
   const [marker, setMarker] = useState<InkTool | null>(null)
   const [inkWidth, setInkWidth] = useState<InkWidth>(loadInkWidth)
-  /*
-   * Rehearsal view is a mode you step into, not a setting you keep. Remembered,
-   * it would mean opening a part next week to an app with no tabs and no deck
-   * and no memory of asking for that — which reads as broken, not as a feature.
-   */
+  // A score opens as paper. Controls are an overlay, revealed by a center tap.
+  const paperSurface = useRef<HTMLDivElement>(null)
+  const topbar = useRef<HTMLDivElement>(null)
+  const [controlsHidden, setControlsHidden] = useState(true)
   const workspaceTrigger = useRef<HTMLButtonElement>(null)
   const workspacePanel = useRef<HTMLDivElement>(null)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
@@ -244,11 +243,13 @@ export default function PracticeChartLayer({
   }, [projectId, revision])
 
   const paperKey = chart ? `${projectId}:${chart.fileName}:${chart.bytes?.byteLength ?? 0}` : null
-  useEffect(() => {
+  useLayoutEffect(() => {
     setPageView(null)
     setLoadFailed(false)
     setMusicMenu(null)
     setMarker(null)
+    setChromeOff(true)
+    setControlsHidden(true)
   }, [paperKey])
 
   /*
@@ -261,14 +262,17 @@ export default function PracticeChartLayer({
    */
   const mounted = paperVisible && chart !== null
   const showing = active && mounted
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!showing) { setMarker(null); setMusicMenu(null) }
+    else { setChromeOff(true); setControlsHidden(true) }
   }, [showing])
   useEffect(() => {
     setMarker(null)
     setMusicMenu(null)
     setMusicMenuAnchor(null)
     setWorkspaceOpen(false)
+    setChromeOff(true)
+    setControlsHidden(true)
   }, [collapseResetKey])
   /*
    * An empty stand is still the music page. Without it, turning Music on for an
@@ -284,31 +288,22 @@ export default function PracticeChartLayer({
   }, [onPaperVisibleChange, showing, showingEmpty, showingLoading])
 
   /*
-   * A part opens full screen.
-   *
-   * Picking music is already the player saying what this screen is for, and a
-   * part fitted into the band left over between the tabs and the deck is a
-   * part you have to squint at. What made this unsafe before was that the way
-   * out lived in a folded widget; the exit and the full-screen toggle now sit
-   * in the page's own top corners, so there is nothing to be stranded in.
-   *
-   * Once per file: a player who leaves full screen and then hides and shows
-   * the page again has said what they want, and it is not this.
-   */
-  const opened = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    if (!showing || !paperKey || opened.current === paperKey) return
-    opened.current = paperKey
-    setChromeOff(true)
-  }, [paperKey, showing])
-
-  /*
    * Rehearsal view only means anything while a part is up, and it must never
    * outlive one: chrome hidden with no page behind it is a room with no way
    * out.
    */
-  const chromeHidden = showing && chromeOff
+  const reading = showing && controlsHidden && !loadFailed
+  const chromeHidden = showing && (chromeOff || reading)
   useLayoutEffect(() => { onChromeHiddenChange(chromeHidden) }, [chromeHidden, onChromeHiddenChange])
+  useLayoutEffect(() => {
+    if (!reading) return
+    // A repeated setlist entry can hide the very control that selected it.
+    const focused = document.activeElement
+    if (focused instanceof HTMLElement && focused !== document.body
+      && (topbar.current?.contains(focused) || getComputedStyle(focused).visibility === 'hidden')) {
+      paperSurface.current?.focus({ preventScroll: true })
+    }
+  }, [reading, paperKey, collapseResetKey])
 
   /*
    * Turning the Music tool off unmounts this layer outright, and the room would
@@ -560,27 +555,46 @@ export default function PracticeChartLayer({
     disabled: isStopping || (!recordReady && !isRecording),
   })
 
+  const revealControls = (focus = false) => {
+    setHint(false)
+    setControlsHidden(false)
+    if (focus) requestAnimationFrame(() => topbar.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }))
+  }
+  const hideControls = () => {
+    // Keep the score's size steady when putting the overlays away.
+    setChromeOff(true)
+    setWorkspaceOpen(false)
+    dismissMusicMenu()
+    setHint(false)
+    paperSurface.current?.focus({ preventScroll: true })
+    setControlsHidden(true)
+  }
   const gesture = useRef<{ id: number; x: number; y: number; at: number } | null>(null)
+  const isControlTarget = (target: EventTarget | null) => target instanceof Element
+    && !!target.closest('button, a, input, select, textarea, [role="button"], [role="dialog"], .practice-chart-topbar, .practice-chart-rail')
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (!event.isPrimary) { gesture.current = null; return }
+    if (!event.isPrimary || event.button !== 0 || marker || loadFailed || isControlTarget(event.target)) { gesture.current = null; return }
     gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, at: Date.now() }
+  }
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const start = gesture.current
+    if (start && start.id === event.pointerId
+      && Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) gesture.current = null
   }
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const start = gesture.current
     gesture.current = null
     // With the marker out every tap is a mark, never a page turn.
-    if (marker) return
+    if (marker || loadFailed || isControlTarget(event.target)) return
     if (!start || start.id !== event.pointerId) return
-    // The corner controls and the rail sit inside the turn zones; pressing one
-    // of them is not a turn.
-    if (event.target instanceof Element
-      && event.target.closest('.practice-chart-topbar, .practice-chart-rail')) return
     if (Date.now() - start.at > TAP_MS) return
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > TAP_SLOP_PX) return
     const box = event.currentTarget.getBoundingClientRect()
     const position = (event.clientX - box.left) / Math.max(1, box.width)
     if (position <= TURN_ZONE) paper.current?.turn(-1)
     else if (position >= 1 - TURN_ZONE) paper.current?.turn(1)
+    else if (reading) revealControls()
+    else hideControls()
   }
 
 
@@ -618,13 +632,31 @@ export default function PracticeChartLayer({
 
     {mounted && chart && (
       <div
+        ref={paperSurface}
         className="practice-chart-paper"
+        data-controls-hidden={reading ? 'true' : undefined}
         data-inactive={showing ? undefined : 'true'}
         aria-hidden={showing ? undefined : true}
+        inert={!showing}
+        tabIndex={showing ? 0 : -1}
+        role="region"
+        aria-label="Music score"
+        aria-description="Tap the left or right third to turn pages. Tap the center to show or hide controls. With the score focused, use arrow keys to turn pages and Enter to toggle controls."
         onPointerDown={showing ? onPointerDown : undefined}
+        onPointerMove={showing ? onPointerMove : undefined}
         onTouchStartCapture={event => { if (event.touches.length > 1) gesture.current = null }}
         onPointerUp={showing ? onPointerUp : undefined}
         onPointerCancel={() => { gesture.current = null }}
+        onKeyDown={event => {
+          if (event.target !== event.currentTarget || marker || loadFailed || event.altKey || event.ctrlKey || event.metaKey) return
+          if (event.key === 'ArrowLeft' || event.key === 'PageUp') { event.preventDefault(); paper.current?.turn(-1) }
+          else if (event.key === 'ArrowRight' || event.key === 'PageDown') { event.preventDefault(); paper.current?.turn(1) }
+          else if (event.key === 'Enter' || event.key === ' ' || event.key === 'Escape') {
+            event.preventDefault()
+            if (reading) revealControls(true)
+            else hideControls()
+          }
+        }}
       >
         <PracticeChartPaper
           key={paperKey ?? 'chart'}
@@ -644,13 +676,8 @@ export default function PracticeChartLayer({
           onStroke={handleStroke}
           onErase={eraseAt}
         />
-        {/*
-          * The two things a player needs from the page itself, in the corners
-          * where no music is: how much screen the part gets, and the way out.
-          * They stay put in full screen — hiding the exit inside the thing it
-          * exits is how a player gets stranded on a page with no deck.
-          */}
-        <div className="practice-chart-topbar">
+        {reading && <button type="button" className="practice-chart-reveal" onClick={() => revealControls(true)}>Show music controls</button>}
+        <div ref={topbar} className="practice-chart-topbar" inert={reading} aria-hidden={reading}>
         <div className="practice-chart-tools">
         <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
           {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
@@ -713,8 +740,11 @@ export default function PracticeChartLayer({
           * the left margin where the staff is not, and only while the deck it
           * stands in for is actually put away.
           */}
-        {chromeOff && (
-          <div className="practice-chart-rail" data-dim={marker ? 'true' : undefined}>
+        {chromeHidden && (
+          <div className="practice-chart-rail" data-dim={marker ? 'true' : undefined}
+            data-active={isRecording || isStopping || handsFreeEnabled ? 'true' : undefined}
+            inert={reading && !isRecording && !isStopping && !handsFreeEnabled}
+            aria-hidden={reading && !isRecording && !isStopping && !handsFreeEnabled}>
             <button
               type="button"
               className="practice-chart-rail__record"
@@ -755,9 +785,8 @@ export default function PracticeChartLayer({
             </div>
           </div>
         ) : (
-          <div className={`practice-chart-hint${hint ? ' practice-chart-hint--on' : ''}${chromeOff ? ' practice-chart-hint--with-record' : ''}`} aria-hidden>
-            <span>Tap to turn back</span>
-            <span>Tap to turn</span>
+          <div className={`practice-chart-hint${hint ? ' practice-chart-hint--on' : ''}`} aria-hidden>
+            <span>Tap left or right to turn · Tap center for controls</span>
           </div>
         )}
       </div>

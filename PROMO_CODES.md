@@ -1,6 +1,6 @@
 # BestTake Plus purchases and Apple offer codes
 
-Current resubmission: version 4.2, build 23, October 22, 2026. StoreKit is the authority for iOS entitlements. The `OfferCodes` Capacitor bridge handles purchase, trial, restore, transaction updates, refunds/revocations, and Apple's official redemption sheet. Dismissing the sheet never grants access. Custom code entry and developer/test unlocks have been removed from every build.
+Current resubmission: version 4.2, build 24, October 30, 2026. StoreKit is the authority for iOS entitlements. The `OfferCodes` Capacitor bridge handles purchase, trial, restore, transaction updates, refunds/revocations, and Apple's official redemption sheet. Dismissing the sheet never grants access. Custom code entry and developer/test unlocks have been removed from every build.
 
 ## Products in App Store Connect
 

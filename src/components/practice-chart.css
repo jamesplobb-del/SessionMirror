@@ -18,6 +18,67 @@
   touch-action: manipulation;
 }
 
+/* Controls overlay the full-size score; revealing them never refits the page. */
+.app-shell--music-page.app-shell--music-chrome-hidden .practice-chart-scroll,
+.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) .practice-chart-scroll { right: 0; }
+
+/* Visibility also removes these controls from keyboard and screen-reader
+ * navigation. Keep the widgets mounted so audio and routine timers continue. */
+.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) :is(
+  .music-widget-drawer, .widget-ball, .pitch-widget-draggable,
+  .metronome-widget-draggable, .drone-widget-draggable, .takes-widget,
+  .reference-widget-live, .reference-widget-chip, .routine-ball, .routine-bar,
+  .routine-bar-scrim, .hands-free-stage, [data-music-reading-tool]
+),
+.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) :is(
+  .music-widget-drawer, .widget-ball, .pitch-widget-draggable,
+  .metronome-widget-draggable, .drone-widget-draggable, .takes-widget,
+  .reference-widget-live, .reference-widget-chip, .routine-ball, .routine-bar,
+  .routine-bar-scrim, .hands-free-stage, [data-music-reading-tool]
+) *,
+.practice-chart-paper[data-controls-hidden='true'] .practice-chart-topbar,
+.practice-chart-paper[data-controls-hidden='true'] .practice-chart-topbar *,
+.practice-chart-paper[data-controls-hidden='true'] .practice-chart-rail:not([data-active='true']),
+.practice-chart-paper[data-controls-hidden='true'] .practice-chart-rail:not([data-active='true']) * {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) .practice-chart-paper::after { opacity: 0; }
+/* Routine controls portal to the body on phones and when expanded. */
+body:has(.app-shell--music-page .practice-chart-paper[data-controls-hidden='true']) :is(.routine-ball, .routine-bar, .routine-bar-scrim),
+body:has(.app-shell--music-page .practice-chart-paper[data-controls-hidden='true']) :is(.routine-ball, .routine-bar, .routine-bar-scrim) * {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.practice-chart-paper[data-controls-hidden='true'] .practice-chart-topbar { opacity: 0; }
+.practice-chart-paper:focus { outline: none; }
+.practice-chart-paper:focus-visible { outline: 2px solid #2873cd; outline-offset: -2px; }
+
+/* An explicit way back for VoiceOver and keyboard users, without covering the score. */
+.practice-chart-reveal {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.practice-chart-reveal:focus-visible {
+  top: max(12px, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  padding: 8px 16px;
+  clip-path: none;
+  border-radius: 12px;
+  background: #fff;
+  color: #235b7e;
+  outline: 2px solid #2873cd;
+}
+
 /* The controls float above the page. They never reduce its reading height. */
 .practice-chart-scroll {
   position: absolute;
@@ -192,8 +253,9 @@
   position: absolute;
   inset: 0;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.5s ease;
@@ -209,13 +271,9 @@
   color: #f1f6ff;
   font-size: 12px;
   font-weight: 600;
+  text-align: center;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-}
-
-/* The full-screen record control occupies the middle of the left turn zone. */
-.practice-chart-hint--with-record span:first-child {
-  transform: translateY(-96px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -680,6 +738,7 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   right: 10px;
   pointer-events: none;
   z-index: 3;
+  transition: opacity .18s ease;
 }
 .app-shell--music-page:has(.audio-practice-top-tabs):not(.app-shell--music-chrome-hidden) .practice-chart-topbar {
   top: var(--music-controls-top, calc(env(safe-area-inset-top, 0px) + 78px));
@@ -773,7 +832,7 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 .practice-chart-control--end { color: #96343a; }
 
 @media (prefers-reduced-motion: reduce) {
-  .practice-chart-controls { transition: none; }
+  .practice-chart-controls, .practice-chart-topbar { transition: none; }
 }
 
 /* ---- The rail ----------------------------------------------------------
