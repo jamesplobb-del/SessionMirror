@@ -18,8 +18,22 @@
     "typescript": "pass",
     "productionWeb": "pass",
     "browserMarkup": "pass",
-    "physicalBlueSelection": "unconfirmed"
+    "physicalBlueSelection": "unconfirmed",
+    "simulatorBuildAndLaunch": "pass",
+    "simulatorMarkupAutoHide": "pass",
+    "simulatorLongPressNoSelectionMenu": "pass"
   },
-  "archive": "pending",
-  "upload": "pending"
+  "archive": "passed",
+  "upload": "succeeded",
+  "sourceCommit": "bbb4a3d",
+  "archivePath": "/Users/jameslobb/Documents/BestTake/build/internal-plus-preview-4.2-29/BestTake-4.2-29-InternalPreview.xcarchive",
+  "archivedWebFilesMatched": 94,
+  "executableSha256": "b6afc0aae19aaa4866ac257428c78b850be021657f5d8fdd0dda1d8c2198eb20",
+  "uploadedAt": "2026-10-30T19:25:11Z",
+  "testflightStatus": "Ready to Test",
+  "appStoreConnectBuildId": "1b8c79cd-1402-46e8-abfa-1b4cb6ea3527",
+  "testflightGroup": "Me",
+  "testflightGroupId": "e679d87f-8388-4bee-a82a-48f9c38ba427",
+  "testflightTesterCount": 1,
+  "testflightVerifiedAt": "2026-10-30T19:31:00Z"
 }
