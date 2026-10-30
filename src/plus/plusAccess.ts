@@ -4,16 +4,18 @@ import { hasPlusAccess, type PlusEntitlement, type PlusFeature } from './plusPol
 
 export interface PlusStatus extends PlusEntitlement {
   ready: boolean
+  refreshing: boolean
   active: boolean
   price: string | null
   purchaseAvailable: boolean
   trialAvailable: boolean
+  productError: string | null
   error: string | null
 }
-type NativeStatus = Omit<PlusStatus, 'ready' | 'active' | 'error'>
+type NativeStatus = Omit<PlusStatus, 'ready' | 'active' | 'refreshing' | 'error'>
 interface PlusBridge {
   redeem(): Promise<void>
-  getStatus(): Promise<NativeStatus>
+  getStatus(options: { refreshProducts: boolean }): Promise<NativeStatus>
   purchase(): Promise<NativeStatus & { outcome?: 'cancelled' | 'pending' }>
   startTrial(): Promise<NativeStatus & { outcome?: 'cancelled' | 'pending' }>
   restore(): Promise<NativeStatus>
@@ -22,13 +24,15 @@ interface PlusBridge {
 export const plusBridge = registerPlugin<PlusBridge>('OfferCodes')
 const bridge = plusBridge
 const native = Capacitor.getPlatform() === 'ios'
-let state: PlusStatus = { ready: false, active: false, purchased: false, trialStartedAt: null, trialExpiresAt: null,
-  price: null, purchaseAvailable: false, trialAvailable: false, error: null }
+let state: PlusStatus = { ready: false, refreshing: false, active: false, purchased: false, trialStartedAt: null, trialExpiresAt: null,
+  price: null, purchaseAvailable: false, trialAvailable: false, productError: null, error: null }
 const listeners = new Set<() => void>()
 let initialized = false
 let refreshing: Promise<void> | null = null
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 let actionBusy = false
+let nativeListener: PluginListenerHandle | null = null
+let registeringListener: Promise<void> | null = null
 
 export const getPlusSnapshot = () => state
 export const subscribePlus = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
@@ -45,24 +49,38 @@ function publish(status: Partial<PlusStatus>) {
   listeners.forEach(listener => listener())
 }
 
-export async function refreshPlusAccess(): Promise<void> {
+async function ensureNativeListener(): Promise<void> {
+  if (nativeListener) return
+  if (!registeringListener) {
+    registeringListener = bridge.addListener('plusChanged', status => publish({ ...status, ready: true, error: null }))
+      .then(handle => { nativeListener = handle })
+      .catch(cause => { console.warn('Could not register App Store updates; will retry on refresh.', cause) })
+      .finally(() => { registeringListener = null })
+  }
+  return registeringListener
+}
+
+export async function refreshPlusAccess(refreshProducts = false): Promise<void> {
   if (refreshing) return refreshing
+  publish({ refreshing: true, error: null })
   refreshing = (async () => {
     try {
-      if (native) publish({ ...await bridge.getStatus(), ready: true, error: null })
+      if (native) {
+        await ensureNativeListener()
+        publish({ ...await bridge.getStatus({ refreshProducts }), ready: true, error: null })
+      }
       else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
     } catch {
       // A temporary bridge error never creates an entitlement or discards one already verified this session.
       publish({ ready: true, error: 'Could not check App Store access. Try again when connected.' })
     }
-  })().finally(() => { refreshing = null })
+  })().finally(() => { refreshing = null; publish({ refreshing: false }) })
   return refreshing
 }
 
 export function initializePlusAccess() {
   if (initialized) return
   initialized = true
-  if (native) void bridge.addListener('plusChanged', status => publish({ ...status, ready: true, error: null })).catch(() => {})
   subscribeAppForeground(foreground => { if (foreground) void refreshPlusAccess() })
   void refreshPlusAccess()
 }

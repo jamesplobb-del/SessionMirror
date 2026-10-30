@@ -1,6 +1,6 @@
 # BestTake — App Store Launch Checklist
 
-Original launch checks were recorded on August 9, 2026. Current resubmission target: version 4.2, build 24 (October 30, 2026). The current release metadata is in `release-review/app-store-4.2/metadata.json`.
+Original launch checks were recorded on August 9, 2026. Current resubmission target: version 4.2, build 25 (October 30, 2026). The current release metadata is in `release-review/app-store-4.2/metadata.json`.
 
 ## Verified locally
 
@@ -11,7 +11,7 @@ Original launch checks were recorded on August 9, 2026. Current resubmission tar
 - SQLite opens, migrations run, and existing take paths resolve at simulator launch.
 - Sentry initializes its JavaScript and native Capacitor SDKs at simulator launch.
 - `PrivacyInfo.xcprivacy` is included in the App target's Resources phase.
-- App and Quick Tuner extension versions are both marketing version 4.2, build 24.
+- App and Quick Tuner extension versions are both marketing version 4.2, build 25.
 - The App target uses iOS 15.0; the Quick Tuner control uses iOS 18.0.
 - Release builds use `DWARF with dSYM File` and the App target has a Sentry dSYM upload phase.
 
@@ -80,6 +80,6 @@ npm install
 npm run cap:sync
 ```
 
-Then open `ios/App/App.xcworkspace`, select **Any iOS Device (arm64)**, and run **Product → Archive**. Confirm `CURRENT_PROJECT_VERSION` is 24 immediately before the archive. Increment it for every later upload.
+Then open `ios/App/App.xcworkspace`, select **Any iOS Device (arm64)**, and run **Product → Archive**. Confirm `CURRENT_PROJECT_VERSION` is 25 immediately before the archive. Increment it for every later upload.
 
 Do not merge `launch-prep` until the real-device pass and Sentry verification are complete.

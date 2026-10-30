@@ -20,7 +20,8 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     private let trialSeenKey = "besttake.plus.trial-first-seen.v1"
     private let clockKey = "besttake.plus.last-clock.v1"
     private var products: [String: Product] = [:]
-    private var loadingProducts = false
+    private var productLoadTask: Task<Void, Never>?
+    private var productError: String?
     private var presenting = false
     private var updatesTask: Task<Void, Never>?
 
@@ -91,23 +92,48 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
             "price": products[lifetimeID]?.displayPrice as Any? ?? NSNull(),
             "purchaseAvailable": products[lifetimeID]?.type == .nonConsumable,
             "trialAvailable": storedTrial == 0 && trialStart == nil && products[trialID]?.type == .nonConsumable && products[trialID]?.price == 0,
+            "productError": productError as Any? ?? NSNull(),
         ]
     }
 
     @MainActor private func loadProducts() async {
-        guard !loadingProducts else { return }
-        loadingProducts = true
-        defer { loadingProducts = false }
-        do {
-            for product in try await Product.products(for: [lifetimeID, trialID]) { products[product.id] = product }
-        } catch { /* Access remains restorable offline; an unavailable product cannot be purchased. */ }
+        if let task = productLoadTask { await task.value; return }
+        let task = Task { @MainActor in
+            do {
+                let fetched = try await PlusProductLookup().fetch([lifetimeID, trialID])
+                products = Dictionary(uniqueKeysWithValues: fetched.map { ($0.id, $0) })
+                let missing = [lifetimeID, trialID].filter { products[$0] == nil }
+                if fetched.isEmpty {
+                    productError = "The App Store returned no purchase options. Please try again shortly."
+                } else if !missing.isEmpty {
+                    productError = "Some Plus purchase options are unavailable from the App Store. Please try again shortly."
+                } else if products[lifetimeID]?.type != .nonConsumable || products[trialID]?.type != .nonConsumable || products[trialID]?.price != 0 {
+                    productError = "A Plus purchase option is temporarily unavailable. Please try again later."
+                } else {
+                    productError = nil
+                }
+                NSLog("[BestTake Plus] Product lookup returned %d products; missing: %@", fetched.count, missing.joined(separator: ", "))
+            } catch {
+                // Lookup failures never alter verified purchases or trial dates.
+                productError = "Could not load App Store purchases. \(error.localizedDescription)"
+                let detail = error as NSError
+                NSLog("[BestTake Plus] Product lookup failed: %@ (%ld): %@", detail.domain, detail.code, detail.localizedDescription)
+            }
+        }
+        productLoadTask = task
+        await task.value
+        productLoadTask = nil
         notifyListeners("plusChanged", data: await snapshot())
     }
 
     @objc func getStatus(_ call: CAPPluginCall) {
         Task { @MainActor in
+            // Keep verified access usable while the storefront request is pending.
+            notifyListeners("plusChanged", data: await snapshot())
+            if call.getBool("refreshProducts") == true || products.count < 2 || productError != nil {
+                await loadProducts()
+            }
             call.resolve(await snapshot())
-            if products.count < 2 { await loadProducts() }
         }
     }
 
@@ -185,5 +211,36 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve()
             } catch { call.reject("Could not open code redemption. Please try again.") }
         }
+    }
+}
+
+/// A timed-out StoreKit request must not leave every later refresh waiting forever.
+@MainActor private final class PlusProductLookup {
+    private var continuation: CheckedContinuation<[Product], Error>?
+    private var request: Task<Void, Never>?
+    private var timeout: Task<Void, Never>?
+
+    func fetch(_ identifiers: [String]) async throws -> [Product] {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            request = Task { @MainActor in
+                do { finish(.success(try await Product.products(for: identifiers))) }
+                catch { finish(.failure(error)) }
+            }
+            timeout = Task { @MainActor in
+                do { try await Task.sleep(nanoseconds: 15_000_000_000) }
+                catch { return }
+                finish(.failure(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut,
+                    userInfo: [NSLocalizedDescriptionKey: "The App Store took too long to respond. Check your connection and try again."])))
+            }
+        }
+    }
+
+    private func finish(_ result: Result<[Product], Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        request?.cancel(); timeout?.cancel()
+        request = nil; timeout = nil
+        continuation.resume(with: result)
     }
 }

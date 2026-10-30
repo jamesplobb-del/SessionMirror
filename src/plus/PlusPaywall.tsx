@@ -94,14 +94,16 @@ export default function PlusPaywall() {
         {!plus.active && plus.trialStartedAt === null && <button className="plus-primary" disabled={busy || !plus.ready || !plus.trialAvailable} onClick={() => void perform(startPlusTrial)}>Try Plus free for 7 days</button>}
         <button className={plus.trialStartedAt === null ? 'plus-secondary' : 'plus-primary'} disabled={busy || !plus.purchaseAvailable} onClick={() => void perform(purchasePlus)}>{plus.price ? `Unlock forever · ${plus.price}` : 'App Store purchase unavailable'}</button>
         <p className="plus-sheet__terms">One payment. No subscription. After the preview, you choose whether to buy. Learn, Balance, and your basic practice tools stay free.</p>
-        {!plus.purchaseAvailable && <button className="plus-link" disabled={busy} onClick={() => void refreshPlusAccess()}>Check App Store availability</button>}
+        {(!plus.purchaseAvailable || plus.productError) && <button className="plus-link" disabled={busy || plus.refreshing} onClick={() => { setError(''); setMessage(''); void refreshPlusAccess(true) }}>{plus.refreshing ? 'Checking App Store…' : 'Check App Store availability'}</button>}
       </div>}
       {permanent && <button className="plus-primary" onClick={() => closePlus(true)}>Continue practicing</button>}
       <div className="plus-sheet__links"><button disabled={busy} onClick={() => void perform(restorePlus, true)}>Restore purchases</button><button disabled={busy} onClick={() => setCodesOpen(value => !value)}>App Store offer codes</button></div>
       {codesOpen && <AppStoreOfferCodePanel />}
       {!permanent && <p className="plus-sheet__terms">When the preview ends, music tools, hands-free, Insights, and expanded limits require Plus. Your existing work stays saved.</p>}
       {busy && <p role="status">Waiting for the App Store…</p>}
+      {plus.refreshing && !busy && <p role="status">Checking App Store purchase options…</p>}
       {(error || plus.error) && <p className="plus-error" role="alert">{error || plus.error}</p>}
+      {!permanent && !plus.refreshing && plus.productError && !error && !plus.error && <p className="plus-error" role="alert">{plus.productError}</p>}
       {message && <p role="status">{message}</p>}
     </div>
   </AnimatedBottomSheet>
