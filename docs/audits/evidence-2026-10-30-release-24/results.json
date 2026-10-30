@@ -1,0 +1,45 @@
+{
+  "archive": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-10-30/BestTake-4.2-24.xcarchive",
+  "bundles": [
+    {
+      "id": "com.besttake.app",
+      "version": "4.2",
+      "build": "24"
+    },
+    {
+      "id": "com.besttake.app.QuickTunerControl",
+      "version": "4.2",
+      "build": "24"
+    }
+  ],
+  "signature": "passed",
+  "productionGuards": "passed",
+  "correctedLifetimeProduct": "verified in native binary",
+  "reader": "verified in bundled assets",
+  "date": "2026-10-30",
+  "sourceCommit": "6afdea8",
+  "purchaseProductCommit": "f7f43b0",
+  "release": "4.2 (24)",
+  "checks": {
+    "musicReading": "passed",
+    "musicMenus": "passed",
+    "plusAccess": "passed",
+    "handsFreeMonitor": "passed",
+    "typescriptProductionBuildAndCapacitorSync": "passed",
+    "phoneTabletReaderBrowserWorkflows": "passed; isolated production-component fixture"
+  },
+  "sentry": {
+    "sourceMaps": "uploaded successfully",
+    "nativeDebugFilesUploaded": 23
+  },
+  "upload": {
+    "result": "EXPORT SUCCEEDED; Upload succeeded",
+    "appleStatus": "Uploaded package is processing",
+    "timeLocal": "2026-10-30 09:33:29 America/New_York"
+  },
+  "limitations": [
+    "Live StoreKit purchase and restore were not tested in this release task.",
+    "App Store review submission and approval are not implied by a successful binary upload."
+  ],
+  "privateLogs": "build/release-4.2-24/"
+}
