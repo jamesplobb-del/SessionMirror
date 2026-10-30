@@ -114,13 +114,13 @@ record control and can be played back and compared against a second take.
 The Practice Games section requires microphone input to control gameplay (pitch detection).
 The YouTube play-along feature loads standard YouTube embeds for user-supplied URLs.
 
-BestTake Plus is an optional in-app purchase. A seven-day trial is offered to eligible users. Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium and Hard Staff Jumper levels. The free app includes recording/playback, tuner, metronome, one saved routine, and two multitrack boxes. The Plus product identifiers are com.besttake.app.plus.lifetime and com.besttake.app.plus.trial7days.
+BestTake Plus is an optional in-app purchase. A seven-day trial is offered to eligible users. Plus unlocks hands-free recording, sheet music and backing tracks, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium and Hard Staff Jumper levels. The free app includes recording/playback, tuner, metronome, one saved routine, and two multitrack boxes. The Plus product identifiers are com.besttake.app.plus.lifetime.v2 and com.besttake.app.plus.trial7days.
 ```
 
 ## Still needed before submit
 
 - Review the drafted [privacy policy](netlify-youtube-proxy/privacy.html) and [support page](netlify-youtube-proxy/support.html), then deploy them and enter their live URLs in App Store Connect.
-- Submit both Plus products with the app version: `com.besttake.app.plus.lifetime` and `com.besttake.app.plus.trial7days`.
+- Submit both Plus products with the app version: `com.besttake.app.plus.lifetime.v2` and `com.besttake.app.plus.trial7days`.
 - Category: Music. Secondary: Education.
 - Age rating questionnaire.
 - App Privacy: Diagnostics → Crash Data, not linked to identity, not used for tracking.

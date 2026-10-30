@@ -1,47 +1,37 @@
-# BestTake Plus purchases and promo codes
+# BestTake Plus purchases and Apple offer codes
 
-Implemented September 27, 2026. StoreKit is the authority for iOS entitlements. The existing `OfferCodes` Capacitor bridge now handles purchase, trial, restore, transaction updates, refunds/revocations, and redemption. Dismissing Apple's code sheet never grants access.
+Current resubmission: version 4.2, build 23, October 22, 2026. StoreKit is the authority for iOS entitlements. The `OfferCodes` Capacitor bridge handles purchase, trial, restore, transaction updates, refunds/revocations, and Apple's official redemption sheet. Dismissing the sheet never grants access. Custom code entry and developer/test unlocks have been removed from every build.
 
-## Product setup required in App Store Connect
+## Products in App Store Connect
 
 | Product ID | Type | Display name | US price |
 | --- | --- | --- | --- |
-| `com.besttake.app.plus.lifetime` | Non-consumable | BestTake Plus | $9.99 |
+| `com.besttake.app.plus.lifetime.v2` | Non-consumable | BestTake Plus | $9.99 (confirmed October 22, 2026) |
 | `com.besttake.app.plus.trial7days` | Non-consumable | 7-day Trial | $0.00 |
 
-Enable Family Sharing for the lifetime product. Supply descriptions, review screenshots, availability, and review notes, then submit the products with the app. Prices in the UI come from StoreKit, never a hardcoded purchase amount. The purchase button stays disabled when Apple has not returned the product.
+The original `com.besttake.app.plus.lifetime` was accidentally created as a consumable (Apple record 6826009047). Leave it unused. The replacement lifetime record is 6826010031. Do not weaken the non-consumable type checks or reuse the original ID.
 
-The trial starts only when the user confirms the free trial transaction. Its verified original purchase date fixes the seven-day window across reinstalls and restores. It never renews or charges automatically. Apple requires a $0 non-consumable for a time-limited trial in a non-subscription app: [App Review Guidelines, 3.1.1](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
+Supply localization, review screenshot, availability, pricing, and review notes for both valid products, then include them with the corrected app version. Family Sharing is currently off for the replacement product; do not describe it as enabled. Prices in the app come from StoreKit, never a hardcoded purchase amount. Purchase controls stay disabled when Apple has not returned the product.
 
-## Testers: `alpha`
+The trial starts only when the user confirms the free Apple transaction. Its verified original purchase date fixes the seven-day window across reinstalls and restores. It never renews or charges automatically.
 
-In a Debug build, a verified TestFlight/sandbox installation, or a Vite development preview:
+## Optional free access for friends
 
-1. Open Settings → Help → Promo codes (also available on the Plus screen).
-2. Enter `alpha` in **Test build code** and tap **Unlock**. Do not use **Redeem App Store offer code** for the test shortcut; Apple's sheet cannot redeem a code that exists only inside BestTake.
-3. Plus stays unlocked on that installation. Whitespace and capitalization are ignored.
+Use an Apple-managed Free Offer for the lifetime product. A redeemed verified lifetime transaction grants permanent Plus access. Customer campaigns can be prepared after the app and product are approved; campaign creation is not a resubmission prerequisite. A Free Offer named BestTake Plus already exists with zero codes as observed October 22; no customer code campaign has been verified.
 
-The native shortcut is gated by `#if DEBUG` or Apple's verified `AppTransaction` sandbox environment. A public release ignores the locally saved alpha flag. Browser production builds ignore development entitlement storage. Test and production trial caches are separate. Test alpha is intentionally uncapped; it is not the public offer-code campaign.
+Customers open the App Store offer-code control in Settings or the Plus screen. Apple's sheet handles redemption and StoreKit verifies the result. The app does not accept or validate custom unlock strings. Old local flags never grant access.
 
-## Public release: capped `ALPHA`
+## Verification before submission
 
-Create a **free offer** for the lifetime product, then a **custom code** named `ALPHA`, in App Store Connect. Set the desired redemption quantity and optional expiry there. Include new users and users with prior purchases, so customers who already redeemed the $0 trial remain eligible. No public code or redemption count has been created by this implementation.
+Run `node scripts/verify-plus-access.mjs`, `node scripts/verify-handsfree-monitor.mjs`, and `npm run cap:sync`.
 
-Customers open Settings → Help → Promo codes → **Redeem App Store offer code** and enter `ALPHA` in Apple's sheet. StoreKit verifies the redemption and grants the same permanent lifetime entitlement. The app cannot prefill Apple's sheet. Apple enforces the campaign cap across devices and accounts; there is no client-side usage counter.
-
-Custom codes require the app to be Ready for Distribution and the IAP approved. Apple's current limit is up to 25,000 redemptions per custom-code batch. Sandbox redemption uses separately generated sandbox codes. See [Apple's IAP offer-code setup](https://developer.apple.com/help/app-store-connect/manage-in-app-purchases/create-offer-codes-for-in-app-purchases).
-
-## Verification before release
-
-Automated checks: `node scripts/verify-plus-access.mjs`, `node scripts/verify-handsfree-monitor.mjs`, and `npm run build`.
-
-On an iOS sandbox device, with both products configured, verify:
+On an iOS sandbox device with both products configured, verify:
 
 - Confirm/cancel the $0 trial; only a verified purchase starts access. Restore preserves the original expiry.
-- Confirm/cancel the lifetime purchase; pending approval stays locked, then unlocks through the transaction listener.
-- Restore on another device; check Family Sharing and refund/revocation.
-- Redeem a sandbox offer, dismiss without redeeming, and try an invalid code.
-- In a public Release installation, a saved test alpha flag must not unlock Plus; redeem the configured public ALPHA through Apple instead.
+- Confirm/cancel the lifetime purchase; pending approval stays locked, then unlocks through transaction updates.
+- Restore on another device and check refund/revocation behavior. Test Family Sharing only if it is deliberately enabled.
+- Redeem an Apple sandbox offer, dismiss without redeeming, and try an invalid code.
+- Legacy custom-code flags must not unlock Plus in any build.
 - Expire the trial between takes: complete the current recording and listen-back; block the next hands-free take. Keep manual recording, Learn, Balance, recordings/export, original-score export/delete, and non-music shared routines usable.
 
-These device/StoreKit checks require Apple's product setup and have not been substituted by the local JavaScript tests.
+Real sandbox purchase, restore, and redemption checks remain unverified. Simulator checks and local JavaScript tests do not establish live StoreKit availability.

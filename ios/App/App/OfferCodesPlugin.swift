@@ -15,7 +15,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "restore", returnType: CAPPluginReturnPromise),
     ]
     // Create both exact product IDs in App Store Connect before release.
-    private let lifetimeID = "com.besttake.app.plus.lifetime"
+    private let lifetimeID = "com.besttake.app.plus.lifetime.v2"
     private let trialID = "com.besttake.app.plus.trial7days"
     private let trialSeenKey = "besttake.plus.trial-first-seen.v1"
     private let clockKey = "besttake.plus.last-clock.v1"

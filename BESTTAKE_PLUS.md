@@ -2,11 +2,11 @@
 
 Product decision, 27 September 2026. This replaces the free/paid boundary dated 16 September 2026.
 
-**BestTake Plus — $9.99 once, for lifetime access.** The app is free to download. One non-consumable unlock, with Family Sharing enabled. No subscription and no automatic charge.
+**BestTake Plus — $9.99 once, for lifetime access.** The app is free to download. One non-consumable unlock, with Family Sharing available as an optional App Store Connect setting. No subscription and no automatic charge.
 
 New users can explicitly start a seven-day Plus preview from the paywall. On iOS, Apple verifies a $0 non-consumable “7-day Trial”; its original purchase date anchors the seven days. When it ends, users keep the free features unless they choose to buy Plus. No subscription or automatic charge. The purchase price is read from StoreKit in the user’s currency.
 
-Promo-code and StoreKit implementation notes live in `PROMO_CODES.md`. The StoreKit bridge, trial, paywalls, restore flow, and test-only alpha shortcut are implemented. App Store Connect product setup, public ALPHA creation/cap, and sandbox purchase validation remain release prerequisites.
+StoreKit and Apple offer-code implementation notes live in `PROMO_CODES.md`. The StoreKit bridge, trial, paywalls, and restore flow are implemented. All custom access-code shortcuts have been removed. The current lifetime product is `com.besttake.app.plus.lifetime.v2`; the trial is `com.besttake.app.plus.trial7days`. The user confirmed keeping the saved $9.99 US lifetime price on October 22, 2026. Product review configuration and real sandbox purchase validation remain release prerequisites. Apple-managed offer campaigns are optional after approval.
 
 ## Always free
 

@@ -1,6 +1,6 @@
 # BestTake — App Store Launch Checklist
 
-Verified on `launch-prep` on August 9, 2026.
+Original launch checks were recorded on August 9, 2026. Current resubmission target: version 4.2, build 23 (October 22, 2026). The current release metadata is in `release-review/app-store-4.2/metadata.json`.
 
 ## Verified locally
 
@@ -11,7 +11,7 @@ Verified on `launch-prep` on August 9, 2026.
 - SQLite opens, migrations run, and existing take paths resolve at simulator launch.
 - Sentry initializes its JavaScript and native Capacitor SDKs at simulator launch.
 - `PrivacyInfo.xcprivacy` is included in the App target's Resources phase.
-- App and Quick Tuner extension versions are both marketing version 2.3, build 4.
+- App and Quick Tuner extension versions are both marketing version 4.2, build 23.
 - The App target uses iOS 15.0; the Quick Tuner control uses iOS 18.0.
 - Release builds use `DWARF with dSYM File` and the App target has a Sentry dSYM upload phase.
 
@@ -64,7 +64,7 @@ __besttakeSentryTest.native()
 - A privacy-policy link inside the app; Apple requires the policy to be easily accessible in-app as well as in App Store Connect.
 - At least one 6.9-inch iPhone screenshot and one 13-inch iPad screenshot. Apple scales those down for the smaller supported sizes.
 - App description, subtitle, keywords, category, copyright, and review notes.
-- Submit both BestTake Plus in-app purchase products with this app version (`com.besttake.app.plus.lifetime` and `com.besttake.app.plus.trial7days`).
+- Submit both BestTake Plus in-app purchase products with this app version (`com.besttake.app.plus.lifetime.v2` and `com.besttake.app.plus.trial7days`).
 - Updated age-rating questionnaire.
 - App Privacy: Diagnostics → Crash Data; not linked to identity; not used for tracking; purpose App Functionality.
 - EU Digital Services Act trader-status declaration if distributing in the EU.
@@ -80,6 +80,6 @@ npm install
 npm run cap:sync
 ```
 
-Then open `ios/App/App.xcworkspace`, select **Any iOS Device (arm64)**, and run **Product → Archive**. Confirm `CURRENT_PROJECT_VERSION` is 4 immediately before the archive. Increment it for every later upload.
+Then open `ios/App/App.xcworkspace`, select **Any iOS Device (arm64)**, and run **Product → Archive**. Confirm `CURRENT_PROJECT_VERSION` is 23 immediately before the archive. Increment it for every later upload.
 
 Do not merge `launch-prep` until the real-device pass and Sentry verification are complete.

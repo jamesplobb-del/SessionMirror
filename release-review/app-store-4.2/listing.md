@@ -1,4 +1,4 @@
-# BestTake 4.2 · Build 22
+# BestTake 4.2 · Build 23
 
 ## name
 
@@ -73,10 +73,10 @@ BestTake is a practice recording app for musicians. No account or sign-in is req
 
 To test recording, allow microphone access, choose audio mode, record a few seconds, and stop. The take appears below the record control. Record a second take to compare them. Camera access is only needed for video recording. The tuner and instrument-controlled games also need microphone input.
 
-BestTake Plus is an optional non-consumable purchase (com.besttake.app.plus.lifetime). The optional seven-day trial is a separate $0 non-consumable (com.besttake.app.plus.trial7days); it never renews or charges automatically. Plus includes hands-free recording, imported sheet music and backing audio, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium/Hard Staff Jumper.
+BestTake Plus is an optional non-consumable purchase (com.besttake.app.plus.lifetime.v2). The optional seven-day trial is a separate $0 non-consumable (com.besttake.app.plus.trial7days); it never renews or charges automatically. Plus includes hands-free recording, imported sheet music and backing audio, YouTube references, Pitch Insights, additional routines and multitrack boxes, and Medium/Hard Staff Jumper.
 
 Learn, Balance, Easy Staff Jumper, manual recording, playback/export, the live tuner, metronome, drone, one saved routine, and two multitrack boxes work without Plus. YouTube references use YouTube's embedded player.
 
-Build 22 removes all custom access-code entry and redemption, including sandbox/TestFlight and development unlocks. Stored code flags no longer grant Plus. Only verified StoreKit purchases or the verified free trial grant access. The App Store offer-code button opens Apple's redemption sheet and does not grant access on its own.
+Build 23 removes all custom access-code entry and redemption, including sandbox/TestFlight and development unlocks. Stored code flags no longer grant Plus. Only verified StoreKit purchases or the verified free trial grant access. The App Store offer-code button opens Apple's redemption sheet and does not grant access on its own.
 
 Purchase testing: Settings > BestTake Plus > Explore BestTake Plus. Use Unlock forever for the lifetime purchase, Try Plus free for 7 days for the free trial, or Restore purchases to restore verified Apple transactions. There are no auto-renewing subscriptions in this binary. Both product IDs above must be included for review with this build.
