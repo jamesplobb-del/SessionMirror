@@ -24,6 +24,12 @@ html.app-dark-mode .plus-sheet,html.app-dark-mode .plus-locked{--plus-text:#f4f7
 .plus-offer-codes small{display:block;opacity:.65}
 .plus-offer-codes__store{display:block;margin-top:10px;text-align:left}
 .plus-error{color:#a92c26!important;opacity:1!important}
+.plus-purchase-check{margin:18px 0;padding:16px;border:1px solid rgba(127,127,127,.3);border-radius:14px}
+.plus-purchase-check h3{font-size:15px;line-height:1.35;margin:0 0 8px}
+.plus-purchase-check p{font-size:12px;line-height:1.5;color:var(--plus-muted);margin:0 0 12px}
+.plus-purchase-check summary{min-height:44px;padding:12px 0;font-size:13px;cursor:pointer}
+.plus-purchase-check pre{max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;border-radius:8px;background:rgba(127,127,127,.08);color:var(--plus-text);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-user-select:text;user-select:text}
+.plus-purchase-check pre:focus-visible,.plus-purchase-check summary:focus-visible{outline:2px solid var(--plus-accent);outline-offset:3px}
 html.app-dark-mode .plus-error{color:#ff9b91!important}
 .plus-locked{width:min(100%,460px);margin:auto;padding:32px 24px;text-align:center}
 .plus-locked>svg{width:28px;height:28px;color:var(--plus-accent);margin:0 auto 16px}

@@ -8,7 +8,7 @@ New users can explicitly start a seven-day Plus preview from the paywall. On iOS
 
 StoreKit and Apple offer-code implementation notes live in `PROMO_CODES.md`. The StoreKit bridge, trial, paywalls, and restore flow are implemented. All custom access-code shortcuts have been removed. The current lifetime product is `com.besttake.app.plus.lifetime.v2`; the trial is `com.besttake.app.plus.trial7days`. The user confirmed keeping the saved $9.99 US lifetime price on October 22, 2026. Product review configuration and real sandbox purchase validation remain release prerequisites. Apple-managed offer campaigns are optional after approval.
 
-Build 25 waits for a shared StoreKit product lookup before finishing an availability refresh. The paywall shows progress, empty or failed lookup messages, and an explicit retry. Product lookups time out after 15 seconds; verified entitlements remain independent of product availability. The Paid Apps Agreement was verified Active on October 30, 2026, but live purchase and restore still require validation on the iPad.
+Build 26 keeps a 15-second deadline across the initial StoreKit product lookup and one retry for each missing product. Restore reloads products after synchronizing Apple transactions. A user-triggered purchase check produces a local, copyable diagnostic report without making a purchase, uploading the report, or changing entitlements. Build 25 loaded purchase options on the user’s iPhone but returned an empty list on the iPad; the underlying iPad cause remains unconfirmed. Paid Apps, bank, and tax status were verified Active on October 30, 2026. Live purchase and restore still require validation.
 
 ## Always free
 

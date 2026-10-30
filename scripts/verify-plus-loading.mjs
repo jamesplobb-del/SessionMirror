@@ -195,7 +195,126 @@ try {
   assert.equal(listenerRecovery.listenerCalls, 2, 'Foreground refresh reuses the recovered transaction listener')
   assert.equal(listenerRecovery.foregroundSubscriptions, 1)
 
-  console.log('PASS: Plus refresh progress/coalescing, explicit product retry, product error recovery, preserved verified access on bridge failure, listener recovery, and foreground refresh.')
+  // A forced check arriving during an ordinary check needs its own fresh lookup.
+  // Multiple forced callers still share one follow-up, and all wait for it.
+  const ordinaryLookup = deferred(), forcedLookup = deferred()
+  const coalesced = await loadFixture({ readStatus: options => options.refreshProducts ? forcedLookup.promise : ordinaryLookup.promise })
+  const ordinaryRefresh = coalesced.api.refreshPlusAccess()
+  await checkpoint()
+  const forcedRefresh = coalesced.api.refreshPlusAccess(true)
+  const duplicateForcedRefresh = coalesced.api.refreshPlusAccess(true)
+  assert.equal(coalesced.statusCalls.length, 1)
+  ordinaryLookup.resolve(unavailable)
+  await checkpoint()
+  assert.equal(coalesced.statusCalls.length, 2, 'An explicit retry is not swallowed by an in-flight ordinary lookup')
+  assert.deepEqual(coalesced.statusCalls[1], { refreshProducts: true })
+  assert.equal(coalesced.api.getPlusSnapshot().refreshing, true, 'Progress stays visible for the queued forced lookup')
+  let forcedFinished = false
+  void forcedRefresh.then(() => { forcedFinished = true })
+  await checkpoint()
+  assert.equal(forcedFinished, false)
+  forcedLookup.resolve(available)
+  await Promise.all([ordinaryRefresh, forcedRefresh, duplicateForcedRefresh])
+  assert.equal(coalesced.statusCalls.length, 2, 'Concurrent explicit retries share their fresh lookup')
+  assert.equal(coalesced.api.getPlusSnapshot().purchaseAvailable, true)
+  assert.equal(coalesced.api.getPlusSnapshot().productError, null)
+
+  // Restore waits for an existing check. A foreground check that begins during
+  // restore cannot later replace its newer verified result with an old snapshot.
+  const beforeRestore = deferred(), restoreResult = deferred(), staleForeground = deferred()
+  const restoring = await loadFixture({ readStatus: () => beforeRestore.promise })
+  let restoreCalls = 0
+  restoring.bridge.restore = () => { restoreCalls++; return restoreResult.promise }
+  const refreshBeforeRestore = restoring.api.refreshPlusAccess()
+  await checkpoint()
+  const restoration = restoring.api.restorePlus()
+  await checkpoint()
+  assert.equal(restoreCalls, 0, 'Restore waits for the current status request')
+  beforeRestore.resolve(unavailable)
+  await refreshBeforeRestore
+  await checkpoint()
+  assert.equal(restoreCalls, 1)
+  restoring.readStatus = () => staleForeground.promise
+  const foregroundDuringRestore = restoring.api.refreshPlusAccess()
+  await checkpoint()
+  restoreResult.resolve({ ...available, purchased: true })
+  assert.equal(await restoration, true)
+  staleForeground.resolve(unavailable)
+  await foregroundDuringRestore
+  assert.equal(restoring.api.getPlusSnapshot().purchased, true, 'A stale foreground response cannot erase the restored entitlement')
+  assert.equal(restoring.api.getPlusSnapshot().purchaseAvailable, true)
+  assert.equal(restoring.api.getPlusSnapshot().productError, null)
+
+  const secondRestore = deferred(), staleFailure = deferred()
+  restoring.bridge.restore = () => secondRestore.promise
+  const restorationBeforeFailure = restoring.api.restorePlus()
+  await checkpoint()
+  restoring.readStatus = () => staleFailure.promise
+  const failingForeground = restoring.api.refreshPlusAccess()
+  await checkpoint()
+  secondRestore.resolve({ ...available, purchased: true })
+  await restorationBeforeFailure
+  staleFailure.reject(new Error('Outdated foreground request failed'))
+  await failingForeground
+  assert.equal(restoring.api.getPlusSnapshot().purchased, true)
+  assert.equal(restoring.api.getPlusSnapshot().error, null, 'A stale foreground failure cannot add an error after successful restore')
+
+  // Native snapshots can be delivered out of order through listener callbacks.
+  // Revisions protect both product state and verified access without blocking a
+  // later legitimate revocation.
+  const revisioned = await loadFixture({ readStatus: async () => ({ ...unavailable, statusRevision: 1 }) })
+  await revisioned.api.refreshPlusAccess()
+  revisioned.bridge.restore = async () => ({ ...available, purchased: true, statusRevision: 4 })
+  await revisioned.api.restorePlus()
+  revisioned.listener({ ...unavailable, statusRevision: 2 })
+  assert.equal(revisioned.api.getPlusSnapshot().purchased, true, 'An older listener snapshot cannot undo restored access')
+  assert.equal(revisioned.api.getPlusSnapshot().purchaseAvailable, true, 'An older listener snapshot cannot roll back the recovered catalog')
+  assert.equal(revisioned.api.getPlusSnapshot().productError, null)
+  assert.equal(revisioned.api.getPlusSnapshot().statusRevision, 4)
+  revisioned.readStatus = async () => ({ ...unavailable, statusRevision: 3 })
+  await revisioned.api.refreshPlusAccess(true)
+  assert.equal(revisioned.api.getPlusSnapshot().statusRevision, 4, 'The same revision guard applies to native promise results')
+  revisioned.listener({ ...available, purchased: false, statusRevision: 5 })
+  assert.equal(revisioned.api.canUsePlus(), false, 'A newer verified revocation still removes access')
+  assert.equal(revisioned.api.getPlusSnapshot().statusRevision, 5)
+  revisioned.bridge.restore = async () => ({ ...available, purchased: true, statusRevision: 4 })
+  assert.equal(await revisioned.api.restorePlus(), false, 'An older action result cannot overwrite a newer revocation')
+  assert.equal(revisioned.api.getPlusSnapshot().statusRevision, 5)
+
+  // Diagnostics return a local report without changing entitlements or product
+  // availability. Purchase, trial, restore, copy, and a second check cannot overlap.
+  const diagnostic = await loadFixture({ readStatus: async () => unavailable })
+  await diagnostic.api.refreshPlusAccess()
+  const diagnosticResult = deferred()
+  let diagnosisCalls = 0, copyCalls = 0
+  diagnostic.bridge.diagnosePurchases = () => { diagnosisCalls++; return diagnosticResult.promise }
+  diagnostic.bridge.copyPurchaseReport = async () => { copyCalls++ }
+  const beforeDiagnostic = { ...diagnostic.api.getPlusSnapshot() }
+  const diagnosis = diagnostic.api.diagnosePlusPurchases()
+  await checkpoint()
+  for (const action of ['diagnosePlusPurchases', 'purchasePlus', 'startPlusTrial', 'restorePlus', 'copyPlusPurchaseReport']) {
+    await assert.rejects(() => diagnostic.api[action](), /finish the current App Store request/, `${action} cannot overlap the support check`)
+  }
+  const report = 'BestTake purchase check\nBuild: 4.2 (26)\nProducts returned: 0\nNo purchase was made.'
+  diagnosticResult.resolve({ report })
+  assert.equal(await diagnosis, report)
+  assert.equal(diagnosisCalls, 1)
+  assert.deepEqual(diagnostic.api.getPlusSnapshot(), beforeDiagnostic, 'The report is not purchase authorization and cannot change catalog availability')
+  assert.equal(diagnostic.statusCalls.length, 1, 'Diagnostic completion does not silently refresh StoreKit products')
+  assert.equal(diagnostic.api.canUsePlus(), false)
+  await diagnostic.api.copyPlusPurchaseReport()
+  assert.equal(copyCalls, 1, 'Copy delegates to the native local clipboard method')
+  assert.deepEqual(diagnostic.api.getPlusSnapshot(), beforeDiagnostic)
+  diagnostic.bridge.copyPurchaseReport = async () => { throw new Error('Clipboard unavailable') }
+  await assert.rejects(() => diagnostic.api.copyPlusPurchaseReport(), /Clipboard unavailable/)
+  diagnostic.bridge.diagnosePurchases = async () => ({ report })
+  assert.equal(await diagnostic.api.diagnosePlusPurchases(), report, 'A failed clipboard operation releases the shared action guard')
+  diagnostic.bridge.diagnosePurchases = async () => ({ report: '' })
+  await assert.rejects(() => diagnostic.api.diagnosePlusPurchases(), /no report/)
+  diagnostic.bridge.diagnosePurchases = async () => ({ report })
+  assert.equal(await diagnostic.api.diagnosePlusPurchases(), report, 'A failed support check can be retried')
+
+  console.log('PASS: Plus refresh progress/coalescing, forced retries, product recovery, verified access, listener recovery, native revision ordering, restore ordering, and local diagnostic/copy action isolation.')
 } finally {
   if (previousFixtures === undefined) delete globalThis[fixturesKey]
   else globalThis[fixturesKey] = previousFixtures

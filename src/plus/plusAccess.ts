@@ -11,6 +11,7 @@ export interface PlusStatus extends PlusEntitlement {
   trialAvailable: boolean
   productError: string | null
   error: string | null
+  statusRevision?: number
 }
 type NativeStatus = Omit<PlusStatus, 'ready' | 'active' | 'refreshing' | 'error'>
 interface PlusBridge {
@@ -19,6 +20,8 @@ interface PlusBridge {
   purchase(): Promise<NativeStatus & { outcome?: 'cancelled' | 'pending' }>
   startTrial(): Promise<NativeStatus & { outcome?: 'cancelled' | 'pending' }>
   restore(): Promise<NativeStatus>
+  diagnosePurchases(): Promise<{ report: string }>
+  copyPurchaseReport(): Promise<void>
   addListener(event: 'plusChanged', listener: (status: NativeStatus) => void): Promise<PluginListenerHandle>
 }
 export const plusBridge = registerPlugin<PlusBridge>('OfferCodes')
@@ -29,6 +32,10 @@ let state: PlusStatus = { ready: false, refreshing: false, active: false, purcha
 const listeners = new Set<() => void>()
 let initialized = false
 let refreshing: Promise<void> | null = null
+let refreshingProducts = false
+let queuedProductRefresh = false
+let actionStatusVersion = 0
+let latestNativeRevision = -1
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 let actionBusy = false
 let nativeListener: PluginListenerHandle | null = null
@@ -49,10 +56,22 @@ function publish(status: Partial<PlusStatus>) {
   listeners.forEach(listener => listener())
 }
 
+function hasNativeRevision(status: NativeStatus): status is NativeStatus & { statusRevision: number } {
+  return typeof status.statusRevision === 'number' && Number.isSafeInteger(status.statusRevision) && status.statusRevision >= 0
+}
+
+function publishNativeStatus(status: NativeStatus) {
+  if (hasNativeRevision(status)) {
+    if (status.statusRevision < latestNativeRevision) return
+    latestNativeRevision = status.statusRevision
+  }
+  publish({ ...status, ready: true, error: null })
+}
+
 async function ensureNativeListener(): Promise<void> {
   if (nativeListener) return
   if (!registeringListener) {
-    registeringListener = bridge.addListener('plusChanged', status => publish({ ...status, ready: true, error: null }))
+    registeringListener = bridge.addListener('plusChanged', publishNativeStatus)
       .then(handle => { nativeListener = handle })
       .catch(cause => { console.warn('Could not register App Store updates; will retry on refresh.', cause) })
       .finally(() => { registeringListener = null })
@@ -61,20 +80,36 @@ async function ensureNativeListener(): Promise<void> {
 }
 
 export async function refreshPlusAccess(refreshProducts = false): Promise<void> {
-  if (refreshing) return refreshing
-  publish({ refreshing: true, error: null })
+  if (refreshing) {
+    // A manual retry must still make a fresh request if an ordinary status
+    // check was already running. Repeated retries share that one follow-up.
+    if (refreshProducts && !refreshingProducts) queuedProductRefresh = true
+    return refreshing
+  }
+  refreshingProducts = refreshProducts
+  queuedProductRefresh = false
   refreshing = (async () => {
-    try {
-      if (native) {
-        await ensureNativeListener()
-        publish({ ...await bridge.getStatus({ refreshProducts }), ready: true, error: null })
+    do {
+      const forceProducts = refreshingProducts
+      queuedProductRefresh = false
+      let version = actionStatusVersion
+      try {
+        if (native) {
+          await ensureNativeListener()
+          version = actionStatusVersion
+          const status = await bridge.getStatus({ refreshProducts: forceProducts })
+          // A delayed foreground check must not undo a newer purchase/restore.
+          if (hasNativeRevision(status) || version === actionStatusVersion) publishNativeStatus(status)
+        }
+        else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
+      } catch {
+        // A temporary bridge error never creates an entitlement or discards one already verified this session.
+        if (version === actionStatusVersion) publish({ ready: true, error: 'Could not check App Store access. Try again when connected.' })
       }
-      else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
-    } catch {
-      // A temporary bridge error never creates an entitlement or discards one already verified this session.
-      publish({ ready: true, error: 'Could not check App Store access. Try again when connected.' })
-    }
-  })().finally(() => { refreshing = null; publish({ refreshing: false }) })
+      refreshingProducts = queuedProductRefresh
+    } while (queuedProductRefresh)
+  })().finally(() => { refreshing = null; refreshingProducts = false; publish({ refreshing: false }) })
+  publish({ refreshing: true, error: null })
   return refreshing
 }
 
@@ -85,23 +120,45 @@ export function initializePlusAccess() {
   void refreshPlusAccess()
 }
 
-async function perform(action: 'purchase' | 'startTrial' | 'restore') {
+async function withPlusAction<T>(action: () => Promise<T>): Promise<T> {
   if (actionBusy) throw new Error('Please finish the current App Store request.')
   actionBusy = true
-  try {
+  try { return await action() }
+  finally { actionBusy = false }
+}
+
+async function perform(action: 'purchase' | 'startTrial' | 'restore') {
+  return withPlusAction(async () => {
     if (native) {
+      if (action === 'restore' && refreshing) await refreshing
       const result = await bridge[action]()
-      publish({ ...result, ready: true, error: null })
+      actionStatusVersion++
+      publishNativeStatus(result)
       if ('outcome' in result && result.outcome === 'pending') throw new Error('Your purchase is awaiting approval. Plus will unlock when Apple confirms it.')
     } else {
       throw new Error('Open BestTake on your iPhone or iPad to buy or restore Plus.')
     }
     return canUsePlus()
-  } finally { actionBusy = false }
+  })
 }
 export const purchasePlus = () => perform('purchase')
 export const startPlusTrial = () => perform('startTrial')
 export const restorePlus = () => perform('restore')
+
+/** Creates a local support report only; it cannot grant access or make a purchase. */
+export const diagnosePlusPurchases = () => withPlusAction(async (): Promise<string> => {
+  if (!native) throw new Error('Open BestTake on your iPhone or iPad to check purchases.')
+  if (refreshing) await refreshing
+  const { report } = await bridge.diagnosePurchases()
+  if (!report?.trim()) throw new Error('The purchase check returned no report. Please try again.')
+  return report
+})
+
+/** Native code copies the last local report; no report is uploaded here. */
+export const copyPlusPurchaseReport = () => withPlusAction(async (): Promise<void> => {
+  if (!native) throw new Error('Open BestTake on your iPhone or iPad to copy the report.')
+  await bridge.copyPurchaseReport()
+})
 
 export interface PlusRequest { feature: PlusFeature; resume?: () => void }
 let request: PlusRequest | null = null
