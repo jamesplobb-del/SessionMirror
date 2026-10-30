@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-30",
+  "release": "4.2 (25)",
+  "sourceCommit": "f14242a",
+  "archive": "build/release-4.2-25/BestTake-4.2-25.xcarchive",
+  "bundles": [
+    {
+      "id": "com.besttake.app",
+      "version": "4.2",
+      "build": "25"
+    },
+    {
+      "id": "com.besttake.app.QuickTunerControl",
+      "version": "4.2",
+      "build": "25"
+    }
+  ],
+  "changes": [
+    "Await shared product lookup before returning refreshed availability",
+    "Report empty, partial, invalid and failed product lookups",
+    "Time out StoreKit product lookup after 15 seconds and ignore late completion",
+    "Show checking status and retry without altering verified entitlements"
+  ],
+  "account": "Paid Apps Agreement, bank account and U.S. tax form verified Active in App Store Connect",
+  "price": "US lifetime remains $9.99; trial remains $0.00",
+  "checks": {
+    "plusAccessRegression": "passed",
+    "plusLoadingRegression": "passed",
+    "swiftLookupHarness": "passed success, thrown error, production timeout and late completion; controlled Product stub",
+    "typescript": "passed",
+    "productionBuildAndCapacitorSync": "passed",
+    "simulatorBuildAndLaunch": "passed on iPhone 17 Pro, iOS26.5",
+    "signature": "passed with system certificate trust store",
+    "archiveContent": "both product IDs, native lookup diagnostics and web checking UI verified; no custom unlock entry point or bundled source maps",
+    "paywallUI": "passed with real PlusPaywall/plusAccess and exact shipped CSS using controlled StoreKit responses: pending status, readable empty-result error, explicit retry, both options enabled on recovery; Plus access remained OFF"
+  },
+  "sentry": {
+    "sourceMaps": "uploaded successfully after explicit user permission",
+    "nativeDebugFilesUploaded": 21
+  },
+  "upload": {
+    "result": "EXPORT SUCCEEDED; Upload succeeded",
+    "appleStatus": "Processed; TestFlight build 4.2 (25) Ready to Submit",
+    "timeLocal": "2026-10-30 11:10:55 America/New_York",
+    "buildRecord": "19fb1b6c-f31a-472c-94ba-da38e1775e6b",
+    "testerAvailability": "Verified build4.2(25) listed as Testing in existing Me group (1 tester); no tester group changes required"
+  },
+  "limitations": [
+    "Live TestFlight product availability, purchase and restore remain unverified on the iPad.",
+    "Native timeout covers product lookup, not every bridge or entitlement operation.",
+    "App Store review submission is not implied by successful binary upload.",
+    "Paywall UI fixture uses controlled product responses and is not evidence of successful live Apple product lookup."
+  ],
+  "privateLogs": "build/release-4.2-25/"
+}
