@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-30",
+  "release": "4.2 (27)",
+  "purpose": "Temporary personal Plus preview distributed only through internal TestFlight testing",
+  "status": "Uploaded, processed, and verified Testing in the existing Me internal group",
+  "previewDeadlineEpochMilliseconds": 1794632399000,
+  "buildSeparation": {
+    "scheme": "AppInternalPreview",
+    "configuration": "InternalPreview",
+    "appCompilationFlag": "BESTTAKE_INTERNAL_PLUS_PREVIEW",
+    "compiledMarker": "BESTTAKE_INTERNAL_PLUS_PREVIEW_BUILD_1",
+    "normalDebugAndRelease": "Preview flag off",
+    "extension": "Preview flag off; QUICK_TUNER_CONTROL_EXTENSION preserved",
+    "appAndExtensionVersion": "4.2 (27)",
+    "export": "Fixed app-store-connect upload options with testFlightInternalTestingOnly=true, team X24D9LKQ58, and manageAppVersionAndBuildNumber=false"
+  },
+  "checks": {
+    "configurationGuard": "Passed: preview flag only on App/InternalPreview; default App scheme uses normal configurations",
+    "artifactGuardFixtures": "Passed: correct marker accepted for internal preview; missing marker, wrong build/bundle, or preview marker in normal release rejected",
+    "exportGuardFixtures": "Passed: disabling or omitting internal-only, changing team/method/destination, or enabling automatic version management rejected",
+    "configurationSyntax": "Project and export plist lint, Podfile Ruby syntax, helper JavaScript syntax, and diff whitespace checks passed",
+    "plusPolicyAndLoading": "Passed (root verification)",
+    "typeScript": "Passed (root verification)",
+    "nativePreviewEnabledAndDisabled": "Passed (native agent verification)",
+    "nativeProductLookup": "13 cases passed (native agent verification)",
+    "productionWebBuild": "Passed (root verification)",
+    "sourceMapUpload": "Completed for existing Sentry project under prior user authorization (root verification)",
+    "capacitorSync": "Passed; Podfile.lock change is the Podfile checksum only (root verification)",
+    "simulatorBuildAndLaunch": "Passed: InternalPreview built, installed, and launched on iPhone 17 Pro, iOS 26.5. Initial tool reporting timed out after 300 seconds; a subsequent incremental build confirmed success.",
+    "nativePreviewUI": "Confirmed actual native app Settings row Temporary Plus and paywall ready message with November13 end date while catalog unavailable; screenshot temporary-plus-simulator.jpg",
+    "archive": "Passed: dedicated AppInternalPreview scheme archive succeeded",
+    "archiveContentsAndSignatures": "Passed: app and extension are 4.2 (27), expected team and explicit profiles, deep strict signature checks, preview marker only in the app. All 94 web files match the archive; no source maps, .storekit file, or development server URL.",
+    "upload": "Succeeded October 30, 2026 at 12:39:42 America/New_York via the forced internal-only export helper. Log: build/internal-plus-preview-4.2-27/upload.log.",
+    "testFlightProcessing": "Complete: App Store Connect labels 4.2 (27) Internal; Me lists it as Testing. Apple UI upload date: October 30, 2026 at 12:46 PM.",
+    "liveDevicePreview": "Not yet verified",
+    "nativePlusFeature": "Opened saved score from Music Library through requirePlus(music) into the reader without purchase prompt. Screenshot plus-score-open-simulator.jpg.",
+    "simulatorCatalog": "Runtime log confirms empty batch and individual Apple product results while temporary access and saved-score opening worked. Simulator proof only, not physical-device purchase validation.",
+    "nativeDebugSymbols": "56 missing debug information files uploaded to existing approved Sentry project; archive log confirms completion"
+  },
+  "distributionScope": {
+    "authorizedAudience": "Owner only, existing Me internal testing group (1 tester)",
+    "targetGroup": "Me",
+    "targetTesterCount": 1,
+    "otherGroupObserved": {
+      "name": "First Build",
+      "testerCount": 10,
+      "buildAssignment": "Manual for Xcode Builds",
+      "inspection": "Read-only; no assignment or tester changes performed"
+    },
+    "restriction": "Apple internal-only marker verified; build available in Me group; no external testing or App Review submission.",
+    "verifiedBuildGroups": "Exactly one assigned group: Me (Internal), 1 tester. No other group assigned."
+  },
+  "unchanged": {
+    "appStoreReview": "Existing 4.2 (23) submission unchanged",
+    "lifetimeUSPrice": "$9.99",
+    "trialUSPrice": "$0.00",
+    "purchaseProducts": "Existing Apple purchase products and pricing unchanged"
+  },
+  "helper": "scripts/internal-plus-preview.mjs",
+  "exportTemplate": "ios/App/InternalPreviewExportOptions.plist",
+  "archivePath": "build/internal-plus-preview-4.2-27/BestTake-4.2-27-InternalPreview.xcarchive",
+  "limitations": [
+    "The owner still needs to install build27 in TestFlight; physical-device preview has not yet been confirmed.",
+    "The personal preview is not an Apple purchase or proof that StoreKit product availability is fixed."
+  ],
+  "archiveExecutableSHA256": "488fb0218bf22136da4df2d397a1dbf54f28fbc48914ff4e94e1991afbc55f09",
+  "sourceCommit": "a007828",
+  "testflightBuildRecord": "427cd08e-e920-4e92-b58e-cffb4e2fa7bf",
+  "testflightUrl": "https://appstoreconnect.apple.com/teams/923f9c32-4da1-463b-9c4d-5ecf8d46820b/apps/6786522172/testflight/ios/427cd08e-e920-4e92-b58e-cffb4e2fa7bf"
+}

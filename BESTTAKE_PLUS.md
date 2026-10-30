@@ -16,6 +16,8 @@ At the owner's request, build 27 has a separate `AppInternalPreview` scheme and 
 
 Only the dedicated internal configuration includes this flag. Normal `App` Debug/Release builds keep Apple-verified purchase/trial access. The preview upload must use Apple's `testFlightInternalTestingOnly=true` export option and the existing internal **Me** group. Such an upload cannot be submitted for App Review or assigned to external testers. Preview access is for testing features; it does not prove that App Store purchases or restore work. Keep build 26 and the existing App Review submission separate from this internal preview.
 
+Build number 27 is reserved for this uploaded internal preview. A later App Store build must use a new build number and the normal `App` scheme; verify that its executable does not contain `BESTTAKE_INTERNAL_PLUS_PREVIEW_BUILD_1` before uploading it.
+
 ## Always free
 
 - Live tuner (pitch, transpose, needle), metronome, and drone
