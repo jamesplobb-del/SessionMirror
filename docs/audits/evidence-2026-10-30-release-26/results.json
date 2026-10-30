@@ -1,0 +1,119 @@
+{
+  "date": "2026-10-30",
+  "version": "4.2",
+  "build": "26",
+  "sourceCommit": "18288e9",
+  "reason": "User requested a code-focused path after build25 loaded options on iPhone but returned empty on iPad; no cable or hotspot test available.",
+  "changes": [
+    "Bounded initial batch plus one retry per missing SKU",
+    "Partial valid results retained within overall15-second deadline",
+    "Fresh catalog lookup after explicit Restore purchases sync",
+    "Shared task cleared before waiters resume",
+    "Native status revisions reject older status events and results",
+    "Explicit refresh queued behind an ordinary refresh",
+    "Local bounded purchase diagnosis and device-only report copying"
+  ],
+  "nativeTests": {
+    "status": "PASS",
+    "count": 13,
+    "source": "scripts/verify-plus-product-lookup.mjs",
+    "scope": [
+      "Production helper code with mocked StoreKit responses",
+      "Empty and partial recovery",
+      "Duplicate/unrequested product filtering",
+      "Real default15-second and10-second deadlines",
+      "Late response suppression",
+      "Bounded storefront and legacy diagnostic",
+      "Sanitized error chain privacy"
+    ]
+  },
+  "javascriptTests": {
+    "status": "PASS",
+    "sources": [
+      "scripts/verify-plus-access.mjs",
+      "scripts/verify-plus-loading.mjs"
+    ],
+    "scope": [
+      "Existing entitlement/trial/revocation rules",
+      "Queued explicit refresh",
+      "Stale native events/results and newer revocation",
+      "Preserved verified access on bridge failure",
+      "Diagnostic action isolation/serialization",
+      "Copy failure recovery"
+    ]
+  },
+  "webBuild": {
+    "status": "PASS",
+    "command": "npm run cap:sync",
+    "log": "build/release-4.2-26/web-sync.log",
+    "sentrySourceMaps": "Uploaded successfully to existing approved project",
+    "sentryDebugSymbols": "21 missing native debug information files uploaded successfully to existing approved project"
+  },
+  "simulator": {
+    "status": "PASS",
+    "device": "iPhone17Pro / iOS26.5",
+    "checks": [
+      "Initial full compile",
+      "Final incremental compile and launch",
+      "Visible app home screen verified",
+      "Actual native Plus paywall opened through Settings > Help > Explore BestTake Plus",
+      "Native Run purchase check completed and report expanded",
+      "Actual native Copy report returned Report copied confirmation",
+      "Real simulator runtime logs show batch then both individual product requests"
+    ],
+    "limitations": "Not an iPadOS18 runtime or live catalog proof",
+    "diagnosticObservation": "Report displayed4.2(26), iOS26.5, com.besttake.app, receipt filename receipt, Payments allowed true, USA storefront. Simulator returned no products; not a live TestFlight catalog result."
+  },
+  "uiFixture": {
+    "status": "PASS",
+    "limitations": "Actual Plus UI/store and production CSS with mocked StoreKit; not a live purchase",
+    "checks": [
+      "1024x1366 DOM layout and scrolling checked",
+      "Report readable and collapsed by default",
+      "Copy confirmation",
+      "Keyboard Tab wraps within modal",
+      "Retry enables trial and$9.99 lifetime buttons while Plus access staysOFF"
+    ],
+    "screenshot": "purchase-report-ui.jpg"
+  },
+  "archive": {
+    "status": "PASS",
+    "path": "build/release-4.2-26/BestTake-4.2-26.xcarchive",
+    "appAndExtensionVersion": "4.2(26)",
+    "bundleId": "com.besttake.app",
+    "team": "X24D9LKQ58",
+    "profile": "Explicit matching app/extension IDs; valid through2027-07-31",
+    "signature": "Both deep/strict verification passed with system trust",
+    "content": [
+      "Exact lifetime.v2/trial7days IDs",
+      "Diagnostic methods and statusRevision present",
+      "Archived/synced web byte-identical; all dist files match",
+      "No maps, StoreKit config, server override or custom unlock markers"
+    ],
+    "limitation": "Development-signed pre-export archive; Apple distribution re-signing not independently inspected"
+  },
+  "independentReview": {
+    "status": "PASS",
+    "findingsFixed": [
+      "Stale plusChanged event guard",
+      "Restore reusing completed lookup"
+    ]
+  },
+  "upload": {
+    "status": "Upload succeeded, processed, and verified Testing in existing Me group",
+    "completedAt": "2026-10-30 11:58:20 America/New_York",
+    "log": "build/release-4.2-26/upload.log",
+    "testflightBuildRecord": "782f1523-b995-4ff3-a87c-be2bab1996f0",
+    "processingDateShown": "October 30, 2026 at 12:02 PM",
+    "group": "Me (internal, 1 tester)",
+    "screenshot": "testflight-26.jpg"
+  },
+  "reviewSubmission": "Existing build23 and both IAPs remain Waiting for Review; not replaced during this work.",
+  "limits": [
+    "Affected iPad must test build26",
+    "No completed live purchase/restore verified",
+    "No proof of root cause or that empty catalog failure is resolved",
+    "Price remains$9.99USD"
+  ],
+  "nextStep": "User asked to update the affected iPad to TestFlight 4.2 (26), open Plus, and, if it still fails, run the purchase check and paste its copied report. Awaiting result."
+}
