@@ -101,7 +101,7 @@ const built = await build({
       if (args.path === 'framer-motion') return { contents: `export const AnimatePresence = 'presence';` }
       if (args.path === 'reduced-motion') return { contents: `export const usePrefersReducedMotion = () => !!globalThis.__menuReducedMotion;` }
       if (args.path === 'motion-surface') return { contents: `export const PremiumMotionDiv = 'motion-div';` }
-      return { contents: ['Check','ChevronLeft','ChevronRight','Eraser','EyeOff','FileMusic','Plus','RefreshCw','Share','SquareSplitVertical','Trash2','Undo2','X'].map(name => `export const ${name} = 'svg';`).join('\n') }
+      return { contents: ['Check','ChevronLeft','ChevronRight','Eraser','EyeOff','FileMusic','Plus','RefreshCw','Share','SquareSplitVertical','Trash2','Undo2','X','ZoomIn','ZoomOut'].map(name => `export const ${name} = 'svg';`).join('\n') }
     })
   } }],
 })
@@ -121,9 +121,10 @@ const props = {
   boundaryRef: { current: {} }, visible: true, menuMode: 'page', menuAnchor: anchor, menuId: 'music-test',
   onDismiss: restore => events.push(['dismiss', restore]), hasChart: true, fileName: 'Part.pdf',
   pageView: { first: 0, last: 0, count: 3 }, paperVisible: true, busy: false, error: '',
-  fit: 'page', spreadAvailable: false, halfTurn: false, marker: null, inkWidth: 'fine', markCount: 2,
+  fit: 'page', zoom: 1, spreadAvailable: false, halfTurn: false, marker: null, inkWidth: 'fine', markCount: 2,
   saving: false, onAdd() {}, onRemove() {}, onTurn: direction => events.push(['turn', direction]),
   onFitChange: value => events.push(['fit', value]), onHalfTurnChange() {}, onPaperVisibleChange() {},
+  onZoomChange: direction => events.push(['zoom', direction]), onResetZoom: () => events.push(['resetZoom']),
   onMarkerChange: value => events.push(['marker', value]), onInkWidthChange() {}, onUndoMark() {}, onClearMarks() {}, onSaveMarked() {},
 }
 function render(patch = {}) {
@@ -142,6 +143,33 @@ assert.equal(nodes(page.tree, node => node.type === 'button' && /^(Black|Red|Era
 assert.equal(nodes(page.tree, node => node.type === 'button' && label(node).startsWith('Two pages')).length, 0, 'a spread is absent when it cannot fit')
 nodes(page.tree, node => node.type === 'button' && label(node).startsWith('Fill width'))[0].props.onClick()
 assert.deepEqual(events.splice(0), [['fit', 'width'], ['dismiss', true]], 'choosing a reading fit applies it and returns focus to Page')
+function zoomButtons(tree) {
+  return {
+    out: nodes(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Zoom out')[0],
+    reset: nodes(tree, node => node.type === 'button' && node.props?.['aria-label']?.startsWith('Reset zoom to'))[0],
+    in: nodes(tree, node => node.type === 'button' && node.props?.['aria-label'] === 'Zoom in')[0],
+  }
+}
+const zoom = zoomButtons(page.tree)
+assert.equal(label(zoom.reset), '100%Reset', 'Page shows the current zoom and a reset action')
+assert.equal(zoom.out.props.disabled, false)
+assert.equal(zoom.in.props.disabled, false)
+zoom.out.props.onClick()
+zoom.in.props.onClick()
+zoom.in.props.onClick()
+zoom.reset.props.onClick()
+assert.deepEqual(events.splice(0), [['zoom', -1], ['zoom', 1], ['zoom', 1], ['resetZoom']], 'zoom and reset callbacks keep Page open for repeated adjustments')
+const smallest = zoomButtons(render({ zoom: .5 }).tree)
+assert.equal(smallest.out.props.disabled, true, 'zoom out stops at 50%')
+assert.equal(smallest.in.props.disabled, false)
+assert.equal(label(smallest.reset), '50%Reset')
+const largest = zoomButtons(render({ zoom: 3 }).tree)
+assert.equal(largest.in.props.disabled, true, 'zoom in stops at 300%')
+assert.equal(largest.out.props.disabled, false)
+assert.equal(label(largest.reset), '300%Reset')
+const unavailableZoom = zoomButtons(render({ pageView: null }).tree)
+assert.ok(Object.values(unavailableZoom).every(button => button.props.disabled), 'zoom controls wait for an available page')
+render({ zoom: 1, pageView: { first: 0, last: 0, count: 3 } })
 let stopped = false
 page.dialog.props.onPointerUp({ stopPropagation: () => { stopped = true } })
 assert.equal(stopped, true, 'menu clicks cannot bubble into score page turns')
@@ -152,6 +180,7 @@ assert.equal(markup.dialog.key, page.dialog.key, 'mode switches update one stabl
 assert.equal(nodes(markup.tree, node => node.props?.role === 'dialog').length, 1)
 assert.equal(markup.dialog.props.id, 'music-test-markup')
 assert.equal(nodes(markup.tree, node => node.type === 'button' && label(node).startsWith('One page')).length, 0, 'Markup contains no duplicate reading settings')
+assert.ok(Object.values(zoomButtons(markup.tree)).every(button => button === undefined), 'zoom controls appear only in Page, not Markup')
 documentListeners.get('pointerdown')({ target: new TestElement(['.practice-chart-scroll']) })
 documentListeners.get('focusin')({ target: new TestElement(['.practice-chart-scroll']) })
 assert.deepEqual(events, [], 'drawing on the score keeps Markup open')
@@ -229,4 +258,4 @@ removalCallback('onReferencesChange(false)', {
 })(removeEvent)
 assert.deepEqual(removeEvents.splice(0), ['focus', 'remove'])
 assert.equal(state.workspace, true)
-console.log('PASS: Page/Markup selection, rapid switching, reading/drawing dismissal, Escape/focus, hidden controls, one-tap Workspace launch, and focused removal regressions.')
+console.log('PASS: Page/Markup selection, bounded zoom/reset without dismissal, rapid switching, reading/drawing dismissal, Escape/focus, hidden controls, one-tap Workspace launch, and focused removal regressions.')

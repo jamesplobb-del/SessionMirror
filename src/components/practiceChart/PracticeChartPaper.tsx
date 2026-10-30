@@ -5,7 +5,7 @@ import {
 import type { PracticeChart } from '../../utils/practiceChartStorage'
 import {
   chartHalfTurnPresentation, chartOffsetAfterReflow, chartOffsetForFraction, chartPagesInView,
-  chartScrollFraction, chartSpreadFits, chartTurnStops, layoutChartStrip,
+  chartScrollFraction, chartScreenHalfTurnBands, chartScreenHalfTurnStops, chartSpreadFits, chartTurnStops, layoutChartStrip,
   nearestChartStop, nextChartStop, resolveChartFit,
   type ChartFitPreference, type ChartPageSize, type ChartStripLayout,
 } from './chartLayout'
@@ -20,6 +20,7 @@ export interface ChartPaperHandle {
   turn(direction: 1 | -1): void
   /** Return to the selected page fit when a page-size control is chosen. */
   resetZoom(): void
+  zoomBy(direction: 1 | -1): void
 }
 
 export interface ChartPaperView {
@@ -35,6 +36,7 @@ interface PracticeChartPaperProps {
   initialFraction: number
   handleRef: RefObject<ChartPaperHandle | null>
   onView: (view: ChartPaperView) => void
+  onZoom: (zoom: number) => void
   onFraction: (fraction: number) => void
   onError: (message: string) => void
   /** The file itself could not be opened, so there is no page to show at all. */
@@ -62,7 +64,7 @@ const ERASER_RADIUS_PX = 17
 const POSITION_SETTLE_MS = 450
 const MAX_ZOOM = 3
 
-const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(1, value))
+const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(.5, value))
 
 interface ZoomAnchor {
   page: number
@@ -73,13 +75,17 @@ interface ZoomAnchor {
 }
 
 export default function PracticeChartPaper({
-  chart, fit, halfTurn, initialFraction, handleRef, onView, onFraction, onError, onLoadFailed,
+  chart, fit, halfTurn, initialFraction, handleRef, onView, onZoom, onFraction, onError, onLoadFailed,
   onSpreadAvailable, strokes, marker, inkWidth, onStroke, onErase,
 }: PracticeChartPaperProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
   const pendingZoomRef = useRef<ZoomAnchor | null>(null)
+  // Zoom is a temporary inspection of the current reading stop. Turning
+  // returns to this stop's normal geometry before advancing, even after panning.
+  const zoomOriginRef = useRef<{ layout: ChartStripLayout; offset: number } | null>(null)
+  const pendingTurnRef = useRef<{ layout: ChartStripLayout; offset: number } | null>(null)
   const pinchRef = useRef<{ startDistance: number; startZoom: number; startX: number; startY: number; anchor: ZoomAnchor; previewZoom: number; clientX: number; clientY: number } | null>(null)
   const [document_, setDocument] = useState<ChartDocument | null>(null)
   const [pages, setPages] = useState<ChartPageSize[] | null>(null)
@@ -154,17 +160,39 @@ export default function PracticeChartPaper({
     [fit, halfTurn, pages, viewport.width, viewport.height],
   )
   const layout = useMemo<ChartStripLayout>(
-    () => layoutChartStrip(pages ?? [], viewport.width, viewport.height, resolvedFit, zoom),
-    [pages, viewport.width, viewport.height, resolvedFit, zoom],
+    () => {
+      const strip = layoutChartStrip(pages ?? [], viewport.width, viewport.height, resolvedFit, zoom)
+      return halfTurn && zoom === 1
+        ? { ...strip, maxScroll: chartScreenHalfTurnStops(strip, viewport.height).at(-1) ?? 0 }
+        : strip
+    },
+    [pages, viewport.width, viewport.height, resolvedFit, zoom, halfTurn],
   )
+  const baseLayout = useMemo(
+    () => {
+      const strip = layoutChartStrip(pages ?? [], viewport.width, viewport.height, resolvedFit)
+      return halfTurn
+        ? { ...strip, maxScroll: chartScreenHalfTurnStops(strip, viewport.height).at(-1) ?? 0 }
+        : strip
+    },
+    [pages, viewport.width, viewport.height, resolvedFit, halfTurn],
+  )
+  useEffect(() => { onZoom(zoom) }, [onZoom, zoom])
 
   const spreadFits = useMemo(
     () => chartSpreadFits(pages ?? [], viewport.width, viewport.height),
     [pages, viewport.width, viewport.height],
   )
   useEffect(() => { onSpreadAvailable(spreadFits) }, [onSpreadAvailable, spreadFits])
-  const stationaryHalfTurn = halfTurn && resolvedFit !== 'width' && zoom === 1
-  const stops = useMemo(() => chartTurnStops(layout, halfTurn), [layout, halfTurn])
+  const stationaryHalfTurn = halfTurn && zoom === 1
+  const widthHalfTurn = stationaryHalfTurn && resolvedFit === 'width'
+  const stops = useMemo(() => stationaryHalfTurn
+    ? chartScreenHalfTurnStops(layout, viewport.height)
+    : chartTurnStops(layout, halfTurn), [layout, halfTurn, stationaryHalfTurn, viewport.height])
+  const persistPosition = useCallback(() => {
+    const origin = zoomOriginRef.current
+    onFraction(origin ? chartScrollFraction(origin.layout, origin.offset) : fractionRef.current)
+  }, [onFraction])
 
   /* ---- Reading position ------------------------------------------------- */
 
@@ -180,6 +208,21 @@ export default function PracticeChartPaper({
   useLayoutEffect(() => {
     const element = scrollRef.current
     if (!element || layout.total <= 0) return
+    const turn = pendingTurnRef.current
+    if (turn) {
+      pendingTurnRef.current = null
+      const restored = chartOffsetAfterReflow(turn.layout, layout, turn.offset)
+      const target = stationaryHalfTurn ? nearestChartStop(stops, restored) : restored
+      element.scrollLeft = 0
+      element.scrollTop = stationaryHalfTurn ? 0 : target
+      offsetRef.current = target
+      setOffset(target)
+      fractionRef.current = chartScrollFraction(layout, target)
+      previousLayoutRef.current = layout
+      reportView(target)
+      persistPosition()
+      return
+    }
     const anchor = pendingZoomRef.current
     if (anchor) {
       pendingZoomRef.current = null
@@ -196,7 +239,7 @@ export default function PracticeChartPaper({
       fractionRef.current = chartScrollFraction(layout, next)
       previousLayoutRef.current = layout
       reportView(next)
-      onFraction(fractionRef.current)
+      persistPosition()
       return
     }
     const previous = previousLayoutRef.current
@@ -215,7 +258,7 @@ export default function PracticeChartPaper({
     // Stops are derived from layout and mode. Reflow restores once, without
     // subscribing the effect to every saved reading-position update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, reportView, stationaryHalfTurn])
+  }, [layout, persistPosition, reportView, stationaryHalfTurn])
 
   /*
    * A mark in progress. It is kept as page-normalised points from the first
@@ -320,6 +363,86 @@ export default function PracticeChartPaper({
     }
   }, [])
 
+  const anchorAt = useCallback((x: number, y: number): ZoomAnchor | null => {
+    const strip = stripRef.current
+    if (!strip) return null
+    const visibleRect = (node: HTMLElement) => {
+      const rect = node.getBoundingClientRect()
+      const pane = node.closest<HTMLElement>('.practice-chart-half-band') ?? scrollRef.current
+      const bounds = pane?.getBoundingClientRect() ?? rect
+      const insets = node.style.clipPath.startsWith('inset(')
+        ? node.style.clipPath.slice(6, -1).split(/\s+/).map(parseFloat) : []
+      const clipTop = insets[0] || 0
+      const clipBottom = insets.length >= 3 ? insets[2] : clipTop
+      return {
+        left: Math.max(rect.left, bounds.left), right: Math.min(rect.right, bounds.right),
+        top: Math.max(rect.top + clipTop, bounds.top), bottom: Math.min(rect.bottom - clipBottom, bounds.bottom),
+      }
+    }
+    const nodes = [...strip.querySelectorAll<HTMLElement>('.practice-chart-page')]
+      .filter(node => {
+        if (node.style.visibility === 'hidden') return false
+        const rect = visibleRect(node)
+        return rect.bottom > rect.top && rect.right > rect.left
+      })
+    if (!nodes.length) return null
+    const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('.practice-chart-page')
+    const page = (hit && nodes.includes(hit) ? hit : null) ?? nodes.find(node => {
+      const rect = visibleRect(node)
+      return x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
+    }) ?? nodes.reduce((nearest, node) => {
+      const distance = (candidate: HTMLElement) => {
+        const rect = visibleRect(candidate)
+        return Math.hypot(Math.max(rect.left - x, 0, x - rect.right), Math.max(rect.top - y, 0, y - rect.bottom))
+      }
+      return distance(node) < distance(nearest) ? node : nearest
+    })
+    const rect = page.getBoundingClientRect()
+    return {
+      page: Number(page.dataset.page),
+      x: Math.min(1, Math.max(0, (x - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (y - rect.top) / rect.height)),
+      clientX: x, clientY: y,
+    }
+  }, [])
+
+  const clearZoomPreview = useCallback(() => {
+    pinchRef.current = null
+    pendingZoomRef.current = null
+    stripRef.current?.style.removeProperty('transform')
+    stripRef.current?.style.removeProperty('transform-origin')
+  }, [])
+
+  const changeZoom = useCallback((value: number, anchor: ZoomAnchor | null) => {
+    const next = Math.round(clampZoom(value) * 100) / 100
+    if (next === zoom || !anchor) return
+    if (next === 1 && zoomOriginRef.current) {
+      pendingTurnRef.current = zoomOriginRef.current
+      zoomOriginRef.current = null
+      clearZoomPreview()
+      setZoom(1)
+      return
+    }
+    if (zoom === 1) zoomOriginRef.current = { layout: baseLayout, offset: offsetRef.current }
+    pendingZoomRef.current = anchor
+    setZoom(next)
+  }, [baseLayout, clearZoomPreview, zoom])
+
+  const resetZoom = useCallback(() => {
+    clearZoomPreview()
+    if (zoom === 1) return
+    pendingTurnRef.current = zoomOriginRef.current ?? { layout, offset: offsetRef.current }
+    zoomOriginRef.current = null
+    setZoom(1)
+  }, [clearZoomPreview, layout, zoom])
+
+  const zoomBy = useCallback((direction: 1 | -1) => {
+    const element = scrollRef.current
+    if (!element) return
+    const box = element.getBoundingClientRect()
+    changeZoom(zoom + direction * .25, anchorAt(box.left + box.width / 2, box.top + box.height / 2))
+  }, [anchorAt, changeZoom, zoom])
+
   /* Preview the pinch with a CSS transform, then re-render the PDF once at
    * the final scale. This keeps a large part responsive under two fingers. */
   useEffect(() => {
@@ -333,29 +456,6 @@ export default function PracticeChartPaper({
         x: (first.clientX + second.clientX) / 2,
         y: (first.clientY + second.clientY) / 2,
         distance: Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY),
-      }
-    }
-    const anchorAt = (x: number, y: number): ZoomAnchor | null => {
-      const nodes = [...strip.querySelectorAll<HTMLElement>('.practice-chart-page')]
-        .filter(node => node.style.visibility !== 'hidden')
-      if (!nodes.length) return null
-      const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('.practice-chart-page')
-      const page = (hit && nodes.includes(hit) ? hit : null) ?? nodes.find(node => {
-        const rect = node.getBoundingClientRect()
-        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
-      }) ?? nodes.reduce((nearest, node) => {
-        const distance = (candidate: HTMLElement) => {
-          const rect = candidate.getBoundingClientRect()
-          return Math.hypot(Math.max(rect.left - x, 0, x - rect.right), Math.max(rect.top - y, 0, y - rect.bottom))
-        }
-        return distance(node) < distance(nearest) ? node : nearest
-      })
-      const rect = page.getBoundingClientRect()
-      return {
-        page: Number(page.dataset.page),
-        x: Math.min(1, Math.max(0, (x - rect.left) / rect.width)),
-        y: Math.min(1, Math.max(0, (y - rect.top) / rect.height)),
-        clientX: x, clientY: y,
       }
     }
     const start = (event: TouchEvent) => {
@@ -392,27 +492,30 @@ export default function PracticeChartPaper({
       const nextZoom = Math.round(pinch.previewZoom * 100) / 100
       const anchor = { ...pinch.anchor, clientX: pinch.clientX, clientY: pinch.clientY }
       if (nextZoom !== zoom) {
-        pendingZoomRef.current = anchor
-        setZoom(nextZoom)
+        changeZoom(nextZoom, anchor)
       } else {
         strip.style.removeProperty('transform')
         strip.style.removeProperty('transform-origin')
         const box = element.getBoundingClientRect()
-        element.scrollLeft = Math.max(0, layout.lefts[anchor.page] + layout.widths[anchor.page] * anchor.x - (anchor.clientX - box.left))
-        element.scrollTop = Math.max(0, layout.tops[anchor.page] + layout.heights[anchor.page] * anchor.y - (anchor.clientY - box.top))
+        if (!stationaryHalfTurn) {
+          element.scrollLeft = Math.max(0, layout.lefts[anchor.page] + layout.widths[anchor.page] * anchor.x - (anchor.clientX - box.left))
+          element.scrollTop = Math.max(0, layout.tops[anchor.page] + layout.heights[anchor.page] * anchor.y - (anchor.clientY - box.top))
+        }
       }
     }
     element.addEventListener('touchstart', start, { passive: false })
     element.addEventListener('touchmove', move, { passive: false })
     element.addEventListener('touchend', finish)
-    element.addEventListener('touchcancel', finish)
+    element.addEventListener('touchcancel', clearZoomPreview)
     return () => {
       element.removeEventListener('touchstart', start)
       element.removeEventListener('touchmove', move)
       element.removeEventListener('touchend', finish)
-      element.removeEventListener('touchcancel', finish)
+      element.removeEventListener('touchcancel', clearZoomPreview)
+      // Rotation or a fit change can replace the geometry mid-gesture.
+      if (pinchRef.current) clearZoomPreview()
     }
-  }, [layout, zoom])
+  }, [anchorAt, changeZoom, clearZoomPreview, layout, stationaryHalfTurn, zoom])
 
   const settleRef = useRef<number | null>(null)
   const handleScroll = useCallback(() => {
@@ -426,19 +529,19 @@ export default function PracticeChartPaper({
     if (settleRef.current !== null) window.clearTimeout(settleRef.current)
     settleRef.current = window.setTimeout(() => {
       settleRef.current = null
-      onFraction(fractionRef.current)
+      persistPosition()
     }, POSITION_SETTLE_MS)
-  }, [layout, onFraction, reportView, stationaryHalfTurn])
+  }, [layout, persistPosition, reportView, stationaryHalfTurn])
 
   // Hiding the page unmounts the paper, and the settle timer would take the
   // last few seconds of reading with it. Write the position out on the way out.
-  const flushRef = useRef(onFraction)
-  flushRef.current = onFraction
+  const flushRef = useRef(persistPosition)
+  flushRef.current = persistPosition
   useEffect(() => () => {
     if (settleRef.current === null) return
     window.clearTimeout(settleRef.current)
     settleRef.current = null
-    flushRef.current(fractionRef.current)
+    flushRef.current()
   }, [])
 
   /*
@@ -451,6 +554,22 @@ export default function PracticeChartPaper({
   const turn = useCallback((direction: 1 | -1) => {
     const element = scrollRef.current
     if (!element) return
+    clearZoomPreview()
+    if (settleRef.current !== null) {
+      window.clearTimeout(settleRef.current)
+      settleRef.current = null
+    }
+    if (zoom !== 1) {
+      const origin = zoomOriginRef.current ?? { layout, offset: offsetRef.current }
+      const originOffset = chartOffsetAfterReflow(origin.layout, baseLayout, origin.offset)
+      const baseStops = halfTurn ? chartScreenHalfTurnStops(baseLayout, viewport.height) : chartTurnStops(baseLayout, false)
+      const current = halfTurn ? nearestChartStop(baseStops, originOffset) : originOffset
+      const target = nextChartStop(baseStops, current, direction) ?? current
+      pendingTurnRef.current = { layout: baseLayout, offset: target }
+      zoomOriginRef.current = null
+      setZoom(1)
+      return
+    }
     const target = nextChartStop(stops, stationaryHalfTurn ? offsetRef.current : element.scrollTop, direction)
     if (target === null) return
     element.scrollTop = stationaryHalfTurn ? 0 : target
@@ -459,12 +578,12 @@ export default function PracticeChartPaper({
     fractionRef.current = chartScrollFraction(layout, target)
     reportView(target)
     onFraction(fractionRef.current)
-  }, [layout, onFraction, reportView, stops, stationaryHalfTurn])
+  }, [baseLayout, clearZoomPreview, halfTurn, layout, onFraction, reportView, stops, stationaryHalfTurn, viewport.height, zoom])
 
   useEffect(() => {
-    handleRef.current = { turn, resetZoom: () => setZoom(1) }
+    handleRef.current = { turn, resetZoom, zoomBy }
     return () => { handleRef.current = null }
-  }, [handleRef, turn])
+  }, [handleRef, resetZoom, turn, zoomBy])
 
   /* ---- Which pages to actually draw -------------------------------------- */
 
@@ -492,9 +611,9 @@ export default function PracticeChartPaper({
    * exists, so scrolling in and out of the window never disturbs the page's
    * position or its marks — only the expensive part comes and goes.
    */
-  const renderPageFace = (index: number) => (
+  const renderPageFace = (index: number, drawFace = true) => (
     <>
-      {index >= window_.first - layout.columns && index <= window_.last + layout.columns && (
+      {drawFace && index >= window_.first - layout.columns && index <= window_.last + layout.columns && (
         document_
           ? <ChartPdfPage
               document={document_}
@@ -513,42 +632,52 @@ export default function PracticeChartPaper({
     </>
   )
 
+  const renderPage = (index: number, top: number, visible = true, clipPath?: string) => (
+    <div
+      key={index}
+      data-page={index}
+      className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}${
+        marker === 'eraser' ? ' practice-chart-page--erasing' : ''}`}
+      style={{
+        top, left: layout.lefts[index],
+        visibility: visible ? undefined : 'hidden',
+        clipPath,
+        height: layout.heights[index], width: layout.widths[index],
+      }}
+      onPointerDown={marker === 'eraser'
+        ? event => beginErase(index, event)
+        : marker ? event => beginStroke(index, event) : undefined}
+      onPointerMove={marker === 'eraser'
+        ? event => extendErase(index, event)
+        : marker ? extendStroke : undefined}
+      onPointerUp={marker === 'eraser' ? endErase : marker ? endStroke : undefined}
+      onPointerCancel={marker === 'eraser' ? endErase : marker ? cancelStroke : undefined}
+    >
+      {renderPageFace(index, !widthHalfTurn || visible)}
+    </div>
+  )
+
   return (
     <div
       ref={scrollRef}
-      className={`practice-chart-scroll${stationaryHalfTurn ? ' practice-chart-scroll--half-turn' : ''}${zoom > 1 ? ' practice-chart-scroll--zoomed' : ''}`}
+      className={`practice-chart-scroll${stationaryHalfTurn ? ' practice-chart-scroll--half-turn' : ''}${zoom !== 1 ? ' practice-chart-scroll--zoomed' : ''}`}
       onScroll={handleScroll}
       role="document"
       aria-label={`${chart.fileName}${ready ? `, ${layout.tops.length} page${layout.tops.length === 1 ? '' : 's'}` : ''}`}
     >
       {/* Stable page nodes retain their canvases through every half turn. */}
       <div ref={stripRef} className="practice-chart-strip" style={{ width: ready ? layout.contentWidth : '100%', height: stationaryHalfTurn ? '100%' : ready ? layout.total : '100%' }}>
-        {layout.tops.map((top, index) => {
-          const presentation = stationaryHalfTurn ? chartHalfTurnPresentation(layout, offset, index) : null
-          return (
-          <div
-            key={index}
-            data-page={index}
-            className={`practice-chart-page${marker ? ' practice-chart-page--marking' : ''}${
-              marker === 'eraser' ? ' practice-chart-page--erasing' : ''}`}
-            style={{
-              top: presentation?.top ?? top, left: layout.lefts[index],
-              visibility: presentation && !presentation.visible ? 'hidden' : undefined,
-              clipPath: presentation ? `inset(${presentation.clipTop}px 0 ${presentation.clipBottom}px 0)` : undefined,
-              height: layout.heights[index], width: layout.widths[index],
-            }}
-            onPointerDown={marker === 'eraser'
-              ? event => beginErase(index, event)
-              : marker ? event => beginStroke(index, event) : undefined}
-            onPointerMove={marker === 'eraser'
-              ? event => extendErase(index, event)
-              : marker ? extendStroke : undefined}
-            onPointerUp={marker === 'eraser' ? endErase : marker ? endStroke : undefined}
-            onPointerCancel={marker === 'eraser' ? endErase : marker ? cancelStroke : undefined}
-          >
-            {renderPageFace(index)}
+        {widthHalfTurn ? chartScreenHalfTurnBands(layout, offset, viewport.height).map((band, slot) => (
+          <div key={slot} className="practice-chart-half-band" data-half-band={slot}
+            style={{ position: 'absolute', overflow: 'hidden', left: 0, right: 0, top: band.top, height: band.height }}>
+            {layout.tops.map((top, index) => renderPage(index, top - band.sourceTop,
+              top < band.sourceTop + band.height && top + layout.heights[index] > band.sourceTop))}
           </div>
-        )})}
+        )) : layout.tops.map((top, index) => {
+          const presentation = stationaryHalfTurn ? chartHalfTurnPresentation(layout, offset, index) : null
+          return renderPage(index, presentation?.top ?? top, !presentation || presentation.visible,
+            presentation ? `inset(${presentation.clipTop}px 0 ${presentation.clipBottom}px 0)` : undefined)
+        })}
         {/* The join between two slots, so a half turn reads as two pages and
             not as one long one. */}
         {!stationaryHalfTurn && halfTurn && layout.rows.slice(1).map((row, index) => (
@@ -559,7 +688,7 @@ export default function PracticeChartPaper({
             aria-hidden
           />
         ))}
-        {stationaryHalfTurn && ready && chartHalfTurnPresentation(layout, offset, 0).split && (
+        {stationaryHalfTurn && ready && (widthHalfTurn || chartHalfTurnPresentation(layout, offset, 0).split) && (
           <div className="practice-chart-join practice-chart-join--half" style={{ top: '50%' }} aria-hidden />
         )}
       </div>

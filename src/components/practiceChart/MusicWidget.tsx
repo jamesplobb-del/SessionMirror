@@ -2,7 +2,7 @@ import { AnimatePresence } from 'framer-motion'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import {
   Check, ChevronLeft, ChevronRight, Eraser, EyeOff, FileMusic, Plus, RefreshCw,
-  Share, SquareSplitVertical, Trash2, Undo2, X,
+  Share, SquareSplitVertical, Trash2, Undo2, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -28,6 +28,7 @@ interface MusicWidgetProps {
   busy: boolean
   error: string
   fit: ChartFitPreference
+  zoom: number
   /** A two-page spread is only offered when two whole pages genuinely fit. */
   spreadAvailable: boolean
   halfTurn: boolean
@@ -35,6 +36,8 @@ interface MusicWidgetProps {
   onRemove: () => void
   onTurn: (direction: 1 | -1) => void
   onFitChange: (fit: ChartFitPreference) => void
+  onZoomChange: (direction: 1 | -1) => void
+  onResetZoom: () => void
   onHalfTurnChange: (halfTurn: boolean) => void
   onPaperVisibleChange: (visible: boolean) => void
   marker: InkTool | null
@@ -57,8 +60,8 @@ function pageLabel(view: ChartPaperView | null): string {
 /** Two coordinated, non-modal menus. Markup leaves the score available to draw on. */
 export default function MusicWidget({
   boundaryRef, visible, menuMode, menuAnchor, menuId, onDismiss, hasChart, fileName,
-  pageView, paperVisible, busy, error, fit, spreadAvailable, halfTurn, onAdd, onRemove,
-  onTurn, onFitChange, onHalfTurnChange, onPaperVisibleChange, marker, inkWidth,
+  pageView, paperVisible, busy, error, fit, zoom, spreadAvailable, halfTurn, onAdd, onRemove,
+  onTurn, onFitChange, onZoomChange, onResetZoom, onHalfTurnChange, onPaperVisibleChange, marker, inkWidth,
   markCount, saving, onMarkerChange, onInkWidthChange, onUndoMark, onClearMarks, onSaveMarked,
 }: MusicWidgetProps) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -155,11 +158,13 @@ export default function MusicWidget({
   }, [menuMode, onDismiss, open])
 
   const turnable = hasChart && paperVisible && (pageView?.count ?? 0) > 0
+  const currentZoom = Math.min(3, Math.max(.5, Number.isFinite(zoom) ? zoom : 1))
+  const zoomPercent = Math.round(currentZoom * 100)
   const activeFit = fit === 'auto' ? spreadAvailable ? 'spread' : 'page' : fit
   const fitOptions: { value: ChartFitPreference; label: string; detail: string }[] = [
     { value: 'page', label: 'One page', detail: 'See the whole part' },
     ...(spreadAvailable ? [{ value: 'spread' as const, label: 'Two pages', detail: 'Read a facing spread' }] : []),
-    { value: 'width', label: 'Fill width', detail: 'Larger notes, scroll to read' },
+    { value: 'width', label: 'Fill width', detail: halfTurn ? 'Larger notes, half-screen turns' : 'Larger notes, scroll to read' },
   ]
   const host = boundaryRef.current
   if (!host) return null
@@ -199,6 +204,16 @@ export default function MusicWidget({
             <span><strong>{option.label}</strong><small>{option.detail}</small></span>
             {activeFit === option.value && <Check aria-hidden />}
           </button>)}
+        </div>
+        <div className="music-control-menu__section music-control-menu__zoom" role="group" aria-label="Zoom" aria-describedby={`${menuId}-zoom-hint`}>
+          <div className="music-control-menu__zoom-controls">
+            <button type="button" aria-label="Zoom out" disabled={!turnable || currentZoom <= .5} onClick={() => onZoomChange(-1)}><ZoomOut aria-hidden /></button>
+            <button type="button" className="music-control-menu__zoom-reset" aria-label={`Reset zoom to 100%, current zoom ${zoomPercent}%`} disabled={!turnable} onClick={onResetZoom}>
+              <span aria-live="polite">{zoomPercent}%</span><small>Reset</small>
+            </button>
+            <button type="button" aria-label="Zoom in" disabled={!turnable || currentZoom >= 3} onClick={() => onZoomChange(1)}><ZoomIn aria-hidden /></button>
+          </div>
+          <p id={`${menuId}-zoom-hint`} className="music-control-menu__zoom-hint">Pinch to zoom. Turning resets zoom.</p>
         </div>
         <button type="button" className="music-control-menu__row" aria-pressed={halfTurn} onClick={() => onHalfTurnChange(!halfTurn)}>
           <SquareSplitVertical aria-hidden /><span>Half-page turns</span><i className="music-control-menu__switch" aria-hidden />

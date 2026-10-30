@@ -1,0 +1,23 @@
+{
+  "version": "4.2",
+  "build": 28,
+  "configuration": "InternalPreview",
+  "internalOnly": true,
+  "temporaryPlusExpiresAt": "2026-11-14T04:59:59Z",
+  "checks": {
+    "zoomCallbacks": 31,
+    "geometry": "pass",
+    "controlMenus": "pass",
+    "readerGestures": "pass",
+    "ink": "pass",
+    "typescript": "pass",
+    "productionWeb": "pass",
+    "simulatorBuild": "pass",
+    "internalPreviewGuards": "pass",
+    "browserWidthHalfTurnAndZoom": "pass",
+    "browserSavedPosition": "pass",
+    "nativePinchPhysicalDevice": "not run"
+  },
+  "archive": "pending",
+  "upload": "pending"
+}

@@ -130,6 +130,7 @@ export default function PracticeChartLayer({
   const [view, setView] = useState<ChartView>(DEFAULT_CHART_VIEW)
   const [paperVisible, setPaperVisible] = useState(true)
   const [pageView, setPageView] = useState<ChartPaperView | null>(null)
+  const [pageZoom, setPageZoom] = useState(1)
   const [busy, setBusy] = useState(true)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState('')
@@ -666,6 +667,7 @@ export default function PracticeChartLayer({
           initialFraction={view.fraction}
           handleRef={paper}
           onView={setPageView}
+          onZoom={setPageZoom}
           onFraction={handleFraction}
           onError={handleError}
           onLoadFailed={handleLoadFailed}
@@ -841,6 +843,9 @@ export default function PracticeChartLayer({
       fit={view.fit}
       spreadAvailable={spreadAvailable}
       halfTurn={view.halfTurn}
+      zoom={pageZoom}
+      onZoomChange={direction => paper.current?.zoomBy(direction)}
+      onResetZoom={() => paper.current?.resetZoom()}
       marker={marker}
       inkWidth={inkWidth}
       markCount={strokes.length}

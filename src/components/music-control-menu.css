@@ -92,6 +92,13 @@
 .music-control-menu__choice small { display: block; margin-top: 2px; font-size: 10px; color: var(--music-menu-muted); }
 .music-control-menu__choice[aria-pressed='true'] { background: var(--music-menu-control); }
 .music-control-menu__choice[aria-pressed='true'] > svg { color: var(--music-menu-accent); }
+.music-control-menu__zoom { padding-block: 8px; }
+.music-control-menu__zoom-controls { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; }
+.music-control-menu__zoom-controls button { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 4px 8px; border-radius: 11px; background: var(--music-menu-control); }
+.music-control-menu__zoom-reset { flex-direction: column; gap: 1px; font-variant-numeric: tabular-nums; }
+.music-control-menu__zoom-reset > span { font-weight: 600; }
+.music-control-menu__zoom-reset > small { color: var(--music-menu-muted); font-size: 10px; }
+.music-control-menu__zoom-hint { margin: 8px 4px 0; color: var(--music-menu-muted); font-size: 10px; line-height: 1.5; }
 .music-control-menu__row {
   display: flex;
   align-items: center;
@@ -149,7 +156,7 @@
 .music-control-menu__error { margin: 10px 8px 4px; color: var(--ls-danger, #b64d45); font-size: 11px; line-height: 1.5; }
 @media (hover: hover) {
   .music-control-menu :is(.music-control-menu__choice, .music-control-menu__row, .music-control-menu__close):hover:not(:disabled) { background: var(--music-menu-control); }
-  .music-control-menu :is(.music-control-menu__pens button, .music-control-menu__edits button, .music-control-menu__save):hover:not(:disabled) { filter: brightness(.97); }
+  .music-control-menu :is(.music-control-menu__pens button, .music-control-menu__edits button, .music-control-menu__zoom-controls button, .music-control-menu__save):hover:not(:disabled) { filter: brightness(.97); }
 }
 @media (prefers-reduced-motion: reduce) {
   .music-control-menu *, .music-control-menu *::after { transition: none; }

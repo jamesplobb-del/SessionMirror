@@ -11,6 +11,7 @@ const {
   layoutChartStrip, chartTurnStops, nextChartStop, chartPagesInView,
   chartScrollFraction, chartOffsetForFraction, nearestChartStop,
   chartSpreadFits, resolveChartFit, chartHalfTurnPresentation, chartOffsetAfterReflow,
+  chartScreenHalfTurnStops, chartScreenHalfTurnBands,
 } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
 
 const LETTER = { width: 612, height: 792 }
@@ -257,6 +258,102 @@ console.log('Practice chart: two-page spreads, odd last pages and mixed page siz
 }
 
 console.log('Practice chart: pinch zoom geometry passed.')
+
+// All fit modes can zoom out without changing page proportions. Normal fitted
+// pages keep their full-height slots; fill-width reading keeps its strip.
+for (const fit of ['page', 'spread', 'width']) {
+  const base = layoutChartStrip(part(4), ...LANDSCAPE, fit)
+  const reduced = layoutChartStrip(part(4), ...LANDSCAPE, fit, 0.5)
+  assert.ok(near(reduced.widths[0], base.widths[0] / 2), `${fit} can zoom out to half size`)
+  assert.ok(near(reduced.heights[0], base.heights[0] / 2), `${fit} zoom preserves aspect ratio`)
+  assert.deepEqual(layoutChartStrip(part(4), ...LANDSCAPE, fit, 0.1), reduced, 'Zoom has a usable lower bound')
+  if (fit !== 'width') assert.equal(reduced.rows[0].height, LANDSCAPE[1], 'Zooming out keeps fitted navigation slots')
+}
+
+// Page and spread mode already have one screen per row: the new screen-sized
+// stops must leave their existing stationary half-turn navigation unchanged.
+for (const [width, height] of [LANDSCAPE, PORTRAIT, PHONE]) {
+  for (const fit of ['page', 'spread']) {
+    const layout = layoutChartStrip(part(5), width, height, fit)
+    assert.deepEqual(chartScreenHalfTurnStops(layout, height), chartTurnStops(layout, true),
+      `${fit} keeps its established stops at ${width}x${height}`)
+  }
+}
+
+const bandHeight = 834
+const halfBand = bandHeight / 2
+const tallWidth = layoutChartStrip(part(3), 1194, bandHeight, 'width')
+assert.equal(chartScreenHalfTurnStops(tallWidth, bandHeight)[1], halfBand,
+  'Fill Width now turns by half the visible screen, not half a tall PDF page')
+const firstBands = chartScreenHalfTurnBands(tallWidth, 0, bandHeight)
+const secondBands = chartScreenHalfTurnBands(tallWidth, halfBand, bandHeight)
+const thirdBands = chartScreenHalfTurnBands(tallWidth, bandHeight, bandHeight)
+assert.deepEqual(firstBands, [
+  { sourceTop: 0, top: 0, height: halfBand },
+  { sourceTop: halfBand, top: halfBand, height: halfBand },
+])
+assert.deepEqual(secondBands[1], firstBands[1], 'First half turn keeps the lower score stationary')
+assert.equal(secondBands[0].sourceTop, bandHeight, 'First half turn replaces the upper score with upcoming content')
+assert.deepEqual(thirdBands[0], secondBands[0], 'Second half turn keeps the upper score stationary')
+assert.equal(thirdBands[1].sourceTop, bandHeight + halfBand, 'Second half turn completes the next reading screen')
+assert.ok(secondBands.every(band => band.sourceTop < tallWidth.heights[0]),
+  'The same tall PDF page can appear in both panes with different offsets')
+
+for (const pages of [
+  part(3),
+  [{ width: 612, height: 1900 }],
+  [{ width: 612, height: 200 }, { width: 612, height: 1800 }, LETTER, { width: 792, height: 250 }],
+]) {
+  const layout = layoutChartStrip(pages, 1194, bandHeight, 'width')
+  const stops = chartScreenHalfTurnStops(layout, bandHeight)
+  const covered = []
+  let position = 0
+  for (const stop of stops) {
+    assert.equal(position, stop, 'Forward turns visit every reading stop')
+    const bands = chartScreenHalfTurnBands(layout, stop, bandHeight)
+    assert.deepEqual(bands.map(band => band.top), [0, halfBand], 'Both panes keep their screen position')
+    assert.deepEqual(bands.map(band => band.sourceTop).sort((a, b) => a - b), [stop, stop + halfBand],
+      'The displayed halves cover a continuous source interval without skipping score content')
+    for (const band of bands) {
+      if (band.sourceTop < layout.total) covered.push([band.sourceTop, Math.min(layout.total, band.sourceTop + band.height)])
+    }
+    position = nextChartStop(stops, stop, 1)
+  }
+  assert.equal(position, null, 'There is no extra turn into blank content')
+  let end = 0
+  for (const [start, finish] of covered.sort((a, b) => a[0] - b[0])) {
+    assert.ok(start <= end + 0.001, 'Reading bands leave no gap across tall or mixed-size pages')
+    end = Math.max(end, finish)
+  }
+  assert.ok(near(end, layout.total, 0.001), 'The final partial band includes the end of the score')
+  position = stops.at(-1)
+  for (const previous of stops.slice(0, -1).reverse()) {
+    position = nextChartStop(stops, position, -1)
+    assert.equal(position, previous, 'Backward turns exactly reverse forward navigation')
+  }
+  assert.equal(nextChartStop(stops, position, -1), null)
+  const navigation = { ...layout, maxScroll: stops.at(-1) }
+  const fraction = chartScrollFraction(navigation, navigation.maxScroll)
+  assert.ok(near(chartOffsetForFraction(navigation, fraction), navigation.maxScroll, 0.001),
+    'The final partial reading position survives saved-fraction restoration')
+  assert.deepEqual(chartScreenHalfTurnBands(layout, -100, bandHeight), chartScreenHalfTurnBands(layout, 0, bandHeight))
+  assert.deepEqual(chartScreenHalfTurnBands(layout, 1e9, bandHeight), chartScreenHalfTurnBands(layout, navigation.maxScroll, bandHeight))
+}
+
+// Exact and partial final screens stop as soon as the last real chunk appears.
+for (const [total, expected] of [[200, [0]], [834, [0]], [1000, [0, 417]], [1668, [0, 417, 834]]]) {
+  const layout = { ...tallWidth, total }
+  assert.deepEqual(chartScreenHalfTurnStops(layout, bandHeight), expected)
+}
+assert.deepEqual(chartScreenHalfTurnStops({ ...tallWidth, total: 1668 + 1e-10 }, bandHeight), [0, 417, 834],
+  'Subpixel floating-point noise does not invent a blank final turn')
+for (const height of [0, -1, NaN, Infinity]) {
+  assert.deepEqual(chartScreenHalfTurnStops(tallWidth, height), [0])
+  assert.deepEqual(chartScreenHalfTurnBands(tallWidth, 0, height), [])
+}
+assert.deepEqual(chartScreenHalfTurnBands({ ...tallWidth, total: 0 }, 0, bandHeight), [])
+
+console.log('Practice chart: zoom out and stationary screen-sized half turns across tall/mixed pages and final partial bands passed.')
 
 // Odd page counts cannot use a percentage of spread count to preserve a page.
 {

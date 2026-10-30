@@ -1,9 +1,9 @@
 /**
  * Geometry for the music page.
  *
- * Whole-page and fill-width reading use a continuous strip. Fitted half turns
- * use its offsets as logical stops, but keep the bottom of the current page
- * stationary while revealing the next page's top above it.
+ * Whole-page and fill-width reading use a continuous strip. Stationary half
+ * turns keep the lower reading pane still while revealing upcoming content
+ * above it, then advance the lower pane to complete the next reading screen.
  *
  * Everything here is pure so the turn maths can be tested without a PDF.
  */
@@ -121,7 +121,7 @@ export function layoutChartStrip(
   const baseScale = fit === 'width'
     ? viewWidth / widest
     : Math.min((viewWidth - (columns - 1) * SPREAD_GUTTER) / (widest * columns), viewHeight / tallest)
-  const scale = baseScale * Math.max(1, zoom)
+  const scale = baseScale * Math.max(0.5, zoom)
   const contentWidth = Math.max(viewWidth,
     ...Array.from({ length: Math.ceil(pages.length / columns) }, (_, rowIndex) => {
       const row = pages.slice(rowIndex * columns, (rowIndex + 1) * columns)
@@ -185,6 +185,60 @@ export function chartTurnStops(layout: ChartStripLayout, halfTurn: boolean): num
   }
   stops.add(layout.maxScroll)
   return [...stops].sort((a, b) => a - b)
+}
+
+export interface ChartScreenHalfTurnBand {
+  /** Start of the visible content in the original, continuous page strip. */
+  sourceTop: number
+  /** Position of this fixed pane in the viewport. */
+  top: number
+  height: number
+}
+
+function lastScreenHalfTurnStep(layout: ChartStripLayout, viewHeight: number): number {
+  if (!(viewHeight > 0) || !Number.isFinite(viewHeight) || !(layout.total > 0) || !Number.isFinite(layout.total)) return 0
+  const chunks = layout.total / (viewHeight / 2)
+  // Floating-point layout rounding must not invent an extra blank turn.
+  const wholeChunks = Math.abs(chunks - Math.round(chunks)) < 1e-9
+    ? Math.round(chunks) : Math.ceil(chunks)
+  // Two chunks are already visible. Each later turn reveals one new chunk.
+  return Math.max(0, wholeChunks - 2)
+}
+
+/**
+ * Stationary half turns advance by half a viewport, including when a PDF page
+ * fills the width and is taller than the screen. A final partial chunk gets a
+ * turn, but a turn that would reveal only blank space does not.
+ *
+ * Use the final stop as the navigation layout's maxScroll when restoring a
+ * saved fraction: the last partial screen can lie beyond physical maxScroll.
+ */
+export function chartScreenHalfTurnStops(layout: ChartStripLayout, viewHeight: number): number[] {
+  const lastStep = lastScreenHalfTurnStep(layout, viewHeight)
+  if (lastStep === 0) return [0]
+  return Array.from({ length: lastStep + 1 }, (_, step) => step * viewHeight / 2)
+}
+
+/**
+ * Two stable clipped panes, top then bottom. On the first turn the top pane
+ * advances while the bottom stays put; on the next turn the bottom catches up.
+ * A tall page may intersect both panes at different source offsets, so render
+ * it in each intersecting pane rather than trying to move one page element.
+ */
+export function chartScreenHalfTurnBands(
+  layout: ChartStripLayout,
+  offset: number,
+  viewHeight: number,
+): ChartScreenHalfTurnBand[] {
+  if (!(viewHeight > 0) || !Number.isFinite(viewHeight) || !(layout.total > 0) || !Number.isFinite(layout.total)) return []
+  const half = viewHeight / 2
+  const step = Math.max(0, Math.min(lastScreenHalfTurnStep(layout, viewHeight),
+    Math.round((Number.isNaN(offset) ? 0 : offset) / half)))
+  const screen = Math.floor(step / 2)
+  return [
+    { sourceTop: (screen + step % 2) * viewHeight, top: 0, height: half },
+    { sourceTop: screen * viewHeight + half, top: half, height: half },
+  ]
 }
 
 /** Tolerance in px: a turn must not be swallowed by a rounded scroll position. */
