@@ -25,4 +25,4 @@ Native pinch behavior has not been verified on a physical device. The in-app bro
 
 ## Release status
 
-Build 28 archive and upload are pending. The temporary Plus preview remains restricted to the internal-only TestFlight configuration and expires November 13, 2026 at 11:59:59 PM Eastern (`2026-11-14T04:59:59Z`). This music fix does not resolve or validate the App Store purchase catalog.
+Build 28 archived and uploaded successfully at 2026-10-30 17:42:24 UTC. Apple processing completed; App Store Connect shows build **4.2 (28) Internal**, status **Testing**, assigned only to **Me**, with one invitation. Build record: `835a9ebc-ec4a-4ddd-a8fe-6bb2aaca12ca`. The existing App Review submission using build 23 was not changed. The final archive passed internal-only configuration, signing, version, and web-asset verification (all 94 web files matched). The temporary Plus preview remains restricted to the internal-only TestFlight configuration and expires November 13, 2026 at 11:59:59 PM Eastern (`2026-11-14T04:59:59Z`). This music fix does not resolve or validate the App Store purchase catalog.

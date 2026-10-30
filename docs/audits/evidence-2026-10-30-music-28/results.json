@@ -18,6 +18,23 @@
     "browserSavedPosition": "pass",
     "nativePinchPhysicalDevice": "not run"
   },
-  "archive": "pending",
-  "upload": "pending"
+  "archive": "passed",
+  "upload": "succeeded",
+  "sourceCommit": "fdf817f",
+  "archivePath": "/Users/jameslobb/Documents/BestTake/build/internal-plus-preview-4.2-28/BestTake-4.2-28-Final-InternalPreview.xcarchive",
+  "archivedWebFilesMatched": 94,
+  "executableSha256": "68db390a99f8eb538bf3cc62656dabe58dd6c23b29bee2f6b8509e12cf6999fe",
+  "uploadedAt": "2026-10-30T17:42:24Z",
+  "testFlight": "Testing",
+  "appStoreConnectBuildId": "835a9ebc-ec4a-4ddd-a8fe-6bb2aaca12ca",
+  "groups": [
+    {
+      "name": "Me",
+      "type": "Internal",
+      "testers": 1
+    }
+  ],
+  "appStoreConnectUploadDate": "2026-10-30 13:43 America/New_York",
+  "appReviewSubmission": "unchanged (build 23)",
+  "physicalDevicePinch": "not verified"
 }
