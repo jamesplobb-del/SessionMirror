@@ -229,7 +229,7 @@ export interface BestTakeAudioPluginType {
     audioOnly?: boolean
     loudnessGainDb?: number
   }): Promise<NativePlaybackTestStartResult>
-  stopInlineTakeBoxPlayback(options?: { notify?: boolean }): Promise<void>
+  stopInlineTakeBoxPlayback(options?: { notify?: boolean; ownerId?: string }): Promise<void>
   updateInlineTakeBoxPlaybackLayout(options: {
     x: number
     y: number

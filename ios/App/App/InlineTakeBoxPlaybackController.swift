@@ -165,8 +165,11 @@ final class InlineTakeBoxPlaybackController {
         audioPlayer?.pause()
     }
 
-    func stop(notify: Bool = true, completed: Bool = false) {
+    func stop(notify: Bool = true, completed: Bool = false, ownerId expectedOwnerId: String? = nil) {
         assert(Thread.isMainThread, "InlineTakeBoxPlaybackController must run on the main thread")
+        // An old card can unmount after another preview has taken the shared
+        // player. Validate on the main queue against the actual native owner.
+        if let expectedOwnerId = expectedOwnerId, expectedOwnerId != ownerId { return }
         let hadPlayer = player != nil || audioPlayer != nil
         let endedOwnerId = ownerId
         startupWatchdog?.cancel()

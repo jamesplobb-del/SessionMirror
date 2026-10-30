@@ -1,0 +1,57 @@
+.markup-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid rgba(23, 26, 34, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #2a3140;
+  box-shadow: 0 4px 18px #142c4417;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.markup-toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  box-sizing: border-box;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.markup-toolbar__button svg { width: 20px; height: 20px; flex: none; stroke-width: 1.8; }
+.markup-toolbar__button[aria-pressed='true'],
+.markup-toolbar__button[aria-expanded='true'] { background: #edf3f8; box-shadow: inset 0 0 0 1px #cedce8; }
+.markup-toolbar__button:active:not(:disabled) { background: #e5edf4; }
+.markup-toolbar__button:focus-visible { outline: 2px solid #2873cd; outline-offset: -2px; }
+.markup-toolbar__button:disabled { opacity: 0.32; cursor: default; }
+.markup-toolbar__done { color: #235b7e; }
+.markup-toolbar__pen { position: relative; display: flex; }
+.markup-toolbar__pen i { position: absolute; right: -3px; bottom: -2px; width: 7px; height: 7px; border: 1px solid #fff; border-radius: 50%; }
+.markup-toolbar__tool-label, .markup-toolbar__done-label { display: none; }
+
+/* Six 44px targets, five 4px gaps, and the frame total 294px on a phone. */
+@media (min-width: 600px) {
+  .markup-toolbar__button[aria-pressed='true'] .markup-toolbar__tool-label,
+  .markup-toolbar__done-label { display: inline; }
+}

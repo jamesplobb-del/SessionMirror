@@ -54,6 +54,9 @@ interface PracticeChartPaperProps {
   onStroke: (stroke: InkStroke) => void
   /** Rub out every mark the eraser touches, in page-normalised units. */
   onErase: (page: number, x: number, y: number, radiusX: number, radiusY: number) => void
+  /** One undoable erase gesture; cancellation restores its starting marks. */
+  onEraseStart?: () => void
+  onEraseEnd?: (cancelled: boolean) => void
 }
 
 /**
@@ -76,9 +79,21 @@ interface ZoomAnchor {
   clientY: number
 }
 
+interface LiveInkStroke {
+  page: number
+  points: number[]
+  colour: InkColour
+  width: InkWidth
+}
+
+interface ActiveInkStroke extends LiveInkStroke {
+  pointerId: number
+  target: HTMLDivElement
+}
+
 export default function PracticeChartPaper({
   chart, fit, halfTurn, initialFraction, handleRef, onView, onZoom, onFraction, onError, onLoadFailed,
-  onSpreadAvailable, strokes, marker, onMarkStart, inkWidth, onStroke, onErase,
+  onSpreadAvailable, strokes, marker, onMarkStart, inkWidth, onStroke, onErase, onEraseStart, onEraseEnd,
 }: PracticeChartPaperProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -267,8 +282,24 @@ export default function PracticeChartPaper({
    * move, so the line that appears under the finger is the same line that gets
    * stored — there is no separate screen-space path to reconcile afterwards.
    */
-  const [drawing, setDrawing] = useState<{ page: number; points: number[] } | null>(null)
-  const drawingRef = useRef<{ pointerId: number; page: number; points: number[] } | null>(null)
+  const [drawing, setDrawing] = useState<LiveInkStroke | null>(null)
+  const drawingRef = useRef<ActiveInkStroke | null>(null)
+  const drawingPreviewFrameRef = useRef<number | null>(null)
+
+  const cancelDrawingPreview = useCallback(() => {
+    if (drawingPreviewFrameRef.current === null) return
+    window.cancelAnimationFrame(drawingPreviewFrameRef.current)
+    drawingPreviewFrameRef.current = null
+  }, [])
+
+  const queueDrawingPreview = useCallback(() => {
+    if (drawingPreviewFrameRef.current !== null) return
+    drawingPreviewFrameRef.current = window.requestAnimationFrame(() => {
+      drawingPreviewFrameRef.current = null
+      const active = drawingRef.current
+      if (active) setDrawing({ page: active.page, points: [...active.points], colour: active.colour, width: active.width })
+    })
+  }, [])
 
   const prepareMarking = useCallback(() => {
     const selection = document.getSelection()
@@ -280,56 +311,73 @@ export default function PracticeChartPaper({
   }, [onMarkStart])
 
   const beginStroke = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isInkColour(marker) || !event.isPrimary || event.button !== 0 || drawingRef.current) return
+    if (!isInkColour(marker) || !event.isPrimary || event.button !== 0 || drawingRef.current || erasingRef.current) return
     const box = event.currentTarget.getBoundingClientRect()
     if (box.width <= 0 || box.height <= 0) return
     const point = [(event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height]
-    drawingRef.current = { pointerId: event.pointerId, page, points: point }
-    setDrawing({ page, points: point })
+    drawingRef.current = { pointerId: event.pointerId, target: event.currentTarget, page, points: point, colour: marker, width: inkWidth }
+    setDrawing({ page, points: [...point], colour: marker, width: inkWidth })
     event.currentTarget.setPointerCapture(event.pointerId)
     event.preventDefault()
     prepareMarking()
-  }, [marker, prepareMarking])
+  }, [inkWidth, marker, prepareMarking])
+
+  const appendStrokePoints = useCallback((event: ReactPointerEvent<HTMLDivElement>, final = false) => {
+    const active = drawingRef.current
+    if (!active || active.pointerId !== event.pointerId) return false
+    const box = active.target.getBoundingClientRect()
+    if (box.width <= 0 || box.height <= 0) return false
+    // Pointer events can contain several Pencil samples from one browser frame.
+    // Keep them in order, then include the dispatched event's final position.
+    const samples = [...(event.nativeEvent?.getCoalescedEvents?.() ?? []), event]
+    let changed = false
+    for (let index = 0; index < samples.length; index++) {
+      const sample = samples[index]
+      if (sample.pointerId !== active.pointerId || !Number.isFinite(sample.clientX) || !Number.isFinite(sample.clientY)) continue
+      const x = Math.min(1, Math.max(0, (sample.clientX - box.left) / box.width))
+      const y = Math.min(1, Math.max(0, (sample.clientY - box.top) / box.height))
+      const last = active.points.length
+      const distance = Math.hypot(x - active.points[last - 2], y - active.points[last - 1])
+      if (distance === 0 || (distance < 0.001 && !(final && index === samples.length - 1))) continue
+      active.points.push(x, y)
+      changed = true
+    }
+    return changed
+  }, [])
 
   const extendStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    const active = drawingRef.current
-    if (!active || active.pointerId !== event.pointerId) return
-    const box = event.currentTarget.getBoundingClientRect()
-    if (box.width <= 0 || box.height <= 0) return
-    const x = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width))
-    const y = Math.min(1, Math.max(0, (event.clientY - box.top) / box.height))
-    const last = active.points.length
-    if (last >= 2 && Math.hypot(x - active.points[last - 2], y - active.points[last - 1]) < 0.001) return
-    active.points.push(x, y)
-    setDrawing({ page: active.page, points: [...active.points] })
+    if (drawingRef.current?.pointerId !== event.pointerId) return
+    if (appendStrokePoints(event)) queueDrawingPreview()
     event.preventDefault()
-  }, [])
+  }, [appendStrokePoints, queueDrawingPreview])
 
   const endStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const active = drawingRef.current
     if (!active || active.pointerId !== event.pointerId) return
+    appendStrokePoints(event, true)
     drawingRef.current = null
+    cancelDrawingPreview()
     setDrawing(null)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
+    if (active.target.hasPointerCapture(event.pointerId)) {
+      active.target.releasePointerCapture(event.pointerId)
     }
-    // A tap is not a mark. Two points is the shortest thing worth keeping, and
-    // it becomes a dot the player can see.
-    if (!isInkColour(marker)) return
+    // A stationary tap still leaves a visible dot, represented by two points.
     const points = active.points.length >= 4
       ? simplifyStroke(active.points)
       : [...active.points, active.points[0] + 0.0015, active.points[1] + 0.0015]
-    onStroke({ page: active.page, colour: marker, points, width: inkWidth })
-  }, [inkWidth, marker, onStroke])
+    onStroke({ page: active.page, colour: active.colour, points, width: active.width })
+  }, [appendStrokePoints, cancelDrawingPreview, onStroke])
 
   const cancelStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (drawingRef.current?.pointerId !== event.pointerId) return
+    const active = drawingRef.current
+    if (!active || active.pointerId !== event.pointerId) return
     drawingRef.current = null
+    cancelDrawingPreview()
     setDrawing(null)
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
+    if (active.target.hasPointerCapture(event.pointerId)) {
+      active.target.releasePointerCapture(event.pointerId)
     }
-  }, [])
+  }, [cancelDrawingPreview])
 
   /*
    * The eraser is a drag, not a tap: it rubs continuously while the finger is
@@ -337,7 +385,17 @@ export default function PracticeChartPaper({
    * caller has to work from the marks it just removed rather than from the
    * last render, which is why it hands back the whole list each time.
    */
-  const erasingRef = useRef<number | null>(null)
+  const erasingRef = useRef<{ pointerId: number; target: HTMLDivElement } | null>(null)
+  const eraseEndRef = useRef(onEraseEnd)
+  eraseEndRef.current = onEraseEnd
+
+  const finishErase = useCallback((cancelled: boolean) => {
+    const active = erasingRef.current
+    if (!active) return
+    erasingRef.current = null
+    if (active.target.hasPointerCapture(active.pointerId)) active.target.releasePointerCapture(active.pointerId)
+    eraseEndRef.current?.(cancelled)
+  }, [])
 
   const eraseAtEvent = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect()
@@ -352,29 +410,51 @@ export default function PracticeChartPaper({
   }, [onErase])
 
   const beginErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!event.isPrimary || event.button !== 0 || erasingRef.current !== null) return
-    erasingRef.current = event.pointerId
+    if (!event.isPrimary || event.button !== 0 || erasingRef.current || drawingRef.current) return
+    erasingRef.current = { pointerId: event.pointerId, target: event.currentTarget }
     event.currentTarget.setPointerCapture(event.pointerId)
     event.preventDefault()
+    onEraseStart?.()
     prepareMarking()
     // A first touch may become a two-finger pinch. Wait for movement before
     // erasing so zooming with the eraser selected cannot delete a mark.
     if (event.pointerType !== 'touch') eraseAtEvent(page, event)
-  }, [eraseAtEvent, prepareMarking])
+  }, [eraseAtEvent, onEraseStart, prepareMarking])
 
   const extendErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (erasingRef.current !== event.pointerId) return
+    if (erasingRef.current?.pointerId !== event.pointerId) return
     event.preventDefault()
     eraseAtEvent(page, event)
   }, [eraseAtEvent])
 
   const endErase = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (erasingRef.current !== event.pointerId) return
-    erasingRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-  }, [])
+    if (erasingRef.current?.pointerId !== event.pointerId) return
+    finishErase(false)
+  }, [finishErase])
+
+  const cancelErase = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (erasingRef.current?.pointerId !== event.pointerId) return
+    finishErase(true)
+  }, [finishErase])
+
+  const cancelActiveMarking = useCallback(() => {
+    const active = drawingRef.current
+    drawingRef.current = null
+    cancelDrawingPreview()
+    setDrawing(null)
+    if (active?.target.hasPointerCapture(active.pointerId)) active.target.releasePointerCapture(active.pointerId)
+    finishErase(true)
+  }, [cancelDrawingPreview, finishErase])
+
+  useEffect(() => () => {
+    // A disappearing score cannot finish a partial gesture. Cancel its erase
+    // transaction and release capture without scheduling an unmounted preview.
+    const active = drawingRef.current
+    drawingRef.current = null
+    cancelDrawingPreview()
+    if (active?.target.hasPointerCapture(active.pointerId)) active.target.releasePointerCapture(active.pointerId)
+    finishErase(true)
+  }, [cancelDrawingPreview, finishErase])
 
   const anchorAt = useCallback((x: number, y: number): ZoomAnchor | null => {
     const strip = stripRef.current
@@ -476,9 +556,7 @@ export default function PracticeChartPaper({
       const mid = midpoint(event.touches)
       const anchor = anchorAt(mid.x, mid.y)
       if (!anchor || mid.distance < 8) return
-      drawingRef.current = null
-      setDrawing(null)
-      erasingRef.current = null
+      cancelActiveMarking()
       pinchRef.current = {
         startDistance: mid.distance, startZoom: zoom, startX: mid.x, startY: mid.y,
         anchor, previewZoom: zoom, clientX: mid.x, clientY: mid.y,
@@ -528,7 +606,7 @@ export default function PracticeChartPaper({
       // Rotation or a fit change can replace the geometry mid-gesture.
       if (pinchRef.current) clearZoomPreview()
     }
-  }, [anchorAt, changeZoom, clearZoomPreview, layout, stationaryHalfTurn, zoom])
+  }, [anchorAt, cancelActiveMarking, changeZoom, clearZoomPreview, layout, stationaryHalfTurn, zoom])
 
   const settleRef = useRef<number | null>(null)
   const handleScroll = useCallback(() => {
@@ -639,8 +717,8 @@ export default function PracticeChartPaper({
       <ChartPageInk
         strokes={strokesByPage.get(index)}
         live={drawing?.page === index ? drawing.points : null}
-        liveColour={isInkColour(marker) ? marker : null}
-        liveWidth={inkWidth}
+        liveColour={drawing?.colour ?? null}
+        liveWidth={drawing?.width ?? inkWidth}
       />
     </>
   )
@@ -660,11 +738,9 @@ export default function PracticeChartPaper({
       onPointerDown={marker === 'eraser'
         ? event => beginErase(index, event)
         : marker ? event => beginStroke(index, event) : undefined}
-      onPointerMove={marker === 'eraser'
-        ? event => extendErase(index, event)
-        : marker ? extendStroke : undefined}
-      onPointerUp={marker === 'eraser' ? endErase : marker ? endStroke : undefined}
-      onPointerCancel={marker === 'eraser' ? endErase : marker ? cancelStroke : undefined}
+      onPointerMove={event => { extendStroke(event); extendErase(index, event) }}
+      onPointerUp={event => { endStroke(event); endErase(event) }}
+      onPointerCancel={event => { cancelStroke(event); cancelErase(event) }}
     >
       {renderPageFace(index, !widthHalfTurn || visible)}
     </div>

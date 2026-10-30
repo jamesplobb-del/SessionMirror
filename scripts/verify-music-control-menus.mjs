@@ -28,6 +28,7 @@ const anchor = { isConnected: true, focus: () => { anchor.focused = true } }
 function open(mode) {
   productionCallback('openMusicMenu', {
     musicMenu: state.menu,
+    penColour: 'black',
     setMusicMenu: value => { state.menu = value },
     setMusicMenuAnchor: value => { state.anchor = value },
     setMarker: value => { state.marker = typeof value === 'function' ? value(state.marker) : value },
@@ -49,10 +50,12 @@ assert.equal(state.menu, 'markup', 'rapid menu switching ends on the requested m
 assert.equal(state.marker, 'black')
 open('markup')
 assert.equal(state.menu, null, 'the active trigger toggles its menu closed')
-assert.equal(state.marker, null, 'closing the active menu puts the marker away')
+assert.equal(state.marker, 'black', 'closing options keeps the pen ready to draw')
 open('markup')
 const dismiss = productionCallback('dismissMusicMenu', {
   musicMenuAnchor: anchor,
+  requestAnimationFrame: callback => callback(),
+  paperSurface: { current: null },
   setMusicMenu: value => { state.menu = value },
   setMarker: value => { state.marker = typeof value === 'function' ? value(state.marker) : value },
 })
@@ -73,7 +76,7 @@ globalThis.document = {
 }
 class TestElement {
   constructor(selectors = []) { this.selectors = selectors }
-  closest(selector) { return this.selectors.includes(selector) ? this : null }
+  closest(selector) { return selector.split(',').some(value => this.selectors.includes(value.trim())) ? this : null }
 }
 globalThis.Element = TestElement
 const built = await build({
@@ -101,7 +104,7 @@ const built = await build({
       if (args.path === 'framer-motion') return { contents: `export const AnimatePresence = 'presence';` }
       if (args.path === 'reduced-motion') return { contents: `export const usePrefersReducedMotion = () => !!globalThis.__menuReducedMotion;` }
       if (args.path === 'motion-surface') return { contents: `export const PremiumMotionDiv = 'motion-div';` }
-      return { contents: ['Check','ChevronLeft','ChevronRight','Eraser','EyeOff','FileMusic','Plus','RefreshCw','Share','SquareSplitVertical','Trash2','Undo2','X','ZoomIn','ZoomOut'].map(name => `export const ${name} = 'svg';`).join('\n') }
+      return { contents: ['Check','ChevronLeft','ChevronRight','Eraser','EyeOff','FileMusic','Plus','RefreshCw','Redo2','Share','SquareSplitVertical','Trash2','Undo2','X','ZoomIn','ZoomOut'].map(name => `export const ${name} = 'svg';`).join('\n') }
     })
   } }],
 })

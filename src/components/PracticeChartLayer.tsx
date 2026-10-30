@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, AudioLines, Check, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
+import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -11,13 +11,15 @@ import {
   type ChartView, type PracticeChart,
 } from '../utils/practiceChartStorage'
 import MusicWidget, { type MusicMenuMode } from './practiceChart/MusicWidget'
+import MarkupToolbar from './practiceChart/MarkupToolbar'
+import { ChartInkHistory } from './practiceChart/chartInkHistory'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { WIDGET_CONTROL_LAYOUT_EVENT } from '../utils/floatingWidgetLayout'
 
 
 import {
-  clearInkStrokes, eraseStrokesAt, loadInkStrokes, loadInkWidth, saveInkStrokes, saveInkWidth,
-  type InkStroke, type InkTool, type InkWidth,
+  clearInkStrokes, eraseStrokesAt, isInkColour, loadInkColour, loadInkStrokes, loadInkWidth, saveInkColour, saveInkStrokes, saveInkWidth,
+  type InkColour, type InkStroke, type InkTool, type InkWidth,
 } from './practiceChart/chartInk'
 import { shareMarkedChart } from './practiceChart/chartExport'
 import PracticeChartPaper, { type ChartPaperHandle, type ChartPaperView } from './practiceChart/PracticeChartPaper'
@@ -137,13 +139,24 @@ export default function PracticeChartLayer({
   const [loadFailed, setLoadFailed] = useState(false)
   const [spreadAvailable, setSpreadAvailable] = useState(false)
   const [strokes, setStrokes] = useState<InkStroke[]>([])
+  const inkHistory = useRef(new ChartInkHistory(projectId, []))
+  const strokesRef = useRef(strokes)
+  strokesRef.current = strokes
+  const restoreInk = useCallback((next: InkStroke[]) => {
+    inkHistory.current.reset('', next)
+    setActiveEraseIdentity(null)
+    strokesRef.current = next
+    setStrokes(next)
+  }, [])
   const [inkSaveFailed, setInkSaveFailed] = useState(false)
+  const [activeEraseIdentity, setActiveEraseIdentity] = useState<string | null>(null)
   /*
    * The marker is picked up for a moment and put down again, so it is not
    * remembered: a part must never open in marking mode, where the first tap
    * to turn the page would draw on it instead.
    */
   const [marker, setMarker] = useState<InkTool | null>(null)
+  const [penColour, setPenColour] = useState<InkColour>(loadInkColour)
   const [inkWidth, setInkWidth] = useState<InkWidth>(loadInkWidth)
   // A score opens as paper. Controls are an overlay, revealed by a center tap.
   const paperSurface = useRef<HTMLDivElement>(null)
@@ -207,7 +220,7 @@ export default function PracticeChartLayer({
     setError('')
     setLoadFailed(false)
     setView(loadChartView(projectId))
-    setStrokes(loadInkStrokes(projectId))
+    restoreInk(loadInkStrokes(projectId))
     setInkSaveFailed(false)
     setMarker(null)
     setChromeOff(false)
@@ -222,7 +235,7 @@ export default function PracticeChartLayer({
         setLoaded(true)
       })
     return () => { cancelled = true }
-  }, [projectId])
+  }, [projectId, restoreInk])
 
   // External imports can replace this file, but opening a toolbar must never
   // recreate the document or discard its reading position.
@@ -236,14 +249,14 @@ export default function PracticeChartLayer({
     void loadPracticeChart(projectId).then(value => {
       if (!cancelled) {
         setChart(value)
-        setStrokes(loadInkStrokes(projectId))
+        restoreInk(loadInkStrokes(projectId))
         setView(loadChartView(projectId))
       }
     }).catch(() => { if (!cancelled) setError('Could not refresh this music.') })
     return () => { cancelled = true }
-  }, [projectId, revision])
+  }, [projectId, restoreInk, revision])
 
-  const paperKey = chart ? `${projectId}:${chart.fileName}:${chart.bytes?.byteLength ?? 0}` : null
+  const paperKey = chart ? `${projectId}:${chart.attachmentId ?? ''}:${chart.fileName}:${chart.bytes?.byteLength ?? 0}` : null
   useLayoutEffect(() => {
     setPageView(null)
     setLoadFailed(false)
@@ -435,8 +448,19 @@ export default function PracticeChartLayer({
   const dismissMusicMenu = useCallback((restoreFocus = false) => {
     setMusicMenu(null)
     setMarker(null)
-    if (restoreFocus && musicMenuAnchor?.isConnected) musicMenuAnchor.focus({ preventScroll: true })
+    if (restoreFocus) requestAnimationFrame(() => {
+      const trigger = paperSurface.current?.querySelector<HTMLButtonElement>('[data-music-menu-trigger="markup"]')
+      if (musicMenuAnchor?.isConnected) musicMenuAnchor.focus({ preventScroll: true })
+      else trigger?.focus({ preventScroll: true })
+    })
   }, [musicMenuAnchor])
+
+  useLayoutEffect(() => {
+    if (marker && musicMenu === 'markup' && !musicMenuAnchor?.isConnected) {
+      const options = paperSurface.current?.querySelector<HTMLButtonElement>('.markup-toolbar [data-music-menu-trigger="markup"]')
+      if (options) setMusicMenuAnchor(options)
+    }
+  }, [marker, musicMenu, musicMenuAnchor])
 
   const tuckMarkupMenu = useCallback(() => {
     // Put the palette away without putting down the selected pen or eraser.
@@ -464,47 +488,80 @@ export default function PracticeChartLayer({
     setMusicMenuAnchor(anchor)
     if (musicMenu === mode) {
       setMusicMenu(null)
-      setMarker(null)
       return
     }
     setMusicMenu(mode)
     // Page always returns to reading, regardless of the last opened menu.
-    setMarker(current => mode === 'markup' ? current ?? 'black' : null)
-  }, [musicMenu])
+    setMarker(current => mode === 'markup' ? current ?? penColour : null)
+  }, [musicMenu, penColour])
+
+  const pickMarker = useCallback((tool: InkTool | null) => {
+    if (isInkColour(tool)) { saveInkColour(tool); setPenColour(tool) }
+    setMarker(tool)
+  }, [])
 
   /*
    * The eraser moves faster than React re-renders, so it works from a mirror
    * of the list rather than from `strokes`: erasing off the last rendered
    * value would put every mark the finger already passed back on the page.
    */
-  const strokesRef = useRef(strokes)
-  strokesRef.current = strokes
+  const inkIdentity = `${projectId}:${chart?.attachmentId ?? chart?.fileName ?? ''}:${revision}`
+  const currentInkHistory = useCallback(() => {
+    if (inkHistory.current.identity !== inkIdentity) inkHistory.current.reset(inkIdentity, strokesRef.current)
+    return inkHistory.current
+  }, [inkIdentity])
   const persistStrokes = useCallback((next: InkStroke[]) => {
     strokesRef.current = next
     setStrokes(next)
     setInkSaveFailed(!saveInkStrokes(projectId, next, chart?.attachmentId ?? null))
   }, [projectId, chart?.attachmentId])
+  const editStrokes = useCallback((next: InkStroke[]) => {
+    const changed = currentInkHistory().edit(next)
+    if (changed) persistStrokes(changed)
+  }, [currentInkHistory, persistStrokes])
   const handleStroke = useCallback((stroke: InkStroke) => {
-    persistStrokes([...strokesRef.current, stroke])
-  }, [persistStrokes])
+    editStrokes([...strokesRef.current, stroke])
+  }, [editStrokes])
   const eraseAt = useCallback((
     page: number, x: number, y: number, radiusX: number, radiusY: number,
   ) => {
     const next = eraseStrokesAt(strokesRef.current, page, x, y, radiusX, radiusY)
     if (!next) return
-    persistStrokes(next)
-  }, [persistStrokes])
+    editStrokes(next)
+  }, [editStrokes])
+
+  const eraseTransaction = useRef<string | null>(null)
+  const beginErase = useCallback(() => {
+    currentInkHistory().begin()
+    eraseTransaction.current = inkIdentity
+    setActiveEraseIdentity(inkIdentity)
+  }, [currentInkHistory, inkIdentity])
+  const finishErase = useCallback((cancelled: boolean) => {
+    if (eraseTransaction.current !== inkIdentity || inkHistory.current.identity !== inkIdentity) return
+    eraseTransaction.current = null
+    setActiveEraseIdentity(null)
+    if (cancelled) {
+      const restored = inkHistory.current.cancel()
+      if (restored) persistStrokes(restored)
+    } else inkHistory.current.end()
+  }, [inkIdentity, persistStrokes])
 
   const undoStroke = useCallback(() => {
-    if (strokesRef.current.length) persistStrokes(strokesRef.current.slice(0, -1))
-  }, [persistStrokes])
+    const previous = currentInkHistory().undo()
+    if (previous) persistStrokes(previous)
+  }, [currentInkHistory, persistStrokes])
+
+  const redoStroke = useCallback(() => {
+    const next = currentInkHistory().redo()
+    if (next) persistStrokes(next)
+  }, [currentInkHistory, persistStrokes])
+
+  const canUndo = activeEraseIdentity !== inkIdentity && inkHistory.current.identity === inkIdentity && inkHistory.current.canUndo
+  const canRedo = activeEraseIdentity !== inkIdentity && inkHistory.current.identity === inkIdentity && inkHistory.current.canRedo
 
   const clearMarks = useCallback(() => {
-    if (!clearInkStrokes(projectId)) { setInkSaveFailed(true); return }
-    strokesRef.current = []
-    setStrokes([])
-    setInkSaveFailed(false)
-  }, [projectId])
+    editStrokes([])
+  }, [editStrokes])
 
   const saveMarked = useCallback(async () => {
     if (!chart) return
@@ -553,7 +610,7 @@ export default function PracticeChartLayer({
       await deletePracticeChart(projectId)
       offered.current = projectId
       clearInkStrokes(projectId)
-      setStrokes([])
+      restoreInk([])
       setMarker(null)
       setChart(null)
       setPageView(null)
@@ -563,7 +620,7 @@ export default function PracticeChartLayer({
     } finally {
       setBusy(false)
     }
-  }, [projectId, showConfirm])
+  }, [projectId, restoreInk, showConfirm])
 
   /*
    * The same gesture the deck's Record has: tap to start or stop, hold to arm
@@ -640,7 +697,7 @@ export default function PracticeChartLayer({
           setChart(await savePracticeChart(projectId, file))
           if (chart && onScoreReplaced) await onScoreReplaced(file.name)
           clearInkStrokes(projectId)
-          setStrokes([])
+          restoreInk([])
           setMarker(null)
           setPaperVisible(true)
           setView(loadChartView(projectId))
@@ -656,6 +713,7 @@ export default function PracticeChartLayer({
       <div
         ref={paperSurface}
         className="practice-chart-paper"
+        data-marking={marker ? 'true' : undefined}
         data-controls-hidden={reading ? 'true' : undefined}
         data-inactive={showing ? undefined : 'true'}
         aria-hidden={showing ? undefined : true}
@@ -699,16 +757,23 @@ export default function PracticeChartLayer({
           inkWidth={inkWidth}
           onStroke={handleStroke}
           onErase={eraseAt}
+          onEraseStart={beginErase}
+          onEraseEnd={finishErase}
         />
         {reading && <button type="button" className="practice-chart-reveal" onClick={() => revealControls(true)}>Show music controls</button>}
         <div ref={topbar} className="practice-chart-topbar" inert={reading} aria-hidden={reading}>
         <div className="practice-chart-tools">
-        <div className="practice-chart-controls" data-marking={marker ? 'true' : undefined} data-dim={marker && musicMenu === 'markup' ? 'true' : undefined}>
+        {marker ? <MarkupToolbar
+          marker={marker} penColour={penColour} canUndo={canUndo} canRedo={canRedo}
+          menuOpen={musicMenu === 'markup'} menuId={musicMenuId}
+          onPen={() => pickMarker(penColour)} onErase={() => pickMarker(marker === 'eraser' ? penColour : 'eraser')}
+          onUndo={undoStroke} onRedo={redoStroke}
+          onOptions={anchor => openMusicMenu('markup', anchor)} onDone={() => dismissMusicMenu(true)}
+        /> : <div className="practice-chart-controls">
           {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
           <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" data-music-menu-trigger="page" aria-haspopup="dialog" aria-expanded={musicMenu === 'page'} aria-controls={`${musicMenuId}-page`} onClick={event => openMusicMenu('page', event.currentTarget)}><FileMusic aria-hidden /><span>Page</span></button>
           <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" data-music-menu-trigger="markup" aria-haspopup="dialog" aria-expanded={musicMenu === 'markup'} aria-controls={`${musicMenuId}-markup`} onClick={event => openMusicMenu('markup', event.currentTarget)}><Pen aria-hidden /><span>Mark up</span></button>
-          {marker && musicMenu !== 'markup' && <button type="button" className="practice-chart-control practice-chart-control--done-marking" aria-label="Done marking" onClick={() => dismissMusicMenu(true)}><Check aria-hidden /><span>Done</span></button>}
           <button
             type="button"
             className="practice-chart-control practice-chart-control--start"
@@ -723,7 +788,7 @@ export default function PracticeChartLayer({
             data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => { dismissMusicMenu(); setWorkspaceOpen(value => !value) }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
-        </div>
+        </div>}
         {workspaceOpen && (
           <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => key === 'audioEnhancerEnabled' ? (
@@ -873,10 +938,13 @@ export default function PracticeChartLayer({
       marker={marker}
       inkWidth={inkWidth}
       markCount={strokes.length}
+      canUndo={canUndo}
+      canRedo={canRedo}
       saving={saving}
-      onMarkerChange={setMarker}
+      onMarkerChange={pickMarker}
       onInkWidthChange={width => { saveInkWidth(width); setInkWidth(width) }}
       onUndoMark={undoStroke}
+      onRedoMark={redoStroke}
       onClearMarks={clearMarks}
       onSaveMarked={() => void saveMarked()}
       onAdd={pick}

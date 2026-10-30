@@ -478,7 +478,13 @@ export function AudioModePlaybackProvider({
         const startTime = knownDuration > 0 && requestedStartTime >= knownDuration - 0.05
           ? 0
           : requestedStartTime
+        const shouldStopPreviousNative = nativePlaybackActiveRef.current || nativePlaybackStartingRef.current
+        // Claim the replacement before awaiting native cleanup. A second seek
+        // must not inherit the old player's running clock or completion event.
+        nativePlaybackActiveRef.current = false
         nativePlaybackStartingRef.current = true
+        nativePlaybackOffsetRef.current = startTime
+        stopProgressLoop()
         desiredPlayingRef.current = true
         externalNativePlaybackEndedRef.current = options.onEnded ?? null
         externalNativePlaybackFailedRef.current = options.onFailed ?? null
@@ -493,10 +499,9 @@ export function AudioModePlaybackProvider({
 
         void (async () => {
           try {
-            if (nativePlaybackActiveRef.current) {
+            if (shouldStopPreviousNative) {
               await stopAudioModeNativePlayback()
-              nativePlaybackActiveRef.current = false
-              stopProgressLoop()
+              if (!isCurrentNativeRequest()) return
             }
             await onBeforePlayRef.current?.()
             if (!isCurrentNativeRequest()) throw new Error('Native playback request was cancelled')
@@ -505,8 +510,10 @@ export function AudioModePlaybackProvider({
               startTime,
               gainDb: item.playbackGainDb,
             })
-            if (!result || !isCurrentNativeRequest()) {
-              if (result) await stopAudioModeNativePlayback()
+            // The native adapter owns cancellation of its own generation. A
+            // stale result here must never stop a newer native player.
+            if (!isCurrentNativeRequest()) return
+            if (!result) {
               throw new Error('Native audio mode playback did not start')
             }
             nativePlaybackActiveRef.current = true
@@ -720,7 +727,7 @@ export function AudioModePlaybackProvider({
         }
       })()
     },
-    [clearResumeTimer, ensurePlayerSource, prepareSessionOnce, startProgressLoop, updateSessionPrepared]
+    [clearResumeTimer, ensurePlayerSource, prepareSessionOnce, startProgressLoop, stopProgressLoop, updateSessionPrepared]
   )
 
   const schedulePlaybackRecovery = useCallback(
@@ -729,10 +736,17 @@ export function AudioModePlaybackProvider({
       const player = playerRef.current
       if (!player || !desiredPlayingRef.current || player.ended) return
       if (resumeTimerRef.current !== null || resumeInFlightRef.current) return
+      const requestId = playbackRequestIdRef.current
+      const sourceKey = currentSourceKeyRef.current
+      const isCurrentRecovery = () =>
+        playbackRequestIdRef.current === requestId &&
+        currentSourceKeyRef.current === sourceKey &&
+        desiredPlayingRef.current &&
+        !nativePlaybackActiveRef.current && !nativePlaybackStartingRef.current
 
       resumeTimerRef.current = window.setTimeout(() => {
         resumeTimerRef.current = null
-        if (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) return
+        if (!isCurrentRecovery()) return
         const currentPlayer = playerRef.current
         if (!currentPlayer || !desiredPlayingRef.current || currentPlayer.ended) return
         if (!currentPlayer.paused && currentPlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -749,7 +763,7 @@ export function AudioModePlaybackProvider({
         })
         void (async () => {
           try {
-            if (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) return
+            if (!isCurrentRecovery()) return
             // Tier 1: a transient stalled/waiting/suspend blip often resolves
             // with a plain play() — no route/graph rebuild needed. Only
             // escalate to the full rebuild (tier 2) if this doesn't actually
@@ -764,10 +778,12 @@ export function AudioModePlaybackProvider({
             } catch {
               started = false
             }
+            if (!isCurrentRecovery()) return
             if (!started) {
-              started = await playTakeMediaAudible(currentPlayer, { skipRoutePrep: true })
+              started = await playTakeMediaAudible(currentPlayer, { skipRoutePrep: true }).catch(() => false)
             }
-            if (started && desiredPlayingRef.current) {
+            if (!isCurrentRecovery()) return
+            if (started) {
               onPlaybackActiveChangeRef.current?.(true)
               startProgressLoop()
               return
@@ -789,7 +805,7 @@ export function AudioModePlaybackProvider({
   )
 
   const pause = useCallback(async () => {
-    playbackRequestIdRef.current += 1
+    const requestId = ++playbackRequestIdRef.current
     if (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) {
       const wasActive = nativePlaybackActiveRef.current
       const wasStarting = nativePlaybackStartingRef.current
@@ -805,15 +821,16 @@ export function AudioModePlaybackProvider({
       }
       const onFailed = wasStarting ? externalNativePlaybackFailedRef.current : null
       desiredPlayingRef.current = false
+      nativePlaybackActiveRef.current = false
       nativePlaybackStartingRef.current = false
       externalNativePlaybackEndedRef.current = null
       externalNativePlaybackFailedRef.current = null
       clearResumeTimer()
+      stopProgressLoop()
       await stopAudioModeNativePlayback()
-      nativePlaybackActiveRef.current = false
+      if (playbackRequestIdRef.current !== requestId) return
       onPlaybackActiveChangeRef.current?.(false)
       updateSessionPrepared(false)
-      stopProgressLoop()
       logPlayback('Paused', {
         takeId: state.currentItem?.takeId ?? state.currentItem?.id,
         position: nativePlaybackOffsetRef.current,
@@ -876,6 +893,7 @@ export function AudioModePlaybackProvider({
 
   const seek = useCallback(
     (time: number) => {
+      if (!Number.isFinite(time)) return
       if (state.currentItem && usesNativeAudioPlayback(state.currentItem)) {
         const duration = nativeDurationRef.current
         const nextTime = Math.max(0, Math.min(time, duration > 0 ? duration : time))
@@ -890,12 +908,13 @@ export function AudioModePlaybackProvider({
           path: 'native-avplayer',
         })
         if (!wasPlaying) return
-        void (async () => {
-          await stopAudioModeNativePlayback()
-          nativePlaybackActiveRef.current = false
-          stopProgressLoop()
-          play(state.currentItem!, { startTime: nextTime })
-        })()
+        // Enter the same generation-owned path as Play immediately; an async
+        // stop→play continuation could otherwise revive a superseded seek.
+        play(state.currentItem, {
+          startTime: nextTime,
+          onEnded: externalNativePlaybackEndedRef.current ?? undefined,
+          onFailed: externalNativePlaybackFailedRef.current ?? undefined,
+        })
         return
       }
 
@@ -914,7 +933,7 @@ export function AudioModePlaybackProvider({
         sessionPrepared: sessionPreparedRef.current,
       })
     },
-    [play, state.currentItem, stopProgressLoop]
+    [play, state.currentItem]
   )
 
   const openFullscreen = useCallback(
@@ -997,8 +1016,11 @@ export function AudioModePlaybackProvider({
       setState((prev) => ({ ...prev, currentTime: player.currentTime }))
     }
     const onPlay = () => {
-      if (nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) return
-      desiredPlayingRef.current = true
+      if (!desiredPlayingRef.current || nativePlaybackActiveRef.current || nativePlaybackStartingRef.current) {
+        // A delayed WebKit play event cannot undo Pause or overlap native audio.
+        player.pause()
+        return
+      }
       clearResumeTimer()
       onPlaybackActiveChangeRef.current?.(true)
       setState((prev) => ({ ...prev, isPlaying: true }))

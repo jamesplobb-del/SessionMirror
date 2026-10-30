@@ -151,6 +151,7 @@
 .music-control-menu__width button i { border-radius: 50%; background: currentColor; }
 .music-control-menu__width button[aria-pressed='true'] { background: var(--music-menu-surface); color: var(--music-menu-accent); box-shadow: 0 1px 4px #1231; }
 .music-control-menu__edits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; padding-top: 10px; border-top: 1px solid var(--music-menu-line); }
+.music-control-menu__edits button:last-child { grid-column: 1 / -1; }
 .music-control-menu__save { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 44px; margin-top: 8px; padding: 8px 12px; border-radius: 11px; background: var(--music-menu-control); color: var(--music-menu-accent) !important; }
 .music-control-menu__hint { display: flex; align-items: center; gap: 8px; margin: 10px; font-size: 11px; line-height: 1.5; color: var(--music-menu-muted); }
 .music-control-menu__error { margin: 10px 8px 4px; color: var(--ls-danger, #b64d45); font-size: 11px; line-height: 1.5; }

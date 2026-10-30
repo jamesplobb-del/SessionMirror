@@ -6,6 +6,7 @@ import {
 } from './playbackRouteCoordinator'
 import { resolveNativeFileUri } from './takeStorage'
 import {
+  ensureNativeInlineTakeBoxPlaybackListener,
   isNativeInlineTakeBoxPlaybackAvailable,
   setNativeInlineTakeBoxEndedHandler,
   stopNativeInlineTakeBoxPlayback,
@@ -44,6 +45,10 @@ interface PlaybackAttempt {
 let playbackGeneration = 0
 let currentAttempt: PlaybackAttempt | null = null
 let activeAttempt: PlaybackAttempt | null = null
+export function isAudioModeNativePlaybackPendingOrActive(): boolean {
+  return currentAttempt !== null || activeAttempt !== null
+}
+
 let nativePlaybackWork: Promise<unknown> = Promise.resolve()
 function enqueuePlayback<T>(operation: () => Promise<T>): Promise<T> {
   const work = nativePlaybackWork.then(operation, operation)
@@ -74,22 +79,19 @@ async function stopActiveAttempt(): Promise<void> {
   }
 }
 let endedHandler: (() => void) | null = null
-let endedListenerInstalled = false
 export function setAudioModeNativePlaybackEndedHandler(handler: (() => void) | null): void {
   endedHandler = handler
 }
 
-function ensureEndedListener(): void {
-  if (endedListenerInstalled) return
-  endedListenerInstalled = true
+async function ensureEndedListener(): Promise<void> {
   setNativeInlineTakeBoxEndedHandler(AUDIO_MODE_NATIVE_PLAYBACK_OWNER, () => {
     endedHandler?.()
   })
+  await ensureNativeInlineTakeBoxPlaybackListener()
 }
 
 export function teardownAudioModeNativePlaybackListener(): void {
   setNativeInlineTakeBoxEndedHandler(AUDIO_MODE_NATIVE_PLAYBACK_OWNER, null)
-  endedListenerInstalled = false
   endedHandler = null
 }
 
@@ -123,7 +125,7 @@ export async function startAudioModeNativePlayback(options: {
     attempt.routePreparation = prepareInlineTakeBoxPlaybackRoute()
     await attempt.routePreparation
     if (!isCurrent()) return null
-    ensureEndedListener()
+    await ensureEndedListener()
 
     const startTime = typeof options.startTime === 'number' && Number.isFinite(options.startTime)
       ? Math.max(0, options.startTime) : 0
@@ -169,6 +171,7 @@ export async function startAudioModeNativePlayback(options: {
     return null
   } finally {
     if (!started) {
+      if (currentAttempt === attempt) currentAttempt = null
       await enqueuePlayback(async () => {
         if (activeAttempt === attempt) await stopActiveAttempt()
       })

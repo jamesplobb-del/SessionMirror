@@ -2,7 +2,7 @@ import { AnimatePresence } from 'framer-motion'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import {
   Check, ChevronLeft, ChevronRight, Eraser, EyeOff, FileMusic, Plus, RefreshCw,
-  Share, SquareSplitVertical, Trash2, Undo2, X, ZoomIn, ZoomOut,
+  Redo2, Share, SquareSplitVertical, Trash2, Undo2, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -43,10 +43,13 @@ interface MusicWidgetProps {
   marker: InkTool | null
   inkWidth: InkWidth
   markCount: number
+  canUndo?: boolean
+  canRedo?: boolean
   saving: boolean
   onMarkerChange: (tool: InkTool | null) => void
   onInkWidthChange: (width: InkWidth) => void
   onUndoMark: () => void
+  onRedoMark?: () => void
   onClearMarks: () => void
   onSaveMarked: () => void
 }
@@ -62,7 +65,7 @@ export default function MusicWidget({
   boundaryRef, visible, menuMode, menuAnchor, menuId, onDismiss, hasChart, fileName,
   pageView, paperVisible, busy, error, fit, zoom, spreadAvailable, halfTurn, onAdd, onRemove,
   onTurn, onFitChange, onZoomChange, onResetZoom, onHalfTurnChange, onPaperVisibleChange, marker, inkWidth,
-  markCount, saving, onMarkerChange, onInkWidthChange, onUndoMark, onClearMarks, onSaveMarked,
+  markCount, canUndo = false, canRedo = false, saving, onMarkerChange, onInkWidthChange, onUndoMark, onRedoMark, onClearMarks, onSaveMarked,
 }: MusicWidgetProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -131,7 +134,7 @@ export default function MusicWidget({
       if (!(target instanceof Element) || menuRef.current?.contains(target)) return
       // Trigger clicks own switching/toggling. A drawing gesture owns the score.
       if (target.closest('[data-music-menu-trigger]')) return
-      if (menuMode === 'markup' && target.closest('.practice-chart-scroll')) return
+      if (menuMode === 'markup' && target.closest('.practice-chart-scroll, .markup-toolbar')) return
       onDismiss(false)
     }
     const escape = (event: KeyboardEvent) => {
@@ -144,7 +147,7 @@ export default function MusicWidget({
       const target = event.target
       if (!(target instanceof Element) || menuRef.current?.contains(target)) return
       if (target.closest('[data-music-menu-trigger]')) return
-      if (menuMode === 'markup' && target.closest('.practice-chart-scroll')) return
+      if (menuMode === 'markup' && target.closest('.practice-chart-scroll, .markup-toolbar')) return
       onDismiss(false)
     }
     document.addEventListener('pointerdown', dismissOutside, true)
@@ -242,9 +245,15 @@ export default function MusicWidget({
           </button>)}</div>
         </div>
         <div className="music-control-menu__edits" role="group" aria-label="Edit markings">
-          <button type="button" disabled={markCount === 0} onClick={onUndoMark}><Undo2 aria-hidden />Undo</button>
+          <button type="button" disabled={!canUndo} onClick={onUndoMark}><Undo2 aria-hidden />Undo</button>
+          <button type="button" disabled={!canRedo} onClick={onRedoMark}><Redo2 aria-hidden />Redo</button>
           <button type="button" disabled={markCount === 0} onClick={onClearMarks}><Trash2 aria-hidden />Clear</button>
         </div>
+        <div className="music-control-menu__turn" role="group" aria-label="Turn page while marking">
+          <button type="button" disabled={!turnable} onClick={() => onTurn(-1)}><ChevronLeft aria-hidden />Previous</button>
+          <button type="button" disabled={!turnable} onClick={() => onTurn(1)}>Next<ChevronRight aria-hidden /></button>
+        </div>
+        <p className="music-control-menu__hint">Marks save automatically. Pinch with two fingers to zoom or move the page.</p>
         <button type="button" className="music-control-menu__save" disabled={markCount === 0 || saving} onClick={onSaveMarked}><Share aria-hidden />{saving ? 'Saving…' : 'Save marked PDF'}</button>
       </> : <>
         <button type="button" className="music-control-menu__save" disabled={busy} onClick={onAdd}><Plus aria-hidden />Add music</button>

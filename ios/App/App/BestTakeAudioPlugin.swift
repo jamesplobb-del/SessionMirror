@@ -2543,8 +2543,9 @@ public class BestTakeAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func stopInlineTakeBoxPlayback(_ call: CAPPluginCall) {
         let notify = call.getBool("notify") ?? true
+        let ownerId = call.getString("ownerId")
         DispatchQueue.main.async {
-            InlineTakeBoxPlaybackController.shared.stop(notify: notify)
+            InlineTakeBoxPlaybackController.shared.stop(notify: notify, ownerId: ownerId)
             call.resolve()
         }
     }

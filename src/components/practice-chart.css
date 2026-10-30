@@ -24,13 +24,13 @@
 
 /* Visibility also removes these controls from keyboard and screen-reader
  * navigation. Keep the widgets mounted so audio and routine timers continue. */
-.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) :is(
+.app-shell--music-page:has(.practice-chart-paper:is([data-controls-hidden='true'], [data-marking='true'])) :is(
   .music-widget-drawer, .widget-ball, .pitch-widget-draggable,
   .metronome-widget-draggable, .drone-widget-draggable, .takes-widget,
   .reference-widget-live, .reference-widget-chip, .routine-ball, .routine-bar,
   .routine-bar-scrim, .hands-free-stage, [data-music-reading-tool]
 ),
-.app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) :is(
+.app-shell--music-page:has(.practice-chart-paper:is([data-controls-hidden='true'], [data-marking='true'])) :is(
   .music-widget-drawer, .widget-ball, .pitch-widget-draggable,
   .metronome-widget-draggable, .drone-widget-draggable, .takes-widget,
   .reference-widget-live, .reference-widget-chip, .routine-ball, .routine-bar,
@@ -45,8 +45,8 @@
 }
 .app-shell--music-page:has(.practice-chart-paper[data-controls-hidden='true']) .practice-chart-paper::after { opacity: 0; }
 /* Routine controls portal to the body on phones and when expanded. */
-body:has(.app-shell--music-page .practice-chart-paper[data-controls-hidden='true']) :is(.routine-ball, .routine-bar, .routine-bar-scrim),
-body:has(.app-shell--music-page .practice-chart-paper[data-controls-hidden='true']) :is(.routine-ball, .routine-bar, .routine-bar-scrim) * {
+body:has(.app-shell--music-page .practice-chart-paper:is([data-controls-hidden='true'], [data-marking='true'])) :is(.routine-ball, .routine-bar, .routine-bar-scrim),
+body:has(.app-shell--music-page .practice-chart-paper:is([data-controls-hidden='true'], [data-marking='true'])) :is(.routine-ball, .routine-bar, .routine-bar-scrim) * {
   visibility: hidden !important;
   pointer-events: none !important;
 }

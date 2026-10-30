@@ -49,9 +49,16 @@ export function subscribeTakeBoxCompletion(listener: (tone: 'current' | 'best') 
 let endedListenerInstalled = false
 const endedHandlers = new Map<string, () => void>()
 let endedListenerHandle: PluginListenerHandle | null = null
+let endedListenerInstall: Promise<void> | null = null
+let endedListenerRemoval: Promise<void> | null = null
 let activeOwnerId: string | null = null
 let playbackGeneration = 0
 let pendingOwnerId: string | null = null
+/** Includes preparation so a delayed foreground repair cannot race a new preview. */
+export function isNativeInlineTakeBoxPlaybackPendingOrActive(): boolean {
+  return pendingOwnerId !== null || activeOwnerId !== null
+}
+
 let nativeOperations: Promise<unknown> = Promise.resolve()
 function enqueueNativeOperation<T>(operation: () => Promise<T>): Promise<T> {
   const next = nativeOperations.catch(() => {}).then(operation)
@@ -69,10 +76,11 @@ export function setNativeInlineTakeBoxEndedHandler(
   else endedHandlers.delete(ownerId)
 }
 
-async function ensureEndedListener(): Promise<void> {
+export async function ensureNativeInlineTakeBoxPlaybackListener(): Promise<void> {
+  if (endedListenerRemoval) await endedListenerRemoval
   if (endedListenerInstalled) return
-  endedListenerInstalled = true
-  endedListenerHandle = await BestTakeAudioPlugin.addListener(
+  if (endedListenerInstall) return endedListenerInstall
+  endedListenerInstall = BestTakeAudioPlugin.addListener(
     'inlineTakeBoxPlaybackEnded',
     (event: { ownerId?: string; completed?: boolean }) => {
       const tone = completedTakeBoxTone(event)
@@ -81,13 +89,18 @@ async function ensureEndedListener(): Promise<void> {
       if (ownerId && ownerId === activeOwnerId) {
         activeOwnerId = null
       }
-      if (ownerId && endedHandlers.has(ownerId)) {
+      if (ownerId) {
+        // A removed sibling's late notification must not stop every other box.
         endedHandlers.get(ownerId)?.()
         return
       }
       for (const handler of endedHandlers.values()) handler()
     },
-  )
+  ).then(handle => {
+    endedListenerHandle = handle
+    endedListenerInstalled = true
+  }).finally(() => { endedListenerInstall = null })
+  await endedListenerInstall
 }
 
 export async function startNativeInlineTakeBoxPlayback(options: {
@@ -101,15 +114,13 @@ export async function startNativeInlineTakeBoxPlayback(options: {
 
   const generation = ++playbackGeneration
   pendingOwnerId = options.ownerId
-  const fileURL = await resolveNativeFileUri(options.filePath)
-  if (!fileURL) {
-    console.warn('[InlineTakeBoxPlayback] could not resolve file URI', options.filePath)
-    return false
-  }
-
-  await ensureEndedListener()
-
   try {
+    const fileURL = await resolveNativeFileUri(options.filePath)
+    if (!fileURL) {
+      console.warn('[InlineTakeBoxPlayback] could not resolve file URI', options.filePath)
+      return false
+    }
+    await ensureNativeInlineTakeBoxPlaybackListener()
     const url = await readyNaturalTakePreview(fileURL, /\.(m4a|mp3|wav|caf|aac)$/i.test(fileURL) ? 'audio' : 'video')
     if (generation !== playbackGeneration) return false
     return await enqueueNativeOperation(async () => {
@@ -148,10 +159,11 @@ export async function stopNativeInlineTakeBoxPlayback(
     pendingOwnerId = null
   }
   await enqueueNativeOperation(async () => {
-    if (owner && activeOwnerId !== null && activeOwnerId !== owner) return
     if (!owner || activeOwnerId === owner) activeOwnerId = null
     try {
-      await BestTakeAudioPlugin.stopInlineTakeBoxPlayback({ notify: options.notify !== false })
+      // Audio-mode previews also use this native singleton. Its actual owner
+      // is authoritative even if a delayed JS ended event has not arrived yet.
+      await BestTakeAudioPlugin.stopInlineTakeBoxPlayback({ notify: options.notify !== false, ownerId: owner })
     } catch { /* ignore */ }
   })
 }
@@ -184,9 +196,17 @@ export async function setNativeInlineTakeBoxVolume(volume: number): Promise<void
 
 export async function teardownNativeInlineTakeBoxListener(): Promise<void> {
   if (endedHandlers.size > 0) return
+  await endedListenerInstall?.catch(() => {})
+  if (endedHandlers.size > 0) return
+  if (endedListenerRemoval) return endedListenerRemoval
   if (endedListenerHandle) {
-    await endedListenerHandle.remove()
+    const handle = endedListenerHandle
     endedListenerHandle = null
+    endedListenerInstalled = false
+    const removal = handle.remove().finally(() => {
+      if (endedListenerRemoval === removal) endedListenerRemoval = null
+    })
+    endedListenerRemoval = removal
+    await removal
   }
-  endedListenerInstalled = false
 }

@@ -1,10 +1,10 @@
 /**
  * Rehearsal marks on the part.
  *
- * This is a marker, not a pencil: two colours, three nibs, and an undo. A
+ * Two colours, three nibs, and reversible edits. A
  * rehearsal mark is a circled accidental, a breath, a bar number — the things
  * you scribble in a sectional and want to still be there next week. Anything
- * more (stamps, layers, shapes, a library of pens) is forScore's job.
+ * more elaborate belongs outside this small rehearsal tool.
  *
  * Points are stored per page in **page-normalised coordinates**, 0..1 of that
  * page's own box, so a mark stays where it was drawn through a rotation, a
@@ -65,6 +65,16 @@ const MAX_STROKES = 600
 
 const inkKey = (projectId: string) => `besttake:practice-chart-ink:v1:${projectId}`
 const widthKey = 'besttake:practice-chart-ink-width:v1'
+const colourKey = 'besttake:practice-chart-ink-colour:v1'
+
+export function loadInkColour(): InkColour {
+  try { return localStorage.getItem(colourKey) === 'red' ? 'red' : 'black' }
+  catch { return 'black' }
+}
+
+export function saveInkColour(colour: InkColour): void {
+  try { localStorage.setItem(colourKey, colour) } catch { /* private mode */ }
+}
 
 export function loadInkWidth(): InkWidth {
   try {

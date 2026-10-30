@@ -9,7 +9,7 @@ import ts from 'typescript'
 const source = await readFile('src/components/practiceChart/PracticeChartPaper.tsx', 'utf8')
 const ast = ts.createSourceFile('paper.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const names = [
-  'MAX_ZOOM', 'POSITION_SETTLE_MS', 'clampZoom', 'resolvedFit', 'layout', 'baseLayout',
+  'MAX_ZOOM', 'POSITION_SETTLE_MS', 'clampZoom', 'cancelDrawingPreview', 'finishErase', 'cancelActiveMarking', 'resolvedFit', 'layout', 'baseLayout',
   'stationaryHalfTurn', 'widthHalfTurn', 'stops', 'persistPosition', 'reportView', 'anchorAt',
   'clearZoomPreview', 'changeZoom', 'resetZoom', 'zoomBy', 'handleScroll', 'turn',
 ]
@@ -86,7 +86,7 @@ function fixture({ fit = 'page', halfTurn = false, width = 1194, height = 834, c
     fit, halfTurn, viewport: { width, height }, zoom,
     scrollRef: ref(scroll), stripRef: ref(strip), pendingZoomRef: ref(null), zoomOriginRef: ref(null), pendingTurnRef: ref(null),
     pinchRef: ref(null), offsetRef: ref(0), fractionRef: ref(0), previousLayoutRef: ref(null), restoredRef: ref(false),
-    drawingRef: ref(null), erasingRef: ref(null), settleRef: ref(null), flushRef: ref(null),
+    drawingRef: ref(null), drawingPreviewFrameRef: ref(null), erasingRef: ref(null), eraseEndRef: ref(undefined), settleRef: ref(null), flushRef: ref(null),
     setZoom: value => { nextZoom = value }, setOffset() {}, setDrawing() {}, onView() {}, onFraction: value => fractions.push(value),
     document: { elementFromPoint: (x, y) => obscured ? { closest: () => null } : [...queriedNodes].reverse().find(node => node.hits(x, y)) ?? null },
     window: { clearTimeout: id => timers.delete(id), setTimeout(fn) { timers.set(++timer, fn); return timer } },
@@ -195,8 +195,9 @@ for (const fit of ['page', 'width']) {
   const f = fixture({ fit, halfTurn: true })
   f.turn(1)
   const origin = f.offset
-  f.scope.drawingRef.current = { pointerId: 1 }
-  f.scope.erasingRef.current = 1
+  const capturedTarget = { hasPointerCapture: () => false, releasePointerCapture() {} }
+  f.scope.drawingRef.current = { pointerId: 1, target: capturedTarget }
+  f.scope.erasingRef.current = { pointerId: 1, target: capturedTarget }
   f.touch('touchstart', [[400, 300], [600, 300]])
   assert.equal(f.scope.drawingRef.current, null, 'A pinch cancels the pending stroke')
   assert.equal(f.scope.erasingRef.current, null, 'A pinch cancels the pending erase')

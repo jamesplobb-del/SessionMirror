@@ -71,6 +71,8 @@ import {
 } from '../utils/cameraSessionState'
 import { Filesystem, Directory } from '@capacitor/filesystem'
 import { isAppInForeground } from '../utils/appForeground'
+import { isAudioModeNativePlaybackPendingOrActive } from '../utils/audioModeNativePlayback'
+import { isNativeInlineTakeBoxPlaybackPendingOrActive } from '../utils/nativeInlineTakeBoxPlayback'
 import { reportError } from '../utils/crashReporting'
 import { showAlertOutsideTree } from '../context/ActionSheetContext'
 import type { MicInputPreference } from '../utils/appSettings'
@@ -3298,6 +3300,7 @@ export function useCameraSession({
 
   const restartCameraAfterForeground = useCallback(async (options: { force?: boolean } = {}) => {
     if (document.visibilityState === 'hidden' && !isAppInForeground()) return
+    if (isAudioModeNativePlaybackPendingOrActive() || isNativeInlineTakeBoxPlaybackPendingOrActive()) return
     if (options.force) {
       clearStaleCaptureStartState()
     }
@@ -3366,6 +3369,7 @@ export function useCameraSession({
             await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
           }
           if (restartToken !== foregroundRestartTokenRef.current) return
+          if (isAudioModeNativePlaybackPendingOrActive() || isNativeInlineTakeBoxPlaybackPendingOrActive()) return
           await acquireNativeVideoBridge()
         }
         onBeforeForegroundRestartRef.current?.()
@@ -3379,6 +3383,7 @@ export function useCameraSession({
             await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
           }
           if (restartToken !== foregroundRestartTokenRef.current) return
+          if (isAudioModeNativePlaybackPendingOrActive() || isNativeInlineTakeBoxPlaybackPendingOrActive()) return
           await acquireNativeVideoBridge()
         }
         onBeforeForegroundRestartRef.current?.()
@@ -3405,10 +3410,11 @@ export function useCameraSession({
         await new Promise((resolve) => window.setTimeout(resolve, IOS_CAMERA_RELEASE_DELAY_MS))
       }
       if (restartToken !== foregroundRestartTokenRef.current) return
+      if (isAudioModeNativePlaybackPendingOrActive() || isNativeInlineTakeBoxPlaybackPendingOrActive()) return
 
       onBeforeForegroundRestartRef.current?.()
 
-      const stream = await acquireStream(recordingModeRef.current, undefined, {
+      const stream = await acquireStream(recordingModeRef.current, () => restartToken !== foregroundRestartTokenRef.current, {
         forceNew: true,
       })
       if (restartToken !== foregroundRestartTokenRef.current) return
@@ -3546,6 +3552,9 @@ export function useCameraSession({
 
   const refreshCameraSession = useCallback(async () => {
     if (!isAppInForeground()) return
+    // Foreground retries may fire after a preview has released capture and
+    // started playback. Reopening capture here interrupts its audio session.
+    if (isAudioModeNativePlaybackPendingOrActive() || isNativeInlineTakeBoxPlaybackPendingOrActive()) return
     if (isRecordingRef.current || resumeInFlightRef.current || streamAcquireInFlightRef.current) {
       return
     }
@@ -3733,6 +3742,15 @@ export function useCameraSession({
 
   /** Drop the WebRTC capture session so native AVPlayer can own the audio route. */
   const suspendAudioCaptureForPlayback = useCallback(async () => {
+    // A foreground retry may already be waiting for capture to release. Make
+    // that old continuation stale before yielding to prepare take playback.
+    foregroundRestartTokenRef.current += 1
+    if (foregroundRestartTimerRef.current !== null) {
+      window.clearTimeout(foregroundRestartTimerRef.current)
+      foregroundRestartTimerRef.current = null
+    }
+    resumeInFlightRef.current = false
+    setIsPreviewRecovering(false)
     await suspendMicForPlayback()
     releaseLiveStream()
     if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios') {
