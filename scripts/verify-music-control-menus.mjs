@@ -30,7 +30,7 @@ function open(mode) {
     musicMenu: state.menu,
     setMusicMenu: value => { state.menu = value },
     setMusicMenuAnchor: value => { state.anchor = value },
-    setMarker: value => { state.marker = value },
+    setMarker: value => { state.marker = typeof value === 'function' ? value(state.marker) : value },
     setWorkspaceOpen: value => { state.workspace = value },
   })(mode, anchor)
 }
@@ -54,7 +54,7 @@ open('markup')
 const dismiss = productionCallback('dismissMusicMenu', {
   musicMenuAnchor: anchor,
   setMusicMenu: value => { state.menu = value },
-  setMarker: value => { state.marker = value },
+  setMarker: value => { state.marker = typeof value === 'function' ? value(state.marker) : value },
 })
 dismiss(true)
 assert.equal(state.menu, null)
@@ -152,17 +152,19 @@ function zoomButtons(tree) {
 }
 const zoom = zoomButtons(page.tree)
 assert.equal(label(zoom.reset), '100%Reset', 'Page shows the current zoom and a reset action')
-assert.equal(zoom.out.props.disabled, false)
+assert.equal(zoom.out.props.disabled, true, 'Normal fit is the minimum zoom')
 assert.equal(zoom.in.props.disabled, false)
-zoom.out.props.onClick()
-zoom.in.props.onClick()
-zoom.in.props.onClick()
-zoom.reset.props.onClick()
+const enlargedZoom = zoomButtons(render({ zoom: 1.25 }).tree)
+assert.equal(enlargedZoom.out.props.disabled, false, 'An enlarged page can zoom back out')
+enlargedZoom.out.props.onClick()
+enlargedZoom.in.props.onClick()
+enlargedZoom.in.props.onClick()
+enlargedZoom.reset.props.onClick()
 assert.deepEqual(events.splice(0), [['zoom', -1], ['zoom', 1], ['zoom', 1], ['resetZoom']], 'zoom and reset callbacks keep Page open for repeated adjustments')
 const smallest = zoomButtons(render({ zoom: .5 }).tree)
-assert.equal(smallest.out.props.disabled, true, 'zoom out stops at 50%')
+assert.equal(smallest.out.props.disabled, true, 'An out-of-range small value also disables zoom out')
 assert.equal(smallest.in.props.disabled, false)
-assert.equal(label(smallest.reset), '50%Reset')
+assert.equal(label(smallest.reset), '100%Reset', 'The displayed lower bound is the normal page fit')
 const largest = zoomButtons(render({ zoom: 3 }).tree)
 assert.equal(largest.in.props.disabled, true, 'zoom in stops at 300%')
 assert.equal(largest.out.props.disabled, false)

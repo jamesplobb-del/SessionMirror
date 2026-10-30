@@ -121,7 +121,7 @@ export function layoutChartStrip(
   const baseScale = fit === 'width'
     ? viewWidth / widest
     : Math.min((viewWidth - (columns - 1) * SPREAD_GUTTER) / (widest * columns), viewHeight / tallest)
-  const scale = baseScale * Math.max(0.5, zoom)
+  const scale = baseScale * Math.max(1, zoom)
   const contentWidth = Math.max(viewWidth,
     ...Array.from({ length: Math.ceil(pages.length / columns) }, (_, rowIndex) => {
       const row = pages.slice(rowIndex * columns, (rowIndex + 1) * columns)

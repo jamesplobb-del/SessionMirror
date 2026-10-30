@@ -47,6 +47,8 @@ interface PracticeChartPaperProps {
   strokes: readonly InkStroke[]
   /** What is in hand — a marker colour, the eraser, or nothing. */
   marker: InkTool | null
+  /** Hide the palette while keeping the current drawing tool active. */
+  onMarkStart: () => void
   /** Nib the current marks are drawn with. */
   inkWidth: InkWidth
   onStroke: (stroke: InkStroke) => void
@@ -64,7 +66,7 @@ const ERASER_RADIUS_PX = 17
 const POSITION_SETTLE_MS = 450
 const MAX_ZOOM = 3
 
-const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(.5, value))
+const clampZoom = (value: number) => Math.min(MAX_ZOOM, Math.max(1, value))
 
 interface ZoomAnchor {
   page: number
@@ -76,7 +78,7 @@ interface ZoomAnchor {
 
 export default function PracticeChartPaper({
   chart, fit, halfTurn, initialFraction, handleRef, onView, onZoom, onFraction, onError, onLoadFailed,
-  onSpreadAvailable, strokes, marker, inkWidth, onStroke, onErase,
+  onSpreadAvailable, strokes, marker, onMarkStart, inkWidth, onStroke, onErase,
 }: PracticeChartPaperProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -268,8 +270,17 @@ export default function PracticeChartPaper({
   const [drawing, setDrawing] = useState<{ page: number; points: number[] } | null>(null)
   const drawingRef = useRef<{ pointerId: number; page: number; points: number[] } | null>(null)
 
+  const prepareMarking = useCallback(() => {
+    const selection = document.getSelection()
+    const score = scrollRef.current
+    if (selection && score && (score.contains(selection.anchorNode) || score.contains(selection.focusNode))) {
+      selection.removeAllRanges()
+    }
+    onMarkStart()
+  }, [onMarkStart])
+
   const beginStroke = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isInkColour(marker) || event.button !== 0 || drawingRef.current) return
+    if (!isInkColour(marker) || !event.isPrimary || event.button !== 0 || drawingRef.current) return
     const box = event.currentTarget.getBoundingClientRect()
     if (box.width <= 0 || box.height <= 0) return
     const point = [(event.clientX - box.left) / box.width, (event.clientY - box.top) / box.height]
@@ -277,7 +288,8 @@ export default function PracticeChartPaper({
     setDrawing({ page, points: point })
     event.currentTarget.setPointerCapture(event.pointerId)
     event.preventDefault()
-  }, [marker])
+    prepareMarking()
+  }, [marker, prepareMarking])
 
   const extendStroke = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const active = drawingRef.current
@@ -340,14 +352,15 @@ export default function PracticeChartPaper({
   }, [onErase])
 
   const beginErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || erasingRef.current !== null) return
+    if (!event.isPrimary || event.button !== 0 || erasingRef.current !== null) return
     erasingRef.current = event.pointerId
     event.currentTarget.setPointerCapture(event.pointerId)
     event.preventDefault()
+    prepareMarking()
     // A first touch may become a two-finger pinch. Wait for movement before
     // erasing so zooming with the eraser selected cannot delete a mark.
     if (event.pointerType !== 'touch') eraseAtEvent(page, event)
-  }, [eraseAtEvent])
+  }, [eraseAtEvent, prepareMarking])
 
   const extendErase = useCallback((page: number, event: ReactPointerEvent<HTMLDivElement>) => {
     if (erasingRef.current !== event.pointerId) return
@@ -662,6 +675,8 @@ export default function PracticeChartPaper({
       ref={scrollRef}
       className={`practice-chart-scroll${stationaryHalfTurn ? ' practice-chart-scroll--half-turn' : ''}${zoom !== 1 ? ' practice-chart-scroll--zoomed' : ''}`}
       onScroll={handleScroll}
+      onContextMenu={event => event.preventDefault()}
+      onDragStart={event => event.preventDefault()}
       role="document"
       aria-label={`${chart.fileName}${ready ? `, ${layout.tops.length} page${layout.tops.length === 1 ? '' : 's'}` : ''}`}
     >

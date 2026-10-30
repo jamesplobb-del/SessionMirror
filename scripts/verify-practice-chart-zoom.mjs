@@ -128,8 +128,15 @@ for (const fit of ['page', 'spread', 'width', 'auto']) {
       const f = fixture({ fit, halfTurn })
       f.turn(1); f.turn(1)
       const origin = f.offset, baseStops = f.api.stops, baseWidth = f.api.layout.widths[0]
-      f.zoomBy(zoomDirection)
-      assert.equal(f.zoom, 1 + zoomDirection * .25, `${fit} permits zoom in and out`)
+      f.zoomBy(-1)
+      assert.equal(f.zoom, 1, `${fit} cannot zoom out below its normal fit`)
+      near(f.offset, origin, 'Attempting to shrink below normal fit preserves the reading position')
+      const inspect = () => {
+        if (zoomDirection === -1) { f.zoomBy(1); f.zoomBy(1) }
+        f.zoomBy(zoomDirection)
+      }
+      inspect()
+      assert.equal(f.zoom, 1.25, `${fit} permits enlarging and reducing an enlarged page`)
       near(f.api.layout.widths[0], baseWidth * f.zoom, `${fit} applies the actual scale`)
       f.pan(f.api.layout.maxScroll * .7)
       f.turn(1)
@@ -139,10 +146,10 @@ for (const fit of ['page', 'spread', 'width', 'auto']) {
       if (halfTurn) near(f.scroll.scrollTop, 0, 'Half turn keeps the viewport fixed')
       assert.equal(f.timers.size, 0, 'Turn cancels the old position save')
       const forward = f.offset
-      f.zoomBy(zoomDirection); f.pan(f.api.layout.maxScroll * .8); f.turn(-1)
+      inspect(); f.pan(f.api.layout.maxScroll * .8); f.turn(-1)
       near(f.offset, geometry.nextChartStop(baseStops, forward, -1) ?? forward, 'Back reverses one base stop')
       const beforeReset = f.offset
-      f.zoomBy(zoomDirection); f.pan(f.api.layout.maxScroll * .75); f.reset()
+      inspect(); f.pan(f.api.layout.maxScroll * .75); f.reset()
       near(f.offset, beforeReset, 'Reset restores the inspection origin')
       f.close(); scenarios++
     }
@@ -153,8 +160,10 @@ for (const fit of ['page', 'spread', 'width']) {
   const f = fixture({ fit, halfTurn: true })
   f.turn(1)
   const origin = f.offset
-  for (const direction of [-1, 1]) {
-    f.zoomBy(direction); f.pan(f.api.layout.maxScroll * .8); f.zoomBy(-direction)
+  for (const steps of [1, 2]) {
+    for (let i = 0; i < steps; i++) f.zoomBy(1)
+    f.pan(f.api.layout.maxScroll * .8)
+    for (let i = 0; i < steps; i++) f.zoomBy(-1)
     assert.equal(f.zoom, 1)
     near(f.offset, origin, 'Crossing back to exactly 1× restores the original half stop')
     assert.equal(f.scope.zoomOriginRef.current, null, 'The completed inspection releases its saved origin')
@@ -166,8 +175,8 @@ for (const fit of ['page', 'spread', 'width']) {
   const f = fixture()
   const baseWidth = f.api.layout.widths[0]
   for (let i = 0; i < 20; i++) f.zoomBy(-1)
-  assert.equal(f.zoom, .5, 'Zoom out stops at 50%')
-  near(f.api.layout.widths[0], baseWidth / 2, '50% is smaller than the fitted page')
+  assert.equal(f.zoom, 1, 'Zoom out stops at 100%')
+  near(f.api.layout.widths[0], baseWidth, 'Repeated zoom-out attempts preserve the fitted page size')
   for (let i = 0; i < 30; i++) f.zoomBy(1)
   assert.equal(f.zoom, 3, 'Zoom in stops at 300%')
   f.reset(); f.turn(-1)
@@ -197,6 +206,12 @@ for (const fit of ['page', 'width']) {
   near(f.offset, origin, 'A same-scale pinch cannot change the half stop')
   near(f.scroll.scrollTop, 0, 'A same-scale pinch cannot scroll the fixed half-turn viewport')
   assert.equal(f.style.transform, undefined, 'Same-scale finish removes the preview')
+  f.touch('touchstart', [[400, 300], [600, 300]])
+  f.touch('touchmove', [[450, 300], [550, 300]])
+  assert.match(f.style.transform, /scale\(1\)/, 'Pinching inward at normal fit cannot preview a smaller page')
+  f.touch('touchend', [])
+  assert.equal(f.zoom, 1, 'Pinching inward cannot commit a scale below normal fit')
+  near(f.offset, origin, 'A bounded inward pinch preserves the original reading stop')
   f.touch('touchstart', [[400, 300], [600, 300]])
   f.touch('touchmove', [[300, 300], [700, 300]])
   assert.match(f.style.transform, /scale\(2\)/, 'Pinching previews without committing a new layout')

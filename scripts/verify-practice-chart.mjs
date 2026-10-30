@@ -259,15 +259,17 @@ console.log('Practice chart: two-page spreads, odd last pages and mixed page siz
 
 console.log('Practice chart: pinch zoom geometry passed.')
 
-// All fit modes can zoom out without changing page proportions. Normal fitted
-// pages keep their full-height slots; fill-width reading keeps its strip.
+// Zooming out stops at the normal fit in every mode. Reject undersized scales
+// at the geometry boundary as well as in the controls and pinch handler.
 for (const fit of ['page', 'spread', 'width']) {
   const base = layoutChartStrip(part(4), ...LANDSCAPE, fit)
-  const reduced = layoutChartStrip(part(4), ...LANDSCAPE, fit, 0.5)
-  assert.ok(near(reduced.widths[0], base.widths[0] / 2), `${fit} can zoom out to half size`)
-  assert.ok(near(reduced.heights[0], base.heights[0] / 2), `${fit} zoom preserves aspect ratio`)
-  assert.deepEqual(layoutChartStrip(part(4), ...LANDSCAPE, fit, 0.1), reduced, 'Zoom has a usable lower bound')
-  if (fit !== 'width') assert.equal(reduced.rows[0].height, LANDSCAPE[1], 'Zooming out keeps fitted navigation slots')
+  for (const requested of [-1, 0, 0.1, 0.5, 0.99]) {
+    assert.deepEqual(layoutChartStrip(part(4), ...LANDSCAPE, fit, requested), base,
+      `${fit} cannot shrink below its normal fit, even when ${requested} is requested`)
+  }
+  const enlarged = layoutChartStrip(part(4), ...LANDSCAPE, fit, 1.25)
+  assert.ok(near(enlarged.widths[0], base.widths[0] * 1.25), `${fit} can enlarge above the normal fit`)
+  assert.ok(near(enlarged.heights[0], base.heights[0] * 1.25), `${fit} zoom preserves aspect ratio`)
 }
 
 // Page and spread mode already have one screen per row: the new screen-sized
@@ -353,7 +355,7 @@ for (const height of [0, -1, NaN, Infinity]) {
 }
 assert.deepEqual(chartScreenHalfTurnBands({ ...tallWidth, total: 0 }, 0, bandHeight), [])
 
-console.log('Practice chart: zoom out and stationary screen-sized half turns across tall/mixed pages and final partial bands passed.')
+console.log('Practice chart: normal-fit zoom minimum and stationary screen-sized half turns across tall/mixed pages and final partial bands passed.')
 
 // Odd page counts cannot use a percentage of spread count to preserve a page.
 {

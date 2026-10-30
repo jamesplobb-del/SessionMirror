@@ -10,7 +10,7 @@ const scheme = 'AppInternalPreview'
 const configuration = 'InternalPreview'
 const team = 'X24D9LKQ58'
 const version = '4.2'
-const build = '28'
+const build = '29'
 export const previewMarker = 'BESTTAKE_INTERNAL_PLUS_PREVIEW_BUILD_1'
 const swiftFlag = 'BESTTAKE_INTERNAL_PLUS_PREVIEW'
 const defaultArchive = join(root, `build/internal-plus-preview-${version}-${build}/BestTake-${version}-${build}-InternalPreview.xcarchive`)
@@ -84,7 +84,7 @@ function checkConfig() {
   const podfile = readFileSync(join(ios, 'Podfile'), 'utf8')
   assert.match(podfile, /'InternalPreview'\s*=>\s*:release/, 'CocoaPods must map the preview configuration to release')
   validateExportOptions(readPlist(join(ios, 'InternalPreviewExportOptions.plist')))
-  console.log('PASS: preview is enabled only for App/InternalPreview; normal Debug/Release and extension remain off; build 4.2 (28); export is internal-only.')
+  console.log('PASS: preview is enabled only for App/InternalPreview; normal Debug/Release and extension remain off; build 4.2 (29); export is internal-only.')
 }
 
 function checkProfile(bundle, expectedBundle) {
@@ -138,8 +138,8 @@ function usage() {
   console.log(`Usage: node scripts/internal-plus-preview.mjs <mode> [path] [export-directory]
   check-config                  Validate build separation and fixed export options.
   archive [archive-path]        Archive AppInternalPreview; never uploads.
-  check-internal <archive>      Require build28, internal scheme/marker, profiles and signatures.
-  check-release <archive|app>   Reject the preview marker in a normal build28 artifact.
+  check-internal <archive>      Require build29, internal scheme/marker, profiles and signatures.
+  check-release <archive|app>   Reject the preview marker in a normal build29 artifact.
   export <archive> [directory]  Verify then UPLOAD for internal TestFlight testing only.
 
 Before archive: build/sync the web app and run CocoaPods install after adding InternalPreview.
@@ -175,7 +175,7 @@ function main(args) {
     else {
       assert.ok(path.endsWith('.app'), 'Expected an .app or .xcarchive path')
       checkApp(resolve(path), false)
-      console.log('PASS: normal build28 app and extension contain no internal-preview marker.')
+      console.log('PASS: normal build29 app and extension contain no internal-preview marker.')
     }
   } else if (mode === 'export') {
     assert.ok(path, 'export requires an archive path')
@@ -183,7 +183,7 @@ function main(args) {
     const archive = checkArchive(path, true)
     const directory = resolve(destination ?? join(dirname(archive), 'export-internal-preview'))
     const options = writeForcedExportOptions(directory)
-    console.log('Uploading build28 with testFlightInternalTestingOnly=true. This export cannot request external testing or App Review.')
+    console.log('Uploading build29 with testFlightInternalTestingOnly=true. This export cannot request external testing or App Review.')
     run('xcodebuild', ['-exportArchive', '-archivePath', archive, '-exportPath', directory,
       '-exportOptionsPlist', options, '-allowProvisioningUpdates'], { stdio: 'inherit' })
   } else {

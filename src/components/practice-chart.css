@@ -93,6 +93,16 @@ body:has(.app-shell--music-page .practice-chart-paper[data-controls-hidden='true
   touch-action: pan-y;
 }
 
+/* The score is a drawing surface, not selectable web content. Keep native
+ * selection handles, image callouts and tap flashes out of the ink gesture. */
+.practice-chart-scroll, .practice-chart-scroll * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.practice-chart-page img { -webkit-user-drag: none; }
+
 /* Tablet music stand: collapsed tools have one predictable rail. The score
  * uses the rest of the width, so no floating control can cover a stave. */
 @media (min-width: 700px) {
@@ -802,11 +812,17 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
   .practice-chart-workspace button { min-width: 0; flex-direction: column; gap: 3px; padding: 6px 3px; font-size: 10px; }
   .practice-chart-controls .practice-chart-control { padding: 0 8px; font-size: 10px; min-height: 44px; }
   .practice-chart-controls .practice-chart-control--mark-up span,
+  .practice-chart-controls .practice-chart-control--done-marking span,
+  .practice-chart-controls[data-marking='true'] .practice-chart-control--start span,
   .practice-chart-controls .practice-chart-control--page span { display: none; }
 }
 
 /* While marking, they step back so a stroke near a corner is not a mis-tap. */
 .practice-chart-controls[data-dim='true'] { opacity: 0.35; }
+.practice-chart-control--done-marking { min-width: 44px; }
+@media (max-width: 380px) {
+  .practice-chart-controls[data-marking='true'] [aria-controls='music-workspace-tools'] span { display: none; }
+}
 
 .practice-chart-control {
   display: inline-flex;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
-import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
+import { ArrowLeft, AudioLines, Check, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -438,6 +438,27 @@ export default function PracticeChartLayer({
     if (restoreFocus && musicMenuAnchor?.isConnected) musicMenuAnchor.focus({ preventScroll: true })
   }, [musicMenuAnchor])
 
+  const tuckMarkupMenu = useCallback(() => {
+    // Put the palette away without putting down the selected pen or eraser.
+    setMusicMenu(null)
+  }, [])
+
+  const finishMarkingOnEscape = useCallback((event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return
+    // A setlist or modal owns Escape until it closes; do not move focus behind it.
+    const popupOpen = [...document.querySelectorAll<HTMLElement>('[role="menu"], [role="dialog"][aria-modal="true"]')]
+      .some(node => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden')
+    if (popupOpen) return
+    event.preventDefault()
+    dismissMusicMenu(true)
+  }, [dismissMusicMenu])
+  useEffect(() => {
+    if (!showing || !marker || musicMenu) return
+    // The disappearing palette may leave focus on the document body.
+    document.addEventListener('keydown', finishMarkingOnEscape)
+    return () => document.removeEventListener('keydown', finishMarkingOnEscape)
+  }, [finishMarkingOnEscape, marker, musicMenu, showing])
+
   const openMusicMenu = useCallback((mode: MusicMenuMode, anchor: HTMLElement) => {
     setWorkspaceOpen(false)
     setMusicMenuAnchor(anchor)
@@ -448,7 +469,7 @@ export default function PracticeChartLayer({
     }
     setMusicMenu(mode)
     // Page always returns to reading, regardless of the last opened menu.
-    setMarker(mode === 'markup' ? 'black' : null)
+    setMarker(current => mode === 'markup' ? current ?? 'black' : null)
   }, [musicMenu])
 
   /*
@@ -674,6 +695,7 @@ export default function PracticeChartLayer({
           onSpreadAvailable={handleSpreadAvailable}
           strokes={strokes}
           marker={marker}
+          onMarkStart={tuckMarkupMenu}
           inkWidth={inkWidth}
           onStroke={handleStroke}
           onErase={eraseAt}
@@ -681,21 +703,23 @@ export default function PracticeChartLayer({
         {reading && <button type="button" className="practice-chart-reveal" onClick={() => revealControls(true)}>Show music controls</button>}
         <div ref={topbar} className="practice-chart-topbar" inert={reading} aria-hidden={reading}>
         <div className="practice-chart-tools">
-        <div className="practice-chart-controls" data-dim={marker ? 'true' : undefined}>
+        <div className="practice-chart-controls" data-marking={marker ? 'true' : undefined} data-dim={marker && musicMenu === 'markup' ? 'true' : undefined}>
           {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
           <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" data-music-menu-trigger="page" aria-haspopup="dialog" aria-expanded={musicMenu === 'page'} aria-controls={`${musicMenuId}-page`} onClick={event => openMusicMenu('page', event.currentTarget)}><FileMusic aria-hidden /><span>Page</span></button>
           <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" data-music-menu-trigger="markup" aria-haspopup="dialog" aria-expanded={musicMenu === 'markup'} aria-controls={`${musicMenuId}-markup`} onClick={event => openMusicMenu('markup', event.currentTarget)}><Pen aria-hidden /><span>Mark up</span></button>
+          {marker && musicMenu !== 'markup' && <button type="button" className="practice-chart-control practice-chart-control--done-marking" aria-label="Done marking" onClick={() => dismissMusicMenu(true)}><Check aria-hidden /><span>Done</span></button>}
           <button
             type="button"
             className="practice-chart-control practice-chart-control--start"
+            aria-label={chromeOff ? 'Exit full screen' : 'Full screen'}
             aria-pressed={chromeOff}
             onClick={() => setChromeOff(!chromeOff)}
           >
             {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
-          <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-expanded={workspaceOpen}
+          <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-label="Workspace" aria-expanded={workspaceOpen}
             data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => { dismissMusicMenu(); setWorkspaceOpen(value => !value) }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>

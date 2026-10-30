@@ -158,7 +158,7 @@ export default function MusicWidget({
   }, [menuMode, onDismiss, open])
 
   const turnable = hasChart && paperVisible && (pageView?.count ?? 0) > 0
-  const currentZoom = Math.min(3, Math.max(.5, Number.isFinite(zoom) ? zoom : 1))
+  const currentZoom = Math.min(3, Math.max(1, Number.isFinite(zoom) ? zoom : 1))
   const zoomPercent = Math.round(currentZoom * 100)
   const activeFit = fit === 'auto' ? spreadAvailable ? 'spread' : 'page' : fit
   const fitOptions: { value: ChartFitPreference; label: string; detail: string }[] = [
@@ -207,7 +207,7 @@ export default function MusicWidget({
         </div>
         <div className="music-control-menu__section music-control-menu__zoom" role="group" aria-label="Zoom" aria-describedby={`${menuId}-zoom-hint`}>
           <div className="music-control-menu__zoom-controls">
-            <button type="button" aria-label="Zoom out" disabled={!turnable || currentZoom <= .5} onClick={() => onZoomChange(-1)}><ZoomOut aria-hidden /></button>
+            <button type="button" aria-label="Zoom out" disabled={!turnable || currentZoom <= 1} onClick={() => onZoomChange(-1)}><ZoomOut aria-hidden /></button>
             <button type="button" className="music-control-menu__zoom-reset" aria-label={`Reset zoom to 100%, current zoom ${zoomPercent}%`} disabled={!turnable} onClick={onResetZoom}>
               <span aria-live="polite">{zoomPercent}%</span><small>Reset</small>
             </button>
