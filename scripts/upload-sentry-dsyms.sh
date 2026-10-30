@@ -3,7 +3,7 @@
 set -eu
 
 # Debug builds do not produce the release symbols Sentry needs.
-if [ "${CONFIGURATION:-}" != "Release" ]; then
+if [ "${CONFIGURATION:-}" != "Release" ] && [ "${CONFIGURATION:-}" != "InternalPreview" ]; then
   [ -n "${SCRIPT_OUTPUT_FILE_0:-}" ] && touch "$SCRIPT_OUTPUT_FILE_0"
   exit 0
 fi

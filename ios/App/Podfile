@@ -3,6 +3,9 @@ require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 platform :ios, '15.0'
 use_frameworks!
 
+# Keep the personal preview separate from ordinary Debug/Release builds.
+project 'App', 'Debug' => :debug, 'Release' => :release, 'InternalPreview' => :release
+
 # workaround to avoid Xcode caching of Pods that requires
 # Product -> Clean Build Folder after new Cordova plugins installed
 # Requires CocoaPods 1.6 or newer

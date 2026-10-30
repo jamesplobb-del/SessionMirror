@@ -2,7 +2,8 @@ import Capacitor
 import StoreKit
 import UIKit
 
-/// Only verified StoreKit transactions grant access in every build and environment.
+/// Purchase and trial access require verified StoreKit transactions.
+/// A separately compiled internal build may expose a clearly dated beta preview.
 @objc(OfferCodesPlugin)
 public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "OfferCodesPlugin"
@@ -26,6 +27,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     private var productError: String?
     private var productAttempts: [PlusProductAttempt] = []
     private var statusRevision = 0
+    private var lastVerifiedSnapshot: [String: Any]?
     private var lastPurchaseReport: String?
     private var diagnosing = false
     private var presenting = false
@@ -48,6 +50,43 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     deinit { updatesTask?.cancel() }
+
+    @MainActor private func internalPreviewExpiresAt() -> Double? {
+        #if BESTTAKE_INTERNAL_PLUS_PREVIEW
+        #if targetEnvironment(simulator)
+        let simulator = true
+        #else
+        let simulator = false
+        #endif
+        let receiptFilename = Bundle.main.appStoreReceiptURL?.lastPathComponent
+        guard simulator || receiptFilename == "sandboxReceipt" else { return nil }
+        let key = "besttake.plus.internal-preview.2026-11-14.last-clock"
+        let now = Date().timeIntervalSince1970
+        let previous = UserDefaults.standard.double(forKey: key)
+        guard now.isFinite, previous.isFinite else { return nil }
+        // Keep a separate watermark; this never consumes or extends the StoreKit trial.
+        UserDefaults.standard.set(max(now, previous), forKey: key)
+        return PlusInternalPreviewPolicy.expiry(now: now, lastObserved: previous,
+            receiptFilename: receiptFilename, simulator: simulator).map { $0 * 1000 }
+        #else
+        return nil
+        #endif
+    }
+
+    @MainActor private func immediateInternalPreviewStatus() -> [String: Any]? {
+        guard let expiresAt = internalPreviewExpiresAt() else { return nil }
+        // Access to the internal preview must not wait for any StoreKit request.
+        // Reuse only previously verified purchase/trial facts, if any are available.
+        var status = lastVerifiedSnapshot ?? [
+            "purchased": false, "trialStartedAt": NSNull(), "trialExpiresAt": NSNull(),
+            "price": NSNull(), "purchaseAvailable": false, "trialAvailable": false,
+            "productError": NSNull(),
+        ]
+        // Do not relabel older verified facts as a newer transaction revision.
+        if status["statusRevision"] == nil { status["statusRevision"] = statusRevision }
+        status["internalPreviewExpiresAt"] = expiresAt
+        return status
+    }
 
     @MainActor private func usesSandboxStorage() async -> Bool {
         #if DEBUG
@@ -94,8 +133,9 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
         let end = trialStart.map { $0.timeIntervalSince1970 + 7 * 24 * 60 * 60 }
         let expiry: Double? = end.map { lastClock > $0 ? min(now, $0) : $0 }
         let paymentsAllowed = AppStore.canMakePayments
-        return [
+        let status: [String: Any] = [
             "statusRevision": revision,
+            "internalPreviewExpiresAt": internalPreviewExpiresAt() as Any? ?? NSNull(),
             "purchased": purchased,
             "trialStartedAt": start.map { $0 * 1000 } as Any? ?? NSNull(),
             "trialExpiresAt": expiry.map { $0 * 1000 } as Any? ?? NSNull(),
@@ -104,6 +144,8 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
             "trialAvailable": paymentsAllowed && storedTrial == 0 && trialStart == nil && products[trialID]?.type == .nonConsumable && products[trialID]?.price == 0,
             "productError": (paymentsAllowed ? productError : "In-app purchases are not allowed on this device. Check Screen Time or device restrictions.") as Any? ?? NSNull(),
         ]
+        if revision == statusRevision { lastVerifiedSnapshot = status }
+        return status
     }
 
     @MainActor private func loadProducts() async {
@@ -138,12 +180,19 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getStatus(_ call: CAPPluginCall) {
         Task { @MainActor in
+            let preview = immediateInternalPreviewStatus()
+            if let preview {
+                notifyListeners("plusChanged", data: preview)
+                call.resolve(preview)
+            }
             // Keep verified access usable while the storefront request is pending.
             notifyListeners("plusChanged", data: await snapshot())
             if !presenting && (call.getBool("refreshProducts") == true || products.count < 2 || productError != nil) {
                 await loadProducts()
             }
-            call.resolve(await snapshot())
+            let status = await snapshot()
+            if preview == nil { call.resolve(status) }
+            else { notifyListeners("plusChanged", data: status) }
         }
     }
 
@@ -225,7 +274,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
             async let legacy = legacyProbe.read([lifetimeID, trialID])
             let (storefrontReport, legacyReport) = await (storefront, legacy)
             let info = Bundle.main.infoDictionary ?? [:]
-            let report = [
+            var lines = [
                 "BestTake purchase diagnostic",
                 "Recorded: \(ISO8601DateFormatter().string(from: Date()))",
                 "App: \(info["CFBundleShortVersionString"] as? String ?? "unknown") (\(info["CFBundleVersion"] as? String ?? "unknown"))",
@@ -240,7 +289,11 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                 "Read-only StoreKit 1 diagnostic (not used for purchases):",
                 legacyReport,
                 "This report contains no Apple Account identity, receipt contents, transaction data, or credentials."
-            ].joined(separator: "\n")
+            ]
+            #if BESTTAKE_INTERNAL_PLUS_PREVIEW
+            lines.append("Internal build: BESTTAKE_INTERNAL_PLUS_PREVIEW_BUILD_1; preview ends 2026-11-14T04:59:59Z")
+            #endif
+            let report = lines.joined(separator: "\n")
             lastPurchaseReport = report
             call.resolve(["report": report])
         }
@@ -493,5 +546,25 @@ private struct PlusProductLookupResult {
         request?.cancel(); timeout?.cancel()
         request = nil; timeout = nil
         continuation.resume(returning: "\(report); duration=\(elapsed)ms")
+    }
+}
+
+// MARK: - Internal Plus preview policy
+
+/// The export pipeline separately restricts this opt-in build to internal TestFlight.
+/// Receipt naming is an environment check, not proof of an internal tester's identity.
+private enum PlusInternalPreviewPolicy {
+    static func expiry(now: TimeInterval, lastObserved: TimeInterval,
+                       receiptFilename: String?, simulator: Bool) -> TimeInterval? {
+        #if BESTTAKE_INTERNAL_PLUS_PREVIEW
+        let startsAt: TimeInterval = 1_793_318_400 // 2026-10-30T00:00:00Z
+        let expiresAt: TimeInterval = 1_794_632_399 // 2026-11-14T04:59:59Z
+        guard simulator || receiptFilename == "sandboxReceipt",
+              now.isFinite, lastObserved.isFinite, lastObserved >= 0,
+              now >= startsAt, now < expiresAt, now >= lastObserved else { return nil }
+        return expiresAt
+        #else
+        return nil
+        #endif
     }
 }

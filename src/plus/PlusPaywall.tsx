@@ -3,7 +3,7 @@ import { Check, LockKeyhole, X } from 'lucide-react'
 import AnimatedBottomSheet from '../components/ui/AnimatedBottomSheet'
 import { redeemOfferCode } from '../utils/offerCodes'
 import { closePlus, copyPlusPurchaseReport, diagnosePlusPurchases, getPlusRequest, getPlusSnapshot, initializePlusAccess, purchasePlus, refreshPlusAccess, restorePlus, showPlus, startPlusTrial, subscribePlusRequest } from './plusAccess'
-import { PLUS_FEATURES, type PlusFeature } from './plusPolicy'
+import { hasInternalPlusPreview, PLUS_FEATURES, type PlusFeature } from './plusPolicy'
 import { usePlus } from './usePlus'
 import './plus.css'
 
@@ -104,6 +104,7 @@ export default function PlusPaywall() {
   }
   const copy = PLUS_FEATURES[request?.feature ?? 'handsfree']
   const permanent = plus.purchased
+  const internalPreview = !permanent && hasInternalPlusPreview(plus, Date.now())
   return <AnimatedBottomSheet isOpen={request !== null} onClose={() => { if (!busyRef.current) closePlus() }} ariaLabel="BestTake Plus" elevated elevatedLight zClass={{ backdrop: 'z-[99998]', sheet: 'z-[99999]' }}>
     <div className="plus-sheet" ref={panel} onKeyDown={event => {
       if (event.key !== 'Tab') return
@@ -113,25 +114,26 @@ export default function PlusPaywall() {
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }}>
       <div className="plus-sheet__top"><span>BESTTAKE PLUS</span><button aria-label="Close Plus" disabled={busy} onClick={() => { if (!busyRef.current) closePlus() }}><X /></button></div>
-      <h2>{permanent ? 'BestTake Plus is unlocked' : copy.title}</h2>
-      <p>{permanent ? 'Your one-time purchase is active.' : copy.detail}</p>
+      <h2>{permanent ? 'BestTake Plus is unlocked' : internalPreview ? 'Your temporary Plus access is ready' : copy.title}</h2>
+      <p>{permanent ? 'Your one-time purchase is active.' : internalPreview ? 'All Plus features are available in this internal test version. No purchase is needed.' : copy.detail}</p>
       <ul className="plus-sheet__features">{['Hands-free recording and playback', 'Scores, backing tracks, and YouTube references', 'Pitch Insights', 'Unlimited routines and more multitrack boxes', 'Medium and Hard Staff Jumper levels'].map(item => <li key={item}><Check aria-hidden />{item}</li>)}</ul>
-      {plus.active && !permanent && plus.trialExpiresAt && <p className="plus-sheet__trial" role="status">Your preview ends {new Date(plus.trialExpiresAt).toLocaleDateString()}. No automatic charge.</p>}
+      {internalPreview && <p className="plus-sheet__trial" role="status">Temporary test access ends {new Date(plus.internalPreviewExpiresAt!).toLocaleDateString()}. No charge. Your recordings and files stay saved.</p>}
+      {plus.active && !permanent && !internalPreview && plus.trialExpiresAt && <p className="plus-sheet__trial" role="status">Your preview ends {new Date(plus.trialExpiresAt).toLocaleDateString()}. No automatic charge.</p>}
       {!plus.active && plus.trialStartedAt !== null && <p className="plus-sheet__trial">Your seven-day preview has ended. Your recordings and files are still saved.</p>}
-      {!permanent && <div className="plus-sheet__actions">
+      {!permanent && !internalPreview && <div className="plus-sheet__actions">
         {!plus.active && plus.trialStartedAt === null && <button className="plus-primary" disabled={busy || !plus.ready || !plus.trialAvailable} onClick={() => void perform(startPlusTrial)}>Try Plus free for 7 days</button>}
         <button className={plus.trialStartedAt === null ? 'plus-secondary' : 'plus-primary'} disabled={busy || !plus.purchaseAvailable} onClick={() => void perform(purchasePlus)}>{plus.price ? `Unlock forever · ${plus.price}` : 'App Store purchase unavailable'}</button>
         <p className="plus-sheet__terms">One payment. No subscription. After the preview, you choose whether to buy. Learn, Balance, and your basic practice tools stay free.</p>
         {(!plus.purchaseAvailable || plus.productError) && <button className="plus-link" disabled={busy || plus.refreshing} onClick={() => { if (busyRef.current) return; setError(''); setMessage(''); void refreshPlusAccess(true) }}>{plus.refreshing ? 'Checking App Store…' : 'Check App Store availability'}</button>}
       </div>}
-      {permanent && <button className="plus-primary" onClick={() => closePlus(true)}>Continue practicing</button>}
+      {(permanent || internalPreview) && <button className="plus-primary" onClick={() => closePlus(true)}>Continue practicing</button>}
       <div className="plus-sheet__links"><button disabled={busy} onClick={() => void perform(restorePlus, true)}>Restore purchases</button><button disabled={busy} onClick={() => setCodesOpen(value => !value)}>App Store offer codes</button></div>
       {codesOpen && <AppStoreOfferCodePanel disabled={busy} onBusyChange={value => { busyRef.current = value; setBusy(value) }} />}
-      {!permanent && <p className="plus-sheet__terms">When the preview ends, music tools, hands-free, Insights, and expanded limits require Plus. Your existing work stays saved.</p>}
+      {!permanent && !internalPreview && <p className="plus-sheet__terms">When the preview ends, music tools, hands-free, Insights, and expanded limits require Plus. Your existing work stays saved.</p>}
       {busy && <p role="status">{checkingPurchases ? 'Running purchase check…' : copyingReport ? 'Copying report…' : 'Waiting for the App Store…'}</p>}
-      {plus.refreshing && !busy && <p role="status">Checking App Store purchase options…</p>}
-      {(error || plus.error) && <p className="plus-error" role="alert">{error || plus.error}</p>}
-      {!permanent && !plus.refreshing && plus.productError && !error && !plus.error && <p className="plus-error" role="alert">{plus.productError}</p>}
+      {plus.refreshing && !busy && !internalPreview && <p role="status">Checking App Store purchase options…</p>}
+      {(error || (!internalPreview && plus.error)) && <p className="plus-error" role="alert">{error || plus.error}</p>}
+      {!permanent && !internalPreview && !plus.refreshing && plus.productError && !error && !plus.error && <p className="plus-error" role="alert">{plus.productError}</p>}
       {!permanent && (plus.productError || purchaseReport) && <section className="plus-purchase-check" aria-labelledby="plus-purchase-check-title">
         <h3 id="plus-purchase-check-title">Purchase support check</h3>
         <p>This check does not make a purchase. The report stays on this device until you choose to share it.</p>

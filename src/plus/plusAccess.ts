@@ -28,7 +28,7 @@ export const plusBridge = registerPlugin<PlusBridge>('OfferCodes')
 const bridge = plusBridge
 const native = Capacitor.getPlatform() === 'ios'
 let state: PlusStatus = { ready: false, refreshing: false, active: false, purchased: false, trialStartedAt: null, trialExpiresAt: null,
-  price: null, purchaseAvailable: false, trialAvailable: false, productError: null, error: null }
+  internalPreviewExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, productError: null, error: null }
 const listeners = new Set<() => void>()
 let initialized = false
 let refreshing: Promise<void> | null = null
@@ -36,6 +36,7 @@ let refreshingProducts = false
 let queuedProductRefresh = false
 let actionStatusVersion = 0
 let latestNativeRevision = -1
+let expiredInternalPreviewDeadline = 0
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 let actionBusy = false
 let nativeListener: PluginListenerHandle | null = null
@@ -47,11 +48,19 @@ export const canUsePlus = () => state.ready && hasPlusAccess(state, Date.now())
 
 function publish(status: Partial<PlusStatus>) {
   const next = { ...state, ...status }
-  next.active = hasPlusAccess(next, Date.now())
+  const now = Date.now()
+  const previewDeadline = next.internalPreviewExpiresAt
+  if (typeof previewDeadline === 'number' && Number.isFinite(previewDeadline)) {
+    if (now >= previewDeadline) expiredInternalPreviewDeadline = Math.max(expiredInternalPreviewDeadline, previewDeadline)
+    if (previewDeadline <= expiredInternalPreviewDeadline) next.internalPreviewExpiresAt = null
+  }
+  next.active = hasPlusAccess(next, now)
   state = next
   clearTimeout(expiryTimer)
-  if (next.active && !next.purchased && next.trialExpiresAt) {
-    expiryTimer = setTimeout(() => publish({}), Math.min(2_147_483_647, Math.max(1, next.trialExpiresAt - Date.now())))
+  if (next.active && !next.purchased) {
+    const deadlines = [next.trialExpiresAt, next.internalPreviewExpiresAt]
+      .filter((expiry): expiry is number => typeof expiry === 'number' && Number.isFinite(expiry) && expiry > now)
+    if (deadlines.length) expiryTimer = setTimeout(() => publish({}), Math.min(2_147_483_647, Math.max(1, Math.min(...deadlines) - now)))
   }
   listeners.forEach(listener => listener())
 }
@@ -65,7 +74,8 @@ function publishNativeStatus(status: NativeStatus) {
     if (status.statusRevision < latestNativeRevision) return
     latestNativeRevision = status.statusRevision
   }
-  publish({ ...status, ready: true, error: null })
+  // An absent field from a normal build must clear any previous preview state.
+  publish({ ...status, internalPreviewExpiresAt: status.internalPreviewExpiresAt ?? null, ready: true, error: null })
 }
 
 async function ensureNativeListener(): Promise<void> {
@@ -101,7 +111,7 @@ export async function refreshPlusAccess(refreshProducts = false): Promise<void> 
           // A delayed foreground check must not undo a newer purchase/restore.
           if (hasNativeRevision(status) || version === actionStatusVersion) publishNativeStatus(status)
         }
-        else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
+        else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, internalPreviewExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
       } catch {
         // A temporary bridge error never creates an entitlement or discards one already verified this session.
         if (version === actionStatusVersion) publish({ ready: true, error: 'Could not check App Store access. Try again when connected.' })
@@ -173,7 +183,7 @@ export function closePlus(resume = false) {
   request = null; requestListeners.forEach(listener => listener())
   action?.()
 }
-/** Call before any mutation or media startup. Nothing starts until access is verified. */
+/** Call before any mutation or media startup. Access must come from the native status. */
 export function requirePlus(feature: PlusFeature, resume?: () => void): boolean {
   if (canUsePlus()) return true
   showPlus(feature, resume)

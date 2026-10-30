@@ -43,6 +43,13 @@ try {
   assert.equal(policy.hasPlusAccess(trial,100),true)
   assert.equal(policy.hasPlusAccess(trial,199),true)
   assert.equal(policy.hasPlusAccess(trial,200),false)
+  const internalPreview = {...empty,internalPreviewExpiresAt:200}
+  assert.equal(policy.hasPlusAccess(internalPreview,199),true,'Native internal preview grants temporary access separately from a purchase')
+  assert.equal(policy.hasPlusAccess(internalPreview,200),false,'Internal access expires at its deadline')
+  for (const invalid of [null,undefined,NaN,Infinity,'200']) {
+    assert.equal(policy.hasPlusAccess({...empty,internalPreviewExpiresAt:invalid},100),false,'Malformed preview status cannot grant access')
+  }
+  assert.equal(policy.hasPlusAccess({...trial,internalPreviewExpiresAt:150},175),true,'Preview expiry does not shorten a verified trial')
   for (const setup of [
     {difficulty:'easy',key:'C',mode:'major',range:'1-octave'},
     {difficulty:'easy',key:'B',mode:'minor',range:'2-octaves',customScale:[0,2,4]},
@@ -51,6 +58,7 @@ try {
   for (const difficulty of ['medium','hard']) assert.equal(policy.isFreeStaffJumperSetup({difficulty}),false,`${difficulty} requires Plus`)
 
   memory.set('besttake:plus-development:v1', JSON.stringify({ alphaUnlocked:true, trialStartedAt:Date.now() }))
+  memory.set('besttake:plus-internal-preview:v1', JSON.stringify({ internalPreviewExpiresAt:Date.now()+86400000 }))
   for (const dev of [false,true]) {
     const web = await load('src/plus/plusAccess.ts',{dev})
     await web.refreshPlusAccess()
@@ -70,6 +78,30 @@ try {
   assert.equal(native.redeemAlpha,undefined)
   status={...status,alphaUnlocked:true,canRedeemAlpha:true};listener(status)
   assert.equal(native.canUsePlus(),false,'Native sandbox/debug status cannot revive old code grants')
+  const previewExpires=Date.now()+86400000
+  status={...status,internalPreviewExpiresAt:previewExpires};listener(status)
+  assert.equal(native.canUsePlus(),true,'Internal preview works even without purchased or trial entitlements')
+  assert.equal(native.getPlusSnapshot().purchased,false)
+  assert.equal(native.getPlusSnapshot().trialStartedAt,null,'Preview does not consume the StoreKit trial')
+  let previewResumed=0
+  native.showPlus('music',()=>previewResumed++)
+  native.closePlus(true)
+  assert.equal(previewResumed,1,'Temporary access resumes a requested Plus feature')
+  const previewNow=Date.now
+  try {
+    Date.now=()=>previewExpires
+    for(const {fn} of [...scheduled.values()]) fn()
+    assert.equal(native.canUsePlus(),false)
+    assert.equal(native.getPlusSnapshot().active,false,'Internal preview expiry updates visible access without restart')
+  } finally { Date.now=previewNow }
+  listener({...status,internalPreviewExpiresAt:previewExpires})
+  assert.equal(native.canUsePlus(),false,'Clock rollback and a stale response cannot revive a preview expired during this session')
+  listener({...status,internalPreviewExpiresAt:previewExpires+1})
+  assert.equal(native.canUsePlus(),true,'A separately issued later deadline can be evaluated normally')
+  delete status.internalPreviewExpiresAt
+  listener(status)
+  assert.equal(native.canUsePlus(),false,'A normal native status with no preview field clears earlier preview access')
+  assert.equal(native.getPlusSnapshot().internalPreviewExpiresAt,null)
   const started=Date.now(), expires=started+policy.PLUS_TRIAL_MS
   status={...status,trialStartedAt:started,trialExpiresAt:expires};listener(status)
   assert.equal(native.canUsePlus(),true,'A verified StoreKit trial remains supported')
@@ -117,5 +149,5 @@ try {
   memory.clear();activeRoutine=first
   assert.equal(routines.canSaveRoutine(second),false,'Today’s unshelved routine counts toward limit')
   assert.ok(prompts>0)
-  console.log('PASS: Plus entitlements, Staff Jumper Easy/paid levels, verified trial expiry, rejected legacy code flags in every build, purchases, restore/revocation, and routine limits.')
+  console.log('PASS: Plus entitlements, internal preview expiry/isolation, Staff Jumper Easy/paid levels, verified trial expiry, rejected legacy code flags in every build, purchases, restore/revocation, and routine limits.')
 } finally { globalThis.setTimeout=nativeSetTimeout; globalThis.clearTimeout=nativeClearTimeout }

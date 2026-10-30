@@ -17,10 +17,17 @@ export interface PlusEntitlement {
   purchased: boolean
   trialStartedAt: number | null
   trialExpiresAt: number | null
+  /** Supplied only by the separately compiled internal TestFlight preview. */
+  internalPreviewExpiresAt?: number | null
+}
+
+export function hasInternalPlusPreview(entitlement: PlusEntitlement, now: number): boolean {
+  const expiry = entitlement.internalPreviewExpiresAt
+  return typeof expiry === 'number' && Number.isFinite(expiry) && Number.isFinite(now) && now < expiry
 }
 
 export function hasPlusAccess(entitlement: PlusEntitlement, now: number): boolean {
-  return entitlement.purchased === true ||
+  return entitlement.purchased === true || hasInternalPlusPreview(entitlement, now) ||
     (entitlement.trialStartedAt !== null && entitlement.trialExpiresAt !== null &&
       now >= entitlement.trialStartedAt && now < entitlement.trialExpiresAt)
 }

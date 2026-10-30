@@ -39,6 +39,7 @@ import { useTutorialAction } from '../context/TutorialContext'
 import { AppStoreOfferCodePanel } from '../plus/PlusPaywall'
 import { showPlus } from '../plus/plusAccess'
 import { usePlus } from '../plus/usePlus'
+import { hasInternalPlusPreview } from '../plus/plusPolicy'
 import BugReportLink from './BugReportLink'
 import { PRIVACY_CONTACT_EMAIL } from '../utils/privacyPolicy'
 
@@ -980,7 +981,7 @@ function SettingsDrawer({
               />
             </SettingsGroup>
             <SettingsGroup title="BestTake Plus" footer="One payment unlocks Plus forever. Learn and Balance stay free.">
-              <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased ? 'Plus unlocked · Manage purchase' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
+              <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased ? 'Plus unlocked · Manage purchase' : plus.active && hasInternalPlusPreview(plus, Date.now()) ? 'Temporary Plus · Manage access' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
             </SettingsGroup>
             <SettingsGroup title="App Store offer codes"><AppStoreOfferCodePanel /></SettingsGroup>
             {onOpenLabs ? (
