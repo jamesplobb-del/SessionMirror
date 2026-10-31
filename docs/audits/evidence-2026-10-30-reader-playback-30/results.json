@@ -27,8 +27,15 @@
     "independentReview": "pass",
     "physicalPhonePlayback": "not verified"
   },
-  "productionWeb": "pending",
-  "simulator": "pending",
-  "archive": "pending",
-  "upload": "pending"
+  "productionWeb": "pass",
+  "simulator": "build and launch passed; audio screen opened; further UI interrupted by Mac lock",
+  "archive": "passed",
+  "upload": "blocked: Xcode Failed to Use Accounts; account credentials unavailable in keychain",
+  "sentrySourceMaps": "uploaded",
+  "archivedWebFilesMatched": 94,
+  "executableSha256": "80b2b1ceeab07840313d899218a3095570e215e527cce9be085011510019ebdb",
+  "sourceCommit": "6b7b154",
+  "uploadAttemptLog": "build/internal-plus-preview-4.2-30/upload.log",
+  "archivePath": "/Users/jameslobb/Documents/BestTake/build/internal-plus-preview-4.2-30/BestTake-4.2-30-InternalPreview.xcarchive",
+  "simulatorCleanup": "app stopped after Mac lock interrupted UI verification"
 }
