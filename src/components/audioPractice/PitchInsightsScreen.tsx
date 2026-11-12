@@ -1529,7 +1529,7 @@ function PitchInsightsContent({
                         {getTunerOctaveOptions(profileKey).map(option => <option key={option.id} value={option.id}>{tunerOctaveLabel(option.id)}</option>)}
                       </select></label>}
                       <button type="submit" disabled={!profileName.trim()}>Create & use instrument</button>
-                      <p>Each named instrument keeps its own history. Earlier unnamed readings remain in Legacy/default.</p>
+                      <p>Each named instrument keeps its own history. Earlier unnamed readings remain in Default.</p>
                     </form>
                   </PremiumReveal>
                 </> : null}

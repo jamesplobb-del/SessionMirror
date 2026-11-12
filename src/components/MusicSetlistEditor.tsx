@@ -137,7 +137,7 @@ export default function MusicSetlistEditor({ setlist, scores, onSave, onCancel, 
               onChange={event => update({ ...draft, name: event.target.value })} />
             <div className="music-setlist-editor__meta">
               <span>{draft.entries.length} {draft.entries.length === 1 ? 'piece' : 'pieces'}</span>
-              {firstReadable && <button type="button" className="music-setlist-editor__start" onClick={() => read(firstReadable.id)}><BookOpen aria-hidden />Start</button>}
+              {firstReadable && <button type="submit" className="music-setlist-editor__save" disabled={!draft.name.trim() || over}><Check aria-hidden />{busy === 'Saving…' ? busy : saved ? 'Saved' : 'Save'}</button>}
             </div>
             {over ? <p className="music-setlist-editor__limit" role="status">This saved list exceeds the {MAX_SETLIST_ENTRIES}-piece limit. Remove pieces before saving.</p>
               : full ? <p className="music-setlist-editor__limit" role="status">Setlists hold up to {MAX_SETLIST_ENTRIES} pieces. Remove one to add another.</p> : null}
@@ -173,8 +173,10 @@ export default function MusicSetlistEditor({ setlist, scores, onSave, onCancel, 
         <footer className="music-sheet__footer">
           {onDelete && setlist ? <button type="button" className="music-setlist-editor__delete" disabled={locked} onClick={() => setConfirm('delete')}><Trash2 aria-hidden /><span>Delete</span></button> : <span />}
           <div className="music-sheet__footer-end">
-            {saved ? <span className="music-setlist-editor__saved" role="status"><Check aria-hidden />Saved</span> : null}
-            <button type="submit" className="music-sheet__primary" disabled={locked || !draft.name.trim() || over}>{busy || 'Save'}</button>
+            {saved && !firstReadable ? <span className="music-setlist-editor__saved" role="status"><Check aria-hidden />Saved</span> : null}
+            {firstReadable
+              ? <button type="button" className="music-sheet__primary" disabled={locked || !draft.name.trim() || over} onClick={() => read(firstReadable.id)}>{busy === 'Opening…' ? busy : <><BookOpen aria-hidden />Start</>}</button>
+              : <button type="submit" className="music-sheet__primary" disabled={locked || !draft.name.trim() || over}>{busy || 'Save'}</button>}
           </div>
         </footer>
       </form>}

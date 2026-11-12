@@ -37,48 +37,66 @@
   color: #fff;
 }
 
+/*
+ * Centred with auto margins, not a translate: the enter/exit motion owns the
+ * element's transform.
+ */
 .pitch-insights-activity-prompt {
   position: absolute;
   z-index: 6;
-  bottom: max(62px, calc(env(safe-area-inset-bottom) + 50px));
-  left: 50%;
-  width: min(360px, calc(100% - 24px));
-  padding: 13px;
-  border: 1px solid var(--audio-blue-border, #bfd3e9);
+  bottom: max(64px, calc(env(safe-area-inset-bottom) + 52px));
+  inset-inline: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 360px;
+  margin-inline: auto;
+  padding: 14px;
+  border: 1px solid var(--audio-divider, #d8e6f2);
   border-radius: 16px;
   background: color-mix(in srgb, var(--audio-surface, #fff) 96%, transparent);
-  box-shadow: 0 10px 30px rgba(23, 58, 92, .12);
+  box-shadow: 0 8px 24px rgba(23, 58, 92, .1);
   color: var(--audio-text-primary, #19334e);
-  transform: translateX(-50%);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
 }
-.pitch-insights-activity-prompt strong { display: block; font-size: 14px; font-weight: 700; }
-.pitch-insights-activity-prompt p,
-.pitch-insights-activity-prompt small {
-  display: block;
-  margin: 4px 0 0;
+.pitch-insights-activity-prompt__copy { min-width: 0; }
+.pitch-insights-activity-prompt strong { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; }
+.pitch-insights-activity-prompt p {
+  margin: 2px 0 0;
   color: var(--audio-text-secondary, #526b82);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.35;
 }
-.pitch-insights-activity-prompt__actions { display: flex; gap: 7px; margin-top: 10px; }
+.pitch-insights-activity-prompt__actions { display: flex; flex: 0 0 auto; gap: 8px; }
 .pitch-insights-activity-prompt__actions button {
   min-height: 44px;
   flex: 1;
-  padding: 0 8px;
-  border: 1px solid var(--audio-blue-border, #bfd3e9);
-  border-radius: 10px;
-  background: var(--audio-surface, #fff);
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--audio-blue, #2677d7) 10%, transparent);
   color: var(--audio-blue, #245f9f);
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .pitch-insights-activity-prompt__actions .pitch-insights-activity-prompt__primary {
-  flex: 1.5;
-  border-color: var(--audio-blue, #2677d7);
   background: var(--audio-blue, #2677d7);
   color: #fff;
 }
 .pitch-insights-activity-prompt__actions button:disabled { opacity: .5; }
+
+/* With room to spare (iPad), it is one quiet row instead of a card. */
+@media (min-width: 600px) {
+  .pitch-insights-activity-prompt {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    max-width: 520px;
+    padding: 12px 12px 12px 16px;
+  }
+  .pitch-insights-activity-prompt__copy { flex: 1; }
+  .pitch-insights-activity-prompt__actions button { flex: 0 0 auto; }
+}

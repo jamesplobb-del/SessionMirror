@@ -6772,6 +6772,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
                     onChromeHiddenChange={setMusicChromeHidden}
+                    toolRailOpen={musicWidgetDrawerOpen}
+                    onToolRailOpenChange={setMusicWidgetDrawerOpen}
                     isRecording={isRecording}
                     isStopping={isStopping}
                     // Same rule as the deck's record button: only a video take waits on the

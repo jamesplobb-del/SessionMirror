@@ -32,12 +32,13 @@ export function AppStoreOfferCodePanel({ disabled = false, onBusyChange }: { dis
   </div>
 }
 
-export function PlusLocked({ feature, children }: { feature: PlusFeature; children?: ReactNode }) {
+/** `action={false}` when the screen already shows its own View Plus button. */
+export function PlusLocked({ feature, action = true, children }: { feature: PlusFeature; action?: boolean; children?: ReactNode }) {
   const plus = usePlus()
   const copy = PLUS_FEATURES[feature]
   return <section className="plus-locked" aria-label={`${copy.title} with BestTake Plus`}>
     <LockKeyhole aria-hidden /><small>BESTTAKE PLUS</small><h3>{copy.title}</h3><p>{copy.detail}</p>
-    <button type="button" disabled={!plus.ready} onClick={() => showPlus(feature)}>{plus.ready ? 'View Plus' : 'Checking access…'}</button>
+    {action && <button type="button" disabled={!plus.ready} onClick={() => showPlus(feature)}>{plus.ready ? 'View Plus' : 'Checking access…'}</button>}
     {children}
   </section>
 }
@@ -116,7 +117,7 @@ export default function PlusPaywall() {
       <div className="plus-sheet__top"><span>BESTTAKE PLUS</span><button aria-label="Close Plus" disabled={busy} onClick={() => { if (!busyRef.current) closePlus() }}><X /></button></div>
       <h2>{permanent ? 'BestTake Plus is unlocked' : internalPreview ? 'Your temporary Plus access is ready' : copy.title}</h2>
       <p>{permanent ? 'Your one-time purchase is active.' : internalPreview ? 'All Plus features are available in this internal test version. No purchase is needed.' : copy.detail}</p>
-      <ul className="plus-sheet__features">{['Hands-free recording and playback', 'Scores, backing tracks, and YouTube references', 'Pitch Insights', 'Unlimited routines and more multitrack boxes', 'Medium and Hard Staff Jumper levels'].map(item => <li key={item}><Check aria-hidden />{item}</li>)}</ul>
+      <ul className="plus-sheet__features">{['Hands-free recording and playback', 'Scores, recordings, and YouTube references', 'Pitch Insights', 'Unlimited routines and more multitrack boxes', 'Medium and Hard Staff Jumper levels'].map(item => <li key={item}><Check aria-hidden />{item}</li>)}</ul>
       {internalPreview && <p className="plus-sheet__trial" role="status">Temporary test access ends {new Date(plus.internalPreviewExpiresAt!).toLocaleDateString()}. No charge. Your recordings and files stay saved.</p>}
       {plus.active && !permanent && !internalPreview && plus.trialExpiresAt && <p className="plus-sheet__trial" role="status">Your preview ends {new Date(plus.trialExpiresAt).toLocaleDateString()}. No automatic charge.</p>}
       {!plus.active && plus.trialStartedAt !== null && <p className="plus-sheet__trial">Your seven-day preview has ended. Your recordings and files are still saved.</p>}

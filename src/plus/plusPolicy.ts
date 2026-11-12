@@ -5,7 +5,7 @@ export type PlusFeature = 'handsfree' | 'music' | 'youtube' | 'insights' | 'rout
 
 export const PLUS_FEATURES: Record<PlusFeature, { title: string; detail: string }> = {
   handsfree: { title: 'Hands-free recording', detail: 'Record a take, hear it back, and start the next one without touching the screen.' },
-  music: { title: 'Sheet music and backing tracks', detail: 'Add scores and backing tracks to your practice room and routines.' },
+  music: { title: 'Sheet music and recordings', detail: 'Add scores and recordings to your practice room and routines.' },
   youtube: { title: 'YouTube references', detail: 'Save and play YouTube references while you practice.' },
   insights: { title: 'Pitch Insights', detail: 'See your pitch history and note tendencies.' },
   routines: { title: 'More routines', detail: 'Save as many routines as you like. One saved routine is free.' },

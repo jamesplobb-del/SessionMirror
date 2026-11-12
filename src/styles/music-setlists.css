@@ -22,7 +22,11 @@
 .music-setlist-editor__name:focus{border-bottom-color:var(--ms-accent);box-shadow:0 1px 0 var(--ms-accent)}
 .music-setlist-editor__name::placeholder{color:var(--ms-muted);opacity:.55}
 .music-setlist-editor__meta{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;color:var(--ms-muted);font-size:14px}
-.music-sheet .music-setlist-editor__start{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 16px;border:0;border-radius:999px;background:color-mix(in srgb,var(--ms-accent) 11%,transparent);color:var(--ms-accent);font-size:14px;font-weight:650}
+.music-sheet .music-setlist-editor__save{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 16px;border:0;border-radius:999px;background:color-mix(in srgb,var(--ms-accent) 11%,transparent);color:var(--ms-accent);font-size:14px;font-weight:650}
+.music-sheet .music-setlist-editor__save svg{width:16px;height:16px}
+.music-sheet .music-setlist-editor__save:disabled{opacity:.45}
+.music-setlist-editor .music-sheet__primary{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.music-setlist-editor .music-sheet__primary svg{width:18px;height:18px}
 
 .music-setlist-editor__entries{list-style:none;margin:0;padding:0;border:1px solid var(--ms-line);border-radius:16px;background:var(--ms-surface)}
 .music-setlist-editor__entry{position:relative;display:flex;align-items:center;min-height:68px;padding:0 2px 0 14px;border-radius:16px;touch-action:pan-y}

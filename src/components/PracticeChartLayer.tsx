@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
@@ -92,6 +93,9 @@ interface PracticeChartLayerProps {
   /** Optional setlist transport, rendered with the page's own top tools. */
   /** Replaces the Library button while a setlist is open. */
   setlistMenu?: ReactNode
+  /** Workspace opens the side rail so its widgets are in reach. */
+  toolRailOpen?: boolean
+  onToolRailOpenChange?: (open: boolean) => void
 }
 
 /** What the rail says while hands-free is running the sitting. */
@@ -123,7 +127,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0, onScoreReplaced, setlistMenu,
+  revision = 0, onScoreReplaced, setlistMenu, toolRailOpen, onToolRailOpenChange,
 }: PracticeChartLayerProps) {
   const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
@@ -177,6 +181,8 @@ export default function PracticeChartLayer({
   // Full screen is for the page. The tool row waits behind Workspace, closed,
   // every time the player steps in.
   useEffect(() => { if (chromeOff) setWorkspaceOpen(false) }, [chromeOff])
+  useEffect(() => { if (marker) setWorkspaceOpen(false) }, [marker])
+  useEffect(() => { if (toolRailOpen === false) setWorkspaceOpen(false) }, [toolRailOpen])
   const closeWorkspace = useCallback((restoreFocus = false) => {
     const focusWasInside = workspacePanel.current?.contains(document.activeElement)
     setWorkspaceOpen(false)
@@ -649,8 +655,9 @@ export default function PracticeChartLayer({
     setControlsHidden(true)
   }
   const gesture = useRef<{ id: number; x: number; y: number; at: number } | null>(null)
+  const toolHost = workspaceOpen && typeof document !== 'undefined' ? document.getElementById('music-widget-drawer-tools') : null
   const isControlTarget = (target: EventTarget | null) => target instanceof Element
-    && !!target.closest('button, a, input, select, textarea, [role="button"], [role="dialog"], .practice-chart-topbar, .practice-chart-rail')
+    && !!target.closest('button, a, input, select, textarea, [role="button"], [role="dialog"], .practice-chart-topbar, .practice-chart-rail, .practice-chart-workspace')
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary || event.button !== 0 || marker || loadFailed || isControlTarget(event.target)) { gesture.current = null; return }
     gesture.current = { id: event.pointerId, x: event.clientX, y: event.clientY, at: Date.now() }
@@ -785,11 +792,17 @@ export default function PracticeChartLayer({
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
           <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-label="Workspace" aria-expanded={workspaceOpen}
-            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => { dismissMusicMenu(); setWorkspaceOpen(value => !value) }}>
+            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => {
+              dismissMusicMenu()
+              if (!workspaceOpen) onToolRailOpenChange?.(true)
+              setWorkspaceOpen(open => !open)
+            }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
         </div>}
-        {workspaceOpen && (
+        </div>
+        </div>
+        {workspaceOpen && (toolHost ? createPortal(
           <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => key === 'audioEnhancerEnabled' ? (
               <button key={key} type="button" aria-pressed={workspace[key]}
@@ -820,10 +833,7 @@ export default function PracticeChartLayer({
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
-          </div>
-        )}
-        </div>
-        </div>
+          </div>, toolHost) : null)}
         {/*
           * In full screen the deck is away, and the whole point of the page
           * being on a stand is that the player is holding an instrument. The

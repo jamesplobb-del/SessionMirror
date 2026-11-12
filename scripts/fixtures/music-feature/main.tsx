@@ -98,7 +98,8 @@ function Fixture() {
     {active && <PracticeChartLayer key={active} projectId={active} active={tab === 'music' && !library} boundaryRef={boundary} offerFileOnOpen={false}
       workspace={pickHudQuickSettings(desk as AppSettings)} onWorkspaceChange={(key, enabled) => setDesk(value => ({ ...value, [key]: enabled }))}
       referencesVisible={references} onReferencesChange={setReferences} onClose={() => setLibrary(true)} onPaperVisibleChange={() => {}} onChromeHiddenChange={setFull}
-      isRecording={false} isStopping={false} recordReady={false} recordElapsed={0} onToggleRecord={() => {}} handsFreeEnabled={false} handsFreePhase={null} onToggleHandsFree={() => {}} />}
+      isRecording={false} isStopping={false} recordReady={false} recordElapsed={0} onToggleRecord={() => {}} handsFreeEnabled={false} handsFreePhase={null} onToggleHandsFree={() => {}}
+      toolRailOpen={drawerOpen} onToolRailOpenChange={setDrawerOpen} />}
     {active && !library && <MusicWidgetDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />}
     {active && !library && <FixtureDockTool boundaryRef={boundary} id="desk-metronome" label="Metronome" slot={0} />}
     {active && !library && <FixtureDockTool boundaryRef={boundary} id="desk-drone" label="Drone" slot={1} />}

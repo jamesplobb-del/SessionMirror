@@ -517,26 +517,43 @@ export function LiveAudioTunerPane({
               ) : null}
             </div>
 
-            {insightsEnabled && noisyActivityPrompt ? (
-              <section className="pitch-insights-activity-prompt" role="status" aria-label="Pitch Insights activity warning">
-                <strong>{noisyActivityPrompt.status === 'failed' ? 'Recent readings remain' : 'Playing with others?'}</strong>
-                <p>{noisyActivityPrompt.status === 'failed'
-                  ? 'Insights is off, but those recent readings could not be removed. Try again.'
-                  : 'The tuner is hearing rapidly changing pitches. Insights is paused while you decide. Turning it off can keep your history accurate.'}</p>
-                <div className="pitch-insights-activity-prompt__actions">
-                  <button type="button" onClick={onKeepInsightsOn}>
-                    {noisyActivityPrompt.status === 'failed' ? 'Dismiss' : 'Keep on'}
-                  </button>
-                  <button type="button" className="pitch-insights-activity-prompt__primary"
-                    disabled={noisyActivityPrompt.status === 'deleting'} onClick={onTurnOffAndClearRecent}>
-                    {noisyActivityPrompt.status === 'deleting' ? 'Clearing…'
-                      : noisyActivityPrompt.status === 'failed' ? 'Retry clear'
-                        : 'Turn off + clear recent'}
-                  </button>
-                </div>
-                {noisyActivityPrompt.status === 'suggested' ? <small>Only recent readings from this tuner session will be removed.</small> : null}
-              </section>
-            ) : null}
+            {/*
+              * Insights is already paused by the time this shows, so nothing
+              * here is urgent: one line of why, two answers, out of the way of
+              * the readout. "Turn off" also drops the noisy stretch just heard.
+              */}
+            <AnimatePresence>
+              {insightsEnabled && noisyActivityPrompt ? (
+                <PremiumMotionSection
+                  key="insights-activity-prompt"
+                  className="pitch-insights-activity-prompt"
+                  role="status"
+                  aria-label="Pitch Insights paused"
+                  initial={{ y: 14, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: 10, opacity: 0, transitionEnd: motionExitHide }}
+                  transition={premiumMotion({ type: 'spring', stiffness: 420, damping: 36 }, 'popover')}
+                >
+                  <div className="pitch-insights-activity-prompt__copy">
+                    <strong>{noisyActivityPrompt.status === 'failed' ? 'Couldn’t clear those readings' : 'Playing with others?'}</strong>
+                    <p>{noisyActivityPrompt.status === 'failed'
+                      ? 'Insights is off. Try again to remove them.'
+                      : 'Insights is paused so this stays out of your history.'}</p>
+                  </div>
+                  <div className="pitch-insights-activity-prompt__actions">
+                    <button type="button" disabled={noisyActivityPrompt.status === 'deleting'} onClick={onKeepInsightsOn}>
+                      {noisyActivityPrompt.status === 'failed' ? 'Dismiss' : 'Keep on'}
+                    </button>
+                    <button type="button" className="pitch-insights-activity-prompt__primary"
+                      disabled={noisyActivityPrompt.status === 'deleting'} onClick={onTurnOffAndClearRecent}>
+                      {noisyActivityPrompt.status === 'deleting' ? 'Turning off…'
+                        : noisyActivityPrompt.status === 'failed' ? 'Try again'
+                          : 'Turn off'}
+                    </button>
+                  </div>
+                </PremiumMotionSection>
+              ) : null}
+            </AnimatePresence>
 
             {/*
               * Both panels share this AnimatePresence, so both need a key.

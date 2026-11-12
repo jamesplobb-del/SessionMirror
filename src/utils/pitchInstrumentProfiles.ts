@@ -72,8 +72,9 @@ export function pitchProfileSources(profiles: PitchInstrumentProfile[], observat
     const id = pitchSourceId(profileId, key)
     if (!sources.has(id)) sources.set(id, { id, profileId, transpositionId: key, label: `${name} · ${getTunerKeyOption(key).keyLabel}` })
   }
-  add(null, 'Legacy/default', defaultKey)
+  const defaultName = 'Default'
+  add(null, defaultName, defaultKey)
   profiles.forEach(profile => add(profile.id, profile.name, profile.transpositionId))
-  observations.forEach(observation => add(observation.instrumentProfileId ?? null, observation.instrumentProfileId ? observation.instrumentProfileName ?? 'Instrument' : 'Legacy/default', observation.transpositionId as TunerTranspositionId))
+  observations.forEach(observation => add(observation.instrumentProfileId ?? null, observation.instrumentProfileId ? observation.instrumentProfileName ?? 'Instrument' : defaultName, observation.transpositionId as TunerTranspositionId))
   return [...sources.values()]
 }
