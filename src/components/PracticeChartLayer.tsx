@@ -792,7 +792,13 @@ export default function PracticeChartLayer({
             <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
           </button>
           <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-label="Workspace" aria-expanded={workspaceOpen}
-            data-guidance="music-workspace" aria-controls="music-workspace-tools" onClick={() => {
+            data-guidance="music-workspace" aria-controls="music-workspace-tools"
+            onKeyDown={event => {
+              // The menu is portalled after the dock; Tab must reach its tools first.
+              if (event.key !== 'Tab' || event.shiftKey || !workspaceOpen) return
+              const first = workspacePanel.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+              if (first) { event.preventDefault(); first.focus({ preventScroll: true }) }
+            }} onClick={() => {
               dismissMusicMenu()
               if (!workspaceOpen) onToolRailOpenChange?.(true)
               setWorkspaceOpen(open => !open)
@@ -803,7 +809,14 @@ export default function PracticeChartLayer({
         </div>
         </div>
         {workspaceOpen && (toolHost ? createPortal(
-          <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets">
+          <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets"
+            onKeyDown={event => {
+              if (event.key === 'Tab' && event.shiftKey
+                && event.target === workspacePanel.current?.querySelector('button:not(:disabled)')) {
+                event.preventDefault()
+                workspaceTrigger.current?.focus({ preventScroll: true })
+              }
+            }}>
             {MUSIC_WORKSPACE_TOOLS.map(({ key, label, icon: Icon }) => key === 'audioEnhancerEnabled' ? (
               <button key={key} type="button" aria-pressed={workspace[key]}
                 onClick={() => onWorkspaceChange(key, !workspace[key])}>

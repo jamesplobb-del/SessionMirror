@@ -264,3 +264,55 @@ removalCallback('onReferencesChange(false)', {
 assert.deepEqual(removeEvents.splice(0), ['focus', 'remove'])
 assert.equal(state.workspace, true)
 console.log('PASS: Page/Markup selection, bounded zoom/reset without dismissal, rapid switching, reading/drawing dismissal, Escape/focus, hidden controls, one-tap Workspace launch, and focused removal regressions.')
+
+
+// Portalling the tray after the dock must not put dock buttons before its choices.
+function workspaceKeyHandler(attribute, value, bindings) {
+  let handler
+  function visit(node) {
+    if (ts.isJsxOpeningElement(node)) {
+      const attributes = node.attributes.properties
+      if (attributes.some(item => ts.isJsxAttribute(item) && item.name.getText(layerAst) === attribute
+        && item.initializer && ts.isStringLiteral(item.initializer) && item.initializer.text === value)) {
+        handler = attributes.find(item => ts.isJsxAttribute(item) && item.name.getText(layerAst) === 'onKeyDown')?.initializer?.expression
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(layerAst)
+  assert.ok(handler, `${value} provides keyboard access across the portal`)
+  const code = ts.transpileModule(`const handler = ${handler.getText(layerAst)}`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText
+  return new Function(...Object.keys(bindings), `${code}; return handler;`)(...Object.values(bindings))
+}
+let keyFocus = '', preventedKey = false
+const firstWorkspaceTool = { focus: () => { keyFocus = 'first' } }
+const workspaceKeyBindings = {
+  workspaceOpen: true,
+  workspacePanel: { current: { querySelector: () => firstWorkspaceTool } },
+  workspaceTrigger: { current: { focus: () => { keyFocus = 'trigger' } } },
+}
+const keyEvent = (key, shiftKey = false, target = firstWorkspaceTool) => ({
+  key, shiftKey, target, preventDefault: () => { preventedKey = true },
+})
+const triggerKey = workspaceKeyHandler('aria-label', 'Workspace', workspaceKeyBindings)
+triggerKey(keyEvent('Tab'))
+assert.equal(keyFocus, 'first')
+assert.equal(preventedKey, true)
+for (const event of [keyEvent('Escape'), keyEvent('Tab', true)]) {
+  keyFocus = ''; preventedKey = false; triggerKey(event)
+  assert.equal(keyFocus, '')
+  assert.equal(preventedKey, false)
+}
+workspaceKeyHandler('aria-label', 'Workspace', { ...workspaceKeyBindings, workspaceOpen: false })(keyEvent('Tab'))
+assert.equal(keyFocus, '', 'closed menu leaves native Tab navigation alone')
+const trayKey = workspaceKeyHandler('id', 'music-workspace-tools', workspaceKeyBindings)
+trayKey(keyEvent('Tab', true))
+assert.equal(keyFocus, 'trigger')
+assert.equal(preventedKey, true)
+keyFocus = ''; preventedKey = false
+trayKey(keyEvent('Tab', true, {}))
+assert.equal(keyFocus, '', 'other tools keep their normal backwards tab order')
+assert.equal(preventedKey, false)
+console.log('PASS: Workspace Tab enters portalled tools, Shift+Tab returns to its trigger, and unrelated/closed navigation stays native.')

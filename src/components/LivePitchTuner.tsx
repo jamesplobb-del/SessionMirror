@@ -538,7 +538,7 @@ export function LiveAudioTunerPane({
                     <strong>{noisyActivityPrompt.status === 'failed' ? 'Couldn’t clear those readings' : 'Playing with others?'}</strong>
                     <p>{noisyActivityPrompt.status === 'failed'
                       ? 'Insights is off. Try again to remove them.'
-                      : 'Insights is paused so this stays out of your history.'}</p>
+                      : 'Insights is paused. Turning off clears recent readings.'}</p>
                   </div>
                   <div className="pitch-insights-activity-prompt__actions">
                     <button type="button" disabled={noisyActivityPrompt.status === 'deleting'} onClick={onKeepInsightsOn}>

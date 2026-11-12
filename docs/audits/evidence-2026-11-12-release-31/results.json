@@ -1,0 +1,47 @@
+{
+  "version": "4.2",
+  "build": 31,
+  "configuration": "Release",
+  "reviewedCommit": "a6fae0291188efc113a3eec493b53b544187c3f4",
+  "reviewScope": "Cursor commit plus production-release safeguards",
+  "fixes": [
+    "Restore keyboard Tab and Shift+Tab access across the portalled Music Workspace menu",
+    "Make recent-reading deletion explicit in the tuner prompt"
+  ],
+  "checks": {
+    "pitch-instrument-profiles": "pass",
+    "pitch-insights-capture": "pass",
+    "practice-chart-zoom": "pass",
+    "music-dock-clearance": "pass",
+    "plus-internal-preview": "pass",
+    "music-markup-interaction": "pass",
+    "plus-loading": "pass",
+    "music-markup-history-integration": "pass",
+    "music-widget-drawer-focus": "pass",
+    "music-reading": "pass",
+    "music-control-menus": "pass",
+    "pitch-insights-recovery-screen": "pass",
+    "plus-access": "pass",
+    "inline-preview-lifecycle": "pass",
+    "music-setlists": "pass",
+    "setlist-reader": "pass",
+    "pitch-insights-screen-lifecycle": "pass",
+    "music-library": "pass",
+    "plus-product-lookup": "pass"
+  },
+  "browser": {
+    "phoneWidth": 390,
+    "ipadWidth": 834,
+    "workspace": "pass: layout, keyboard entry/return, launch, markup exclusivity, outside dismissal",
+    "environment": "isolated Chrome against production components; no physical iPad/VoiceOver verification"
+  },
+  "webBuild": "passed",
+  "sentrySourceMaps": "uploaded",
+  "archive": "in progress",
+  "upload": "pending",
+  "offerCodes": "pending browser access; not generated",
+  "unverified": [
+    "Live StoreKit purchase/restore",
+    "Physical-device playback and accessibility"
+  ]
+}
