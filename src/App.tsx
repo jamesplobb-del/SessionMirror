@@ -789,9 +789,11 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     setActiveTab: setAudioPracticeTab,
   } = useAudioPracticeTab(bootSurface.tab)
   const lastFullToolTab = useRef<'music' | 'tuner' | 'metronome'>(bootSurface.tab === 'metronome' || bootSurface.tab === 'tuner' ? bootSurface.tab : 'music')
+  const lastPracticeToolTab = useRef<'tuner' | 'metronome'>(bootSurface.tab === 'metronome' ? 'metronome' : 'tuner')
   const handleAudioPracticeTabChange = useCallback(
     (tab: AudioPracticeTab) => {
       if (tab === 'music' || tab === 'tuner' || tab === 'metronome') lastFullToolTab.current = tab
+      if (tab === 'tuner' || tab === 'metronome') lastPracticeToolTab.current = tab
       if (tab === 'music') {
         updateSettings({ showMusic: canUsePlus() })
         if (!canUsePlus()) setMusicLibraryOpen(true)
@@ -6774,6 +6776,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     onChromeHiddenChange={setMusicChromeHidden}
                     toolRailOpen={musicWidgetDrawerOpen}
                     onToolRailOpenChange={setMusicWidgetDrawerOpen}
+                    onOpenTools={() => { void handleOpenFullPracticeTool(lastPracticeToolTab.current) }}
                     isRecording={isRecording}
                     isStopping={isStopping}
                     // Same rule as the deck's record button: only a video take waits on the
@@ -7092,12 +7095,12 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                   }}
                 >
 
-                  {onRecordSurface && !isSplitView && !musicPageVisible && (
+                  {onRecordSurface && !isSplitView && !musicPageVisible && !isAudioPracticeMusicTab && (
                     <RecordingHeader mode={recordingMode} disabled={isRecording || isStopping || practiceTransitionBusy}
                       onModeChange={(mode) => { handleAudioPracticeTabChange('audio'); handleRecordingModeChange(mode) }}
                       hapticFeedback={settings.hapticFeedback} />
                   )}
-                  {recordingMode === 'audio' && audioPracticeTab !== 'audio' && !isLabsOpen && !isAudioPracticeGamesTab && !practiceSessionActive && !isSplitView && !musicChromeHidden && (
+                  {recordingMode === 'audio' && audioPracticeTab !== 'audio' && !isLabsOpen && !isAudioPracticeGamesTab && !practiceSessionActive && !isSplitView && !musicChromeHidden && !isAudioPracticeMusicTab && (
                     <div data-tutorial="audio-mode-tabs">
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
@@ -7115,7 +7118,8 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                           onCreateRoutine={handleCreateRoutineFromMusic}
                           onReadSetlist={handleReadMusicSetlist}
                           onRename={handleRenameMusicScore}
-                          onImported={() => setMusicChartRevision(value => value + 1)} />
+                          onImported={() => setMusicChartRevision(value => value + 1)}
+                          onOpenTools={() => { void handleOpenFullPracticeTool(lastPracticeToolTab.current) }} />
                       </AnimatedTabPanel>
                       <AnimatedTabPanel
                         panelKey="audio-practice-metronome-layer"
@@ -7419,7 +7423,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
                     {recordingMode === 'video' && isRecording && <GuidedRecordingCue focus={guidedNextFocus} />}
 
                     {!isLabsOpen && !isAudioPracticeGamesTab &&
-                      !musicChromeHidden &&
+                      !musicChromeHidden && !isAudioPracticeMusicTab &&
                       !(
                         isAudioPracticeTimelineTab &&
                         !practiceSessionActive &&

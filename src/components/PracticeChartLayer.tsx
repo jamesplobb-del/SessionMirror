@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, AudioLines, Ear, FileMusic, Grid2X2, Maximize2, MicVocal, Minimize2, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, AudioLines, Ear, FileMusic, Grid2X2, MicVocal, Pen, Radio, SlidersHorizontal, Square, Upload, X } from 'lucide-react'
 import { MetronomeToolIcon, TakesToolIcon } from './icons/toolIcons'
 import { useLongPress } from '../hooks/useLongPress'
 import type { HandsFreePhase } from '../utils/handsFreePhase'
@@ -96,6 +96,8 @@ interface PracticeChartLayerProps {
   /** Workspace opens the side rail so its widgets are in reach. */
   toolRailOpen?: boolean
   onToolRailOpenChange?: (open: boolean) => void
+  /** Leaves the music page for the tuner or metronome. */
+  onOpenTools?: () => void
 }
 
 /** What the rail says while hands-free is running the sitting. */
@@ -127,7 +129,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0, onScoreReplaced, setlistMenu, toolRailOpen, onToolRailOpenChange,
+  revision = 0, onScoreReplaced, setlistMenu, toolRailOpen, onToolRailOpenChange, onOpenTools,
 }: PracticeChartLayerProps) {
   const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
@@ -773,24 +775,15 @@ export default function PracticeChartLayer({
         {marker ? <MarkupToolbar
           marker={marker} penColour={penColour} canUndo={canUndo} canRedo={canRedo}
           menuOpen={musicMenu === 'markup'} menuId={musicMenuId}
-          onPen={() => pickMarker(penColour)} onErase={() => pickMarker(marker === 'eraser' ? penColour : 'eraser')}
+          onPen={anchor => { pickMarker(penColour); openMusicMenu('markup', anchor) }}
+          onErase={() => pickMarker(marker === 'eraser' ? penColour : 'eraser')}
           onUndo={undoStroke} onRedo={redoStroke}
-          onOptions={anchor => openMusicMenu('markup', anchor)} onDone={() => dismissMusicMenu(true)}
+          onDone={() => dismissMusicMenu(true)}
         /> : <div className="practice-chart-controls">
           {setlistMenu ?? <button type="button" className="practice-chart-control" onClick={onClose} disabled={isRecording || isStopping}><ArrowLeft aria-hidden /><span>Library</span></button>}
           <span className="practice-chart-title" title={chart.fileName}>{chart.fileName.replace(/\.[^.]+$/, '')}</span>
           <button type="button" className="practice-chart-control practice-chart-control--page" aria-label="Page controls" data-music-menu-trigger="page" aria-haspopup="dialog" aria-expanded={musicMenu === 'page'} aria-controls={`${musicMenuId}-page`} onClick={event => openMusicMenu('page', event.currentTarget)}><FileMusic aria-hidden /><span>Page</span></button>
-          <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" data-music-menu-trigger="markup" aria-haspopup="dialog" aria-expanded={musicMenu === 'markup'} aria-controls={`${musicMenuId}-markup`} onClick={event => openMusicMenu('markup', event.currentTarget)}><Pen aria-hidden /><span>Mark up</span></button>
-          <button
-            type="button"
-            className="practice-chart-control practice-chart-control--start"
-            aria-label={chromeOff ? 'Exit full screen' : 'Full screen'}
-            aria-pressed={chromeOff}
-            onClick={() => setChromeOff(!chromeOff)}
-          >
-            {chromeOff ? <Minimize2 aria-hidden /> : <Maximize2 aria-hidden />}
-            <span>{chromeOff ? 'Exit full screen' : 'Full screen'}</span>
-          </button>
+          <button type="button" className="practice-chart-control practice-chart-control--mark-up" aria-label="Mark up this score" onClick={() => { setWorkspaceOpen(false); setMusicMenu(null); setMarker(penColour) }}><Pen aria-hidden /><span>Mark up</span></button>
           <button type="button" ref={workspaceTrigger} className="practice-chart-control" aria-label="Workspace" aria-expanded={workspaceOpen}
             data-guidance="music-workspace" aria-controls="music-workspace-tools"
             onKeyDown={event => {
@@ -805,6 +798,7 @@ export default function PracticeChartLayer({
             }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
           </button>
+          {onOpenTools && <button type="button" className="practice-chart-control practice-chart-control--tools" onClick={onOpenTools}><span>Tools</span><ArrowRight aria-hidden /></button>}
         </div>}
         </div>
         </div>
@@ -945,7 +939,14 @@ export default function PracticeChartLayer({
       menuMode={musicMenu}
       menuAnchor={musicMenuAnchor}
       menuId={musicMenuId}
-      onDismiss={dismissMusicMenu}
+      onDismiss={restoreFocus => {
+        if (musicMenu === 'markup') {
+          setMusicMenu(null)
+          if (restoreFocus) requestAnimationFrame(() => paperSurface.current?.querySelector<HTMLButtonElement>('[data-music-menu-trigger="markup"]')?.focus({ preventScroll: true }))
+          return
+        }
+        dismissMusicMenu(restoreFocus)
+      }}
       hasChart={chart !== null}
       fileName={chart?.fileName ?? null}
       pageView={pageView}
@@ -961,18 +962,13 @@ export default function PracticeChartLayer({
       marker={marker}
       inkWidth={inkWidth}
       markCount={strokes.length}
-      canUndo={canUndo}
-      canRedo={canRedo}
       saving={saving}
       onMarkerChange={pickMarker}
       onInkWidthChange={width => { saveInkWidth(width); setInkWidth(width) }}
-      onUndoMark={undoStroke}
-      onRedoMark={redoStroke}
       onClearMarks={clearMarks}
       onSaveMarked={() => void saveMarked()}
       onAdd={pick}
       onRemove={() => void remove()}
-      onTurn={direction => paper.current?.turn(direction)}
       onFitChange={fit => { paper.current?.resetZoom(); updateView({ fit }) }}
       onHalfTurnChange={halfTurn => updateView({ halfTurn })}
       onPaperVisibleChange={handlePaperVisible}

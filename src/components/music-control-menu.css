@@ -24,7 +24,8 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
-.music-control-menu--markup { width: min(280px, calc(100vw - 24px)); }
+.music-control-menu--markup,
+.music-control-menu--page { width: min(280px, calc(100vw - 24px)); }
 .music-control-menu button {
   border: 0;
   font: inherit;

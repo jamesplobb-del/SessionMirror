@@ -3,7 +3,7 @@ import { PlusLocked } from '../plus/PlusPaywall'
 import { requirePlus, showPlus } from '../plus/plusAccess'
 import PremiumDisclosure from './ui/PremiumDisclosure'
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
-import { ArrowLeft, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, ListChecks, ListMusic, LockKeyhole, Pencil, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronRight, File, Folder, FolderPlus, GripVertical, ListChecks, ListMusic, LockKeyhole, Pencil, Plus, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react'
 import type { Project } from '../db'
 import { exportPracticeChart, deletePracticeChart, hasPracticeChart, practiceChartName, savePracticeChart, PRACTICE_CHART_CHANGED } from '../utils/practiceChartStorage'
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
@@ -32,6 +32,7 @@ interface Props {
   onImported: () => void
   onCreateRoutine: (steps: RoutineStep[]) => void
   onReadSetlist: (setlist: MusicSetlist, entryId: string) => Promise<void>
+  onOpenTools?: () => void
 }
 type DragKind = 'score' | 'folder'
 type DragGesture = { kind: DragKind; id: string; startX: number; startY: number; active: boolean }
@@ -52,7 +53,7 @@ function setupLabel(id: string): string {
 }
 
 /** Folders organize the library; a score's recordings stay in its practice item. */
-export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported, onCreateRoutine, onReadSetlist }: Props) {
+export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported, onCreateRoutine, onReadSetlist, onOpenTools }: Props) {
   const plus = usePlus()
   const input = useRef<HTMLInputElement>(null)
   const scroll = useRef<HTMLElement>(null)
@@ -355,9 +356,10 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
   return <section ref={scroll} className="music-library" aria-label="Music library">
     <header className="music-library__header">
       <div>{selectedFolder && <button type="button" className="music-library__back" data-music-drop="root" onClick={() => { setFolderId(null); setQuery(''); setEditingFolder(null); setRemoveFolder(false) }}><ArrowLeft aria-hidden /> All music</button>}<h1>{selectedFolder?.name ?? 'Music'}</h1><p>{selectedFolder ? 'Scores in this folder' : 'Your scores, ready for practice.'}</p></div>
-      {!selecting && (plus.active
-        ? <div className="music-library__header-actions">{!selectedFolder && <button type="button" className="music-library__new-folder" onClick={() => { setEditingFolder('new'); setFolderName('') }}><FolderPlus aria-hidden /> New folder</button>}<button type="button" className="music-library__import" disabled={disabled || Boolean(busy)} onClick={() => input.current?.click()}><Upload aria-hidden />Import music</button></div>
-        : <div className="music-library__header-actions"><button type="button" className="music-library__import" disabled={!plus.ready} onClick={() => showPlus('music')}><LockKeyhole aria-hidden />{plus.ready ? 'View Plus' : 'Checking access…'}</button></div>)}
+      <div className="music-library__header-actions">{!selecting && (plus.active
+        ? <>{!selectedFolder && <button type="button" className="music-library__new-folder" onClick={() => { setEditingFolder('new'); setFolderName('') }}><FolderPlus aria-hidden /> New folder</button>}<button type="button" className="music-library__import" disabled={disabled || Boolean(busy)} onClick={() => input.current?.click()}><Upload aria-hidden />Import music</button></>
+        : <button type="button" className="music-library__import" disabled={!plus.ready} onClick={() => showPlus('music')}><LockKeyhole aria-hidden />{plus.ready ? 'View Plus' : 'Checking access…'}</button>)}
+        {onOpenTools && <button type="button" className="music-library__tools" onClick={onOpenTools}><span>Tools</span><ArrowRight aria-hidden /></button>}</div>
     </header>
     {!selectedFolder && !selecting && <section className="music-library__setlists" aria-label="Your setlists">
       <div className="music-library__section-head"><h2>Setlists</h2>{plus.active

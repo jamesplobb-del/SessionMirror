@@ -76,6 +76,7 @@
 .music-library__section-head>button{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px 0 10px;border:0;background:none;color:var(--ml-accent);font-size:15px;font-weight:600}
 .music-library__section-head>button svg{width:17px;height:17px}
 .music-library__plus-tag{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:8px;background:color-mix(in srgb,var(--ml-accent) 12%,transparent);color:var(--ml-accent);font-size:13px;font-weight:600}
+.music-library__tools{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--ml-accent);min-height:44px;padding:0 2px 0 8px;font-size:15px;font-weight:600}.music-library__tools svg{width:17px;height:17px}
 .music-library__setlists>p{margin:2px 0 0;color:var(--ml-muted);font-size:14px;line-height:1.5}
 .music-library__setlists>ul{list-style:none;margin:0;padding:0;border:1px solid var(--ml-line);border-radius:14px;background:var(--ml-panel);overflow:hidden}
 .music-library__setlists>ul>li{position:relative}.music-library__setlists>ul>li+li::before{content:'';position:absolute;top:0;left:68px;right:0;height:1px;background:var(--ml-line)}

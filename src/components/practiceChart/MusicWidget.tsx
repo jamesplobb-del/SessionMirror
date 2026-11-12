@@ -1,8 +1,8 @@
 import { AnimatePresence } from 'framer-motion'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import {
-  Check, ChevronLeft, ChevronRight, Eraser, EyeOff, FileMusic, Plus, RefreshCw,
-  Redo2, Share, SquareSplitVertical, Trash2, Undo2, X, ZoomIn, ZoomOut,
+  EyeOff, FileMusic, Plus, RefreshCw,
+  Share, SquareSplitVertical, Trash2, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
@@ -34,7 +34,6 @@ interface MusicWidgetProps {
   halfTurn: boolean
   onAdd: () => void
   onRemove: () => void
-  onTurn: (direction: 1 | -1) => void
   onFitChange: (fit: ChartFitPreference) => void
   onZoomChange: (direction: 1 | -1) => void
   onResetZoom: () => void
@@ -43,13 +42,9 @@ interface MusicWidgetProps {
   marker: InkTool | null
   inkWidth: InkWidth
   markCount: number
-  canUndo?: boolean
-  canRedo?: boolean
   saving: boolean
   onMarkerChange: (tool: InkTool | null) => void
   onInkWidthChange: (width: InkWidth) => void
-  onUndoMark: () => void
-  onRedoMark?: () => void
   onClearMarks: () => void
   onSaveMarked: () => void
 }
@@ -64,8 +59,8 @@ function pageLabel(view: ChartPaperView | null): string {
 export default function MusicWidget({
   boundaryRef, visible, menuMode, menuAnchor, menuId, onDismiss, hasChart, fileName,
   pageView, paperVisible, busy, error, fit, zoom, spreadAvailable, halfTurn, onAdd, onRemove,
-  onTurn, onFitChange, onZoomChange, onResetZoom, onHalfTurnChange, onPaperVisibleChange, marker, inkWidth,
-  markCount, canUndo = false, canRedo = false, saving, onMarkerChange, onInkWidthChange, onUndoMark, onRedoMark, onClearMarks, onSaveMarked,
+  onFitChange, onZoomChange, onResetZoom, onHalfTurnChange, onPaperVisibleChange, marker, inkWidth,
+  markCount, saving, onMarkerChange, onInkWidthChange, onClearMarks, onSaveMarked,
 }: MusicWidgetProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -164,10 +159,10 @@ export default function MusicWidget({
   const currentZoom = Math.min(3, Math.max(1, Number.isFinite(zoom) ? zoom : 1))
   const zoomPercent = Math.round(currentZoom * 100)
   const activeFit = fit === 'auto' ? spreadAvailable ? 'spread' : 'page' : fit
-  const fitOptions: { value: ChartFitPreference; label: string; detail: string }[] = [
-    { value: 'page', label: 'One page', detail: 'See the whole part' },
-    ...(spreadAvailable ? [{ value: 'spread' as const, label: 'Two pages', detail: 'Read a facing spread' }] : []),
-    { value: 'width', label: 'Fill width', detail: halfTurn ? 'Larger notes, half-screen turns' : 'Larger notes, scroll to read' },
+  const fitOptions: { value: ChartFitPreference; label: string }[] = [
+    { value: 'page', label: 'One page' },
+    ...(spreadAvailable ? [{ value: 'spread' as const, label: 'Two pages' }] : []),
+    { value: 'width', label: 'Width' },
   ]
   const host = boundaryRef.current
   if (!host) return null
@@ -195,64 +190,49 @@ export default function MusicWidget({
           <h2 id={`${menuId}-${menuMode}-title`}>{menuMode === 'markup' ? 'Mark up' : 'Page'}</h2>
           <span>{menuMode === 'markup' ? 'Draw on the score' : pageLabel(pageView)}</span>
         </div>
-        <button ref={closeRef} type="button" className="music-control-menu__close" aria-label={menuMode === 'markup' ? 'Done marking' : 'Close page controls'} onClick={() => onDismiss(true)}>
-          {menuMode === 'markup' ? <><Check aria-hidden /><span>Done</span></> : <X aria-hidden />}
+        <button ref={closeRef} type="button" className="music-control-menu__close" aria-label={menuMode === 'markup' ? 'Close pen options' : 'Close page controls'} onClick={() => onDismiss(true)}>
+          <X aria-hidden />
         </button>
       </div>
 
       {hasChart ? menuMode === 'page' ? <>
-        <div className="music-control-menu__section" role="group" aria-label="Page size">
-          {fitOptions.map(option => <button key={option.value} type="button" className="music-control-menu__choice" aria-pressed={activeFit === option.value}
-            onClick={() => { onFitChange(option.value); onDismiss(true) }}>
-            <span><strong>{option.label}</strong><small>{option.detail}</small></span>
-            {activeFit === option.value && <Check aria-hidden />}
-          </button>)}
+        <div className="music-control-menu__width" role="group" aria-label="Page layout">
+          <span className="music-control-menu__label">Layout</span>
+          <div style={{ gridTemplateColumns: `repeat(${fitOptions.length}, minmax(0, 1fr))` }}>{fitOptions.map(option => <button key={option.value} type="button" aria-pressed={activeFit === option.value}
+            onClick={() => { onFitChange(option.value); onDismiss(true) }}>{option.label}</button>)}</div>
         </div>
-        <div className="music-control-menu__section music-control-menu__zoom" role="group" aria-label="Zoom" aria-describedby={`${menuId}-zoom-hint`}>
-          <div className="music-control-menu__zoom-controls">
+        <div className="music-control-menu__width" role="group" aria-label="Zoom">
+          <span className="music-control-menu__label">Zoom</span>
+          <div>
             <button type="button" aria-label="Zoom out" disabled={!turnable || currentZoom <= 1} onClick={() => onZoomChange(-1)}><ZoomOut aria-hidden /></button>
-            <button type="button" className="music-control-menu__zoom-reset" aria-label={`Reset zoom to 100%, current zoom ${zoomPercent}%`} disabled={!turnable} onClick={onResetZoom}>
-              <span aria-live="polite">{zoomPercent}%</span><small>Reset</small>
+            <button type="button" aria-label={`Reset zoom to 100%, current zoom ${zoomPercent}%`} disabled={!turnable} onClick={onResetZoom}>
+              <span aria-live="polite">{zoomPercent}%</span>
             </button>
             <button type="button" aria-label="Zoom in" disabled={!turnable || currentZoom >= 3} onClick={() => onZoomChange(1)}><ZoomIn aria-hidden /></button>
           </div>
-          <p id={`${menuId}-zoom-hint`} className="music-control-menu__zoom-hint">Pinch to zoom. Turning resets zoom.</p>
         </div>
         <button type="button" className="music-control-menu__row" aria-pressed={halfTurn} onClick={() => onHalfTurnChange(!halfTurn)}>
           <SquareSplitVertical aria-hidden /><span>Half-page turns</span><i className="music-control-menu__switch" aria-hidden />
         </button>
-        <div className="music-control-menu__turn" role="group" aria-label="Turn the page">
-          <button type="button" disabled={!turnable} onClick={() => onTurn(-1)}><ChevronLeft aria-hidden />Previous</button>
-          <button type="button" disabled={!turnable} onClick={() => onTurn(1)}>Next<ChevronRight aria-hidden /></button>
-        </div>
         <div className="music-control-menu__section music-control-menu__files" role="group" aria-label="Music file">
           <button type="button" className="music-control-menu__row" disabled={busy} onClick={onAdd}><RefreshCw aria-hidden /><span>Replace music</span></button>
           <button type="button" className="music-control-menu__row" onClick={() => onPaperVisibleChange(false)}><EyeOff aria-hidden /><span>Hide page</span></button>
           <button type="button" className="music-control-menu__row music-control-menu__row--remove" disabled={busy} onClick={onRemove}><Trash2 aria-hidden /><span>Remove music</span></button>
         </div>
       </> : <>
-        <div className="music-control-menu__pens" role="group" aria-label="Drawing tool">
+        <div className="music-control-menu__pens" role="group" aria-label="Pen colour">
           {(['black', 'red'] as const).map(colour => <button key={colour} type="button" aria-label={`${colour} marker`} aria-pressed={marker === colour} onClick={() => onMarkerChange(colour)}>
             <i style={{ background: INK_CSS[colour] }} aria-hidden /><span>{colour === 'black' ? 'Black' : 'Red'}</span>
           </button>)}
-          <button type="button" aria-label="Eraser" aria-pressed={marker === 'eraser'} onClick={() => onMarkerChange('eraser')}><Eraser aria-hidden /><span>Erase</span></button>
         </div>
         <div className="music-control-menu__width" role="group" aria-label="Marker thickness">
           <span className="music-control-menu__label">Pen size</span>
-          <div>{INK_WIDTHS.map(width => <button key={width} type="button" aria-label={`${width} marker`} aria-pressed={inkWidth === width} disabled={marker === 'eraser'} onClick={() => onInkWidthChange(width)}>
+          <div>{INK_WIDTHS.map(width => <button key={width} type="button" aria-label={`${width} marker`} aria-pressed={inkWidth === width} onClick={() => onInkWidthChange(width)}>
             <i style={{ width: INK_WIDTH_PX[width] + 4, height: INK_WIDTH_PX[width] + 4 }} aria-hidden />
             {width === 'fine' ? 'Fine' : width === 'medium' ? 'Medium' : 'Bold'}
           </button>)}</div>
         </div>
-        <div className="music-control-menu__edits" role="group" aria-label="Edit markings">
-          <button type="button" disabled={!canUndo} onClick={onUndoMark}><Undo2 aria-hidden />Undo</button>
-          <button type="button" disabled={!canRedo} onClick={onRedoMark}><Redo2 aria-hidden />Redo</button>
-          <button type="button" disabled={markCount === 0} onClick={onClearMarks}><Trash2 aria-hidden />Clear</button>
-        </div>
-        <div className="music-control-menu__turn" role="group" aria-label="Turn page while marking">
-          <button type="button" disabled={!turnable} onClick={() => onTurn(-1)}><ChevronLeft aria-hidden />Previous</button>
-          <button type="button" disabled={!turnable} onClick={() => onTurn(1)}>Next<ChevronRight aria-hidden /></button>
-        </div>
+        <button type="button" className="music-control-menu__row" disabled={markCount === 0} onClick={onClearMarks}><Trash2 aria-hidden /><span>Clear</span></button>
         <p className="music-control-menu__hint">Marks save automatically. Pinch with two fingers to zoom or move the page.</p>
         <button type="button" className="music-control-menu__save" disabled={markCount === 0 || saving} onClick={onSaveMarked}><Share aria-hidden />{saving ? 'Saving…' : 'Save marked PDF'}</button>
       </> : <>
