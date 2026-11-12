@@ -43,7 +43,7 @@ try {
   await new Promise(r=>setTimeout(r,450))
   const info=await evaluate(`(()=>{const p=document.querySelector('#music-workspace-tools'),r=p.getBoundingClientRect();return {x:r.x,right:r.right,w:r.width,inert:!!p.closest('[inert]'),buttons:[...p.querySelectorAll('button')].map(b=>({label:b.innerText,w:b.getBoundingClientRect().width,visible:getComputedStyle(b).visibility}))}})()`)
   console.log(width,JSON.stringify(info))
-  const menuShot=await send('Page.captureScreenshot',{format:'png'});await writeFile(`build/release-4.2-31/menu-${width}.png`,Buffer.from(menuShot.data,'base64'))
+  const menuShot=await send('Page.captureScreenshot',{format:'png'});await writeFile(`build/release-4.2.2-32/menu-${width}.png`,Buffer.from(menuShot.data,'base64'))
   assert.ok(info.x>=0 && info.right<=width && info.w>150 && !info.inert)
   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27})
   await wait(`!document.querySelector('#music-workspace-tools')`)
@@ -74,6 +74,6 @@ try {
   await click(40,800)
   await wait(`!document.querySelector('#music-workspace-tools')`)
   console.log('PASS Workspace layout, keyboard entry/return, launch, markup, outside dismiss:',width)
-  const shot=await send('Page.captureScreenshot',{format:'png'});await writeFile(`build/release-4.2-31/workspace-${width}.png`,Buffer.from(shot.data,'base64'))
+  const shot=await send('Page.captureScreenshot',{format:'png'});await writeFile(`build/release-4.2.2-32/workspace-${width}.png`,Buffer.from(shot.data,'base64'))
  }
 }finally{ws.close()}

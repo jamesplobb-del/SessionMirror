@@ -1,6 +1,6 @@
 {
-  "version": "4.2",
-  "build": 31,
+  "version": "4.2.2",
+  "build": 32,
   "configuration": "Release",
   "reviewedCommit": "a6fae0291188efc113a3eec493b53b544187c3f4",
   "reviewScope": "Cursor commit plus production-release safeguards",
@@ -43,5 +43,9 @@
   "unverified": [
     "Live StoreKit purchase/restore",
     "Physical-device playback and accessibility"
-  ]
+  ],
+  "previousSubmission": "4.2.1 (31), confirmed in browser retry chat; submission 50a14cca-1893-4cfd-a2a3-60fed44848c5",
+  "supersededArchive": "Stopped initial 4.2 (31) archive after reconciling newer App Store release history; never uploaded",
+  "sourceCommit": "56617bd",
+  "releaseNotes": "4.2.2 (32) follows the separate browser chat\u2019s confirmed 4.2.1 (31) submission. Prior 4.2 (31) archive was interrupted and not uploaded."
 }
