@@ -45,6 +45,7 @@ try {
   console.log(width,JSON.stringify(info))
   const menuShot=await send('Page.captureScreenshot',{format:'png'});await writeFile(`build/release-4.2.2-32/menu-${width}.png`,Buffer.from(menuShot.data,'base64'))
   assert.ok(info.x>=0 && info.right<=width && info.w>150 && !info.inert)
+  assert.match(await evaluate(`getComputedStyle(document.querySelector('.music-widget-drawer')).backgroundColor`), /^rgb\(/, 'the themed menu has an opaque background')
   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27})
   await wait(`!document.querySelector('#music-workspace-tools')`)
   await evaluate(`document.querySelector('[aria-label="Workspace"]').focus()`)

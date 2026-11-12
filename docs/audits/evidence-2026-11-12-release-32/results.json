@@ -33,19 +33,61 @@
     "phoneWidth": 390,
     "ipadWidth": 834,
     "workspace": "pass: layout, keyboard entry/return, launch, markup exclusivity, outside dismissal",
-    "environment": "isolated Chrome against production components; no physical iPad/VoiceOver verification"
+    "environment": "isolated Chrome against production components; no physical iPad/VoiceOver verification",
+    "appearance": "passed: production theme, opaque background, phone and iPad screenshots visually reviewed",
+    "workflowLog": "workspace-browser.log"
   },
   "webBuild": "passed",
   "sentrySourceMaps": "uploaded",
-  "archive": "in progress",
-  "upload": "pending",
-  "offerCodes": "pending browser access; not generated",
+  "archive": "passed",
+  "upload": "not attempted; distribution export requires Xcode account sign-in",
+  "offerCodes": "not generated; browser startup blocked by symlinked workspace, permission to continue codes in browser retry chat pending",
   "unverified": [
     "Live StoreKit purchase/restore",
     "Physical-device playback and accessibility"
   ],
   "previousSubmission": "4.2.1 (31), confirmed in browser retry chat; submission 50a14cca-1893-4cfd-a2a3-60fed44848c5",
   "supersededArchive": "Stopped initial 4.2 (31) archive after reconciling newer App Store release history; never uploaded",
-  "sourceCommit": "56617bd",
-  "releaseNotes": "4.2.2 (32) follows the separate browser chat\u2019s confirmed 4.2.1 (31) submission. Prior 4.2 (31) archive was interrupted and not uploaded."
+  "sourceCommit": "d82ac6f",
+  "releaseNotes": "4.2.2 (32) follows the separate browser chat\u2019s confirmed 4.2.1 (31) submission. Prior 4.2 (31) archive was interrupted and not uploaded.",
+  "archivePath": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-11-12/BestTake-4.2.2-32.xcarchive",
+  "archiveVerification": {
+    "archive": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-11-12/BestTake-4.2.2-32.xcarchive",
+    "bundles": [
+      {
+        "CFBundleIdentifier": "com.besttake.app",
+        "CFBundleShortVersionString": "4.2.2",
+        "CFBundleVersion": "32"
+      },
+      {
+        "CFBundleIdentifier": "com.besttake.app.QuickTunerControl",
+        "CFBundleShortVersionString": "4.2.2",
+        "CFBundleVersion": "32"
+      }
+    ],
+    "archiveSigningAllowsDebug": [
+      true,
+      true
+    ],
+    "productionWebFilesMatched": 94,
+    "signature": "passed",
+    "distributionEntitlements": "verify after App Store export",
+    "internalPreviewMarker": false,
+    "customUnlockMarkers": false,
+    "nativeProductIDs": "correct",
+    "developmentServer": false,
+    "sourceMapsInApp": false,
+    "storeKitTestConfig": false,
+    "executableSha256": "810c2ae807f315d5ef1febcac3a2791e2d7dfc520ecab0a861103b6619b5bf2c"
+  },
+  "distributionExport": "blocked: Xcode No Accounts and no iOS Distribution signing identity; security find-identity showed only Apple Development",
+  "publicStorefront": {
+    "checked": "2026-11-12",
+    "source": "https://itunes.apple.com/lookup?id=6786522172&country=us",
+    "version": "4.2.1",
+    "price": "Free",
+    "releaseDate": "2026-11-04T22:02:49Z"
+  },
+  "fixtureCorrection": "Match production lens-system/premium-app classes and premium-app CSS; no production artifact change",
+  "sentryNativeSymbols": "upload phase completed successfully"
 }

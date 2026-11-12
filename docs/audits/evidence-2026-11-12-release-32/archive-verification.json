@@ -1,0 +1,29 @@
+{
+  "archive": "/Users/jameslobb/Library/Developer/Xcode/Archives/2026-11-12/BestTake-4.2.2-32.xcarchive",
+  "bundles": [
+    {
+      "CFBundleIdentifier": "com.besttake.app",
+      "CFBundleShortVersionString": "4.2.2",
+      "CFBundleVersion": "32"
+    },
+    {
+      "CFBundleIdentifier": "com.besttake.app.QuickTunerControl",
+      "CFBundleShortVersionString": "4.2.2",
+      "CFBundleVersion": "32"
+    }
+  ],
+  "archiveSigningAllowsDebug": [
+    true,
+    true
+  ],
+  "productionWebFilesMatched": 94,
+  "signature": "passed",
+  "distributionEntitlements": "verify after App Store export",
+  "internalPreviewMarker": false,
+  "customUnlockMarkers": false,
+  "nativeProductIDs": "correct",
+  "developmentServer": false,
+  "sourceMapsInApp": false,
+  "storeKitTestConfig": false,
+  "executableSha256": "810c2ae807f315d5ef1febcac3a2791e2d7dfc520ecab0a861103b6619b5bf2c"
+}

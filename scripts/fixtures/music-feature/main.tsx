@@ -24,6 +24,7 @@ import '../../../src/index.css'
 import '../../../src/styles/practice-routines.css'
 import '../../../src/styles/open-lens.css'
 import '../../../src/styles/open-lens-system.css'
+import '../../../src/styles/premium-app.css'
 
 const fixtureStep = createStep({ title: 'Warmup', minutes: 5 })
 const fixtureRoutine = createRoutine('Fixture routine', [fixtureStep], null)
