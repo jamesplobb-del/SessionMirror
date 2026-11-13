@@ -818,7 +818,7 @@ export default function PracticeChartLayer({
               </button>
             ) : (
               <div key={key} className="practice-chart-workspace__tool" data-enabled={workspace[key] ? 'true' : undefined}>
-                <button type="button" onClick={() => { onWorkspaceChange(key, true); onRevealToolRail?.(); closeWorkspace() }}>
+                <button type="button" onClick={() => { onWorkspaceChange(key, true); onRevealToolRail?.() }}>
                   <Icon aria-hidden /><span>{label}</span>
                 </button>
                 {workspace[key] && <button type="button" className="practice-chart-workspace__remove" aria-label={`Remove ${label} from workspace`}
@@ -829,7 +829,7 @@ export default function PracticeChartLayer({
               </div>
             ))}
             {onReferencesChange && <div className="practice-chart-workspace__tool" data-enabled={referencesVisible ? 'true' : undefined}>
-              <button type="button" onClick={() => { onReferencesChange(true); onRevealToolRail?.(); closeWorkspace() }}>
+              <button type="button" onClick={() => { onReferencesChange(true); onRevealToolRail?.() }}>
                 <FileMusic aria-hidden /><span>References</span>
               </button>
               {referencesVisible && <button type="button" className="practice-chart-workspace__remove" aria-label="Remove References from workspace" onClick={event => {
