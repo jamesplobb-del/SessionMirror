@@ -330,7 +330,8 @@ import {
   audioModePlaybackControlsRef,
 } from './context/AudioModePlaybackContext'
 import type { AudioPracticeTab } from './types/audioPractice'
-import { requestQuickFunctionFromApp } from './utils/quickTunerLaunch'
+import { dismissQuickTuner, getQuickTunerLaunchSnapshot, requestQuickFunctionFromApp } from './utils/quickTunerLaunch'
+import { rememberRecentMusic, resolveRecentMusic } from './utils/recentMusic'
 import { initHeadphoneOutputDetection } from './utils/headphoneOutput'
 import { registerKeepAwakeLifecycle } from './utils/keepScreenAwake'
 import { analyzeTakeForFocusedPractice } from './utils/takePracticeAnalysis'
@@ -502,7 +503,7 @@ async function performAppBoot(): Promise<AppBootSnapshot> {
   }
 }
 
-export default function App() {
+export default function App({ recentMusicRequestId }: { recentMusicRequestId?: string }) {
   const [isBooting, setIsBooting] = useState(true)
   const [bootSnapshot, setBootSnapshot] = useState<AppBootSnapshot | null>(null)
   const [bootError, setBootError] = useState<string | null>(null)
@@ -586,10 +587,10 @@ export default function App() {
     )
   }
 
-  return <StandardApp bootSnapshot={bootSnapshot} />
+  return <StandardApp bootSnapshot={bootSnapshot} recentMusicRequestId={recentMusicRequestId} />
 }
 
-function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
+function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: AppBootSnapshot; recentMusicRequestId?: string }) {
   usePhysicalOrientation()
   const isNativeCameraPlatform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
   const [takes, setTakes] = useState<Take[]>(bootSnapshot.takes)
@@ -4882,6 +4883,7 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
       setMusicLibraryOpen(false)
       handleAudioPracticeTabChange('music')
       rememberLastPracticeDestination({ kind: 'music', projectId })
+      rememberRecentMusic({ projectId, setlist: setlist && { id: setlist.list.id, entryId: setlist.entryId } })
       setActiveMusicSetlist(setlist ?? null)
     })
   }, [isRecording, isStopping, runPracticeTransition, handleSelectProject, applyDeskSnapshot, applyReferenceAudio, commitRoutineDay, handleAudioPracticeTabChange, rememberLastPracticeDestination, updateSettings])
@@ -4897,6 +4899,35 @@ function StandardApp({ bootSnapshot }: { bootSnapshot: AppBootSnapshot }) {
     await handleOpenMusicScore(projectId)
     dismissPracticeHub()
   }, [dismissPracticeHub, handleOpenMusicScore])
+
+  useEffect(() => {
+    if (!recentMusicRequestId || !plus.ready || getQuickTunerLaunchSnapshot()?.id !== recentMusicRequestId) return
+    dismissQuickTuner(recentMusicRequestId)
+    if (captureBusyRef.current || practiceTransition.current.busy || multitrackOpen) {
+      showAlertOutsideTree({
+        title: 'Continue Music',
+        message: multitrackOpen ? 'Close Multitrack, then try Continue Music again.' : 'Finish your current take or practice change, then try Continue Music again.',
+      })
+      return
+    }
+    const recent = canUsePlus()
+      ? resolveRecentMusic(id => projects.some(project => project.id === id) && hasPracticeChart(id))
+      : null
+    setReviewSlot(null)
+    setReviewContext('compare')
+    setFocusPanel(null)
+    setMusicLibraryOpen(true)
+    setActiveMusicSetlist(null)
+    void (async () => {
+      try {
+        await handleOpenFullPracticeTool('music')
+        if (recent && canUsePlus()) await handleOpenMusicScore(recent.projectId, recent.setlist)
+      } catch {
+        setMusicLibraryOpen(true)
+        showAlertOutsideTree({ title: 'Couldn’t reopen music', message: 'Choose a score or setlist from your Music Library.' })
+      }
+    })()
+  }, [recentMusicRequestId, plus.ready, projects, multitrackOpen, handleOpenFullPracticeTool, handleOpenMusicScore])
 
   const incomingPdfBusyRef = useRef(false)
   const promptedPdfRef = useRef<string | null>(null)

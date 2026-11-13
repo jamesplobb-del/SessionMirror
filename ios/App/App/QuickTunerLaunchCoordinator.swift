@@ -3,6 +3,7 @@ import Foundation
 enum QuickFunctionDestination: String, Codable {
     case tuner
     case metronome
+    case recentMusic
 }
 
 enum QuickTunerLaunchSource: String, Codable {
@@ -78,6 +79,7 @@ final class QuickTunerLaunchCoordinator {
     static let appGroupIdentifier = "group.com.besttake.app.quicktuner"
     static let tunerHomeScreenShortcutType = "com.besttake.app.quickTuner"
     static let metronomeHomeScreenShortcutType = "com.besttake.app.quickMetronome"
+    static let recentMusicHomeScreenShortcutType = "com.besttake.app.recentMusic"
 
     private let pendingKey = "quickTuner.pendingLaunches.v1"
     private let lastConsumedKey = "quickTuner.lastConsumedLaunchID.v1"
@@ -212,6 +214,8 @@ final class QuickTunerLaunchCoordinator {
             return .tuner
         case metronomeHomeScreenShortcutType:
             return .metronome
+        case recentMusicHomeScreenShortcutType:
+            return .recentMusic
         default:
             return nil
         }

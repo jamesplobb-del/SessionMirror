@@ -148,6 +148,14 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.besttake.app.quickMetronome</string>
 		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>music.note.list</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Continue Music</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.besttake.app.recentMusic</string>
+		</dict>
 	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>

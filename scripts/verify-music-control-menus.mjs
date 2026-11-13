@@ -144,7 +144,7 @@ assert.equal(page.dialog.key, 'music-controls')
 assert.equal(page.dialog.props.id, 'music-test-page')
 assert.equal(nodes(page.tree, node => node.type === 'button' && /^(Black|Red|Erase)$/.test(label(node))).length, 0, 'Page contains no drawing palette or duplicated tabs')
 assert.equal(nodes(page.tree, node => node.type === 'button' && label(node).startsWith('Two pages')).length, 0, 'a spread is absent when it cannot fit')
-nodes(page.tree, node => node.type === 'button' && label(node).startsWith('Fill width'))[0].props.onClick()
+nodes(page.tree, node => node.type === 'button' && label(node) === 'Width')[0].props.onClick()
 assert.deepEqual(events.splice(0), [['fit', 'width'], ['dismiss', true]], 'choosing a reading fit applies it and returns focus to Page')
 function zoomButtons(tree) {
   return {
@@ -154,7 +154,7 @@ function zoomButtons(tree) {
   }
 }
 const zoom = zoomButtons(page.tree)
-assert.equal(label(zoom.reset), '100%Reset', 'Page shows the current zoom and a reset action')
+assert.equal(label(zoom.reset), '100%', 'Page shows the current zoom and a reset action')
 assert.equal(zoom.out.props.disabled, true, 'Normal fit is the minimum zoom')
 assert.equal(zoom.in.props.disabled, false)
 const enlargedZoom = zoomButtons(render({ zoom: 1.25 }).tree)
@@ -167,11 +167,11 @@ assert.deepEqual(events.splice(0), [['zoom', -1], ['zoom', 1], ['zoom', 1], ['re
 const smallest = zoomButtons(render({ zoom: .5 }).tree)
 assert.equal(smallest.out.props.disabled, true, 'An out-of-range small value also disables zoom out')
 assert.equal(smallest.in.props.disabled, false)
-assert.equal(label(smallest.reset), '100%Reset', 'The displayed lower bound is the normal page fit')
+assert.equal(label(smallest.reset), '100%', 'The displayed lower bound is the normal page fit')
 const largest = zoomButtons(render({ zoom: 3 }).tree)
 assert.equal(largest.in.props.disabled, true, 'zoom in stops at 300%')
 assert.equal(largest.out.props.disabled, false)
-assert.equal(label(largest.reset), '300%Reset')
+assert.equal(label(largest.reset), '300%')
 const unavailableZoom = zoomButtons(render({ pageView: null }).tree)
 assert.ok(Object.values(unavailableZoom).every(button => button.props.disabled), 'zoom controls wait for an available page')
 render({ zoom: 1, pageView: { first: 0, last: 0, count: 3 } })

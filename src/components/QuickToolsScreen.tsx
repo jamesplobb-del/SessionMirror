@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { loadAppSettings } from '../utils/appSettings'
-import type { QuickFunctionLaunchRequest } from '../utils/quickTunerLaunch'
+import type { QuickFunctionLaunchRequest, QuickToolDestination } from '../utils/quickTunerLaunch'
 import AudioPracticeTopTabs from './audioPractice/AudioPracticeTopTabs'
 import QuickTunerScreen from './QuickTunerScreen'
 import QuickMetronomeScreen from './QuickMetronomeScreen'
 
 /** Both shortcut destinations open the same shell, selecting their tool first. */
 export default function QuickToolsScreen({ request, onExit }: {
-  request: QuickFunctionLaunchRequest
+  request: QuickFunctionLaunchRequest & { destination: QuickToolDestination }
   onExit: () => void
 }) {
   const [activeTool, setActiveTool] = useState(request.destination)

@@ -10,7 +10,8 @@ export type QuickTunerLaunchSource =
   | 'deepLink'
   | 'systemControl'
 
-export type QuickFunctionDestination = 'tuner' | 'metronome'
+export type QuickToolDestination = 'tuner' | 'metronome'
+export type QuickFunctionDestination = QuickToolDestination | 'recentMusic'
 
 export interface QuickFunctionLaunchRequest {
   id: string
@@ -123,7 +124,7 @@ export async function initializeQuickTunerLaunch(): Promise<void> {
 }
 
 export function requestQuickFunctionFromApp(
-  destination: QuickFunctionDestination,
+  destination: QuickToolDestination,
   source: Extract<QuickTunerLaunchSource, 'inAppSettings'>,
 ): void {
   emitRequest({

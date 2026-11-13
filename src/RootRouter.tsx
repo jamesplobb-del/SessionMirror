@@ -65,7 +65,7 @@ export default function RootRouter() {
     getQuickTunerLaunchSnapshot,
   )
 
-  if (quickTunerRequest) {
+  if (quickTunerRequest && quickTunerRequest.destination !== 'recentMusic') {
     const handleExit = () => dismissQuickTuner(quickTunerRequest.id)
 
     return (
@@ -73,7 +73,7 @@ export default function RootRouter() {
         <QuickToolErrorBoundary requestId={quickTunerRequest.id} onExit={handleExit}>
           <QuickToolsScreen
             key={quickTunerRequest.id}
-            request={quickTunerRequest}
+            request={{ ...quickTunerRequest, destination: quickTunerRequest.destination }}
             onExit={handleExit}
           />
         </QuickToolErrorBoundary>
@@ -83,7 +83,7 @@ export default function RootRouter() {
 
   return (
     <Suspense fallback={<AppLaunchFallback />}>
-      <FullBestTakeApp />
+      <FullBestTakeApp recentMusicRequestId={quickTunerRequest?.id} />
     </Suspense>
   )
 }
