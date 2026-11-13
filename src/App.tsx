@@ -39,7 +39,7 @@ import MusicLibrary from './components/MusicLibrary'
 import MusicSetlistNavigation from './components/MusicSetlistNavigation'
 import type { MusicSetlist } from './utils/musicSetlists'
 import MusicWidgetDrawer from './components/MusicWidgetDrawer'
-import { loadMusicScoreSettings, loadMusicSetup, saveMusicSetup } from './utils/musicLibrary'
+import { loadMusicScoreSettings, loadMusicSetup, saveMusicScoreReference, saveMusicSetup } from './utils/musicLibrary'
 import { blankDesk } from './utils/practiceRoutines'
 import {
   clearPracticePlanOpen,
@@ -4810,9 +4810,12 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
   }, [handleShowDroneSettingChange])
 
   /** Loads a pinned recording for a practice item the way a pinned YouTube link loads. */
-  const applyReferenceAudio = useCallback((projectId: string, itemId: string) => {
-    try { localStorage.setItem(`besttake.reference-audio.${projectId}`, itemId) }
-    catch { setTakeDeleteError('Could not load this item’s saved reference recording.'); return }
+  const applyReferenceAudio = useCallback((projectId: string, itemId: string | null) => {
+    try {
+      const key = `besttake.reference-audio.${projectId}`
+      if (itemId) localStorage.setItem(key, itemId)
+      else localStorage.removeItem(key)
+    } catch { setTakeDeleteError('Reference selection could not be remembered on this device.') }
     if (activeProjectIdRef.current === projectId) setReferenceAudioId(itemId)
   }, [])
 
@@ -4836,7 +4839,11 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
     return runPracticeTransition(`music:${projectId}`, async () => {
       if (!hasPracticeChart(projectId)) throw new Error('This file is no longer available. Import it again.')
       const previousId = activeProjectIdRef.current
-      if (previousId !== projectId) setMusicTakesVisible(false)
+      if (previousId !== projectId) {
+        setMusicTakesVisible(false)
+        pauseYoutubeProxy(youtubeIframeRef.current)
+        setYoutubeUrl(null)
+      }
       // Leaving the reader already flushes its setup. Tools used elsewhere must
       // not overwrite that score's settings when returning through the library.
       // Browsing is harmless; choosing a different score pauses the routine before
@@ -4863,13 +4870,15 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
         applyDeskSnapshot({ ...desk, mode: 'audio', showMusic: true })
         const exercise = loadExerciseLibrary().find(item => item.step.projectId === projectId)?.step
         const scoreSettings = loadMusicScoreSettings(projectId)
-        const referenceVideoId = scoreSettings ? scoreSettings.referenceVideoId : exercise?.referenceVideoId
-        if (scoreSettings) {
-          selectPracticeReference(projectId, referenceVideoId ? buildYoutubeProxyUrl(referenceVideoId) : null)
-        } else if (!getSelectedReferenceUrl(projectId) && referenceVideoId) {
-          selectPracticeReference(projectId, buildYoutubeProxyUrl(referenceVideoId))
+        if (scoreSettings?.referenceAudio) {
+          applyReferenceAudio(projectId, scoreSettings.referenceAudio.itemId)
+          selectPracticeReference(projectId, null)
+        } else if (scoreSettings?.referenceVideoId) {
+          applyReferenceAudio(projectId, null)
+          selectPracticeReference(projectId, buildYoutubeProxyUrl(scoreSettings.referenceVideoId))
+        } else if (!scoreSettings && exercise?.referenceVideoId && !getSelectedReferenceUrl(projectId) && !localStorage.getItem(`besttake.reference-audio.${projectId}`)) {
+          selectPracticeReference(projectId, buildYoutubeProxyUrl(exercise.referenceVideoId))
         }
-        if (canUsePlus() && scoreSettings?.referenceAudio) applyReferenceAudio(projectId, scoreSettings.referenceAudio.itemId)
         prepareRoutineProgram(setlist ? null : scoreSettings ? scoreSettings.programId : exercise?.programId ?? null)
         musicSetupOwnerRef.current = setlist ? null : projectId
         setMusicWorkspaceExpandRequest({ pitch: desk.pitchTrackerEnabled || undefined, metronome: desk.showMetronome || undefined, drone: desk.showDrone || undefined })
@@ -5267,7 +5276,7 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
       item.playbackUrl = persisted.playbackUrl
     }
     if (item) {
-      setLibraryItems((current) => [item, ...current])
+      setLibraryItems(current => activeProjectIdRef.current === projectId ? [item, ...current] : current)
     }
     return item
   }, [storeLibraryAudio])
@@ -5301,14 +5310,10 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
 
   const selectReferenceAudio = useCallback((id: string | null) => {
     if (id && !requirePlus('music')) return
-    setReferenceAudioId(id)
     const projectId = activeProjectIdRef.current
-    if (!projectId) return
-    try {
-      if (id) localStorage.setItem(`besttake.reference-audio.${projectId}`, id)
-      else localStorage.removeItem(`besttake.reference-audio.${projectId}`)
-    } catch { setTakeDeleteError('Reference selection could not be remembered on this device.') }
-  }, [])
+    if (projectId) applyReferenceAudio(projectId, id)
+    else setReferenceAudioId(null)
+  }, [applyReferenceAudio])
   const referenceAudio = libraryItems.find(item => item.id === referenceAudioId && item.projectId === activeProjectId) ?? null
   const hasSelectedReference = Boolean(youtubeUrl || referenceAudio)
   const referenceSurfaceKey = `${activeProjectId ?? ''}:${recordingMode}:${audioPracticeTab}`
@@ -5331,8 +5336,7 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
   useEffect(() => {
     if (!settings.showMusic || !activeProjectId || !hasSelectedReference) return
     setReferenceVisible(true)
-    setReferenceExpanded(false)
-  }, [settings.showMusic, activeProjectId, routineDay?.activeStepId, hasSelectedReference])
+  }, [settings.showMusic, activeProjectId, routineDay?.activeStepId, hasSelectedReference, musicRoomActive])
 
   const handleReferenceBeforePlay = useCallback(() => {
       stopAutoPlaybackAudio()
@@ -6357,14 +6361,62 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
   }, [musicRoomActive, routineActiveStep?.id])
 
 
+  const scoreReferenceProjectId = !focusedRoutineContextRef.current &&
+    (musicRoomActive || (splitReferenceActive && splitReturnTabRef.current === 'music')) ? activeProjectId : null
+  // An upload may finish after the reader changes pieces or loads a different reference.
+  const pendingReferenceUploads = useRef(new Map<string, symbol>())
+
   const handleReferenceUpload = (file: File) => {
     if (!file.type.startsWith('audio/') && !/\.(mp3|m4a|wav|aac|ogg|flac)$/i.test(file.name)) { setTakeDeleteError('Choose an audio file for References.'); return }
+    if (!requirePlus('music')) return
     const projectId = activeProjectIdRef.current
+    if (!projectId) return
+    const upload = Symbol()
+    pendingReferenceUploads.current.set(projectId, upload)
     void handleImportLibraryAudio(file).then(item => {
-    if (!item) throw new Error('No reference imported')
-    if (activeProjectIdRef.current !== projectId) return
-    handleClearYoutube(); selectReferenceAudio(item.id); setReferenceExpanded(true)
-    }).catch(() => setTakeDeleteError('Could not import reference audio. Please try another file.'))
+      if (pendingReferenceUploads.current.get(projectId) !== upload || !canUsePlus()) return
+      if (!item) throw new Error('No reference imported')
+      if (projectId === scoreReferenceProjectId) {
+        saveMusicScoreReference(projectId, { referenceVideoId: null, referenceAudio: { itemId: item.id, name: item.name, duration: item.duration } })
+      }
+      if (activeProjectIdRef.current !== projectId) return
+      handleClearYoutube()
+      selectReferenceAudio(item.id)
+      setReferenceExpanded(true)
+    }).catch(() => {
+      if (pendingReferenceUploads.current.get(projectId) === upload) setTakeDeleteError('Could not save the reference recording. Please try again.')
+    }).finally(() => {
+      if (pendingReferenceUploads.current.get(projectId) === upload) pendingReferenceUploads.current.delete(projectId)
+    })
+  }
+
+  const handleReferenceYoutube = (url: string) => {
+    if (!requirePlus('youtube')) return
+    const projectId = activeProjectIdRef.current
+    const videoId = parseYoutubeVideoId(url)
+    if (!projectId || !videoId) return
+    pendingReferenceUploads.current.delete(projectId)
+    if (projectId === scoreReferenceProjectId) {
+      try { saveMusicScoreReference(projectId, { referenceVideoId: videoId, referenceAudio: null }) }
+      catch { setTakeDeleteError('Could not save the YouTube reference. Please try again.'); return }
+    }
+    selectReferenceAudio(null)
+    handleSubmitYoutube(url)
+    setReferenceExpanded(true)
+  }
+
+  const handleRemoveReference = (source: 'audio' | 'youtube') => {
+    const projectId = activeProjectIdRef.current
+    if (projectId) pendingReferenceUploads.current.delete(projectId)
+    if (projectId && projectId === scoreReferenceProjectId) {
+      try { saveMusicScoreReference(projectId, { referenceVideoId: null, referenceAudio: null }) }
+      catch { setTakeDeleteError('Could not remove the saved reference. Please try again.'); return }
+      selectReferenceAudio(null)
+      handleClearYoutube()
+      return
+    }
+    if (source === 'audio') selectReferenceAudio(null)
+    else handleClearYoutube()
   }
 
   const leaveSplitView = useCallback((reason: 'split-close' | 'split-exit') => {
@@ -6805,8 +6857,7 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                     onClose={handleCloseMusic}
                     onPaperVisibleChange={setMusicPageVisible}
                     onChromeHiddenChange={setMusicChromeHidden}
-                    toolRailOpen={musicWidgetDrawerOpen}
-                    onToolRailOpenChange={setMusicWidgetDrawerOpen}
+                    onRevealToolRail={() => setMusicWidgetDrawerOpen(true)}
                     onOpenTools={() => { void handleOpenFullPracticeTool(lastPracticeToolTab.current) }}
                     isRecording={isRecording}
                     isStopping={isStopping}
@@ -7035,9 +7086,10 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                   <ReferenceWidget onExpandView={() => { handleReferenceBeforePlay(); handleToggleSplitView(); setSplitReferenceActive(true) }} showTrackName visible={referenceVisible} playing={referencePlaying} onClose={() => { setReferenceExpanded(false); setReferenceVisible(false) }} boundaryRef={appShellRef} expanded={referenceExpanded} onExpandedChange={setReferenceExpanded} dockRight={musicRoomActive}
                     youtubeUrl={youtubeUrl} libraryPlayback={referenceAudio?.playbackUrl ? { ...referenceAudio, playbackUrl: referenceAudio.playbackUrl } : null}
                     suspended={!referenceVisible || suspendPipPlayback || isRecording || isStopping || quickSettingsOpen || autoPlaybackPlaying}
-                    onSubmitYoutube={(url) => { selectReferenceAudio(null); handleSubmitYoutube(url); setYoutubeAutoPlayOnLoad(false); setShowYoutubeExpandTip(false); setReferenceExpanded(true) }}
+                    onSubmitYoutube={handleReferenceYoutube}
+                    uploadLabel={scoreReferenceProjectId ? 'Add recording' : undefined}
                     onUpload={handleReferenceUpload}
-                    onClearAudio={() => selectReferenceAudio(null)} onClearYoutube={handleClearYoutube}
+                    onClearAudio={() => handleRemoveReference('audio')} onClearYoutube={() => handleRemoveReference('youtube')}
                     onYoutubeHostChange={handleYoutubeHostChange} youtubeIframeRef={youtubeIframeRef}
                     onBeforePlay={handleReferenceBeforePlay} onPlaybackChange={setReferencePlaying} />
                 )}
@@ -7309,11 +7361,11 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                             (mainAudioPitchSource !== null || mainVideoPitchSource !== null)
                           }
                           metronomeStageActive={metronomeStageActive}
-                          onUnpinBenchmark={splitReferenceActive ? () => selectReferenceAudio(null) : handleUnpinBenchmark}
-                          onClearLibraryReference={splitReferenceActive ? () => selectReferenceAudio(null) : handleClearLibraryReference}
+                          onUnpinBenchmark={splitReferenceActive ? () => handleRemoveReference('audio') : handleUnpinBenchmark}
+                          onClearLibraryReference={splitReferenceActive ? () => handleRemoveReference('audio') : handleClearLibraryReference}
                           onUnpinChallenger={handleUnpinChallenger}
-                          onClearYoutube={handleClearYoutube}
-                          onSubmitYoutube={splitReferenceActive ? (url) => { selectReferenceAudio(null); handleSubmitYoutube(url) } : handleSubmitYoutube}
+                          onClearYoutube={splitReferenceActive ? () => handleRemoveReference('youtube') : handleClearYoutube}
+                          onSubmitYoutube={splitReferenceActive ? handleReferenceYoutube : handleSubmitYoutube}
                           onUploadBenchmark={splitReferenceActive ? handleReferenceUpload : handleUploadBenchmark}
                           onToggleSplitView={handleExitSplitView}
                           onBenchmarkPlaybackChange={splitReferenceActive ? setReferencePlaying : setBenchmarkPipPlaying}

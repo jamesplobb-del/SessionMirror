@@ -13,6 +13,7 @@ import {
 } from '../utils/practiceChartStorage'
 import MusicWidget, { type MusicMenuMode } from './practiceChart/MusicWidget'
 import MarkupToolbar from './practiceChart/MarkupToolbar'
+import { useMusicMenuPlacement } from './practiceChart/useMusicMenuPlacement'
 import { ChartInkHistory } from './practiceChart/chartInkHistory'
 import type { HudQuickSettings } from '../utils/hudQuickSettings'
 import { WIDGET_CONTROL_LAYOUT_EVENT } from '../utils/floatingWidgetLayout'
@@ -93,9 +94,8 @@ interface PracticeChartLayerProps {
   /** Optional setlist transport, rendered with the page's own top tools. */
   /** Replaces the Library button while a setlist is open. */
   setlistMenu?: ReactNode
-  /** Workspace opens the side rail so its widgets are in reach. */
-  toolRailOpen?: boolean
-  onToolRailOpenChange?: (open: boolean) => void
+  /** Make the active tool dock available when a widget is opened. */
+  onRevealToolRail?: () => void
   /** Leaves the music page for the tuner or metronome. */
   onOpenTools?: () => void
 }
@@ -129,7 +129,7 @@ export default function PracticeChartLayer({
   onChromeHiddenChange, isRecording, isStopping, recordReady, recordElapsed, onToggleRecord,
   handsFreeEnabled, handsFreePhase, onToggleHandsFree, offerFileOnOpen = true,
   referencesVisible = false, onReferencesChange,
-  revision = 0, onScoreReplaced, setlistMenu, toolRailOpen, onToolRailOpenChange, onOpenTools,
+  revision = 0, onScoreReplaced, setlistMenu, onRevealToolRail, onOpenTools,
 }: PracticeChartLayerProps) {
   const { showConfirm } = useActionSheet()
   const input = useRef<HTMLInputElement>(null)
@@ -184,7 +184,6 @@ export default function PracticeChartLayer({
   // every time the player steps in.
   useEffect(() => { if (chromeOff) setWorkspaceOpen(false) }, [chromeOff])
   useEffect(() => { if (marker) setWorkspaceOpen(false) }, [marker])
-  useEffect(() => { if (toolRailOpen === false) setWorkspaceOpen(false) }, [toolRailOpen])
   const closeWorkspace = useCallback((restoreFocus = false) => {
     const focusWasInside = workspacePanel.current?.contains(document.activeElement)
     setWorkspaceOpen(false)
@@ -285,7 +284,7 @@ export default function PracticeChartLayer({
   const mounted = paperVisible && chart !== null
   const showing = active && mounted
   useLayoutEffect(() => {
-    if (!showing) { setMarker(null); setMusicMenu(null) }
+    if (!showing) { setMarker(null); setMusicMenu(null); setWorkspaceOpen(false) }
     else { setChromeOff(true); setControlsHidden(true) }
   }, [showing])
   useEffect(() => {
@@ -657,7 +656,8 @@ export default function PracticeChartLayer({
     setControlsHidden(true)
   }
   const gesture = useRef<{ id: number; x: number; y: number; at: number } | null>(null)
-  const toolHost = workspaceOpen && typeof document !== 'undefined' ? document.getElementById('music-widget-drawer-tools') : null
+  const workspaceShowing = showing && workspaceOpen && !reading && !marker
+  const workspacePlacement = useMusicMenuPlacement(boundaryRef, workspacePanel, workspaceTrigger.current, workspaceShowing)
   const isControlTarget = (target: EventTarget | null) => target instanceof Element
     && !!target.closest('button, a, input, select, textarea, [role="button"], [role="dialog"], .practice-chart-topbar, .practice-chart-rail, .practice-chart-workspace')
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -793,7 +793,6 @@ export default function PracticeChartLayer({
               if (first) { event.preventDefault(); first.focus({ preventScroll: true }) }
             }} onClick={() => {
               dismissMusicMenu()
-              if (!workspaceOpen) onToolRailOpenChange?.(true)
               setWorkspaceOpen(open => !open)
             }}>
             <Grid2X2 aria-hidden /><span>Workspace</span>
@@ -802,8 +801,9 @@ export default function PracticeChartLayer({
         </div>}
         </div>
         </div>
-        {workspaceOpen && (toolHost ? createPortal(
-          <div ref={workspacePanel} className="practice-chart-workspace" id="music-workspace-tools" role="toolbar" aria-label="Workspace widgets"
+        {workspaceShowing && boundaryRef.current && createPortal(
+          <div ref={workspacePanel} className="music-control-menu practice-chart-workspace" id="music-workspace-tools" role="group" aria-label="Workspace widgets"
+            style={workspacePlacement}
             onKeyDown={event => {
               if (event.key === 'Tab' && event.shiftKey
                 && event.target === workspacePanel.current?.querySelector('button:not(:disabled)')) {
@@ -818,7 +818,7 @@ export default function PracticeChartLayer({
               </button>
             ) : (
               <div key={key} className="practice-chart-workspace__tool" data-enabled={workspace[key] ? 'true' : undefined}>
-                <button type="button" onClick={() => { onWorkspaceChange(key, true); closeWorkspace() }}>
+                <button type="button" onClick={() => { onWorkspaceChange(key, true); onRevealToolRail?.(); closeWorkspace() }}>
                   <Icon aria-hidden /><span>{label}</span>
                 </button>
                 {workspace[key] && <button type="button" className="practice-chart-workspace__remove" aria-label={`Remove ${label} from workspace`}
@@ -829,7 +829,7 @@ export default function PracticeChartLayer({
               </div>
             ))}
             {onReferencesChange && <div className="practice-chart-workspace__tool" data-enabled={referencesVisible ? 'true' : undefined}>
-              <button type="button" onClick={() => { onReferencesChange(true); closeWorkspace() }}>
+              <button type="button" onClick={() => { onReferencesChange(true); onRevealToolRail?.(); closeWorkspace() }}>
                 <FileMusic aria-hidden /><span>References</span>
               </button>
               {referencesVisible && <button type="button" className="practice-chart-workspace__remove" aria-label="Remove References from workspace" onClick={event => {
@@ -840,7 +840,7 @@ export default function PracticeChartLayer({
             <button type="button" aria-pressed={handsFreeEnabled} onClick={onToggleHandsFree}>
               <MicVocal aria-hidden /><span>Hands-Free</span>
             </button>
-          </div>, toolHost) : null)}
+          </div>, boundaryRef.current)}
         {/*
           * In full screen the deck is away, and the whole point of the page
           * being on a stand is that the player is holding an instrument. The

@@ -142,7 +142,6 @@ body:has(.app-shell--music-page .practice-chart-paper:is([data-controls-hidden='
     transition: transform .28s cubic-bezier(.22,.68,.18,1);
   }
   .app-shell--music-page .music-widget-drawer--closed { transform: translateX(100%); }
-  .app-shell--music-page .music-widget-drawer { transition: transform .28s cubic-bezier(.22,.68,.18,1), width .28s cubic-bezier(.22,.68,.18,1); }
   .music-widget-drawer__handle {
     position: absolute;
     z-index: 1;
@@ -772,64 +771,29 @@ html.app-music-page.app-audio-mode:has(.app-ui-overlay--audio-practice-record)
 .practice-chart-scroll--half-turn { overflow: hidden; touch-action: pan-y; }
 .practice-chart-join--half { background: #4d91bf; height: 2px; }
 
-/* Workspace lives in the side rail: the rail widens and the choices sit beside the balls. */
-.app-shell--music-page .music-widget-drawer:has(#music-workspace-tools) {
-  display: block;
-  position: absolute;
-  z-index: 38;
-  top: max(60px, env(safe-area-inset-top, 0px));
-  right: 0;
-  bottom: max(12px, env(safe-area-inset-bottom, 0px));
-  width: min(304px, calc(100% - 12px));
-  background: linear-gradient(90deg, #fbfcfe, #f5f8fc);
-  border-left: 1px solid #e4eaf2;
-  box-shadow: -8px 0 18px #213d6208;
+/* Workspace is a picker. Launched widgets use the existing dock on collapse. */
+.music-control-menu.practice-chart-workspace {
+  width: min(376px, calc(100vw - 24px));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  align-content: start;
 }
-.app-shell--music-page .music-widget-drawer:has(#music-workspace-tools) .music-widget-drawer__handle {
-  visibility: hidden;
-  pointer-events: none;
-}
-.music-widget-drawer__tools {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 72px;
-  overflow: auto;
-  pointer-events: none;
-}
-.music-widget-drawer__tools:not(:empty) { pointer-events: auto; }
-@media (max-width: 699px) {
-  .music-widget-drawer__tools { right: 0; }
-  .app-shell--music-page .music-widget-drawer:has(#music-workspace-tools) { width: min(260px, calc(100% - 16px)); }
-  .app-shell--music-page .music-widget-drawer:has(#music-workspace-tools) .music-widget-dock { display: none; }
-  .app-shell--music-page:has(#music-workspace-tools) .widget-ball { visibility: hidden; pointer-events: none; }
-}
-.practice-chart-workspace {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  height: 100%;
-  margin: 0;
-  padding: 10px 8px max(12px, env(safe-area-inset-bottom));
-  overflow: auto;
-  pointer-events: auto;
-  background: transparent;
-}
-.practice-chart-workspace > button,
-.practice-chart-workspace__tool { width: 100%; }
 .practice-chart-workspace button {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 4px 8px;
   border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
+  background: transparent;
+  text-align: left;
+  line-height: 1.15;
+}
+@media (max-width: 359px) {
+  .music-control-menu.practice-chart-workspace { grid-template-columns: minmax(0, 1fr); width: min(208px, calc(100vw - 24px)); }
 }
 .practice-chart-workspace button[aria-pressed='true'] { background: #fff; color: #235b7e; box-shadow: 0 1px 4px #0001; }
 .practice-chart-workspace svg { width: 17px; height: 17px; flex-shrink: 0; }

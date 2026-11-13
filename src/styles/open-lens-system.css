@@ -831,8 +831,6 @@ html#lens-design-system :is(.practice-chart-empty button:first-child,.practice-c
 html#lens-design-system .practice-chart-topbar { left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); }
 html#lens-design-system .practice-chart-control { background:var(--ls-glass); gap:7px; }
 html#lens-design-system .practice-chart-control svg { stroke-width:1.6; }
-html#lens-design-system .music-widget-drawer:has(#music-workspace-tools) { background:var(--ls-soft); border-left:1px solid var(--ls-line); box-shadow:none; }
-html#lens-design-system .music-widget-drawer__tools .practice-chart-workspace { border:0; background:transparent; box-shadow:none; border-radius:0; padding:8px; }
 html#lens-design-system .practice-chart-workspace button { color:var(--ls-muted); border-radius:18px; font-weight:500; }
 html#lens-design-system .practice-chart-workspace button[aria-pressed='true'] { background:var(--ls-panel); color:var(--ls-blue); box-shadow:var(--ls-shadow); }
 html#lens-design-system .practice-chart-rail__record { background:var(--ls-panel); color:#f04460; border:1px solid var(--ls-line); box-shadow:var(--ls-shadow); }

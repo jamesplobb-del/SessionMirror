@@ -101,6 +101,7 @@ export interface BestTakeBoxProps {
   displayLabel?: string
   onBeforePlay?: () => void
   uploadAccept?: string
+  uploadLabel?: string
   layout: 'pip' | 'fill'
   compact?: boolean
   take: Take | null
@@ -137,6 +138,7 @@ function BestTakeBox({
   displayLabel = 'Best Take',
   onBeforePlay,
   uploadAccept = 'video/*, audio/*, audio/mpeg, audio/mp4, .mp3, .m4a, .wav',
+  uploadLabel = 'Upload',
   layout,
   compact = false,
   take,
@@ -912,7 +914,7 @@ function BestTakeBox({
                     className={`${emptyActionClass} pip-empty-action--upload`}
                   >
                     <Upload className="h-3 w-3" />
-                    Upload
+                    {uploadLabel}
                   </label>
                 )}
                 {allowReferenceSources && <Pressable

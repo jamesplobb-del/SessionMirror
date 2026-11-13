@@ -13,7 +13,7 @@ import './music-dock-special-tools.css'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 
 export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChange, onExpandView, onClose, showTrackName = false, visible = true, dockRight = false, playing = false, youtubeUrl, libraryPlayback,
-  suspended, onSubmitYoutube, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
+  suspended, onSubmitYoutube, uploadLabel, onUpload, onClearAudio, onClearYoutube, onYoutubeHostChange, youtubeIframeRef, onPlaybackChange, onBeforePlay,
 }: {
   boundaryRef: RefObject<HTMLElement | null>
   expanded: boolean
@@ -28,6 +28,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
   libraryPlayback: LibraryPlaybackReference | null
   suspended: boolean
   onSubmitYoutube: (url: string) => void
+  uploadLabel?: string
   onUpload: (file: File) => void
   onClearAudio: () => void
   onClearYoutube: () => void
@@ -170,7 +171,7 @@ export default function ReferenceWidget({ boundaryRef, expanded, onExpandedChang
       </header>
       {showTrackName && libraryPlayback && <p className="reference-widget-track-name">{libraryPlayback.name}</p>}
       <div className="reference-widget-media">
-        <BestTakeBox layout="fill" take={null} playbackOwner="reference-widget" displayLabel="" uploadAccept="audio/*,.mp3,.m4a,.wav" youtubeEmbedUrl={youtubeUrl} libraryPlayback={libraryPlayback}
+        <BestTakeBox layout="fill" take={null} playbackOwner="reference-widget" displayLabel="" uploadLabel={uploadLabel} uploadAccept="audio/*,.mp3,.m4a,.wav" youtubeEmbedUrl={youtubeUrl} libraryPlayback={libraryPlayback}
           suspendPlayback={suspended} onBeforePlay={onBeforePlay} onUnpinTake={onClearAudio} onClearLibraryReference={onClearAudio}
           onClearYoutube={onClearYoutube} onSubmitYoutube={onSubmitYoutube} onUpload={onUpload}
           onYoutubeHostChange={onYoutubeHostChange} youtubeIframeRef={youtubeIframeRef} onPlaybackChange={onPlaybackChange} />

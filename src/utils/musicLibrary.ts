@@ -35,6 +35,12 @@ export function saveMusicScoreSettings(projectId: string, settings: MusicScoreSe
   localStorage.setItem(scoreSettingsKey(projectId), JSON.stringify(settings))
 }
 
+/** The reader and Library Tools share one saved reference per score. */
+export function saveMusicScoreReference(projectId: string, reference: Pick<MusicScoreSettings, 'referenceVideoId' | 'referenceAudio'>): void {
+  const current = loadMusicScoreSettings(projectId) ?? loadExerciseLibrary().find(item => item.step.projectId === projectId)?.step
+  saveMusicScoreSettings(projectId, { referenceQuery: '', programId: current?.programId ?? null, ...reference })
+}
+
 export function clearMusicScoreSettings(projectId: string): void {
   localStorage.removeItem(scoreSettingsKey(projectId))
   localStorage.removeItem(setupKey(projectId))

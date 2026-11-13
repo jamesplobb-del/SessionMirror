@@ -29,11 +29,11 @@ import '../../../src/styles/premium-app.css'
 const fixtureStep = createStep({ title: 'Warmup', minutes: 5 })
 const fixtureRoutine = createRoutine('Fixture routine', [fixtureStep], null)
 
-function FixtureDockTool({ boundaryRef, id, label, slot }: { boundaryRef: RefObject<HTMLDivElement | null>; id: string; label: string; slot: number }) {
+function FixtureDockTool({ boundaryRef, id, label, slot, expandRequest, onExpandRequestConsumed }: { boundaryRef: RefObject<HTMLDivElement | null>; id: string; label: string; slot: number; expandRequest?: boolean; onExpandRequestConsumed?: () => void }) {
   const widgetRef = useRef<HTMLDivElement>(null)
   const x = useMotionValue(120), y = useMotionValue(180)
   const fold = useCollapsibleWidget({ boundaryRef, widgetRef, x, y, positionId: id,
-    label, icon: <span>{label[0]}</span>, detail: label, ballSlot: slot, dockRight: true })
+    label, icon: <span>{label[0]}</span>, detail: label, ballSlot: slot, dockRight: true, expandRequest, onExpandRequestConsumed })
   return <>{fold.ball}<motion.div ref={widgetRef} style={{ x, y, width: 210, position: 'absolute', zIndex: 36,
     padding: 16, border: '1px solid #dbe5ef', borderRadius: 16, background: 'white' }}
     data-music-reading-tool className={fold.collapsed ? 'widget-is-collapsed' : ''}>
@@ -50,7 +50,9 @@ function Fixture() {
   const [full, setFull] = useState(false)
   const [revision, setRevision] = useState(0)
   const [references, setReferences] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(true)
+  const workspaceCheck = new URLSearchParams(location.search).has('workspace')
+  const [drawerOpen, setDrawerOpen] = useState(!workspaceCheck)
+  const [expandTool, setExpandTool] = useState<string | null>(null)
   const [silenceSeconds, setSilenceSeconds] = useState(2)
   const [volumeThreshold, setVolumeThreshold] = useState(35)
   const [removedCanvases, setRemovedCanvases] = useState(0)
@@ -97,21 +99,24 @@ function Fixture() {
         onImported={() => setRevision(value => value + 1)} onOpen={async id => { setActive(id); setDesk(loadMusicSetup(id) ?? blankDesk('audio')); setLibrary(false) }} />
     </div>
     {active && <PracticeChartLayer key={active} projectId={active} active={tab === 'music' && !library} boundaryRef={boundary} offerFileOnOpen={false}
-      workspace={pickHudQuickSettings(desk as AppSettings)} onWorkspaceChange={(key, enabled) => setDesk(value => ({ ...value, [key]: enabled }))}
+      workspace={pickHudQuickSettings(desk as AppSettings)} onWorkspaceChange={(key, enabled) => {
+        setDesk(value => ({ ...value, [key]: enabled }))
+        if (workspaceCheck && enabled) setExpandTool(key)
+      }}
       referencesVisible={references} onReferencesChange={setReferences} onClose={() => setLibrary(true)} onPaperVisibleChange={() => {}} onChromeHiddenChange={setFull}
       isRecording={false} isStopping={false} recordReady={false} recordElapsed={0} onToggleRecord={() => {}} handsFreeEnabled={false} handsFreePhase={null} onToggleHandsFree={() => {}}
-      toolRailOpen={drawerOpen} onToolRailOpenChange={setDrawerOpen} />}
+      onRevealToolRail={() => setDrawerOpen(true)} />}
     {active && !library && <MusicWidgetDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />}
-    {active && !library && <FixtureDockTool boundaryRef={boundary} id="desk-metronome" label="Metronome" slot={0} />}
-    {active && !library && <FixtureDockTool boundaryRef={boundary} id="desk-drone" label="Drone" slot={1} />}
-    {active && !library && <HandsFreeStage phase="listening" movable dockRight elapsed={0}
+    {active && !library && (!workspaceCheck || desk.showMetronome) && <FixtureDockTool boundaryRef={boundary} id="desk-metronome" label="Metronome" slot={0} expandRequest={expandTool === 'showMetronome'} onExpandRequestConsumed={() => setExpandTool(null)} />}
+    {active && !library && (!workspaceCheck || desk.showDrone) && <FixtureDockTool boundaryRef={boundary} id="desk-drone" label="Drone" slot={1} expandRequest={expandTool === 'showDrone'} onExpandRequestConsumed={() => setExpandTool(null)} />}
+    {active && !library && !workspaceCheck && <HandsFreeStage phase="listening" movable dockRight elapsed={0}
       silenceSeconds={silenceSeconds} volumeThreshold={volumeThreshold}
       onSilenceSecondsChange={setSilenceSeconds} onVolumeThresholdChange={setVolumeThreshold} />}
-    {active && !library && <RoutineBar routine={fixtureRoutine} day={null} step={fixtureStep} nextStep={null}
+    {active && !library && !workspaceCheck && <RoutineBar routine={fixtureRoutine} day={null} step={fixtureStep} nextStep={null}
       startedAt={null} paused audioSurface tunerTransposition="concert" hapticFeedback={false}
       onResume={() => {}} onPause={() => {}} onClose={() => {}} onDone={() => {}}
       onJumpToStep={() => {}} onOpenToday={() => {}} preferBall />}
-    {active && !library && <ReferenceWidget boundaryRef={boundary} expanded={references} onExpandedChange={setReferences} visible dockRight youtubeUrl={null} libraryPlayback={null}
+    {active && !library && <ReferenceWidget boundaryRef={boundary} expanded={references} onExpandedChange={setReferences} visible={!workspaceCheck || references} dockRight youtubeUrl={null} libraryPlayback={null}
       suspended onExpandView={() => {}} onSubmitYoutube={() => {}} onUpload={() => {}} onClearAudio={() => {}} onClearYoutube={() => {}}
       onYoutubeHostChange={() => {}} youtubeIframeRef={youtubeIframe} onPlaybackChange={() => {}} onBeforePlay={() => {}} />}
   </div>

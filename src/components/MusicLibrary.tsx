@@ -9,6 +9,7 @@ import { exportPracticeChart, deletePracticeChart, hasPracticeChart, practiceCha
 import { createMusicExercise, musicExerciseTitle, prepareRoutineMusicFile } from '../utils/routineMusic'
 import { clearMusicScoreSettings, loadMusicOrder, loadMusicOrganization, loadMusicScoreSettings, loadMusicSetup, orderMusic, saveMusicOrder, saveMusicOrganization, saveMusicScoreSettings, saveMusicSetup, type MusicOrganization } from '../utils/musicLibrary'
 import { loadExerciseLibrary } from '../utils/routineLibrary'
+import { selectPracticeReference } from '../utils/practiceReferences'
 import { blankDesk, MAX_ROUTINE_STEPS, type RoutineStep } from '../utils/practiceRoutines'
 import { normalizeDeskMetronome } from '../utils/deskMetronome'
 import { getWrittenPitchLabel } from '../utils/tunerTransposition'
@@ -110,6 +111,10 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
     try {
       saveMusicScoreSettings(item.id, { referenceQuery: next.referenceQuery,
         referenceVideoId: next.referenceVideoId, referenceAudio: next.referenceAudio, programId: next.programId })
+      if ('referenceAudio' in patch || 'referenceVideoId' in patch) {
+        localStorage.removeItem(`besttake.reference-audio.${item.id}`)
+        selectPracticeReference(item.id, null)
+      }
       saveMusicSetup(item.id, next.desk ?? blankDesk('audio'))
       refreshSetup(value => value + 1)
       setError('')

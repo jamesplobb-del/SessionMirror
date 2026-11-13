@@ -72,6 +72,5 @@ export default function MusicWidgetDrawer({ open, onOpenChange }: { open: boolea
       inert={!open} aria-hidden={!open}
       onPointerDown={start} onPointerUp={end} onPointerCancel={() => { gesture.current = null }}
       onLostPointerCapture={() => { gesture.current = null }} />
-    <div id="music-widget-drawer-tools" className="music-widget-drawer__tools" inert={!open} />
   </div>
 }

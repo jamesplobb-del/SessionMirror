@@ -35,7 +35,8 @@ async function scenario(overrides = {}) {
     focusedPracticeRef: { current: {} }, setFocusedPracticeSessionId: () => {}, setFocusedPractice: () => {}, setFocusedReferenceTakeId: () => {},
     handleSelectProject: async id => events.push(['score', id]), loadMusicSetup: () => originalDesk, blankDesk: () => ({}),
     applyDeskSnapshot: next => { desk = next }, loadExerciseLibrary: () => [], loadMusicScoreSettings: () => ({ programId: 'live-program', referenceVideoId: null }),
-    selectPracticeReference: () => {}, buildYoutubeProxyUrl: value => value, getSelectedReferenceUrl: () => null,
+    applyReferenceAudio: (id, itemId) => events.push(['audio', id, itemId]),
+    selectPracticeReference: (id, url) => events.push(['video', id, url]), buildYoutubeProxyUrl: value => value, getSelectedReferenceUrl: () => null,
     prepareRoutineProgram: value => { assert.equal(value, null, 'Setlist navigation must not prepare a timed program') },
     musicSetupOwnerRef: owner, setMusicWorkspaceExpandRequest: () => {}, pauseYoutubeProxy: () => {}, youtubeIframeRef: { current: null },
     prepareNewYoutubeReference: () => {}, setYoutubeAutoPlayOnLoad: value => assert.equal(value, false),
@@ -71,6 +72,20 @@ for (const [overrides, entryId, pattern] of [
   assert.deepEqual(blocked.events, [], 'Blocked navigation makes no session/project mutations')
   assert.equal(blocked.context, undefined)
 }
+const secondScore = { ...list.entries[1], projectId: 'next-score' }
+const concert = { ...list, entries: [list.entries[0], secondScore] }
+const track = { itemId: 'mp3', name: 'Study', duration: 60 }
+const switching = await scenario({
+  loadMusicScoreSettings: id => id === 'score' ? { referenceAudio: track } : { referenceVideoId: 'abc123DEF45' },
+})
+await switching.open('score', { list: concert, entryId: 'first' })
+await switching.open('next-score', { list: concert, entryId: 'reprise' })
+await switching.open('score', { list: concert, entryId: 'first' })
+assert.deepEqual(switching.events.filter(event => ['audio', 'video'].includes(event[0])), [
+  ['audio', 'score', 'mp3'], ['video', 'score', null],
+  ['audio', 'next-score', null], ['video', 'next-score', 'abc123DEF45'],
+  ['audio', 'score', 'mp3'], ['video', 'score', null],
+], 'Moving between music files switches their references and returning restores the last selection')
 console.log('PASS: setlist reader silence, same-score routine detachment, independent occurrence identity, progress/setup preservation and blocked-navigation recovery')
 
 const bundled = await build({ entryPoints: ['src/utils/recentMusic.ts'], bundle: true, write: false, platform: 'node', format: 'esm' })
@@ -94,3 +109,45 @@ assert.equal(resolveRecentMusic(() => false), null, 'A deleted score falls back 
 rememberRecentMusic({ projectId: 'earlier' })
 assert.deepEqual(resolveRecentMusic(canRead), { projectId: 'earlier' }, 'Opening a standalone score replaces setlist history')
 console.log('PASS: Continue Music history, repeated entries, renamed/deleted setlists, standalone scores, and Library fallback')
+
+// Exercise the reader's real upload callback with controlled completion timing.
+let uploadCallback
+function findUpload(node) {
+  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'handleReferenceUpload') uploadCallback = node.initializer
+  ts.forEachChild(node, findUpload)
+}
+findUpload(ast)
+assert.ok(uploadCallback)
+const savedReferences = []
+const previewed = []
+const pending = []
+const uploadProject = { current: 'score' }
+const uploadBindings = {
+  requirePlus: () => true, canUsePlus: () => true,
+  activeProjectIdRef: uploadProject, scoreReferenceProjectId: 'score',
+  pendingReferenceUploads: { current: new Map() },
+  handleImportLibraryAudio: () => new Promise(resolve => pending.push(resolve)),
+  saveMusicScoreReference: (id, reference) => savedReferences.push([id, reference.referenceAudio.itemId]),
+  handleClearYoutube: () => {}, selectReferenceAudio: id => previewed.push(id), setReferenceExpanded: () => {},
+  setTakeDeleteError: message => assert.fail(message),
+}
+const uploadCode = ts.transpileModule(`return ${uploadCallback.getText(ast)};`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText
+const upload = new Function(...Object.keys(uploadBindings), uploadCode)(...Object.values(uploadBindings))
+const audioFile = { type: 'audio/mpeg', name: 'test.mp3' }
+const complete = async (index, id) => {
+  pending[index]({ id, name: id, duration: 12 })
+  await new Promise(resolve => setImmediate(resolve))
+}
+upload(audioFile)
+uploadProject.current = 'next-score'
+await complete(0, 'first-upload')
+assert.deepEqual(savedReferences, [['score', 'first-upload']], 'An upload stays with the piece it started on')
+assert.deepEqual(previewed, [], 'A late upload cannot interrupt playback for another piece')
+uploadProject.current = 'score'
+upload(audioFile)
+upload(audioFile)
+await complete(2, 'newest-upload')
+await complete(1, 'stale-upload')
+assert.deepEqual(savedReferences, [['score', 'first-upload'], ['score', 'newest-upload']])
+assert.deepEqual(previewed, ['newest-upload'], 'Finishing out of order keeps the latest reference')
+console.log('PASS: audio upload saves to the original score and preserves the latest selection')

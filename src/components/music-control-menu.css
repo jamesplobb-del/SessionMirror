@@ -178,8 +178,3 @@ html#lens-design-system .practice-chart-workspace button.practice-chart-workspac
   background: transparent;
 }
 .practice-chart-workspace__remove svg { width: 13px; height: 13px; }
-@media (max-width: 540px) {
-  .practice-chart-topbar .practice-chart-workspace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  html#lens-design-system .practice-chart-workspace__tool > button:first-child,
-  .practice-chart-workspace__tool > button:first-child { flex-direction: row; justify-content: flex-start; padding: 8px; gap: 7px; }
-}

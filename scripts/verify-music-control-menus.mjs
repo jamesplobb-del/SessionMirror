@@ -217,9 +217,9 @@ anchor.focused = false
 productionCallback('closeWorkspace', workspaceBindings)()
 assert.equal(state.workspace, false)
 assert.equal(anchor.focused, true, 'closing a keyboard-launched tray restores the Workspace trigger')
-assert.match(layerSource, /onWorkspaceChange\(key, true\); closeWorkspace\(\)/, 'primary launches reopen enabled panels')
+assert.match(layerSource, /onWorkspaceChange\(key, true\); onRevealToolRail\?\.\(\); closeWorkspace\(\)/, 'primary launches reopen enabled panels')
 assert.match(layerSource, /onWorkspaceChange\(key, false\)/, 'panel removal remains explicit')
-assert.match(layerSource, /onReferencesChange\(true\); closeWorkspace\(\)/, 'References has the same one-tap launch behavior')
+assert.match(layerSource, /onReferencesChange\(true\); onRevealToolRail\?\.\(\); closeWorkspace\(\)/, 'References has the same one-tap launch behavior')
 assert.doesNotMatch(layerSource, /pageToolsRequested|markUpRequested/, 'one mode state makes Page and Markup mutually exclusive')
 function removalCallback(call, bindings) {
   let callback
