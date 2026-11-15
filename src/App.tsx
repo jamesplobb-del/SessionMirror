@@ -4000,13 +4000,6 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
     stopRecording,
   ])
 
-  const handleCloseLabs = useCallback(() => {
-    triggerLightHaptic(settings.hapticFeedback)
-    setLabsRoute(null)
-    if (audioPracticeTab === 'games') handleAudioPracticeTabChange(lastFullToolTab.current)
-    recoverCameraAfterSurfaceDismiss('labs-close')
-  }, [audioPracticeTab, recoverCameraAfterSurfaceDismiss, handleAudioPracticeTabChange, settings.hapticFeedback])
-
   const handleLabsNavigate = useCallback((route: LabsRoute) => {
     setLabsRoute(route)
   }, [])
@@ -4469,6 +4462,21 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
   useEffect(() => {
     if (onRecordSurface) setToolsReturnMode(recordingMode)
   }, [onRecordSurface, recordingMode])
+  /** One way home from every tool tab: back to whichever recorder the player left. */
+  const handleReturnToRecording = useCallback(() => {
+    if (captureBusyRef.current || practiceTransition.current.busy) return
+    setMusicPageVisible(false)
+    handleAudioPracticeTabChange('audio')
+    if (toolsReturnMode === 'video') handleRecordingModeChange('video')
+  }, [handleAudioPracticeTabChange, handleRecordingModeChange, toolsReturnMode])
+
+  const handleCloseLabs = useCallback(() => {
+    triggerLightHaptic(settings.hapticFeedback)
+    setLabsRoute(null)
+    // Games has no tool tabs of its own, so its back arrow goes straight to Record.
+    if (audioPracticeTab === 'games') handleReturnToRecording()
+    recoverCameraAfterSurfaceDismiss('labs-close')
+  }, [audioPracticeTab, handleReturnToRecording, recoverCameraAfterSurfaceDismiss, settings.hapticFeedback])
   const showFloatingMetronomeWidget = showMetronomeWidget
 
   const musicLibrarySurface = recordingMode === 'audio' && audioPracticeTab === 'music' && musicLibraryOpen
@@ -7188,6 +7196,8 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                       <AudioPracticeTopTabs
                         activeTab={audioPracticeTab}
                         onTabChange={handleAudioPracticeTabChange}
+                        onBackToRecording={handleReturnToRecording}
+                        backToRecordingDisabled={isRecording || isStopping || pendingTakeSaves > 0 || practiceTransitionBusy}
                       />
                     </div>
                   )}
@@ -7196,13 +7206,14 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                     <div className="relative flex min-h-0 flex-1 overflow-hidden">
                       <AnimatedTabPanel panelKey="audio-practice-music-layer" active={isAudioPracticeMusicTab && musicLibraryOpen} keepMounted className="music-library-layer flex min-h-0 flex-1">
                         <MusicLibrary projects={projects} activeProjectId={activeProjectId} instrumentId={preferredInstrumentId} revision={musicChartRevision}
-                          disabled={isRecording || isStopping || practiceTransitionBusy}
+                          disabled={isRecording || isStopping || pendingTakeSaves > 0 || practiceTransitionBusy}
                           onCreateItem={handleCreatePracticeItem} onOpen={handleOpenMusicScore}
                           onCreateRoutine={handleCreateRoutineFromMusic}
                           onReadSetlist={handleReadMusicSetlist}
                           onRename={handleRenameMusicScore}
                           onImported={() => setMusicChartRevision(value => value + 1)}
-                          onOpenTools={() => { void handleOpenFullPracticeTool(lastPracticeToolTab.current) }} />
+                          onOpenTools={() => { void handleOpenFullPracticeTool(lastPracticeToolTab.current) }}
+                          onBackToRecording={handleReturnToRecording} />
                       </AnimatedTabPanel>
                       <AnimatedTabPanel
                         panelKey="audio-practice-metronome-layer"
@@ -7521,11 +7532,7 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
                         toolsActive={isAudioPracticeToolTab}
                         onOpenTools={() => handleOpenFullPracticeTool(lastFullToolTab.current)}
                         toolsReturnMode={toolsReturnMode}
-                        onOpenAudioRecorder={() => {
-                          setMusicPageVisible(false)
-                          handleAudioPracticeTabChange('audio')
-                          if (toolsReturnMode === 'video') handleRecordingModeChange('video')
-                        }}
+                        onOpenAudioRecorder={handleReturnToRecording}
                         vaultRevision={takes.length}
                         isRecording={isRecording}
                         isStopping={isStopping || pendingTakeSaves > 0}

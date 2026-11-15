@@ -34,6 +34,9 @@ interface Props {
   onCreateRoutine: (steps: RoutineStep[]) => void
   onReadSetlist: (setlist: MusicSetlist, entryId: string) => Promise<void>
   onOpenTools?: () => void
+  /** Leaves the Music tab for the recorder the player came from. */
+  onBackToRecording?: () => void
+  backToRecordingLabel?: string
 }
 type DragKind = 'score' | 'folder'
 type DragGesture = { kind: DragKind; id: string; startX: number; startY: number; active: boolean }
@@ -54,7 +57,7 @@ function setupLabel(id: string): string {
 }
 
 /** Folders organize the library; a score's recordings stay in its practice item. */
-export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported, onCreateRoutine, onReadSetlist, onOpenTools }: Props) {
+export default function MusicLibrary({ projects, activeProjectId, instrumentId, revision, disabled, onCreateItem, onOpen, onRename, onImported, onCreateRoutine, onReadSetlist, onOpenTools, onBackToRecording, backToRecordingLabel = 'Recording' }: Props) {
   const plus = usePlus()
   const input = useRef<HTMLInputElement>(null)
   const scroll = useRef<HTMLElement>(null)
@@ -360,7 +363,7 @@ export default function MusicLibrary({ projects, activeProjectId, instrumentId, 
 
   return <section ref={scroll} className="music-library" aria-label="Music library">
     <header className="music-library__header">
-      <div>{selectedFolder && <button type="button" className="music-library__back" data-music-drop="root" onClick={() => { setFolderId(null); setQuery(''); setEditingFolder(null); setRemoveFolder(false) }}><ArrowLeft aria-hidden /> All music</button>}<h1>{selectedFolder?.name ?? 'Music'}</h1><p>{selectedFolder ? 'Scores in this folder' : 'Your scores, ready for practice.'}</p></div>
+      <div>{!selectedFolder && onBackToRecording && <button type="button" className="music-library__back" disabled={disabled || Boolean(busy)} onClick={onBackToRecording}><ArrowLeft aria-hidden /> {backToRecordingLabel}</button>}{selectedFolder && <button type="button" className="music-library__back" data-music-drop="root" onClick={() => { setFolderId(null); setQuery(''); setEditingFolder(null); setRemoveFolder(false) }}><ArrowLeft aria-hidden /> All music</button>}<h1>{selectedFolder?.name ?? 'Music'}</h1><p>{selectedFolder ? 'Scores in this folder' : 'Your scores, ready for practice.'}</p></div>
       <div className="music-library__header-actions">{!selecting && (plus.active
         ? <>{!selectedFolder && <button type="button" className="music-library__new-folder" onClick={() => { setEditingFolder('new'); setFolderName('') }}><FolderPlus aria-hidden /> New folder</button>}<button type="button" className="music-library__import" disabled={disabled || Boolean(busy)} onClick={() => input.current?.click()}><Upload aria-hidden />Import music</button></>
         : <button type="button" className="music-library__import" disabled={!plus.ready} onClick={() => showPlus('music')}><LockKeyhole aria-hidden />{plus.ready ? 'View Plus' : 'Checking access…'}</button>)}

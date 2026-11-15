@@ -19,7 +19,10 @@ interface AudioPracticeTopTabsProps {
   includeRecording?: boolean
   includeMusic?: boolean
   includeGames?: boolean
+  /** Shown above the tool tabs so Record is one tap away from any tool. */
   onBackToRecording?: () => void
+  backToRecordingDisabled?: boolean
+  backToRecordingLabel?: string
   activeTab: AudioPracticeTab
   onTabChange: (tab: AudioPracticeTab) => void
 }
@@ -29,6 +32,8 @@ export default function AudioPracticeTopTabs({
   includeMusic = true,
   includeGames = true,
   onBackToRecording,
+  backToRecordingDisabled = false,
+  backToRecordingLabel = 'Recording',
   activeTab,
   onTabChange,
 }: AudioPracticeTopTabsProps) {
@@ -46,7 +51,7 @@ export default function AudioPracticeTopTabs({
   }
   return (
     <>
-    {onBackToRecording && <button className="tools-record-return" onClick={onBackToRecording}>‹ Recording</button>}
+    {onBackToRecording && <button type="button" className="tools-record-return" data-tutorial="tools-record-return" disabled={backToRecordingDisabled} onClick={onBackToRecording}>‹ {backToRecordingLabel}</button>}
     <nav
       className="audio-practice-top-tabs pointer-events-auto"
       aria-label="Audio practice tools"
