@@ -111,6 +111,10 @@ export async function refreshPlusAccess(refreshProducts = false): Promise<void> 
           // A delayed foreground check must not undo a newer purchase/restore.
           if (hasNativeRevision(status) || version === actionStatusVersion) publishNativeStatus(status)
         }
+        else if (import.meta.env.DEV && new URLSearchParams(location.search).get('plusPreview') === '1') {
+          // Local browser preview only. Vite removes this branch from a production build.
+          publish({ purchased: true, trialStartedAt: null, trialExpiresAt: null, internalPreviewExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: null })
+        }
         else publish({ purchased: false, trialStartedAt: null, trialExpiresAt: null, internalPreviewExpiresAt: null, price: null, purchaseAvailable: false, trialAvailable: false, ready: true, error: 'Purchases are available in the iPhone and iPad app.' })
       } catch {
         // A temporary bridge error never creates an entitlement or discards one already verified this session.

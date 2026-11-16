@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8FA14F5575F9491EA9D62341 /* HeyCatchPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2165ECA0EDCD45F2B9C03E9C /* HeyCatchPlugin.swift */; };
 		02AB3A7C96C84CAA80A2A948 /* QuickTunerControl.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = F0DF5106155249CF971FED8B /* QuickTunerControl.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1374E93445FE40A6A1560F62 /* OpenQuickTunerIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */; };
 		2C57C5F4B910493DB389289B /* QuickTunerLaunchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */; };
@@ -71,6 +72,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		2165ECA0EDCD45F2B9C03E9C /* HeyCatchPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeyCatchPlugin.swift; sourceTree = "<group>"; };
 		180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTunerPlugin.swift; sourceTree = "<group>"; };
 		26CC1F5F8BFD47979B1C9E03 /* QuickTunerControl.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = QuickTunerControl.entitlements; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -192,6 +194,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				DEB45D10C6694B2097523F43 /* QuickTunerLaunchCoordinator.swift */,
 				180A6835659B4E08BEB73C46 /* QuickTunerPlugin.swift */,
+				2165ECA0EDCD45F2B9C03E9C /* HeyCatchPlugin.swift */,
 				B7C0DE012026091300000002 /* OfferCodesPlugin.swift */,
 				QKTNRPGL1FED79650016851F /* QuickTunerPlugin.m */,
 				A0D6590AC38E42FF9236EAA6 /* OpenQuickTunerIntent.swift */,
@@ -442,6 +445,7 @@
 				METRONPLG4FED79650016851F /* MetronomePlugin.m in Sources */,
 				BB6FCA35FB8E433F9535D103 /* QuickTunerLaunchCoordinator.swift in Sources */,
 				54237EC25C3F4F819FD8FA05 /* QuickTunerPlugin.swift in Sources */,
+				8FA14F5575F9491EA9D62341 /* HeyCatchPlugin.swift in Sources */,
 				B7C0DE012026091300000001 /* OfferCodesPlugin.swift in Sources */,
 				QKTNRPGL2FED79650016851F /* QuickTunerPlugin.m in Sources */,
 				BC5958393C594FB59C50D9C5 /* OpenQuickTunerIntent.swift in Sources */,

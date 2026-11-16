@@ -39,6 +39,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                 guard let self else { return }
                 guard case .verified(let transaction) = result,
                       [self.lifetimeID, self.trialID].contains(transaction.productID) else { continue }
+                self.trackVerifiedPurchase(transaction)
                 self.statusRevision += 1
                 await self.rememberTrial(transaction)
                 let status = await self.snapshot()
@@ -227,6 +228,7 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                           transaction.revocationDate == nil else {
                         call.reject("Apple could not verify this purchase. Try Restore Purchases."); return
                     }
+                    trackVerifiedPurchase(transaction)
                     statusRevision += 1
                     await rememberTrial(transaction)
                     let status = await snapshot()
@@ -241,6 +243,20 @@ public class OfferCodesPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             } catch { call.reject("The App Store could not complete the request. Please try again.") }
         }
+    }
+
+    @MainActor private func trackVerifiedPurchase(_ transaction: StoreKit.Transaction) {
+        guard transaction.revocationDate == nil, transaction.ownershipType == .purchased else { return }
+        if #available(iOS 16.0, *) {
+            guard transaction.environment == .production else { return }
+        } else {
+            guard Bundle.main.appStoreReceiptURL?.lastPathComponent == "receipt" else { return }
+        }
+        HeyCatchAnalytics.trackPurchase(
+            event: transaction.productID == trialID ? "trial_started" : "purchase",
+            transactionID: transaction.id,
+            productID: transaction.productID
+        )
     }
 
     @objc func restore(_ call: CAPPluginCall) {

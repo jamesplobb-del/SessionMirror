@@ -67,6 +67,7 @@ __besttakeSentryTest.native()
 - Submit both BestTake Plus in-app purchase products with this app version (`com.besttake.app.plus.lifetime.v2` and `com.besttake.app.plus.trial7days`).
 - Updated age-rating questionnaire.
 - App Privacy: Diagnostics → Crash Data; not linked to identity; not used for tracking; purpose App Functionality.
+- In App Privacy, disclose optional HeyCatch collection of device identifiers, product interaction, and purchase history for analytics. Review Apple’s privacy report and the updated privacy policy before submitting the analytics-enabled build.
 - EU Digital Services Act trader-status declaration if distributing in the EU.
 
 ### 5. Deploy the web proxy change

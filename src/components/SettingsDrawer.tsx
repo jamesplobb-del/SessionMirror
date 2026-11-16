@@ -42,6 +42,7 @@ import { usePlus } from '../plus/usePlus'
 import { hasInternalPlusPreview } from '../plus/plusPolicy'
 import BugReportLink from './BugReportLink'
 import { PRIVACY_CONTACT_EMAIL } from '../utils/privacyPolicy'
+import { hasHeyCatch, useHeyCatchConsent } from '../utils/heyCatch'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -568,6 +569,7 @@ function SettingsDrawer({
 }: SettingsDrawerProps) {
   const notifyTutorial = useTutorialAction()
   const plus = usePlus()
+  const analytics = useHeyCatchConsent(isOpen)
   const [featureTipsEnabled, setFeatureTipsPreference] = useState(() => readGuidancePreferences().enabled)
   useEffect(() => {
     const sync = () => setFeatureTipsPreference(readGuidancePreferences().enabled)
@@ -980,6 +982,17 @@ function SettingsDrawer({
                 onClick={() => setPrivacyPolicyOpen(true)}
               />
             </SettingsGroup>
+            {hasHeyCatch && <SettingsGroup title="Privacy" footer="Help improve BestTake by sharing screen views and app activity with HeyCatch.">
+              <SwitchRow
+                icon={ShieldCheck}
+                tint={TINT.green}
+                label="Share app analytics"
+                checked={analytics.checked}
+                disabled={analytics.disabled}
+                onChange={checked => void analytics.update(checked)}
+              />
+              {analytics.error && <p role="status">Could not update the analytics preference.</p>}
+            </SettingsGroup>}
             <SettingsGroup title="BestTake Plus" footer="One payment unlocks Plus forever. Learn and Balance stay free.">
               <LinkRow icon={Sparkles} tint={TINT.purple} label={plus.purchased ? 'Plus unlocked · Manage purchase' : plus.active && hasInternalPlusPreview(plus, Date.now()) ? 'Temporary Plus · Manage access' : plus.active ? 'Plus preview · Manage access' : 'Explore BestTake Plus'} onClick={() => showPlus()} />
             </SettingsGroup>

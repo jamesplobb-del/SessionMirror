@@ -3,7 +3,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Search, X } from 'lucide-react'
 import { INSTRUMENT_FAMILIES, getInstrumentProfile, getInstrumentProfilesByFamily } from '../utils/instrumentProfiles'
-import { markOnboardingComplete } from '../utils/onboardingTutorial'
+import { isOnboardingComplete, markOnboardingComplete } from '../utils/onboardingTutorial'
+import { hasHeyCatch, trackHeyCatchOnboarding, useHeyCatchConsent } from '../utils/heyCatch'
 import { triggerLightHaptic } from '../utils/haptics'
 import { PremiumMotionDiv } from './ui/PremiumMotionSurface'
 import '../styles/practice-introduction.css'
@@ -39,15 +40,18 @@ export default function OnboardingTutorial({ onComplete, onSkip, onSelectInstrum
   const reducedMotion = useReducedMotion()
   const step = steps[index]
   const last = index === steps.length - 1
+  const analytics = useHeyCatchConsent(last)
   const profile = selected ? getInstrumentProfile(selected) : undefined
   const groups = useMemo(() => INSTRUMENT_FAMILIES.map(family => ({family, items:getInstrumentProfilesByFamily(family).filter(item=>item.label.toLowerCase().includes(search.trim().toLowerCase()))})).filter(group=>group.items.length), [search])
   const duration = reducedMotion ? 0 : .414
   const feedback = () => { void triggerLightHaptic(hapticFeedback) }
-  const finish = (action: () => void = onComplete) => {
+  const finish = (completed = true) => {
     if (finishAction.current || leaving) return
     feedback()
+    const firstRun = !isOnboardingComplete()
     markOnboardingComplete()
-    finishAction.current = action
+    if (firstRun) trackHeyCatchOnboarding(completed)
+    finishAction.current = completed ? onComplete : onSkip
     setLeaving(true)
   }
   const completeExit = () => {
@@ -87,7 +91,7 @@ export default function OnboardingTutorial({ onComplete, onSkip, onSelectInstrum
       onAnimationComplete={completeExit}
       onKeyDown={event=>{
         event.stopPropagation()
-        if(event.key==='Escape'){event.preventDefault();if(picker)closePicker();else finish(onSkip);return}
+        if(event.key==='Escape'){event.preventDefault();if(picker)closePicker();else finish(false);return}
         if(event.key!=='Tab')return
         const scope=picker?pickerDialog.current:dialog.current
         const controls=Array.from(scope?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')??[]).filter(node=>node.getClientRects().length>0)
@@ -98,7 +102,7 @@ export default function OnboardingTutorial({ onComplete, onSkip, onSelectInstrum
       <div className={`practice-intro__shell ${index===0?'practice-intro__shell--welcome':''}`} inert={picker||leaving}>
         <header className="practice-intro__header">
           <span className="practice-intro__brand"><img src="/icons/icon.png" alt=""/>BestTake</span>
-          <motion.button whileTap={reducedMotion?undefined:{scale:.96}} className="practice-intro__quiet" onClick={()=>finish(onSkip)}>Skip intro</motion.button>
+          <motion.button whileTap={reducedMotion?undefined:{scale:.96}} className="practice-intro__quiet" onClick={()=>finish(false)}>Skip intro</motion.button>
         </header>
         <div className="premium-intro-progress" role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={2} aria-valuenow={index+1}>
           <motion.span initial={false} animate={{scaleX:(index+1)/steps.length}} transition={{duration:reducedMotion?0:.495,ease}}/>
@@ -119,6 +123,16 @@ export default function OnboardingTutorial({ onComplete, onSkip, onSelectInstrum
                   <AnimatePresence mode="wait" initial={false}><motion.span key={selected||'empty'} className="premium-instrument-check" initial={{opacity:0,scale:.7}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:.8}} transition={{duration:reducedMotion?0:.18}}>{selected?<Check aria-hidden/>:<ChevronDown aria-hidden/>}</motion.span></AnimatePresence>
                 </motion.button>
                 <p className="practice-intro__note" aria-live="polite">{selected?'You can change this anytime.':'Choose now or set it later.'}</p>
+                {hasHeyCatch && <div className="practice-intro__note">
+                  <label>
+                    <input type="checkbox" checked={analytics.checked} disabled={analytics.disabled}
+                      onChange={event => void analytics.update(event.target.checked)}
+                      aria-describedby="onboarding-analytics-description" />
+                    {' '}Share app analytics (optional)
+                  </label>
+                  <p id="onboarding-analytics-description">Help improve BestTake by sharing screen views and app activity with HeyCatch. You can turn this off in Settings.</p>
+                  {analytics.error && <p role="status">Could not update the analytics preference. You can try again in Settings.</p>}
+                </div>}
               </motion.div>}
             </motion.main>
           </AnimatePresence>

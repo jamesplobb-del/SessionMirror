@@ -17,6 +17,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private var isCompletingColdLaunch = true
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        HeyCatchAnalytics.startIfAllowed()
         _ = bestTakeAudioPluginClass
         _ = dronePluginClass
         _ = metronomePluginClass

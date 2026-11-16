@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { loadAppSettings } from '../utils/appSettings'
+import { HeyCatchScreen } from '../utils/heyCatch'
 import type { QuickFunctionLaunchRequest, QuickToolDestination } from '../utils/quickTunerLaunch'
 import AudioPracticeTopTabs from './audioPractice/AudioPracticeTopTabs'
 import QuickTunerScreen from './QuickTunerScreen'
@@ -27,6 +28,7 @@ export default function QuickToolsScreen({ request, onExit }: {
 
   return (
     <div className="quick-tools-screen app-ui-overlay--audio-mode">
+      <HeyCatchScreen name={activeTool === 'tuner' ? 'Quick Tuner' : 'Quick Metronome'} />
       <header className="quick-tuner-header">
         <button type="button" className="quick-tuner-icon-button" onClick={onExit} aria-label="Return to BestTake">
           <ArrowLeft aria-hidden />

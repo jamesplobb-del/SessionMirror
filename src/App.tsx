@@ -140,6 +140,7 @@ import { scheduleAfterPaint, scheduleIdle } from './utils/scheduleDeferred'
 import { sharedMetronomeEngine } from './metronome/sharedMetronomeEngine'
 import { iosHudDim, motionGpuLayer } from './utils/motionPresets'
 import { isOnboardingComplete, markAllCoachMarksSeen } from './utils/onboardingTutorial'
+import { HeyCatchScreen } from './utils/heyCatch'
 import { hasSeenDeveloperNote, markDeveloperNoteSeen } from './utils/developerNote'
 import DeveloperNote from './components/DeveloperNote'
 import { getInstrumentProfile, getInstrumentSettings } from './utils/instrumentProfiles'
@@ -6514,8 +6515,30 @@ function StandardApp({ bootSnapshot, recentMusicRequestId }: { bootSnapshot: App
     ]
   )
 
+  function screenName() {
+    if (showOnboardingTutorial) return 'Onboarding'
+    if (!isOnboardingComplete() && !isPracticeHubOpen) return null
+    if (isReviewOpen) return 'Take Review'
+    if (isSettingsOpen) return 'Settings'
+    if (isVaultOpen) return 'Take Vault'
+    if (multitrackOpen) return 'Multitrack'
+    if (isLabsOpen) return 'Practice Games'
+    if (isPracticeHubOpen) return 'Practice Home'
+    if (musicPageVisible) return 'Music'
+    if (recordingMode === 'video') return 'Camera'
+    return {
+      audio: 'Audio Recorder',
+      music: 'Music',
+      metronome: 'Metronome',
+      tuner: 'Tuner',
+      practice: 'Practice Timeline',
+      games: 'Practice Games',
+    }[audioPracticeTab]
+  }
+
   return (
     <ReferenceAudioContext.Provider value={referenceAudioApi}>
+    <HeyCatchScreen name={screenName()} />
     <PracticeReferenceContext.Provider value={{ projectId: activeProjectId ?? undefined, query: routineActiveStep?.referenceQuery || activeProject?.name || '', autoSearch: Boolean(routineActiveStep?.referenceQuery) }}>
       <ChallengeRewardNotice />
       <FeatureGuidance

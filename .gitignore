@@ -21,3 +21,6 @@ ios/App/App/config*.xml
 
 # Unused local asset experiments
 /kenney_isometricBlocks/
+
+# Local SQLite session export
+/:memory:.ses

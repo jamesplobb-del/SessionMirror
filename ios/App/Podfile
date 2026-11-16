@@ -29,7 +29,7 @@ end
 
 target 'App' do
   capacitor_pods
-  # Add your Pods here
+  pod "PostHog", "~> 3.0"
 end
 
 post_install do |installer|
