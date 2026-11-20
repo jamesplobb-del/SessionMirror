@@ -1,0 +1,2 @@
+# Private notes that must never be pushed (the repo is public)
+*.private.md
